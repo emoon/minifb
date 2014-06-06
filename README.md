@@ -1,7 +1,7 @@
 MinFB
 ======
 
-MiniFB is a small cross platform library that makes it easy to render (32-bit) pixels in a window. An example is the best way to show how it works:
+MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy to render (32-bit) pixels in a window. An example is the best way to show how it works:
 
 	if (!mfb_open("my display", 800, 600))
 		return 0;
