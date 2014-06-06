@@ -32,9 +32,11 @@ int main()
 
 		state = mfb_update(s_buffer);
 
-		if (state < 0 || state == MFB_KEY_ESC)
+		if (state < 0)
 			break;
 	}
 
 	mfb_close();
+
+	return 0;
 }
