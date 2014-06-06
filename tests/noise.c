@@ -13,7 +13,7 @@ int main()
 	if (!mfb_open("Noise Test", WIDTH, HEIGHT))
 		return 0;
 
-	while (1)
+	for (;;)
 	{
 		int i, state;
 
@@ -27,7 +27,7 @@ int main()
 			seed >>= 1;
 			seed |= (carry << 30);
 			noise &= 0xFF;
-			s_buffer[i] = MFB_RGB(0, noise, 0); 
+			s_buffer[i] = MFB_RGB(noise, noise, noise); 
 		}
 
 		state = mfb_update(s_buffer);
