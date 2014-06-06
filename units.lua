@@ -10,7 +10,7 @@ StaticLibrary {
 		Filters = {
 			{ Pattern = "[/\\]windows[/\\]"; Config = { "win32-*", "win64-*" } },
 			{ Pattern = "[/\\]macosx[/\\]"; Config = "mac*-*" },
-			{ Pattern = "[/\\]unix[/\\]"; Config = { "freebsd*-*", "linux*-*" } },
+			{ Pattern = "[/\\]x11[/\\]"; Config = { "x11-*" } },
 		},
 
 		Recursive = true,
@@ -35,6 +35,8 @@ Program {
 
 	Depends = { "minifb" },
 	Sources = { "tests/noise.c" }, 
+
+	Libs = { "X11"; Config = "x11-*" },
 }
 
 Default "noise"

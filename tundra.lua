@@ -31,6 +31,11 @@ local macosx = {
 	Frameworks = { "Cocoa" },
 }
 
+local x11 = {
+	Env = { CPPPATH = { "/usr/include", }, },
+}
+
+
 Build {
 	IdeGenerationHints = {
 		Msvc = {
@@ -54,7 +59,8 @@ Build {
 		Config { Name = "win32-msvc", Inherit = win32, Tools = { "msvc" }, SupportedHosts = { "windows" }, },
 		Config { Name = "win64-msvc", Inherit = win32, Tools = { "msvc" }, SupportedHosts = { "windows" }, },
 		Config { Name = "macosx-clang", Inherit = macosx, Tools = { "clang-osx" }, SupportedHosts = { "macosx" },},
-		Config { Name = "linux-gcc", Tools = { "gcc" }, SupportedHosts = { "linux" },},
+		Config { Name = "x11-gcc", Inherit = x11, Tools = { "gcc" }, SupportedHosts = { "linux", "freebsd" },},
+		-- Config { Name = "x11-clang", Inherit = x11, Tools = { "clang" }, SupportedHosts = { "linux", "freebsd" },},
 	},
 
 	Units = {
