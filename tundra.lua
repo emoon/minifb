@@ -7,7 +7,7 @@ local win32 = {
 		CCOPTS = {
 			"/FS",
 			"/W4", 
-			"/WX", "/I.", "/D_CRT_SECURE_NO_WARNINGS", "\"/DOBJECT_DIR=$(OBJECTDIR:#)\"",
+			"/WX", "/I.", "/D_CRT_SECURE_NO_WARNINGS",
 			{ "/Od"; Config = "*-*-debug" },
 			{ "/O2"; Config = "*-*-release" },
 		},
@@ -16,10 +16,6 @@ local win32 = {
 			"/INCREMENTAL:NO"-- Disable incremental linking. It doesn't work properly in our use case (nearly all code in libs) and causes log spam.
 		},
 
-	},
-
-	ReplaceEnv = {
-		["OBJCCOM"] = "dummy",	-- no ObjC compiler
 	},
 }
 
@@ -36,6 +32,24 @@ local macosx = {
 }
 
 Build {
+	IdeGenerationHints = {
+		Msvc = {
+		PlatformMappings = {
+			['win32-msvc'] = 'Win32',
+			['win32-msvc'] = 'Win64',
+		},
+		FullMappings = {
+			['win32-msvc-debug-default']         = { Config='Debug',              Platform='Win32' },
+			['win32-msvc-production-default']    = { Config='Production',         Platform='Win32' },
+			['win32-msvc-release-default']       = { Config='Release',            Platform='Win32' },
+			['win64-msvc-debug-default']         = { Config='Debug',              Platform='Win64' },
+			['win64-msvc-production-default']    = { Config='Production',         Platform='Win64' },
+			['win64-msvc-release-default']       = { Config='Release',            Platform='Win64' },
+			},
+		},
+		MsvcSolutions = { ['minfb.sln'] = { } },
+	},
+
 	Configs = {
 		Config { Name = "win32-msvc", Inherit = win32, Tools = { "msvc" }, SupportedHosts = { "windows" }, },
 		Config { Name = "win64-msvc", Inherit = win32, Tools = { "msvc" }, SupportedHosts = { "windows" }, },
