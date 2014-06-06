@@ -6,6 +6,9 @@ extern "C" {
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*
+
+Keys not implemented yet
 
 enum
 {
@@ -37,6 +40,7 @@ enum
 	MFB_KEY_Y   = 0x59,
 	MFB_KEY_Z   = 0x5A,
 };
+*/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,7 +52,7 @@ enum
 int mfb_open(const char* name, int width, int height);
 
 // Update the display. Input buffer is assumed to be a 32-bit buffer of the size given in the open call
-// Will return -1 on error, 0 if no key has been pressed otherwise the key code matching the keycode enum
+// Will return -1 when ESC key is pressed (later on will return keycode and -1 on other close signal) 
 int mfb_update(void* buffer);
 
 // Close the window
