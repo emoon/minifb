@@ -8,7 +8,7 @@ StaticLibrary {
 		Dir = "src",
 		Extensions = { ".cpp", ".c", ".h", ".s", ".m" },
 		Filters = {
-			{ Pattern = "[/\\]win32[/\\]"; Config = "win32-*" },
+			{ Pattern = "[/\\]windows[/\\]"; Config = { "win32-*", "win64-*" } },
 			{ Pattern = "[/\\]macosx[/\\]"; Config = "mac*-*" },
 			{ Pattern = "[/\\]unix[/\\]"; Config = { "freebsd*-*", "linux*-*" } },
 		},
