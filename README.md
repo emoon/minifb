@@ -46,3 +46,8 @@ x11 (FreeBSD, Linux, *nix)
 
 gcc and x11-dev libs needs to be installed. To build the code run tundra2 x11-gcc-debug and you should be able to run t2-output/x11-gcc-debug-default/noise
 
+wayland (Linux)
+--------------------------
+
+Depends on gcc and wayland-client. Built using the wayland-gcc variants.
+
