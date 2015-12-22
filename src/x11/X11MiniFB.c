@@ -104,7 +104,7 @@ static int processEvents()
 	KeySym sym;
 
 	if (!XPending(s_display))
-		return;
+		return 0;
 
 	XNextEvent(s_display, &event);
 
