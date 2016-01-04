@@ -260,6 +260,7 @@ int mfb_update(void *buffer)
    // update shm buffer
    memcpy(wl.shm_ptr, buffer, wl.stride * wl.height);
 
+   wl_surface_attach(wl.surface, wl.buffer, 0, 0);
    wl_surface_damage(wl.surface, 0, 0, wl.width, wl.height);
 
    struct wl_callback *frame = wl_surface_frame(wl.surface);
