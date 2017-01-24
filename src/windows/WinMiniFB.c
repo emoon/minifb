@@ -1,4 +1,4 @@
-#include <MiniFB.h> 
+#include "MiniFB.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -95,7 +95,7 @@ int mfb_open(const char* title, int width, int height)
 
 	ShowWindow(s_wnd, SW_NORMAL);
 
-	s_bitmapInfo = (BITMAPINFO*)malloc(sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 2);
+	s_bitmapInfo = (BITMAPINFO*)calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
 	s_bitmapInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 	s_bitmapInfo->bmiHeader.biPlanes = 1;
 	s_bitmapInfo->bmiHeader.biBitCount = 32;
