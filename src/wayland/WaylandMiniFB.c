@@ -147,8 +147,7 @@ static void registry_global(void *data, struct wl_registry *registry,
       wl.seat = wl_registry_bind(registry, id, &wl_seat_interface, 1);
       if (wl.seat)
       {
-         wl.keyboard = wl_seat_get_keyboard(wl.seat);
-         wl_keyboard_add_listener(wl.keyboard, &keyboard_listener, NULL);
+         wl_seat_add_listener(wl.seat, &seat_listener, NULL);
       }
    }
 }
