@@ -2,14 +2,14 @@
 #include "OSXWindow.h"
 #include <Cocoa/Cocoa.h>
 #include <unistd.h>
-#include <MiniFB.h>
+#include "MiniFB.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void* g_updateBuffer = 0;
 int g_width = 0;
 int g_height = 0;
-static NSWindow* window_;
+static OSXWindow* window_;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,6 +82,9 @@ static int updateEvents()
 		}
 	}
 	[pool release];
+
+	if (window_->closed)
+		state = -1;
 
 	return state;
 }
