@@ -11,6 +11,7 @@ StaticLibrary {
 			{ Pattern = "[/\\]windows[/\\]"; Config = { "win32-*", "win64-*" } },
 			{ Pattern = "[/\\]macosx[/\\]"; Config = "mac*-*" },
 			{ Pattern = "[/\\]x11[/\\]"; Config = { "x11-*" } },
+			{ Pattern = "[/\\]wayland[/\\]"; Config = { "wayland-*" } },
 		},
 
 		Recursive = true,
@@ -36,7 +37,10 @@ Program {
 	Depends = { "minifb" },
 	Sources = { "tests/noise.c" }, 
 
-	Libs = { "X11"; Config = "x11-*" },
+	Libs = {
+           { "X11"; Config = "x11-*" },
+           { "wayland-client", "wayland-cursor"; Config = "wayland-*" },
+        },
 }
 
 Default "noise"
