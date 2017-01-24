@@ -5,6 +5,7 @@
 @interface OSXWindow : NSWindow
 {
 	NSView* childContentView;
+	@public bool closed;
 }
 
 @end

@@ -27,6 +27,8 @@ extern int g_height;
 
 - (void)drawRect:(NSRect)rect
 {
+	(void)rect;
+
 	if (!g_updateBuffer)
 		return;
 

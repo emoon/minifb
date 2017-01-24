@@ -6,7 +6,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (id)initWithContentRect:(NSRect)contentRect
-	styleMask:(NSUInteger)windowStyle
+	styleMask:(NSWindowStyleMask)windowStyle
 	backing:(NSBackingStoreType)bufferingType
 	defer:(BOOL)deferCreation
 {
@@ -31,6 +31,14 @@
 			selector:@selector(mainWindowChanged:)
 			name:NSWindowDidResignMainNotification
 			object:self];
+
+		[[NSNotificationCenter defaultCenter]
+			addObserver:self
+			selector:@selector(willClose)
+			name:NSWindowWillCloseNotification
+			object:self];
+
+		closed = false;
 	}
 	return self;
 }
@@ -65,6 +73,7 @@
 
 - (void)mainWindowChanged:(NSNotification *)aNotification
 {
+	(void)aNotification;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,9 +137,17 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-+ (NSRect)frameRectForContentRect:(NSRect)windowContentRect styleMask:(NSUInteger)windowStyle
++ (NSRect)frameRectForContentRect:(NSRect)windowContentRect styleMask:(NSWindowStyleMask)windowStyle
 {
+	(void)windowStyle;
 	return NSInsetRect(windowContentRect, 0, 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)willClose
+{
+	closed = true;
 }
 
 @end
