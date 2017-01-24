@@ -3,6 +3,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include <stdlib.h>
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static WNDCLASS s_wc;
@@ -12,13 +14,13 @@ static int s_width;
 static int s_height;
 static HDC s_hdc;
 static void* s_buffer;
-static BITMAPINFO s_bitmapInfo;
+static BITMAPINFO* s_bitmapInfo;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	int res = 0;
+	LRESULT res = 0;
 
 	switch (message)
 	{
@@ -27,7 +29,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 			if (s_buffer)
 			{
 				StretchDIBits(s_hdc, 0, 0, s_width, s_height, 0, 0, s_width, s_height, s_buffer, 
-							  &s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+				              s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
 				ValidateRect(hWnd, NULL);
 			}
@@ -93,15 +95,16 @@ int mfb_open(const char* title, int width, int height)
 
 	ShowWindow(s_wnd, SW_NORMAL);
 
-	s_bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	s_bitmapInfo.bmiHeader.biPlanes = 1;
-	s_bitmapInfo.bmiHeader.biBitCount = 32;
-	s_bitmapInfo.bmiHeader.biCompression = BI_BITFIELDS;
-	s_bitmapInfo.bmiHeader.biWidth = width;
-	s_bitmapInfo.bmiHeader.biHeight = -height;
-	s_bitmapInfo.bmiColors[0].rgbRed = 0xff; 
-	s_bitmapInfo.bmiColors[1].rgbGreen = 0xff; 
-	s_bitmapInfo.bmiColors[2].rgbBlue = 0xff; 
+	s_bitmapInfo = (BITMAPINFO*)malloc(sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 2);
+	s_bitmapInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+	s_bitmapInfo->bmiHeader.biPlanes = 1;
+	s_bitmapInfo->bmiHeader.biBitCount = 32;
+	s_bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
+	s_bitmapInfo->bmiHeader.biWidth = width;
+	s_bitmapInfo->bmiHeader.biHeight = -height;
+	s_bitmapInfo->bmiColors[0].rgbRed = 0xff; 
+	s_bitmapInfo->bmiColors[1].rgbGreen = 0xff; 
+	s_bitmapInfo->bmiColors[2].rgbBlue = 0xff; 
 
 	s_hdc = GetDC(s_wnd);
 
@@ -136,6 +139,7 @@ int mfb_update(void* buffer)
 void mfb_close()
 {
 	s_buffer = 0;
+	free(s_bitmapInfo);
 	ReleaseDC(s_wnd, s_hdc);
 	DestroyWindow(s_wnd);
 }
