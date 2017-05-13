@@ -6,7 +6,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (id)initWithContentRect:(NSRect)contentRect
-	styleMask:(NSWindowStyleMask)windowStyle
+	styleMask:(NSUInteger)windowStyle
 	backing:(NSBackingStoreType)bufferingType
 	defer:(BOOL)deferCreation
 {
@@ -137,7 +137,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-+ (NSRect)frameRectForContentRect:(NSRect)windowContentRect styleMask:(NSWindowStyleMask)windowStyle
++ (NSRect)frameRectForContentRect:(NSRect)windowContentRect styleMask:(NSUInteger)windowStyle
 {
 	(void)windowStyle;
 	return NSInsetRect(windowContentRect, 0, 0);
