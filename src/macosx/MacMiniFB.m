@@ -22,9 +22,9 @@ int mfb_open(const char* name, int width, int height)
 
 	[NSApplication sharedApplication];
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-		
-	unsigned int styles = NSResizableWindowMask | NSClosableWindowMask | NSTitledWindowMask;
-		
+
+	NSWindowStyleMask styles = NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
+
 	NSRect rectangle = NSMakeRect(0, 0, width, height);
 	window_ = [[OSXWindow alloc] initWithContentRect:rectangle styleMask:styles backing:NSBackingStoreBuffered defer:NO];
 
@@ -62,13 +62,13 @@ static int updateEvents()
 {
 	int state = 0;
 	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-	NSEvent* event = [NSApp nextEventMatchingMask:NSAnyEventMask untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-	if (event) 
+	NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+	if (event)
 	{
 		switch ([event type])
 		{
-			case NSKeyDown:
-			case NSKeyUp:
+			case NSEventTypeKeyDown:
+			case NSEventTypeKeyUp:
 			{
 				state = -1;
 				break;
