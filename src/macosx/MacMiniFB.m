@@ -26,7 +26,8 @@ int mfb_open(const char* name, int width, int height)
 	NSWindowStyleMask styles = NSWindowStyleMaskResizable | NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
 
 	NSRect rectangle = NSMakeRect(0, 0, width, height);
-	window_ = [[OSXWindow alloc] initWithContentRect:rectangle styleMask:styles backing:NSBackingStoreBuffered defer:NO];
+	NSRect frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
+	window_ = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO];
 
 	if (!window_)
 		return 0;
