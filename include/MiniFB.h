@@ -1,7 +1,10 @@
 #ifndef _MINIFB_H_
 #define _MINIFB_H_
 
+#include "MiniFB_ex.h"
+
 #ifdef __cplusplus
+#include "MiniFB_ex_cpp.h"
 extern "C" {
 #endif
 
