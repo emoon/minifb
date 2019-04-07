@@ -1,146 +1,135 @@
-#include "MiniFB.h"
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <MiniFB.h>
+#include <MiniFB_internal.h>
+#include "WinWindowData.h"
 
 #include <stdlib.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static WNDCLASS s_wc;
-static HWND s_wnd;
-static int s_close = 0;
-static int s_width;
-static int s_height;
-static HDC s_hdc;
-static void* s_buffer;
-static BITMAPINFO* s_bitmapInfo;
+
+SWindowData g_window_data  = { 0 };
+
+WNDCLASS    s_wc           = { 0 };
+HDC         s_hdc          = 0;
+BITMAPINFO  *s_bitmapInfo  = 0x0;
+long        s_window_style   = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsigned long lParam);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	LRESULT res = 0;
+    LRESULT res = 0;
 
-	switch (message)
-	{
-		case WM_PAINT:
-		{
-			if (s_buffer)
-			{
-				StretchDIBits(s_hdc, 0, 0, s_width, s_height, 0, 0, s_width, s_height, s_buffer, 
-				              s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+    if (ManageMessagesEx(hWnd, (unsigned int)message, (unsigned int)wParam, (unsigned long)lParam) == eTrue) {
+        return res;
+    }
 
-				ValidateRect(hWnd, NULL);
-			}
+    switch (message)
+    {
+        case WM_PAINT:
+        {
+            if (g_window_data.draw_buffer)
+            {
+                if (g_window_data.dst_offset_x > 0) {
+                    BitBlt(s_hdc, 0, g_window_data.dst_offset_y, g_window_data.dst_offset_x, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
+                }
+                if (g_window_data.dst_offset_y > 0) {
+                    BitBlt(s_hdc, 0, 0, g_window_data.window_width, g_window_data.dst_offset_y, 0, 0, 0, BLACKNESS);
+                }
+                uint32_t offsetY = g_window_data.dst_offset_y + g_window_data.dst_height;
+                if (offsetY < g_window_data.window_height) {
+                    BitBlt(s_hdc, 0, offsetY, g_window_data.window_width, g_window_data.window_height-offsetY, 0, 0, 0, BLACKNESS);
+                }
+                uint32_t offsetX = g_window_data.dst_offset_x + g_window_data.dst_width;
+                if (offsetX < g_window_data.window_width) {
+                    BitBlt(s_hdc, offsetX, g_window_data.dst_offset_y, g_window_data.window_width-offsetX, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
+                }
 
-			break;
-		}
+                StretchDIBits(s_hdc, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.draw_buffer, 
+                              s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
-		case WM_KEYDOWN:
-		{
-			if ((wParam&0xFF) == 27) 
-				s_close = 1;
+                ValidateRect(hWnd, NULL);
+            }
 
-			break;
-		}
+            break;
+        }
 
-		case WM_CLOSE:
-		{
-			s_close = 1;
-			break;
-		}
+        // Already managed in ManageMessagesEx
+        case WM_KEYDOWN:
+        {
+            if ((wParam & 0xFF) == 27)
+                g_window_data.close = 1;
 
-		default:
-		{
-			res = DefWindowProc(hWnd, message, wParam, lParam);
-		}
-	}
+            break;
+        }
 
-	return res;
+        case WM_DESTROY:
+        case WM_CLOSE:
+        {
+            g_window_data.close = 1;
+            break;
+        }
+
+        default:
+        {
+            res = DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+
+    return res;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int mfb_open(const char* title, int width, int height)
-{
-	RECT rect = { 0 };
-
-	s_wc.style = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-	s_wc.lpfnWndProc = WndProc;
-	s_wc.hCursor = LoadCursor(0, IDC_ARROW);
-	s_wc.lpszClassName = title;
-	RegisterClass(&s_wc);
-
-	rect.right = width;
-	rect.bottom = height;
-
-	AdjustWindowRect(&rect, WS_POPUP | WS_SYSMENU | WS_CAPTION, 0);
-
-	rect.right -= rect.left;
-	rect.bottom -= rect.top;
-
-	s_width = width;
-	s_height = height;
-
-	s_wnd = CreateWindowEx(0, 
-		title, title,
-		WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME,
-		CW_USEDEFAULT, CW_USEDEFAULT,
-		rect.right, rect.bottom,
-		0, 0, 0, 0);
-
-	if (!s_wnd)
-		return 0;
-
-	ShowWindow(s_wnd, SW_NORMAL);
-
-	s_bitmapInfo = (BITMAPINFO*)calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
-	s_bitmapInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	s_bitmapInfo->bmiHeader.biPlanes = 1;
-	s_bitmapInfo->bmiHeader.biBitCount = 32;
-	s_bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
-	s_bitmapInfo->bmiHeader.biWidth = width;
-	s_bitmapInfo->bmiHeader.biHeight = -height;
-	s_bitmapInfo->bmiColors[0].rgbRed = 0xff; 
-	s_bitmapInfo->bmiColors[1].rgbGreen = 0xff; 
-	s_bitmapInfo->bmiColors[2].rgbBlue = 0xff; 
-
-	s_hdc = GetDC(s_wnd);
-
-	return 1;
+int mfb_open(const char* title, int width, int height) {
+    return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int mfb_update(void* buffer)
 {
-	MSG msg;
-	
-	s_buffer = buffer;
+    MSG msg;
+    
+    if (buffer == 0x0)
+        return -2;
 
-	InvalidateRect(s_wnd, NULL, TRUE);
-	SendMessage(s_wnd, WM_PAINT, 0, 0);
+    if (g_window_data.close == 1)
+        return -1;
 
-	while (PeekMessage(&msg, s_wnd, 0, 0, PM_REMOVE))
-	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-	}
+    g_window_data.draw_buffer = buffer;
 
-	if (s_close == 1)
-		return -1;
+    InvalidateRect(g_window_data.window, NULL, TRUE);
+    SendMessage(g_window_data.window, WM_PAINT, 0, 0);
 
-	return 0;
+    while (g_window_data.close == 0 && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void mfb_close()
 {
-	s_buffer = 0;
-	free(s_bitmapInfo);
-	ReleaseDC(s_wnd, s_hdc);
-	DestroyWindow(s_wnd);
+    g_window_data.draw_buffer = 0x0;
+    if(s_bitmapInfo != 0x0)
+        free(s_bitmapInfo);
+    if (g_window_data.window != 0 && s_hdc != 0) {
+        ReleaseDC(g_window_data.window, s_hdc);
+        DestroyWindow(g_window_data.window);
+    }
+
+    g_window_data.window = 0;
+    s_hdc = 0;
+    s_bitmapInfo = 0x0;
+    g_window_data.close = 1;
 }
 
