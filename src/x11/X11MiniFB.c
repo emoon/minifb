@@ -84,12 +84,12 @@ static int processEvents()
 
 			case ConfigureNotify: 
 			{
+				g_window_data.window_width  = event.xconfigure.width;
+				g_window_data.window_height = event.xconfigure.height;
 				g_window_data.dst_offset_x = 0;
 				g_window_data.dst_offset_y = 0;
 				g_window_data.dst_width    = g_window_data.window_width;
 				g_window_data.dst_height   = g_window_data.window_height;
-				g_window_data.window_width  = event.xconfigure.width;
-				g_window_data.window_height = event.xconfigure.height;
 
 				XClearWindow(g_window_data.display, g_window_data.window);
 				kCall(s_resize, g_window_data.window_width, g_window_data.window_height);
