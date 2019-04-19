@@ -14,8 +14,8 @@
 SWindowData g_window_data  = { 0 };
 
 extern void 
-StretchImage(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
-             uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
+stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
+              uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -152,7 +152,7 @@ int mfb_update(void* buffer)
     }
 
     if(g_window_data.image_scaler != 0x0) {
-        StretchImage(buffer, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.buffer_width, g_window_data.image_buffer, 0, 0, g_window_data.dst_width, g_window_data.dst_height, g_window_data.dst_width);
+        stretch_image(buffer, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.buffer_width, g_window_data.image_buffer, 0, 0, g_window_data.dst_width, g_window_data.dst_height, g_window_data.dst_width);
         g_window_data.image_scaler->data = g_window_data.image_buffer;
 	    XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image_scaler, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
     }
