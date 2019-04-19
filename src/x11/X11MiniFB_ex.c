@@ -11,8 +11,6 @@
 
 extern SWindowData g_window_data;
 
-int    s_screen = 0;
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern short int keycodes[512];
@@ -300,10 +298,11 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
     
     init_keycodes();
 
-    s_screen = DefaultScreen(g_window_data.display);
-    visual   = DefaultVisual(g_window_data.display, s_screen);
+    g_window_data.screen = DefaultScreen(g_window_data.display);
+
+    visual   = DefaultVisual(g_window_data.display, g_window_data.screen);
     formats  = XListPixmapFormats(g_window_data.display, &formatCount);
-    depth    = DefaultDepth(g_window_data.display, s_screen);
+    depth    = DefaultDepth(g_window_data.display, g_window_data.screen);
 
     Window defaultRootWindow = DefaultRootWindow(g_window_data.display);
 
@@ -325,16 +324,18 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         return -1;
     }
 
-    int screenWidth  = DisplayWidth(g_window_data.display, s_screen);
-    int screenHeight = DisplayHeight(g_window_data.display, s_screen);
+    int screenWidth  = DisplayWidth(g_window_data.display, g_window_data.screen);
+    int screenHeight = DisplayHeight(g_window_data.display, g_window_data.screen);
 
-    windowAttributes.border_pixel     = BlackPixel(g_window_data.display, s_screen);
-    windowAttributes.background_pixel = BlackPixel(g_window_data.display, s_screen);
+    windowAttributes.border_pixel     = BlackPixel(g_window_data.display, g_window_data.screen);
+    windowAttributes.background_pixel = BlackPixel(g_window_data.display, g_window_data.screen);
     windowAttributes.backing_store    = NotUseful;
 
     int posX, posY;
     int windowWidth, windowHeight;
 
+    g_window_data.window_width  = width;
+    g_window_data.window_height = height;
     g_window_data.buffer_width  = width;
     g_window_data.buffer_height = height;
     g_window_data.dst_offset_x  = 0;
@@ -426,12 +427,12 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         sizeHints.max_height = height;
     }
 
-      XSetWMNormalHints(g_window_data.display, g_window_data.window, &sizeHints);
-      XClearWindow(g_window_data.display, g_window_data.window);
-      XMapRaised(g_window_data.display, g_window_data.window);
+    XSetWMNormalHints(g_window_data.display, g_window_data.window, &sizeHints);
+    XClearWindow(g_window_data.display, g_window_data.window);
+    XMapRaised(g_window_data.display, g_window_data.window);
     XFlush(g_window_data.display);
 
-    g_window_data.gc = DefaultGC(g_window_data.display, s_screen);
+    g_window_data.gc = DefaultGC(g_window_data.display, g_window_data.screen);
 
     g_window_data.image = XCreateImage(g_window_data.display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, width * 4);
 

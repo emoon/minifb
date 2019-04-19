@@ -20,6 +20,7 @@ typedef struct {
     eBool       close;
 
     Display     *display;
+    int         screen;
     GC          gc;
     XImage      *image;
 } SWindowData;
