@@ -325,6 +325,11 @@ eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, uns
         return eFalse;
     }
 
+    g_window_data.dst_offset_x = offset_x;
+    g_window_data.dst_offset_y = offset_y;
+    g_window_data.dst_width    = width;
+    g_window_data.dst_height   = height;
+
 #if defined(USE_METAL_API)
     float x1 =  ((float) offset_x           / g_window_data.window_width)  * 2.0f - 1.0f;
     float x2 = (((float) offset_x + width)  / g_window_data.window_width)  * 2.0f - 1.0f;
@@ -342,16 +347,9 @@ eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, uns
 
     gVertices[3].x = x2;
     gVertices[3].y = y2;
-
-    return eTrue;
-#else
-    g_window_data.dst_offset_x = offset_x;
-    g_window_data.dst_offset_y = offset_y;
-    g_window_data.dst_width    = width;
-    g_window_data.dst_height   = height;
-
-    return eTrue;
 #endif
+
+    return eTrue;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

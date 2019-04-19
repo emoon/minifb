@@ -2,7 +2,8 @@
 
 #include "MiniFB_ex.h"
 
-#define kCall(f, ...) if((f)) (f)(__VA_ARGS__);
+#define kCall(f, ...)   if((f)) (f)(__VA_ARGS__);
+#define kUnused(var)    (void) var;
 
 #if defined(__cplusplus)
 extern "C" {

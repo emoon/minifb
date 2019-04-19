@@ -159,8 +159,10 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void keyboard_default(eKey key, eKeyMod mod, eBool isPressed) {
+    kUnused(mod);
+    kUnused(isPressed);
     if (key == KB_KEY_ESCAPE)
-        g_window_data.close = 1;
+        g_window_data.close = eTrue;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,7 +279,7 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
     s_bitmapInfo->bmiHeader.biBitCount    = 32;
     s_bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
     s_bitmapInfo->bmiHeader.biWidth       = g_window_data.buffer_width;
-    s_bitmapInfo->bmiHeader.biHeight      = (LONG)-g_window_data.buffer_height;
+    s_bitmapInfo->bmiHeader.biHeight      = -(LONG)g_window_data.buffer_height;
     s_bitmapInfo->bmiColors[0].rgbRed     = 0xff;
     s_bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
     s_bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
@@ -347,7 +349,7 @@ extern short int keycodes[512];
 void init_keycodes() {
 
     // Clear keys
-    for (int i = 0; i < sizeof(keycodes) / sizeof(keycodes[0]); ++i) 
+    for (size_t i = 0; i < sizeof(keycodes) / sizeof(keycodes[0]); ++i) 
         keycodes[i] = 0;
 
     keycodes[0x00B] = KB_KEY_0;

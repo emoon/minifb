@@ -141,7 +141,8 @@ eBool gActive = eFalse;
     NSString    *characters;
     NSUInteger  length;
     
-    (void)replacementRange;
+    kUnused(replacementRange);
+
     if ([string isKindOfClass:[NSAttributedString class]])
         characters = [string string];
     else
@@ -162,7 +163,7 @@ eBool gActive = eFalse;
 
 - (void)mainWindowChanged:(NSNotification *)notification
 {
-    (void)notification;
+    kUnused(notification);
 
     if(gActive == eTrue) {
         gActive = eFalse;
@@ -215,18 +216,18 @@ eBool gActive = eFalse;
 
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
-    (void)notification;
+    kUnused(notification);
     kCall(s_active, eTrue);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
-    (void)notification;
+    kUnused(notification);
     kCall(s_active, eFalse);
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
-    (void)notification;
+    kUnused(notification);
     g_window_data.close = eTrue;
 }
 
@@ -249,7 +250,7 @@ eBool gActive = eFalse;
 
 + (NSRect)frameRectForContentRect:(NSRect)windowContentRect styleMask:(NSWindowStyleMask)windowStyle
 {
-    (void)windowStyle;
+    kUnused(windowStyle);
     return NSInsetRect(windowContentRect, 0, 0);
 }
 
@@ -263,7 +264,7 @@ eBool gActive = eFalse;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)windowDidResize:(NSNotification *)notification {
-    (void)notification;
+    kUnused(notification);
     CGSize size = [self contentRectForFrameRect:[self frame]].size;
 
     g_window_data.window_width  = size.width;
