@@ -1,122 +1,120 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/XKBlib.h>
+#include <X11/keysym.h>
+#include <X11/Xatom.h>
+#include <X11/cursorfont.h>
 #include <MiniFB.h>
+#include <MiniFB_internal.h>
+#include "X11WindowData.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define KEY_FUNCTION 0xFF
-#define KEY_ESC 0x1B
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static Display* s_display;
-static int s_screen;
-static int s_width;
-static int s_height;
-static Window s_window;
-static GC s_gc;
-static XImage *s_ximage;
+SWindowData g_window_data  = { 0 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int mfb_open(const char* title, int width, int height)
 {
-	int depth, i, formatCount, convDepth = -1;
-	XPixmapFormatValues* formats;
-	XSetWindowAttributes windowAttributes;
-	XSizeHints sizeHints;
-	Visual* visual;
-
-	s_display = XOpenDisplay(0);
-
-	if (!s_display)
-		return -1;
-	
-	s_screen = DefaultScreen(s_display);
-	visual = DefaultVisual(s_display, s_screen);
-	formats = XListPixmapFormats(s_display, &formatCount);
-	depth = DefaultDepth(s_display, s_screen);
-	Window defaultRootWindow = DefaultRootWindow(s_display);
-
-	for (i = 0; i < formatCount; ++i)
-	{
-		if (depth == formats[i].depth)
-		{
-			convDepth = formats[i].bits_per_pixel;
-			break;
-		}
-	}
-  
-	XFree(formats);
-
-	// We only support 32-bit right now
-	if (convDepth != 32)
-	{
-		XCloseDisplay(s_display);
-		return -1;
-	}
-
-	int screenWidth = DisplayWidth(s_display, s_screen);
-	int screenHeight = DisplayHeight(s_display, s_screen);
-
-	windowAttributes.border_pixel = BlackPixel(s_display, s_screen);
-	windowAttributes.background_pixel = BlackPixel(s_display, s_screen);
-	windowAttributes.backing_store = NotUseful;
-
-	s_window = XCreateWindow(s_display, defaultRootWindow, (screenWidth - width) / 2,
-					(screenHeight - height) / 2, width, height, 0, depth, InputOutput,
-					visual, CWBackPixel | CWBorderPixel | CWBackingStore,
-					&windowAttributes);
-	if (!s_window)
-		return 0;
-
-	XSelectInput(s_display, s_window, KeyPressMask | KeyReleaseMask);
-	XStoreName(s_display, s_window, title);
-
-	sizeHints.flags = PPosition | PMinSize | PMaxSize;
-	sizeHints.x = 0;
-	sizeHints.y = 0;
-	sizeHints.min_width = width;
-	sizeHints.max_width = width;
-	sizeHints.min_height = height;
-	sizeHints.max_height = height;
-
-  	XSetWMNormalHints(s_display, s_window, &sizeHints);
-  	XClearWindow(s_display, s_window);
-  	XMapRaised(s_display, s_window);
-	XFlush(s_display);
-
-	s_gc = DefaultGC(s_display, s_screen);
-
-	s_ximage = XCreateImage(s_display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, width * 4);
-
-	s_width = width;
-	s_height = height;
-
-	return 1;
+	return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+int translate_key(int scancode);
+int translate_mod(int state);
+int translate_mod_ex(int key, int state, int is_pressed);
+
 static int processEvents()
 {
 	XEvent event;
-	KeySym sym;
 
-	if (!XPending(s_display))
-		return 0;
+	while ((g_window_data.close == eFalse) && XPending(g_window_data.display)) {
+		XNextEvent(g_window_data.display, &event);
 
-	XNextEvent(s_display, &event);
+		switch (event.type) {
+			case KeyPress:
+			case KeyRelease: 
+			{
+				int kb_key     = translate_key(event.xkey.keycode);
+				int is_pressed = (event.type == KeyPress);
+				g_window_data.mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
 
-	if (event.type != KeyPress)
-		return 0;
+				kCall(s_keyboard, kb_key, g_window_data.mod_keys, is_pressed);
+			}
+			break;
 
-	sym = XLookupKeysym(&event.xkey, 0);
+			case ButtonPress:
+			case ButtonRelease:
+			{
+				eMouseButton button     = event.xbutton.button;
+				int          is_pressed = (event.type == ButtonPress);
+				g_window_data.mod_keys = translate_mod(event.xkey.state);
+				switch (button) {
+					case Button1:
+					case Button2:
+					case Button3:
+						kCall(s_mouse_btn, button, g_window_data.mod_keys, is_pressed);
+						break;
 
-	if ((sym >> 8) != KEY_FUNCTION)
-		return 0;
+					case Button4:
+						kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, 1.0f);
+						break;
+					case Button5:
+						kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, -1.0f);
+						break;
 
-	if ((sym & 0xFF) == KEY_ESC)
+					case 6:
+						kCall(s_mouse_wheel, g_window_data.mod_keys, 1.0f, 0.0f);
+						break;
+					case 7:
+						kCall(s_mouse_wheel, g_window_data.mod_keys, -1.0f, 0.0f);
+						break;
+
+					default:
+						kCall(s_mouse_btn, button - 4, g_window_data.mod_keys, is_pressed);
+						break;
+				}
+			}
+			break;
+
+			case MotionNotify:
+				kCall(s_mouse_move, event.xmotion.x, event.xmotion.y);
+				break;
+
+			case ConfigureNotify: 
+			{
+				g_window_data.dst_offset_x = 0;
+				g_window_data.dst_offset_y = 0;
+				g_window_data.dst_width    = g_window_data.window_width;
+				g_window_data.dst_height   = g_window_data.window_height;
+				g_window_data.window_width  = event.xconfigure.width;
+				g_window_data.window_height = event.xconfigure.height;
+
+				XClearWindow(g_window_data.display, g_window_data.window);
+				kCall(s_resize, g_window_data.window_width, g_window_data.window_height);
+			}
+			break;
+
+			case EnterNotify:
+			case LeaveNotify:
+			break;
+
+			case FocusIn:
+				kCall(s_active, eTrue);
+				break;
+
+			case FocusOut:
+				kCall(s_active, eFalse);
+				break;
+
+			case DestroyNotify:
+				return -1;
+				break;
+		}
+	}
+
+	if(g_window_data.close == eTrue)
 		return -1;
 
 	return 0;
@@ -126,10 +124,13 @@ static int processEvents()
 
 int mfb_update(void* buffer)
 {
-	s_ximage->data = (char*)buffer;
+    if (buffer == 0x0)
+        return -2;
 
-	XPutImage(s_display, s_window, s_gc, s_ximage, 0, 0, 0, 0, s_width, s_height);
-	XFlush(s_display);
+	g_window_data.image->data = (char*)buffer;
+
+	XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+	XFlush(g_window_data.display);
 
 	if (processEvents() < 0)
 		return -1;
@@ -139,10 +140,17 @@ int mfb_update(void* buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void mfb_close (void)
+void mfb_close(void)
 {
-	s_ximage->data = NULL;
-	XDestroyImage(s_ximage);
-	XDestroyWindow(s_display, s_window);
-	XCloseDisplay(s_display);
+	if(g_window_data.image != 0x0) {
+		g_window_data.image->data = 0x0;
+        XDestroyImage(g_window_data.image);
+		XDestroyWindow(g_window_data.display, g_window_data.window);
+		XCloseDisplay(g_window_data.display);
+
+		g_window_data.image  = 0x0;
+		g_window_data.display = 0x0;
+		g_window_data.window  = 0;
+	}
+	g_window_data.close = eTrue;
 }
