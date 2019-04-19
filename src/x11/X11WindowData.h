@@ -23,4 +23,9 @@ typedef struct {
     int         screen;
     GC          gc;
     XImage      *image;
+
+    void        *image_buffer;
+    XImage      *image_scaler;
+    uint32_t    image_scaler_width;
+    uint32_t    image_scaler_height;
 } SWindowData;

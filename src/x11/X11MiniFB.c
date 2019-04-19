@@ -4,6 +4,7 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <stdlib.h>
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
 #include "X11WindowData.h"
@@ -11,6 +12,10 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SWindowData g_window_data  = { 0 };
+
+extern void 
+StretchImage(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
+             uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -124,12 +129,37 @@ static int processEvents()
 
 int mfb_update(void* buffer)
 {
-    if (buffer == 0x0)
+    if (buffer == 0x0) {
         return -2;
+    }
 
-	g_window_data.image->data = (char*)buffer;
+    if (g_window_data.buffer_width != g_window_data.dst_width || g_window_data.buffer_height != g_window_data.dst_height) {
+        if(g_window_data.image_scaler_width != g_window_data.dst_width || g_window_data.image_scaler_height != g_window_data.dst_height) {
+            if(g_window_data.image_scaler != 0x0) {
+                g_window_data.image_scaler->data = 0x0;
+                XDestroyImage(g_window_data.image_scaler);
+            }
+            if(g_window_data.image_buffer != 0x0) {
+                free(g_window_data.image_buffer);
+                g_window_data.image_buffer = 0x0;
+            }
+            int depth = DefaultDepth(g_window_data.display, g_window_data.screen);
+            g_window_data.image_buffer = malloc(g_window_data.dst_width * g_window_data.dst_height * 4);
+            g_window_data.image_scaler_width  = g_window_data.dst_width;
+            g_window_data.image_scaler_height = g_window_data.dst_height;
+            g_window_data.image_scaler = XCreateImage(g_window_data.display, CopyFromParent, depth, ZPixmap, 0, NULL, g_window_data.image_scaler_width, g_window_data.image_scaler_height, 32, g_window_data.image_scaler_width * 4);
+        }
+    }
 
-	XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    if(g_window_data.image_scaler != 0x0) {
+        StretchImage(buffer, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.buffer_width, g_window_data.image_buffer, 0, 0, g_window_data.dst_width, g_window_data.dst_height, g_window_data.dst_width);
+        g_window_data.image_scaler->data = g_window_data.image_buffer;
+	    XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image_scaler, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    }
+    else {
+    	g_window_data.image->data = (char *) buffer;
+	    XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    }
 	XFlush(g_window_data.display);
 
 	if (processEvents() < 0)
