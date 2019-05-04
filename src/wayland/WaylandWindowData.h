@@ -25,7 +25,12 @@ typedef struct
     struct wl_shell         *shell;
     struct wl_seat          *seat;
     struct wl_keyboard      *keyboard;
+    
     struct wl_pointer       *pointer;
+    struct wl_cursor_theme  *cursor_theme;
+    struct wl_cursor        *default_cursor;
+    struct wl_surface       *cursor_surface;
+    
     struct wl_shm           *shm;
     struct wl_shm_pool      *shm_pool;
     struct wl_surface       *surface;
