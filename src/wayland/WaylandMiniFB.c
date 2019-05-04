@@ -1,4 +1,7 @@
 #include <MiniFB.h>
+#include "MiniFB_internal.h"
+#include "MiniFB_ex_enums.h"
+#include "WaylandWindowData.h"
 
 #include <wayland-client.h>
 
@@ -13,271 +16,480 @@
 
 #include <sys/mman.h>
 
-static struct wl
-{
-   struct wl_display *display;
-   struct wl_registry *registry;
-   struct wl_compositor *compositor;
-   struct wl_shell *shell;
-   struct wl_seat *seat;
-   struct wl_keyboard *keyboard;
-   struct wl_shm *shm;
-   struct wl_shm_pool *shm_pool;
-   struct wl_surface *surface;
-   struct wl_shell_surface *shell_surface;
-
-   uint32_t seat_version;
-   uint32_t shm_format;
-   uint32_t width;
-   uint32_t height;
-   uint32_t stride;
-   uint32_t *shm_ptr;
-   struct wl_buffer *buffer;
-   int should_close;
-} wl;
+SWindowData g_window_data = { 0 };
 
 static void destroy(void)
 {
-   if (! wl.display)
-      return;
+    if (! g_window_data.display)
+	  return;
 
-#define KILL(NAME)                     \
-   do                                  \
-   {                                   \
-      if (wl.NAME)                     \
-         wl_##NAME##_destroy(wl.NAME); \
-   } while (0)
-   KILL(shell_surface);
-   KILL(shell);
-   KILL(surface);
-   KILL(buffer);
-   KILL(shm_pool);
-   KILL(shm);
-   KILL(compositor);
-   KILL(keyboard);
-   KILL(seat);
-   KILL(registry);
+#define KILL(NAME)                                   \
+    do                                               \
+    {                                                \
+        if (g_window_data.NAME)                      \
+            wl_##NAME##_destroy(g_window_data.NAME); \
+    } while (0);                                     \
+    g_window_data.NAME = 0x0;
+
+    KILL(shell_surface);
+    KILL(shell);
+    KILL(surface);
+    //KILL(buffer);
+    if(g_window_data.draw_buffer) {
+        wl_buffer_destroy(g_window_data.draw_buffer);
+        g_window_data.draw_buffer = 0x0;
+    }
+    KILL(shm_pool);
+    KILL(shm);
+    KILL(compositor);
+    KILL(keyboard);
+    KILL(seat);
+    KILL(registry);
 #undef KILL
-   wl_display_disconnect(wl.display);
-   memset(&wl, 0, sizeof(wl));
+    wl_display_disconnect(g_window_data.display);
+    memset(&g_window_data, 0, sizeof(SWindowData));
 }
 
 static void nop() {}
 
 #define NO_FUNC (void (*)()) nop
 
-static void keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
-                         uint32_t serial, uint32_t time, uint32_t key,
-                         uint32_t state)
+// This event provides a file descriptor to the client which can be memory-mapped 
+// to provide a keyboard mapping description.
+// format	 keymap format
+// fd	      keymap file descriptor
+// size	      keymap size, in bytes
+static void
+keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size)
 {
-   if (state == WL_KEYBOARD_KEY_STATE_RELEASED && key == KEY_ESC)
-   {
-      wl.should_close = 1;
-   }
+	kUnused(data);
+	kUnused(keyboard);
+	kUnused(format);
+	kUnused(fd);
+	kUnused(size);
 }
 
+// Notification that this seat's keyboard focus is on a certain surface.
+// serial	serial number of the enter event
+// surface	surface gaining keyboard focus
+// keys	     the currently pressed keys
+static void 
+keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys)
+{
+	kUnused(data);
+	kUnused(keyboard);
+	kUnused(serial);
+	kUnused(surface);
+	kUnused(keys);
+    kCall(s_active, eTrue);
+}
+
+// The leave notification is sent before the enter notification for the new focus.
+// serial	serial number of the leave event
+// surface	surface that lost keyboard focus
+static void 
+keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface)
+{
+	kUnused(data);
+	kUnused(keyboard);
+	kUnused(serial);
+	kUnused(surface);
+    kCall(s_active, eFalse);
+}
+
+// A key was pressed or released. The time argument is a timestamp with 
+// millisecond granularity, with an undefined base.
+// serial     serial number of the key event
+// time	      timestamp with millisecond granularity
+// key	      key that produced the event
+// state	 physical state of the key
+static void 
+keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
+{
+    kUnused(data);
+    kUnused(keyboard);
+    kUnused(serial);
+    kUnused(time);
+    if(key < 512) {
+        eKey    kb_key     = (eKey) keycodes[key];
+        eBool   is_pressed = (eBool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        switch (kb_key)
+        {
+            case KB_KEY_LEFT_SHIFT:
+            case KB_KEY_RIGHT_SHIFT:
+                if(is_pressed)
+                    g_window_data.mod_keys |= KB_MOD_SHIFT;
+                else
+                    g_window_data.mod_keys &= ~KB_MOD_SHIFT;
+                break;
+
+            case KB_KEY_LEFT_CONTROL:
+            case KB_KEY_RIGHT_CONTROL:
+                if(is_pressed)
+                    g_window_data.mod_keys |= KB_MOD_CONTROL;
+                else
+                    g_window_data.mod_keys &= ~KB_MOD_CONTROL;
+                break;
+
+            case KB_KEY_LEFT_ALT:
+            case KB_KEY_RIGHT_ALT:
+                if(is_pressed)
+                    g_window_data.mod_keys |= KB_MOD_ALT;
+                else
+                    g_window_data.mod_keys &= ~KB_MOD_ALT;
+                break;
+
+            case KB_KEY_LEFT_SUPER:
+            case KB_KEY_RIGHT_SUPER:
+                if(is_pressed)
+                    g_window_data.mod_keys |= KB_MOD_SUPER;
+                else
+                    g_window_data.mod_keys &= ~KB_MOD_SUPER;
+                break;
+        }
+
+        kCall(s_keyboard, kb_key, (eKeyMod)g_window_data.mod_keys, is_pressed);
+    }
+}
+
+// Notifies clients that the modifier and/or group state has changed, 
+// and it should update its local state.
+// serial	          serial number of the modifiers event
+// mods_depressed	depressed modifiers
+// mods_latched	     latched modifiers
+// mods_locked	     locked modifiers
+// group	          keyboard layout
+static void 
+keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
+{
+	kUnused(data);
+	kUnused(keyboard);
+	kUnused(serial);
+	kUnused(mods_depressed);
+	kUnused(mods_latched);
+	kUnused(mods_locked);
+	kUnused(group);
+	//g_window_data.mod_keys
+	// it is not easy to identify them here :(
+}
+
+// Informs the client about the keyboard's repeat rate and delay.
+// rate	     the rate of repeating keys in characters per second
+// delay	delay in milliseconds since key down until repeating starts
+static void 
+keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay)
+{
+	kUnused(data);
+	kUnused(keyboard);
+	kUnused(rate);
+	kUnused(delay);
+}
 static const struct wl_keyboard_listener keyboard_listener = {
-   .keymap = NO_FUNC,
-   .enter = NO_FUNC,
-   .leave = NO_FUNC,
-   .key = keyboard_key,
-   .modifiers = NO_FUNC,
-   .repeat_info = NO_FUNC,
+	.keymap      = keyboard_keymap,
+	.enter       = keyboard_enter,
+	.leave       = keyboard_leave,
+	.key         = keyboard_key,
+	.modifiers   = keyboard_modifiers,
+	.repeat_info = keyboard_repeat_info,
 };
 
-static void seat_capabilities(void *data, struct wl_seat *seat,
-                              enum wl_seat_capability caps)
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+pointer_handle_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy)
 {
-   if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !wl.keyboard)
-   {
-      wl.keyboard = wl_seat_get_keyboard(seat);
-      wl_keyboard_add_listener(wl.keyboard, &keyboard_listener, NULL);
-   }
-   else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && wl.keyboard)
-   {
-      wl_keyboard_destroy(wl.keyboard);
-      wl.keyboard = NULL;
-   }
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(serial);
+    kUnused(surface);
+    kUnused(sx);
+    kUnused(sy);
+	//fprintf(stderr, "Pointer entered surface %p at %d %d\n", surface, sx, sy);
+}
+
+static void
+pointer_handle_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface)
+{
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(serial);
+    kUnused(surface);
+	//fprintf(stderr, "Pointer left surface %p\n", surface);
+}
+
+static void
+pointer_handle_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy)
+{
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(time);
+	//printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
+    kCall(s_mouse_move, sx >> 24, sy >> 24);
+}
+
+static void
+pointer_handle_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
+{
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(serial);
+    kUnused(time);
+	//printf("Pointer button '%d'(%d)\n", button, state);
+    kCall(s_mouse_btn, button, g_window_data.mod_keys, state == 1);
+}
+
+static void
+pointer_handle_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value)
+{
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(time);
+    kUnused(axis);
+    //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
+    kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, value / 256.0f);
+}
+
+static const struct wl_pointer_listener pointer_listener = {
+	.enter         = pointer_handle_enter,
+	.leave         = pointer_handle_leave,
+	.motion        = pointer_handle_motion,
+	.button        = pointer_handle_button,
+	.axis          = pointer_handle_axis,
+    .frame         = NULL,
+    .axis_source   = NULL,
+    .axis_stop     = NULL,
+    .axis_discrete = NULL,
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps)
+{
+    kUnused(data);
+    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !g_window_data.keyboard)
+    {
+        g_window_data.keyboard = wl_seat_get_keyboard(seat);
+        wl_keyboard_add_listener(g_window_data.keyboard, &keyboard_listener, NULL);
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && g_window_data.keyboard)
+    {
+        wl_keyboard_destroy(g_window_data.keyboard);
+        g_window_data.keyboard = NULL;
+    }
+
+	if ((caps & WL_SEAT_CAPABILITY_POINTER) && !g_window_data.pointer) 
+	{
+		g_window_data.pointer = wl_seat_get_pointer(seat);
+		wl_pointer_add_listener(g_window_data.pointer, &pointer_listener, NULL);
+	} 
+	else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && g_window_data.pointer) 
+	{
+		wl_pointer_destroy(g_window_data.pointer);
+		g_window_data.pointer = NULL;
+	}
 }
 
 static const struct wl_seat_listener seat_listener = {
-   .capabilities = seat_capabilities, .name = NO_FUNC,
+    .capabilities = seat_capabilities, 
+    .name = NO_FUNC,
 };
 
 static void shm_format(void *data, struct wl_shm *shm, uint32_t format)
 {
-   if (wl.shm_format == -1u)
-   {
-      switch (format)
-      {
-      // We could do RGBA, but that would not be what is expected from minifb...
-      /* case WL_SHM_FORMAT_ARGB8888: */
-      case WL_SHM_FORMAT_XRGB8888:
-         wl.shm_format = format;
-         break;
+    kUnused(data);
+    kUnused(shm);
+    if (g_window_data.shm_format == -1u)
+    {
+	  switch (format)
+	  {
+	  // We could do RGBA, but that would not be what is expected from minifb...
+	  /* case WL_SHM_FORMAT_ARGB8888: */
+	  case WL_SHM_FORMAT_XRGB8888:
+		 g_window_data.shm_format = format;
+		 break;
 
-      default:
-         break;
-      }
-   }
+	  default:
+		 break;
+	  }
+    }
 }
 
-static const struct wl_shm_listener shm_listener = {.format = shm_format};
+static const struct wl_shm_listener shm_listener = {
+    .format = shm_format
+};
 
 static void registry_global(void *data, struct wl_registry *registry,
-                            uint32_t id, char const *iface, uint32_t version)
+							uint32_t id, char const *iface, uint32_t version)
 {
-   if (strcmp(iface, "wl_compositor") == 0)
-   {
-      wl.compositor =
-         wl_registry_bind(registry, id, &wl_compositor_interface, 1);
-   }
-   else if (strcmp(iface, "wl_shm") == 0)
-   {
-      wl.shm = wl_registry_bind(registry, id, &wl_shm_interface, 1);
-      if (wl.shm)
-         wl_shm_add_listener(wl.shm, &shm_listener, NULL);
-   }
-   else if (strcmp(iface, "wl_shell") == 0)
-   {
-      wl.shell = wl_registry_bind(registry, id, &wl_shell_interface, 1);
-   }
-   else if (strcmp(iface, "wl_seat") == 0)
-   {
-      wl.seat = wl_registry_bind(registry, id, &wl_seat_interface, 1);
-      if (wl.seat)
-      {
-         wl_seat_add_listener(wl.seat, &seat_listener, NULL);
-      }
-   }
+    kUnused(data);
+    kUnused(version);
+    if (strcmp(iface, "wl_compositor") == 0)
+    {
+        g_window_data.compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
+    }
+    else if (strcmp(iface, "wl_shm") == 0)
+    {
+	  g_window_data.shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
+	  if (g_window_data.shm)
+		 wl_shm_add_listener(g_window_data.shm, &shm_listener, NULL);
+    }
+    else if (strcmp(iface, "wl_shell") == 0)
+    {
+	  g_window_data.shell = (struct wl_shell *) wl_registry_bind(registry, id, &wl_shell_interface, 1);
+    }
+    else if (strcmp(iface, "wl_seat") == 0)
+    {
+	  g_window_data.seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
+	  if (g_window_data.seat)
+	  {
+		 wl_seat_add_listener(g_window_data.seat, &seat_listener, NULL);
+	  }
+    }
 }
 
 static const struct wl_registry_listener registry_listener = {
-   .global = registry_global, .global_remove = NO_FUNC,
+    .global = registry_global, 
+    .global_remove = NO_FUNC,
 };
 
 int mfb_open(const char *title, int width, int height)
 {
-   int fd = -1;
+    int fd = -1;
 
-   wl.display = wl_display_connect(NULL);
-   if (!wl.display)
-      return -1;
-   wl.registry = wl_display_get_registry(wl.display);
-   wl_registry_add_listener(wl.registry, &registry_listener, NULL);
-   if (wl_display_roundtrip(wl.display) == -1 ||
-       wl_display_roundtrip(wl.display) == -1)
-   {
-      return -1;
-   }
+    g_window_data.shm_format = -1u;
+    g_window_data.display = wl_display_connect(NULL);
+    if (!g_window_data.display)
+	  return -1;
+    g_window_data.registry = wl_display_get_registry(g_window_data.display);
+    wl_registry_add_listener(g_window_data.registry, &registry_listener, NULL);
 
-   // did not get a format we want... meh
-   if (wl.shm_format == -1)
-      goto out;
-   if (!wl.compositor)
-      goto out;
+    init_keycodes();
 
-   char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
-   char shmfile[PATH_MAX];
-   int ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX",
-                      xdg_rt_dir);
-   if (ret >= sizeof(shmfile))
-      goto out;
+    if (wl_display_roundtrip(g_window_data.display) == -1 ||
+	    wl_display_roundtrip(g_window_data.display) == -1)
+    {
+	  return -1;
+    }
 
-   fd = mkstemp(shmfile);
-   if (fd == -1)
-      goto out;
-   unlink(shmfile);
+    // did not get a format we want... meh
+    if (g_window_data.shm_format == -1u)
+	  goto out;
+    if (!g_window_data.compositor)
+	  goto out;
 
-   uint32_t length = sizeof(uint32_t) * width * height;
+    char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
+    char shmfile[PATH_MAX];
+    uint32_t ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX",
+					  xdg_rt_dir);
+    if (ret >= sizeof(shmfile))
+	  goto out;
 
-   if (ftruncate(fd, length) == -1)
-      goto out;
+    fd = mkstemp(shmfile);
+    if (fd == -1)
+	  goto out;
+    unlink(shmfile);
 
-   wl.shm_ptr = mmap(NULL, length, PROT_WRITE, MAP_SHARED, fd, 0);
-   if (wl.shm_ptr == MAP_FAILED)
-      goto out;
+    uint32_t length = sizeof(uint32_t) * width * height;
 
-   wl.width = width;
-   wl.height = height;
-   wl.stride = width * sizeof(uint32_t);
-   wl.shm_pool = wl_shm_create_pool(wl.shm, fd, length);
-   wl.buffer = wl_shm_pool_create_buffer(wl.shm_pool, 0, wl.width, wl.height,
-                                         wl.stride, wl.shm_format);
+    if (ftruncate(fd, length) == -1)
+	  goto out;
 
-   close(fd);
-   fd = -1;
+    g_window_data.shm_ptr = (uint32_t *) mmap(NULL, length, PROT_WRITE, MAP_SHARED, fd, 0);
+    if (g_window_data.shm_ptr == MAP_FAILED)
+	  goto out;
 
-   wl.surface = wl_compositor_create_surface(wl.compositor);
-   if (!wl.surface)
-      goto out;
+    g_window_data.window_width  = width;
+    g_window_data.window_height = height;
+    g_window_data.buffer_width  = width;
+    g_window_data.buffer_height = height;
+    g_window_data.buffer_stride = width * sizeof(uint32_t);
+    g_window_data.dst_offset_x  = 0;
+    g_window_data.dst_offset_y  = 0;
+    g_window_data.dst_width     = width;
+    g_window_data.dst_height    = height;
 
-   // There should always be a shell, right?
-   if (wl.shell)
-   {
-      wl.shell_surface = wl_shell_get_shell_surface(wl.shell, wl.surface);
-      if (!wl.shell_surface)
-         goto out;
+    g_window_data.shm_pool    = wl_shm_create_pool(g_window_data.shm, fd, length);
+    g_window_data.draw_buffer = wl_shm_pool_create_buffer(g_window_data.shm_pool, 0, g_window_data.buffer_width, g_window_data.buffer_height,
+										 g_window_data.buffer_stride, g_window_data.shm_format);
 
-      wl_shell_surface_set_title(wl.shell_surface, title);
-      wl_shell_surface_set_toplevel(wl.shell_surface);
-   }
+    close(fd);
+    fd = -1;
 
-   wl_surface_attach(wl.surface, wl.buffer, 0, 0);
-   wl_surface_damage(wl.surface, 0, 0, width, height);
-   wl_surface_commit(wl.surface);
+    g_window_data.surface = wl_compositor_create_surface(g_window_data.compositor);
+    if (!g_window_data.surface)
+	  goto out;
 
-   return 1;
+    // There should always be a shell, right?
+    if (g_window_data.shell)
+    {
+	  g_window_data.shell_surface = wl_shell_get_shell_surface(g_window_data.shell, g_window_data.surface);
+	  if (!g_window_data.shell_surface)
+		 goto out;
+
+	  wl_shell_surface_set_title(g_window_data.shell_surface, title);
+	  wl_shell_surface_set_toplevel(g_window_data.shell_surface);
+    }
+
+    wl_surface_attach(g_window_data.surface, g_window_data.draw_buffer, g_window_data.dst_offset_x, g_window_data.dst_offset_y);
+    wl_surface_damage(g_window_data.surface, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    wl_surface_commit(g_window_data.surface);
+
+    return 1;
 
 out:
-   close(fd);
-   destroy();
-   return 0;
+    close(fd);
+    destroy();
+    return 0;
 }
 
 static void frame_done(void *data, struct wl_callback *callback,
-                       uint32_t cookie)
+					    uint32_t cookie)
 {
-   wl_callback_destroy(callback);
-   *(uint32_t *)data = 1;
+    kUnused(cookie);
+    wl_callback_destroy(callback);
+    *(uint32_t *)data = 1;
 }
 
 static const struct wl_callback_listener frame_listener = {
-   .done = frame_done,
+    .done = frame_done,
 };
 
 int mfb_update(void *buffer)
 {
-   uint32_t done = 0;
+    uint32_t done = 0;
 
-   if (!wl.display || wl_display_get_error(wl.display) != 0)
-      return -1;
+    if (!g_window_data.display || wl_display_get_error(g_window_data.display) != 0)
+	  return -1;
 
-   if (wl.should_close)
-      return -1;
+    if (g_window_data.close == eTrue)
+	  return -1;
 
-   // update shm buffer
-   memcpy(wl.shm_ptr, buffer, wl.stride * wl.height);
+    // update shm buffer
+    memcpy(g_window_data.shm_ptr, buffer, g_window_data.buffer_stride * g_window_data.buffer_height);
 
-   wl_surface_attach(wl.surface, wl.buffer, 0, 0);
-   wl_surface_damage(wl.surface, 0, 0, wl.width, wl.height);
+    wl_surface_attach(g_window_data.surface, g_window_data.draw_buffer, g_window_data.dst_offset_x, g_window_data.dst_offset_y);
+    wl_surface_damage(g_window_data.surface, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
 
-   struct wl_callback *frame = wl_surface_frame(wl.surface);
-   if (!frame)
-      return -1;
+    struct wl_callback *frame = wl_surface_frame(g_window_data.surface);
+    if (!frame)
+	  return -1;
 
-   wl_callback_add_listener(frame, &frame_listener, &done);
+    wl_callback_add_listener(frame, &frame_listener, &done);
 
-   wl_surface_commit(wl.surface);
+    wl_surface_commit(g_window_data.surface);
 
-   while (!done)
-      if (wl_display_dispatch(wl.display) == -1)
-      {
-         wl_callback_destroy(frame);
-         return -1;
-      }
+    while (!done) {
+        if (wl_display_dispatch(g_window_data.display) == -1)
+        {
+            wl_callback_destroy(frame);
+            return -1;
+        }
+    }
 
-   return 0;
+    static int counter = 0;
+    printf("update!: %d\n", counter++);
+
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
