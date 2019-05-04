@@ -26,7 +26,7 @@ endif()
 if (APPLE) 
     OPTION(USE_METAL_API "Build the project using metal API code" ON)
 elseif (UNIX)
-    OPTION(USE_WAYLAND_API "Build the project using wayland API code" ON)
+    OPTION(USE_WAYLAND_API "Build the project using wayland API code" OFF)
 endif()
 
 if (MSVC)

@@ -315,12 +315,12 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     kUnused(pointer);
     kUnused(time);
     kUnused(axis);
-    printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
+    //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
     if(axis == 0) {
-        kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, value / 256.0f);
+        kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, -(value / 256.0f));
     }
     else if(axis == 1) {
-        kCall(s_mouse_wheel, g_window_data.mod_keys, value / 256.0f, 0.0f);
+        kCall(s_mouse_wheel, g_window_data.mod_keys, -(value / 256.0f), 0.0f);
     }
 }
 
