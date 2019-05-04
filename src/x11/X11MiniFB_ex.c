@@ -348,11 +348,6 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         posY         = 0;
         windowWidth  = screenWidth;
         windowHeight = screenHeight;
-
-        // It seems that X11 cannot scale images ¬¬
-        g_window_data.dst_offset_x = (screenWidth  - width)  / 2;
-        g_window_data.dst_offset_y = (screenHeight - height) / 2;
-
     }
     else {
         posX         = (screenWidth  - width)  / 2;

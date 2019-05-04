@@ -27,14 +27,14 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
         case WM_KEYUP:
         case WM_SYSKEYUP:
         {
-            int kb_key     = translate_key((unsigned int)wParam, (unsigned long)lParam);
-            int is_pressed = !((lParam >> 31) & 1);
-            int kb_mods    = translate_mod();
+            int kb_key             = translate_key((unsigned int)wParam, (unsigned long)lParam);
+            int is_pressed         = !((lParam >> 31) & 1);
+            g_window_data.mod_keys = translate_mod();
 
             if (kb_key == KB_KEY_UNKNOWN)
                 return FALSE;
 
-            kCall(s_keyboard, kb_key, kb_mods, is_pressed);
+            kCall(s_keyboard, kb_key, g_window_data.mod_keys, is_pressed);
             break;
         }
 
@@ -67,7 +67,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
         case WM_XBUTTONDBLCLK:
         {
             eMouseButton button     = MOUSE_BTN_0;
-            eKeyMod      kb_mods    = translate_mod();
+            g_window_data.mod_keys  = translate_mod();
             int          is_pressed = 0;
             switch (message) {
                 case WM_LBUTTONDOWN:
@@ -92,7 +92,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
                         is_pressed = 1;
                     }
             }
-            kCall(s_mouse_btn, button, kb_mods, is_pressed);
+            kCall(s_mouse_btn, button, g_window_data.mod_keys, is_pressed);
             break;
         }
 
@@ -145,7 +145,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
 
         case WM_CLOSE:
         {
-            g_window_data.close = 1;
+            g_window_data.close = eTrue;
             break;
         }
 

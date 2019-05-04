@@ -62,7 +62,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_KEYDOWN:
         {
             if ((wParam & 0xFF) == 27)
-                g_window_data.close = 1;
+                g_window_data.close = eTrue;
 
             break;
         }
@@ -70,7 +70,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_DESTROY:
         case WM_CLOSE:
         {
-            g_window_data.close = 1;
+            g_window_data.close = eTrue;
             break;
         }
 
@@ -98,7 +98,7 @@ int mfb_update(void* buffer)
     if (buffer == 0x0)
         return -2;
 
-    if (g_window_data.close == 1)
+    if (g_window_data.close == eTrue)
         return -1;
 
     g_window_data.draw_buffer = buffer;
@@ -106,7 +106,7 @@ int mfb_update(void* buffer)
     InvalidateRect(g_window_data.window, NULL, TRUE);
     SendMessage(g_window_data.window, WM_PAINT, 0, 0);
 
-    while (g_window_data.close == 0 && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
+    while (g_window_data.close == eFalse && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -120,8 +120,9 @@ int mfb_update(void* buffer)
 void mfb_close()
 {
     g_window_data.draw_buffer = 0x0;
-    if(s_bitmapInfo != 0x0)
+    if (s_bitmapInfo != 0x0) {
         free(s_bitmapInfo);
+    }
     if (g_window_data.window != 0 && s_hdc != 0) {
         ReleaseDC(g_window_data.window, s_hdc);
         DestroyWindow(g_window_data.window);
@@ -130,6 +131,6 @@ void mfb_close()
     g_window_data.window = 0;
     s_hdc = 0;
     s_bitmapInfo = 0x0;
-    g_window_data.close = 1;
+    g_window_data.close = eTrue;
 }
 
