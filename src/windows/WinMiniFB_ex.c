@@ -126,7 +126,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
         case WM_SIZE:
         {
             g_window_data.dst_offset_x  = 0;
-            g_window_data.dst_offset_y  = 0
+            g_window_data.dst_offset_y  = 0;
             g_window_data.dst_width     = LOWORD(lParam);
             g_window_data.dst_height    = HIWORD(lParam);
             g_window_data.window_width  = g_window_data.dst_width;
