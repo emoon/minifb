@@ -10,7 +10,7 @@ extern HDC          s_hdc;
 extern BITMAPINFO   *s_bitmapInfo;
 extern long         s_window_style;
 
-eBool s_mouse_inside = eTrue;
+bool s_mouse_inside = true;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ eBool s_mouse_inside = eTrue;
 int translate_mod();
 int translate_key(unsigned int wParam, unsigned long lParam);
 
-eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsigned long lParam) 
+bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsigned long lParam) 
 {
     switch (message)
     {
@@ -66,7 +66,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
         case WM_XBUTTONDOWN:
         case WM_XBUTTONDBLCLK:
         {
-            eMouseButton button     = MOUSE_BTN_0;
+            MouseButton button     = MOUSE_BTN_0;
             g_window_data.mod_keys  = translate_mod();
             int          is_pressed = 0;
             switch (message) {
@@ -107,8 +107,8 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
             break;
 
         case WM_MOUSEMOVE:
-            if(s_mouse_inside == eFalse) {
-                s_mouse_inside = eTrue;
+            if(s_mouse_inside == false) {
+                s_mouse_inside = true;
                 TRACKMOUSEEVENT tme;
                 ZeroMemory(&tme, sizeof(tme));
                 tme.cbSize = sizeof(tme);
@@ -120,7 +120,7 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
             break;
 
         case WM_MOUSELEAVE:
-            s_mouse_inside = eFalse;
+            s_mouse_inside = false;
             break;
 
         case WM_SIZE:
@@ -136,35 +136,35 @@ eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, uns
         }
 
         case WM_SETFOCUS:
-            kCall(s_active, eTrue);
+            kCall(s_active, true);
             break;
 
         case WM_KILLFOCUS:
-            kCall(s_active, eFalse);
+            kCall(s_active, false);
             break;
 
         case WM_CLOSE:
         {
-            g_window_data.close = eTrue;
+            g_window_data.close = true;
             break;
         }
 
         default:
         {
-            return eFalse;
+            return false;
         }
     }
 
-    return eTrue;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(eKey key, eKeyMod mod, eBool isPressed) {
+void keyboard_default(Key key, KeyMod mod, bool isPressed) {
     kUnused(mod);
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE)
-        g_window_data.close = eTrue;
+        g_window_data.close = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,13 +297,13 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)
+bool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)
 {
     if(offset_x + width > g_window_data.window_width) {
-        return eFalse;
+        return false;
     }
     if(offset_y + height > g_window_data.window_height) {
-        return eFalse;
+        return false;
     }
 
     g_window_data.dst_offset_x = offset_x;
@@ -320,7 +320,7 @@ eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, uns
     //    s_bitmapInfo->bmiHeader.biHeight = height;
     //}
 
-    return eTrue;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

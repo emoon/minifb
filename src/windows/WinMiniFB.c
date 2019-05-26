@@ -16,7 +16,7 @@ long        s_window_style   = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eBool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsigned long lParam);
+bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsigned long lParam);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     LRESULT res = 0;
 
-    if (ManageMessagesEx(hWnd, (unsigned int)message, (unsigned int)wParam, (unsigned long)lParam) == eTrue) {
+    if (ManageMessagesEx(hWnd, (unsigned int)message, (unsigned int)wParam, (unsigned long)lParam) == true) {
         return res;
     }
 
@@ -62,7 +62,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_KEYDOWN:
         {
             if ((wParam & 0xFF) == 27)
-                g_window_data.close = eTrue;
+                g_window_data.close = true;
 
             break;
         }
@@ -70,7 +70,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_DESTROY:
         case WM_CLOSE:
         {
-            g_window_data.close = eTrue;
+            g_window_data.close = true;
             break;
         }
 
@@ -98,7 +98,7 @@ int mfb_update(void* buffer)
     if (buffer == 0x0)
         return -2;
 
-    if (g_window_data.close == eTrue)
+    if (g_window_data.close == true)
         return -1;
 
     g_window_data.draw_buffer = buffer;
@@ -106,7 +106,7 @@ int mfb_update(void* buffer)
     InvalidateRect(g_window_data.window, NULL, TRUE);
     SendMessage(g_window_data.window, WM_PAINT, 0, 0);
 
-    while (g_window_data.close == eFalse && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
+    while (g_window_data.close == false && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -131,6 +131,6 @@ void mfb_close()
     g_window_data.window = 0;
     s_hdc = 0;
     s_bitmapInfo = 0x0;
-    g_window_data.close = eTrue;
+    g_window_data.close = true;
 }
 

@@ -80,7 +80,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(serial);
     kUnused(surface);
     kUnused(keys);
-    kCall(s_active, eTrue);
+    kCall(s_active, true);
 }
 
 // The leave notification is sent before the enter notification for the new focus.
@@ -93,7 +93,7 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(keyboard);
     kUnused(serial);
     kUnused(surface);
-    kCall(s_active, eFalse);
+    kCall(s_active, false);
 }
 
 // A key was pressed or released. The time argument is a timestamp with 
@@ -110,8 +110,8 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     kUnused(serial);
     kUnused(time);
     if(key < 512) {
-        eKey    kb_key     = (eKey) keycodes[key];
-        eBool   is_pressed = (eBool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        Key    kb_key     = (Key) keycodes[key];
+        bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
         switch (kb_key)
         {
             case KB_KEY_LEFT_SHIFT:
@@ -147,7 +147,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 break;
         }
 
-        kCall(s_keyboard, kb_key, (eKeyMod)g_window_data.mod_keys, is_pressed);
+        kCall(s_keyboard, kb_key, (KeyMod)g_window_data.mod_keys, is_pressed);
     }
 }
 
@@ -598,7 +598,7 @@ mfb_update(void *buffer)
     if (!g_window_data.display || wl_display_get_error(g_window_data.display) != 0)
         return -1;
 
-    if (g_window_data.close == eTrue)
+    if (g_window_data.close == true)
         return -1;
 
     // update shm buffer
@@ -615,14 +615,14 @@ mfb_update(void *buffer)
 
     wl_surface_commit(g_window_data.surface);
 
-    while (!done && g_window_data.close == eFalse) {
+    while (!done && g_window_data.close == false) {
         if (wl_display_dispatch(g_window_data.display) == -1)
         {
             wl_callback_destroy(frame);
             return -1;
         }
     }
-    if(g_window_data.close == eTrue) {
+    if(g_window_data.close == true) {
         destroy(); 
     }
 
@@ -636,5 +636,5 @@ mfb_update(void *buffer)
 
 void 
 mfb_close(void) { 
-    g_window_data.close = eTrue;
+    g_window_data.close = true;
 }

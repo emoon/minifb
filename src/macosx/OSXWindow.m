@@ -7,7 +7,7 @@
 extern SWindowData g_window_data;
 extern short int g_keycodes[512];
 
-eBool gActive = eFalse;
+bool gActive = false;
 
 @implementation OSXWindow
 
@@ -165,9 +165,9 @@ eBool gActive = eFalse;
 {
     kUnused(notification);
 
-    if(gActive == eTrue) {
-        gActive = eFalse;
-        kCall(s_active, eFalse);
+    if(gActive == true) {
+        gActive = false;
+        kCall(s_active, false);
     }
 }
 
@@ -217,18 +217,18 @@ eBool gActive = eFalse;
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(s_active, eTrue);
+    kCall(s_active, true);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(s_active, eFalse);
+    kCall(s_active, false);
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
     kUnused(notification);
-    g_window_data.close = eTrue;
+    g_window_data.close = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,7 +258,7 @@ eBool gActive = eFalse;
 
 - (void)willClose
 {
-    g_window_data.close = eTrue;
+    g_window_data.close = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

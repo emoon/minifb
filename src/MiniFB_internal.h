@@ -11,7 +11,7 @@ extern "C" {
 
     short int keycodes[512];
     void init_keycodes();
-    void keyboard_default(eKey key, eKeyMod mod, eBool isPressed);
+    void keyboard_default(Key key, KeyMod mod, bool isPressed);
 
     extern mfb_active_func          s_active;
     extern mfb_resize_func          s_resize;

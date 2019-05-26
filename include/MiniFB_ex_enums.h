@@ -1,6 +1,6 @@
 #pragma once
 
-typedef enum { eFalse = 0, eTrue = 1 } eBool;
+#include <stdbool.h>
 
 typedef enum {
     MOUSE_BTN_0, // No mouse button
@@ -12,7 +12,7 @@ typedef enum {
     MOUSE_BTN_6,
     MOUSE_BTN_7,
     MOUSE_BTN_8
-} eMouseButton;
+} MouseButton;
 #define MOUSE_LAST   MOUSE_BTN_8
 #define MOUSE_LEFT   MOUSE_BTN_0
 #define MOUSE_RIGHT  MOUSE_BTN_1
@@ -140,7 +140,7 @@ typedef enum {
     KB_KEY_RIGHT_ALT     = 346,
     KB_KEY_RIGHT_SUPER   = 347,
     KB_KEY_MENU          = 348
-} eKey;
+} Key;
 #define KB_KEY_UNKNOWN  -1
 #define KB_KEY_LAST     KB_KEY_MENU
 
@@ -151,7 +151,7 @@ typedef enum {
     KB_MOD_SUPER     = 0x0008,
     KB_MOD_CAPS_LOCK = 0x0010,
     KB_MOD_NUM_LOCK  = 0x0020
-} eKeyMod;
+} KeyMod;
 
 typedef enum {
     WF_RESIZABLE          = 0x01,
@@ -159,4 +159,4 @@ typedef enum {
     WF_FULLSCREEN_DESKTOP = 0x04,
     WF_BORDERLESS         = 0x08,
     WF_ALWAYS_ON_TOP      = 0x10,
-} eWindowFlags;
+} WindowFlags;

@@ -263,7 +263,7 @@ void mfb_close()
 {
 	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
-	g_window_data.close = eTrue;
+	g_window_data.close = true;
 	if (g_window_data.window)
 		[g_window_data.window close]; 
 
@@ -284,11 +284,11 @@ static int update_events()
             [NSApp sendEvent:event];
         }
     }
-    while ((g_window_data.close == eFalse) && event);
+    while ((g_window_data.close == false) && event);
 
 	[pool release];
 
-	if(g_window_data.close == eTrue)
+	if(g_window_data.close == true)
 		return -1;
 
 	return 0;
@@ -308,7 +308,7 @@ int mfb_update(void* buffer)
 #endif
 
 	int state = update_events();
-	if(g_window_data.close == eFalse)
+	if(g_window_data.close == false)
 		[[g_window_data.window contentView] setNeedsDisplay:YES];
 
 	return state;
@@ -316,13 +316,13 @@ int mfb_update(void* buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
+bool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
 {
     if(offset_x + width > g_window_data.window_width) {
-        return eFalse;
+        return false;
     }
     if(offset_y + height > g_window_data.window_height) {
-        return eFalse;
+        return false;
     }
 
     g_window_data.dst_offset_x = offset_x;
@@ -349,7 +349,7 @@ eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, uns
     gVertices[3].y = y2;
 #endif
 
-    return eTrue;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

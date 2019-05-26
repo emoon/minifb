@@ -7,15 +7,15 @@ extern "C" {
 #endif
 
     int mfb_open_ex(const char* name, int width, int height, int flags);
-    eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+    bool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 
-    typedef void(*mfb_active_func)(eBool isActive);
+    typedef void(*mfb_active_func)(bool isActive);
     typedef void(*mfb_resize_func)(int width, int height);
-    typedef void(*mfb_keyboard_func)(eKey key, eKeyMod mod, eBool isPressed);
+    typedef void(*mfb_keyboard_func)(Key key, KeyMod mod, bool isPressed);
     typedef void(*mfb_char_input_func)(unsigned int code);
-    typedef void(*mfb_mouse_btn_func)(eMouseButton button, eKeyMod mod, eBool isPressed);
+    typedef void(*mfb_mouse_btn_func)(MouseButton button, KeyMod mod, bool isPressed);
     typedef void(*mfb_mouse_move_func)(int x, int y);
-    typedef void(*mfb_mouse_scroll_func)(eKeyMod mod, float deltaX, float deltaY);
+    typedef void(*mfb_mouse_scroll_func)(KeyMod mod, float deltaX, float deltaY);
 
     void mfb_active_callback(mfb_active_func callback);
     void mfb_resize_callback(mfb_resize_func callback);

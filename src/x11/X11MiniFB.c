@@ -34,7 +34,7 @@ static int processEvents()
 {
 	XEvent event;
 
-	while ((g_window_data.close == eFalse) && XPending(g_window_data.display)) {
+	while ((g_window_data.close == false) && XPending(g_window_data.display)) {
 		XNextEvent(g_window_data.display, &event);
 
 		switch (event.type) {
@@ -52,7 +52,7 @@ static int processEvents()
 			case ButtonPress:
 			case ButtonRelease:
 			{
-				eMouseButton button     = event.xbutton.button;
+				MouseButton button     = event.xbutton.button;
 				int          is_pressed = (event.type == ButtonPress);
 				g_window_data.mod_keys = translate_mod(event.xkey.state);
 				switch (button) {
@@ -106,11 +106,11 @@ static int processEvents()
 			break;
 
 			case FocusIn:
-				kCall(s_active, eTrue);
+				kCall(s_active, true);
 				break;
 
 			case FocusOut:
-				kCall(s_active, eFalse);
+				kCall(s_active, false);
 				break;
 
 			case DestroyNotify:
@@ -119,7 +119,7 @@ static int processEvents()
 		}
 	}
 
-	if(g_window_data.close == eTrue)
+	if(g_window_data.close == true)
 		return -1;
 
 	return 0;
@@ -182,5 +182,5 @@ void mfb_close(void)
 		g_window_data.display = 0x0;
 		g_window_data.window  = 0;
 	}
-	g_window_data.close = eTrue;
+	g_window_data.close = true;
 }

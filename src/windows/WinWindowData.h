@@ -21,5 +21,5 @@ typedef struct {
     uint32_t    buffer_height;
     
     uint32_t    mod_keys;
-    eBool       close;
+    bool       close;
 } SWindowData;

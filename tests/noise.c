@@ -10,7 +10,7 @@ static unsigned int s_buffer[WIDTH * HEIGHT];
 //-------------------------------------
 // C interface
 //-------------------------------------
-void active(eBool isActive) {
+void active(bool isActive) {
     fprintf(stdout, "active: %d\n", isActive);
 }
 
@@ -30,7 +30,7 @@ void resize(int width, int height) {
     mfb_set_viewport(x, y, width, height);
 }
 
-void keyboard(eKey key, eKeyMod mod, eBool isPressed) {
+void keyboard(Key key, KeyMod mod, bool isPressed) {
     fprintf(stdout, "keyboard: key: %d (pressed: %d) [KeyMod: %x]\n", key, isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
         mfb_close();
@@ -41,7 +41,7 @@ void char_input(unsigned int charCode) {
     fprintf(stdout, "charCode: %d\n", charCode);
 }
 
-void mouse_btn(eMouseButton button, eKeyMod mod, eBool isPressed) {
+void mouse_btn(MouseButton button, KeyMod mod, bool isPressed) {
     fprintf(stdout, "mouse_btn: button: %d (pressed: %d) [KeyMod: %x]\n", button, isPressed, mod);
 }
 
@@ -49,7 +49,7 @@ void mouse_move(int x, int y) {
     //fprintf(stdout, "mouse_move: %d, %d\n", x, y);
 }
 
-void mouse_scroll(eKeyMod mod, float deltaX, float deltaY) {
+void mouse_scroll(KeyMod mod, float deltaX, float deltaY) {
     fprintf(stdout, "mouse_scroll: x: %f, y: %f [KeyMod: %x]\n", deltaX, deltaY, mod);
 }
 
@@ -60,7 +60,7 @@ void mouse_scroll(eKeyMod mod, float deltaX, float deltaY) {
 
 class Events {
 public:
-    void active(eBool isActive) {
+    void active(bool isActive) {
         ::active(isActive);
     }
 
@@ -68,7 +68,7 @@ public:
         ::resize(width, height);
     }
 
-    void keyboard(eKey key, eKeyMod mod, eBool isPressed) {
+    void keyboard(Key key, KeyMod mod, bool isPressed) {
         ::keyboard(key, mod, isPressed);
     }
 
@@ -76,7 +76,7 @@ public:
         ::char_input(charCode);
     }
 
-    void mouse_btn(eMouseButton button, eKeyMod mod, eBool isPressed) {
+    void mouse_btn(MouseButton button, KeyMod mod, bool isPressed) {
         ::mouse_btn(button, mod, isPressed);
     }
 
@@ -84,7 +84,7 @@ public:
         ::mouse_move(x, y);
     }
 
-    void mouse_scroll(eKeyMod mod, float deltaX, float deltaY) {
+    void mouse_scroll(KeyMod mod, float deltaX, float deltaY) {
         ::mouse_scroll(mod, deltaX, deltaY);
     }
 };

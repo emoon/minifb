@@ -275,11 +275,11 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(eKey key, eKeyMod mod, eBool isPressed) {
+void keyboard_default(Key key, KeyMod mod, bool isPressed) {
     kUnused(mod);
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE) {
-        g_window_data.close = eTrue;
+        g_window_data.close = true;
     }
 }
 
@@ -438,18 +438,18 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
     return 1;    
 }
 
-eBool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
+bool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
 {
     if(offset_x + width > g_window_data.window_width) {
-        return eFalse;
+        return false;
     }
     if(offset_y + height > g_window_data.window_height) {
-        return eFalse;
+        return false;
     }
 
     g_window_data.dst_offset_x = offset_x;
     g_window_data.dst_offset_y = offset_y;
     g_window_data.dst_width    = width;
     g_window_data.dst_height   = height;
-    return eTrue;
+    return true;
 }
