@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define kUnused(var)    (void) var;
+
 #define WIDTH 800
 #define HEIGHT 600
 static unsigned int s_buffer[WIDTH * HEIGHT];
@@ -9,14 +11,16 @@ static unsigned int s_buffer[WIDTH * HEIGHT];
 //-------------------------------------
 // C interface
 //-------------------------------------
-void active(bool isActive) {
+void active(void *user_data, bool isActive) {
+    kUnused(user_data);
     fprintf(stdout, "active: %d\n", isActive);
 }
 
-void resize(int width, int height) {
+void resize(void *user_data, int width, int height) {
     uint32_t x = 0;
     uint32_t y = 0;
 
+    kUnused(user_data);
     fprintf(stdout, "resize: %d, %d\n", width, height);
     if(width > WIDTH) {
         x = (width - WIDTH) >> 1;
@@ -29,26 +33,33 @@ void resize(int width, int height) {
     mfb_set_viewport(x, y, width, height);
 }
 
-void keyboard(Key key, KeyMod mod, bool isPressed) {
+void keyboard(void *user_data, Key key, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
     fprintf(stdout, "keyboard: key: %d (pressed: %d) [KeyMod: %x]\n", key, isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
         mfb_close();
     }    
 }
 
-void char_input(unsigned int charCode) {
+void char_input(void *user_data, unsigned int charCode) {
+    kUnused(user_data);
     fprintf(stdout, "charCode: %d\n", charCode);
 }
 
-void mouse_btn(MouseButton button, KeyMod mod, bool isPressed) {
+void mouse_btn(void *user_data, MouseButton button, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
     fprintf(stdout, "mouse_btn: button: %d (pressed: %d) [KeyMod: %x]\n", button, isPressed, mod);
 }
 
-void mouse_move(int x, int y) {
+void mouse_move(void *user_data, int x, int y) {
+    kUnused(user_data);
+    kUnused(x);
+    kUnused(y);
     //fprintf(stdout, "mouse_move: %d, %d\n", x, y);
 }
 
-void mouse_scroll(KeyMod mod, float deltaX, float deltaY) {
+void mouse_scroll(void *user_data, KeyMod mod, float deltaX, float deltaY) {
+    kUnused(user_data);
     fprintf(stdout, "mouse_scroll: x: %f, y: %f [KeyMod: %x]\n", deltaX, deltaY, mod);
 }
 
@@ -59,32 +70,32 @@ void mouse_scroll(KeyMod mod, float deltaX, float deltaY) {
 
 class Events {
 public:
-    void active(bool isActive) {
-        ::active(isActive);
+    void active(void *user_data, bool isActive) {
+        ::active(user_data, isActive);
     }
 
-    void resize(int width, int height) {
-        ::resize(width, height);
+    void resize(void *user_data, int width, int height) {
+        ::resize(user_data, width, height);
     }
 
-    void keyboard(Key key, KeyMod mod, bool isPressed) {
-        ::keyboard(key, mod, isPressed);
+    void keyboard(void *user_data, Key key, KeyMod mod, bool isPressed) {
+        ::keyboard(user_data, key, mod, isPressed);
     }
 
-    void char_input(unsigned int charCode) {
-        ::char_input(charCode);
+    void char_input(void *user_data, unsigned int charCode) {
+        ::char_input(user_data, charCode);
     }
 
-    void mouse_btn(MouseButton button, KeyMod mod, bool isPressed) {
-        ::mouse_btn(button, mod, isPressed);
+    void mouse_btn(void *user_data, MouseButton button, KeyMod mod, bool isPressed) {
+        ::mouse_btn(user_data, button, mod, isPressed);
     }
 
-    void mouse_move(int x, int y) {
-        ::mouse_move(x, y);
+    void mouse_move(void *user_data, int x, int y) {
+        ::mouse_move(user_data, x, y);
     }
 
-    void mouse_scroll(KeyMod mod, float deltaX, float deltaY) {
-        ::mouse_scroll(mod, deltaX, deltaY);
+    void mouse_scroll(void *user_data, KeyMod mod, float deltaX, float deltaY) {
+        ::mouse_scroll(user_data, mod, deltaX, deltaY);
     }
 };
 

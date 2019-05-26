@@ -183,7 +183,7 @@ extern Vertex gVertices[4];
 - (void)mouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(s_mouse_btn, MOUSE_BTN_1, g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +191,7 @@ extern Vertex gVertices[4];
 - (void)mouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(s_mouse_btn, MOUSE_BTN_1, g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,7 +199,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(s_mouse_btn, MOUSE_BTN_2, g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, MOUSE_BTN_2, g_window_data.mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +207,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(s_mouse_btn, MOUSE_BTN_1, g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -215,7 +215,7 @@ extern Vertex gVertices[4];
 - (void)otherMouseDown:(NSEvent *)event
 {
     (void)event;
-    kCall(s_mouse_btn, [event buttonNumber], g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,14 +223,14 @@ extern Vertex gVertices[4];
 - (void)otherMouseUp:(NSEvent *)event
 {
     (void)event;
-    kCall(s_mouse_btn, [event buttonNumber], g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)scrollWheel:(NSEvent *)event
 {
-    kCall(s_mouse_wheel, g_window_data.mod_keys, [event deltaX], [event deltaY]);
+    kCall(g_mouse_wheel_func, g_window_data.mod_keys, [event deltaX], [event deltaY]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +254,7 @@ extern Vertex gVertices[4];
 {
     NSPoint point = [event locationInWindow];
     //NSPoint localPoint = [self convertPoint:point fromView:nil];
-    kCall(s_mouse_move, point.x, point.y);
+    kCall(g_mouse_move_func, point.x, point.y);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

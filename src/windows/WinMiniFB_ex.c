@@ -34,7 +34,7 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
             if (kb_key == KB_KEY_UNKNOWN)
                 return FALSE;
 
-            kCall(s_keyboard, kb_key, g_window_data.mod_keys, is_pressed);
+            kCall(g_keyboard_func, kb_key, g_window_data.mod_keys, is_pressed);
             break;
         }
 
@@ -49,7 +49,7 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
                 return TRUE;
             }
 
-            kCall(s_char_input, wParam);
+            kCall(g_char_input_func, wParam);
             break;
         }
 
@@ -92,18 +92,18 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
                         is_pressed = 1;
                     }
             }
-            kCall(s_mouse_btn, button, g_window_data.mod_keys, is_pressed);
+            kCall(g_mouse_btn_func, button, g_window_data.mod_keys, is_pressed);
             break;
         }
 
         case WM_MOUSEWHEEL:
-            kCall(s_mouse_wheel, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
+            kCall(g_mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             break;
 
         case WM_MOUSEHWHEEL:
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
-            kCall(s_mouse_wheel, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
+            kCall(g_mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
             break;
 
         case WM_MOUSEMOVE:
@@ -116,7 +116,7 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
                 tme.hwndTrack = hWnd;
                 TrackMouseEvent(&tme);
             }
-            kCall(s_mouse_move, ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam)));
+            kCall(g_mouse_move_func, ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam)));
             break;
 
         case WM_MOUSELEAVE:
@@ -131,16 +131,16 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
             g_window_data.dst_height    = HIWORD(lParam);
             g_window_data.window_width  = g_window_data.dst_width;
             g_window_data.window_height = g_window_data.dst_height;
-            kCall(s_resize, g_window_data.dst_width, g_window_data.dst_height);
+            kCall(g_resize_func, g_window_data.dst_width, g_window_data.dst_height);
             break;
         }
 
         case WM_SETFOCUS:
-            kCall(s_active, true);
+            kCall(g_active_func, true);
             break;
 
         case WM_KILLFOCUS:
-            kCall(s_active, false);
+            kCall(g_active_func, false);
             break;
 
         case WM_CLOSE:
@@ -160,7 +160,8 @@ bool ManageMessagesEx(HWND hWnd, unsigned int message, unsigned int wParam, unsi
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(Key key, KeyMod mod, bool isPressed) {
+void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
     kUnused(mod);
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE)
@@ -288,7 +289,7 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
 
     s_hdc = GetDC(g_window_data.window);
 
-    if (s_keyboard == 0x0) {
+    if (g_keyboard_func == 0x0) {
         mfb_keyboard_callback(keyboard_default);
     }
 

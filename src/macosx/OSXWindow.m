@@ -4,8 +4,8 @@
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
 
-extern SWindowData g_window_data;
-extern short int g_keycodes[512];
+extern SWindowData  g_window_data;
+extern short int    g_keycodes[512];
 
 bool gActive = false;
 
@@ -93,22 +93,22 @@ bool gActive = false;
         if(keyCode != KB_KEY_UNKNOWN) {
             mod_keys_aux = mod_keys ^ g_window_data.mod_keys;
             if(mod_keys_aux & KB_MOD_CAPS_LOCK) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
             }
             if(mod_keys_aux & KB_MOD_SHIFT) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
             }
             if(mod_keys_aux & KB_MOD_CONTROL) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
             }
             if(mod_keys_aux & KB_MOD_ALT) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
             }
             if(mod_keys_aux & KB_MOD_SUPER) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
             }
             if(mod_keys_aux & KB_MOD_NUM_LOCK) {
-                kCall(s_keyboard, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
+                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
             }
         }
     }
@@ -123,7 +123,7 @@ bool gActive = false;
 - (void)keyDown:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(s_keyboard, keyCode, g_window_data.mod_keys, true);
+    kCall(g_keyboard_func, keyCode, g_window_data.mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +131,7 @@ bool gActive = false;
 - (void)keyUp:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(s_keyboard, keyCode, g_window_data.mod_keys, false);
+    kCall(g_keyboard_func, keyCode, g_window_data.mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,7 +155,7 @@ bool gActive = false;
         if ((code & 0xff00) == 0xf700)
             continue;
 
-        kCall(s_char_input, code);
+        kCall(g_char_input_func, code);
     }
 }
 
@@ -167,7 +167,7 @@ bool gActive = false;
 
     if(gActive == true) {
         gActive = false;
-        kCall(s_active, false);
+        kCall(g_active_func, false);
     }
 }
 
@@ -217,13 +217,13 @@ bool gActive = false;
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(s_active, true);
+    kCall(g_active_func, true);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(s_active, false);
+    kCall(g_active_func, false);
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
@@ -270,7 +270,7 @@ bool gActive = false;
     g_window_data.window_width  = size.width;
     g_window_data.window_height = size.height;
 
-    kCall(s_resize, size.width, size.height);
+    kCall(g_resize_func, size.width, size.height);
 }
 
 @end

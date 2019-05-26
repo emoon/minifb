@@ -80,7 +80,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(serial);
     kUnused(surface);
     kUnused(keys);
-    kCall(s_active, true);
+    kCall(g_active_func, true);
 }
 
 // The leave notification is sent before the enter notification for the new focus.
@@ -93,7 +93,7 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(keyboard);
     kUnused(serial);
     kUnused(surface);
-    kCall(s_active, false);
+    kCall(g_active_func, false);
 }
 
 // A key was pressed or released. The time argument is a timestamp with 
@@ -147,7 +147,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 break;
         }
 
-        kCall(s_keyboard, kb_key, (KeyMod)g_window_data.mod_keys, is_pressed);
+        kCall(g_keyboard_func, kb_key, (KeyMod)g_window_data.mod_keys, is_pressed);
     }
 }
 
@@ -256,7 +256,7 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
     kUnused(pointer);
     kUnused(time);
     //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
-    kCall(s_mouse_move, sx >> 24, sy >> 24);
+    kCall(g_mouse_move_func, sx >> 24, sy >> 24);
 }
 
 // Mouse button click and release notifications.
@@ -285,7 +285,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
     kUnused(serial);
     kUnused(time);
     //printf("Pointer button '%d'(%d)\n", button, state);
-    kCall(s_mouse_btn, button - BTN_MOUSE + 1, g_window_data.mod_keys, state == 1);
+    kCall(g_mouse_btn_func, button - BTN_MOUSE + 1, g_window_data.mod_keys, state == 1);
 }
 
 //  Scroll and other axis notifications.
@@ -317,10 +317,10 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     kUnused(axis);
     //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
     if(axis == 0) {
-        kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, -(value / 256.0f));
+        kCall(g_mouse_wheel_func, g_window_data.mod_keys, 0.0f, -(value / 256.0f));
     }
     else if(axis == 1) {
-        kCall(s_mouse_wheel, g_window_data.mod_keys, -(value / 256.0f), 0.0f);
+        kCall(g_mouse_wheel_func, g_window_data.mod_keys, -(value / 256.0f), 0.0f);
     }
 }
 

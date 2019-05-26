@@ -165,7 +165,7 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
 
     g_window_data.image = XCreateImage(g_window_data.display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, width * 4);
 
-    if (s_keyboard == 0x0) {
+    if (g_keyboard_func == 0x0) {
         mfb_keyboard_callback(keyboard_default);
     }
 
@@ -198,7 +198,7 @@ static int processEvents()
 				int is_pressed = (event.type == KeyPress);
 				g_window_data.mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
 
-				kCall(s_keyboard, kb_key, g_window_data.mod_keys, is_pressed);
+				kCall(g_keyboard_func, kb_key, g_window_data.mod_keys, is_pressed);
 			}
 			break;
 
@@ -212,32 +212,32 @@ static int processEvents()
 					case Button1:
 					case Button2:
 					case Button3:
-						kCall(s_mouse_btn, button, g_window_data.mod_keys, is_pressed);
+						kCall(g_mouse_btn_func, button, g_window_data.mod_keys, is_pressed);
 						break;
 
 					case Button4:
-						kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, 1.0f);
+						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 0.0f, 1.0f);
 						break;
 					case Button5:
-						kCall(s_mouse_wheel, g_window_data.mod_keys, 0.0f, -1.0f);
+						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 0.0f, -1.0f);
 						break;
 
 					case 6:
-						kCall(s_mouse_wheel, g_window_data.mod_keys, 1.0f, 0.0f);
+						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 1.0f, 0.0f);
 						break;
 					case 7:
-						kCall(s_mouse_wheel, g_window_data.mod_keys, -1.0f, 0.0f);
+						kCall(g_mouse_wheel_func, g_window_data.mod_keys, -1.0f, 0.0f);
 						break;
 
 					default:
-						kCall(s_mouse_btn, button - 4, g_window_data.mod_keys, is_pressed);
+						kCall(g_mouse_btn_func, button - 4, g_window_data.mod_keys, is_pressed);
 						break;
 				}
 			}
 			break;
 
 			case MotionNotify:
-				kCall(s_mouse_move, event.xmotion.x, event.xmotion.y);
+				kCall(g_mouse_move_func, event.xmotion.x, event.xmotion.y);
 				break;
 
 			case ConfigureNotify: 
@@ -250,7 +250,7 @@ static int processEvents()
 				g_window_data.dst_height   = g_window_data.window_height;
 
 				XClearWindow(g_window_data.display, g_window_data.window);
-				kCall(s_resize, g_window_data.window_width, g_window_data.window_height);
+				kCall(g_resize_func, g_window_data.window_width, g_window_data.window_height);
 			}
 			break;
 
@@ -259,11 +259,11 @@ static int processEvents()
 			break;
 
 			case FocusIn:
-				kCall(s_active, true);
+				kCall(g_active_func, true);
 				break;
 
 			case FocusOut:
-				kCall(s_active, false);
+				kCall(g_active_func, false);
 				break;
 
 			case DestroyNotify:
@@ -602,7 +602,8 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(Key key, KeyMod mod, bool isPressed) {
+void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
     kUnused(mod);
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE) {

@@ -1,47 +1,52 @@
 #include "MiniFB.h"
 
 //-------------------------------------
-mfb_active_func         s_active      = 0x0;
-mfb_resize_func         s_resize      = 0x0;
-mfb_keyboard_func       s_keyboard    = 0x0;
-mfb_char_input_func     s_char_input  = 0x0;
-mfb_mouse_btn_func      s_mouse_btn   = 0x0;
-mfb_mouse_move_func     s_mouse_move  = 0x0;
-mfb_mouse_scroll_func   s_mouse_wheel = 0x0;
+mfb_active_func         g_active_func      = 0x0;
+mfb_resize_func         g_resize_func      = 0x0;
+mfb_keyboard_func       g_keyboard_func    = 0x0;
+mfb_char_input_func     g_char_input_func  = 0x0;
+mfb_mouse_btn_func      g_mouse_btn_func   = 0x0;
+mfb_mouse_move_func     g_mouse_move_func  = 0x0;
+mfb_mouse_scroll_func   g_mouse_wheel_func = 0x0;
+
+void                    *g_user_data       = 0x0;
 
 //-------------------------------------
 void mfb_active_callback(mfb_active_func callback) {
-    s_active = callback;
+    g_active_func = callback;
 }
 
 //-------------------------------------
 void mfb_resize_callback(mfb_resize_func callback) {
-    s_resize = callback;
+    g_resize_func = callback;
 }
 
 //-------------------------------------
 void mfb_keyboard_callback(mfb_keyboard_func callback) {
-    s_keyboard = callback;
+    g_keyboard_func = callback;
 }
 
 //-------------------------------------
 void mfb_char_input_callback(mfb_char_input_func callback) {
-    s_char_input = callback;
+    g_char_input_func = callback;
 }
 
 //-------------------------------------
 void mfb_mouse_button_callback(mfb_mouse_btn_func callback) {
-    s_mouse_btn = callback;
+    g_mouse_btn_func = callback;
 }
 
 //-------------------------------------
 void mfb_mouse_move_callback(mfb_mouse_move_func callback) {
-    s_mouse_move = callback;
+    g_mouse_move_func = callback;
 }
 
 //-------------------------------------
 void mfb_mouse_scroll_callback(mfb_mouse_scroll_func callback) {
-    s_mouse_wheel = callback;
+    g_mouse_wheel_func = callback;
 }
 
-
+//-------------------------------------
+void mfb_set_user_data(void *user_data) {
+    g_user_data = user_data;
+}
