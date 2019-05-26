@@ -3,7 +3,7 @@
 #if defined(__cplusplus)
 
 #include <functional>
-#include "MiniFB_ex.h"
+#include "MiniFB.h"
 
 template <class T>
 void mfb_active_callback(T *obj, void (T::*method)(bool));

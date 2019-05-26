@@ -2,7 +2,7 @@
 #import "OSXWindowFrameView.h"
 #include "OSXWindowData.h"
 #include <MiniFB_internal.h>
-#include <MiniFB_ex_enums.h>
+#include <MiniFB_enums.h>
 
 extern SWindowData g_window_data;
 extern short int g_keycodes[512];

@@ -1,6 +1,6 @@
 #include <MiniFB.h>
 #include "MiniFB_internal.h"
-#include "MiniFB_ex_enums.h"
+#include "MiniFB_enums.h"
 #include "WaylandWindowData.h"
 
 #include <wayland-client.h>

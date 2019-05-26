@@ -1,6 +1,6 @@
 #pragma once
 
-#include <MiniFB_ex_enums.h>
+#include <MiniFB_enums.h>
 #include <stdint.h>
 
 struct wl_display;

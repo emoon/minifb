@@ -1,5 +1,4 @@
 #include <MiniFB.h>
-#include <MiniFB_ex.h>
 #include <stdio.h>
 #include <stdint.h>
 

@@ -1,5 +1,5 @@
-#include <MiniFB_ex_cpp.h>
-#include <MiniFB_ex_enums.h>
+#include <MiniFB_cpp.h>
+#include <MiniFB_enums.h>
 
 std::function<void(bool)>                          Stub::m_active;
 std::function<void(int, int)>                       Stub::m_resize;

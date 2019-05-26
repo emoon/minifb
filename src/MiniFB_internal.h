@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MiniFB_ex.h"
+#include "MiniFB.h"
 
 #define kCall(f, ...)   if((f)) (f)(__VA_ARGS__);
 #define kUnused(var)    (void) var;

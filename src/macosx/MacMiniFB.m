@@ -2,7 +2,7 @@
 #include "OSXWindowFrameView.h"
 #include "OSXWindowData.h"
 #include <MiniFB.h>
-#include <MiniFB_ex_enums.h>
+#include <MiniFB_enums.h>
 #include <Cocoa/Cocoa.h>
 #if defined(USE_METAL_API)
 #include <Carbon/Carbon.h>

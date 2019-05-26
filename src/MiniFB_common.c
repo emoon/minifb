@@ -1,4 +1,4 @@
-#include "MiniFB_ex.h"
+#include "MiniFB.h"
 
 //-------------------------------------
 mfb_active_func         s_active      = 0x0;
