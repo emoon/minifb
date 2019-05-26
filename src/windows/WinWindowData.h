@@ -8,6 +8,11 @@
 
 typedef struct {
     HWND        window;
+    WNDCLASS    s_wc;
+    HDC         s_hdc;
+    BITMAPINFO  *s_bitmapInfo;
+    bool        s_mouse_inside;
+
     uint32_t    window_width;
     uint32_t    window_height;
 
@@ -21,5 +26,5 @@ typedef struct {
     uint32_t    buffer_height;
     
     uint32_t    mod_keys;
-    bool       close;
+    bool        close;
 } SWindowData;

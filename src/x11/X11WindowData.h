@@ -20,7 +20,7 @@ typedef struct {
     uint32_t    buffer_height;
     
     uint32_t    mod_keys;
-    bool       close;
+    bool        close;
 
     Display     *display;
     int         screen;

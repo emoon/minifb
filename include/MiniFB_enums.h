@@ -19,6 +19,8 @@ typedef enum {
 #define MOUSE_MIDDLE MOUSE_BTN_2
 
 typedef enum {
+    KB_KEY_UNKNOWN       = -1,
+
     KB_KEY_SPACE         = 32,
     KB_KEY_APOSTROPHE    = 39,
     KB_KEY_COMMA         = 44,
@@ -141,7 +143,6 @@ typedef enum {
     KB_KEY_RIGHT_SUPER   = 347,
     KB_KEY_MENU          = 348
 } Key;
-#define KB_KEY_UNKNOWN  -1
 #define KB_KEY_LAST     KB_KEY_MENU
 
 typedef enum {

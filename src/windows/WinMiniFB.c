@@ -8,16 +8,12 @@
 
 SWindowData g_window_data  = { 0 };
 
-WNDCLASS    s_wc           = { 0 };
-HDC         s_hdc          = 0;
-BITMAPINFO  *s_bitmapInfo  = 0x0;
 long        s_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
-bool        s_mouse_inside = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_mod();
-int translate_key(unsigned int wParam, unsigned long lParam);
+uint32_t translate_mod();
+Key translate_key(unsigned int wParam, unsigned long lParam);
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -30,22 +26,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (g_window_data.draw_buffer)
             {
                 if (g_window_data.dst_offset_x > 0) {
-                    BitBlt(s_hdc, 0, g_window_data.dst_offset_y, g_window_data.dst_offset_x, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
+                    BitBlt(g_window_data.s_hdc, 0, g_window_data.dst_offset_y, g_window_data.dst_offset_x, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
                 }
                 if (g_window_data.dst_offset_y > 0) {
-                    BitBlt(s_hdc, 0, 0, g_window_data.window_width, g_window_data.dst_offset_y, 0, 0, 0, BLACKNESS);
+                    BitBlt(g_window_data.s_hdc, 0, 0, g_window_data.window_width, g_window_data.dst_offset_y, 0, 0, 0, BLACKNESS);
                 }
                 uint32_t offsetY = g_window_data.dst_offset_y + g_window_data.dst_height;
                 if (offsetY < g_window_data.window_height) {
-                    BitBlt(s_hdc, 0, offsetY, g_window_data.window_width, g_window_data.window_height-offsetY, 0, 0, 0, BLACKNESS);
+                    BitBlt(g_window_data.s_hdc, 0, offsetY, g_window_data.window_width, g_window_data.window_height-offsetY, 0, 0, 0, BLACKNESS);
                 }
                 uint32_t offsetX = g_window_data.dst_offset_x + g_window_data.dst_width;
                 if (offsetX < g_window_data.window_width) {
-                    BitBlt(s_hdc, offsetX, g_window_data.dst_offset_y, g_window_data.window_width-offsetX, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
+                    BitBlt(g_window_data.s_hdc, offsetX, g_window_data.dst_offset_y, g_window_data.window_width-offsetX, g_window_data.dst_height, 0, 0, 0, BLACKNESS);
                 }
 
-                StretchDIBits(s_hdc, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.draw_buffer, 
-                              s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+                StretchDIBits(g_window_data.s_hdc, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.draw_buffer, 
+                              g_window_data.s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
                 ValidateRect(hWnd, NULL);
             }
@@ -65,7 +61,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_KEYUP:
         case WM_SYSKEYUP:
         {
-            int kb_key             = translate_key((unsigned int)wParam, (unsigned long)lParam);
+            Key kb_key             = translate_key((unsigned int)wParam, (unsigned long)lParam);
             int is_pressed         = !((lParam >> 31) & 1);
             g_window_data.mod_keys = translate_mod();
 
@@ -145,8 +141,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case WM_MOUSEMOVE:
-            if(s_mouse_inside == false) {
-                s_mouse_inside = true;
+            if(g_window_data.s_mouse_inside == false) {
+                g_window_data.s_mouse_inside = true;
                 TRACKMOUSEEVENT tme;
                 ZeroMemory(&tme, sizeof(tme));
                 tme.cbSize = sizeof(tme);
@@ -158,7 +154,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case WM_MOUSELEAVE:
-            s_mouse_inside = false;
+            g_window_data.s_mouse_inside = false;
             break;
 
         case WM_SIZE:
@@ -265,11 +261,11 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom + rect.top) / 2;
     }
 
-    s_wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-    s_wc.lpfnWndProc   = WndProc;
-    s_wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    s_wc.lpszClassName = title;
-    RegisterClass(&s_wc);
+    g_window_data.s_wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
+    g_window_data.s_wc.lpfnWndProc   = WndProc;
+    g_window_data.s_wc.hCursor       = LoadCursor(0, IDC_ARROW);
+    g_window_data.s_wc.lpszClassName = title;
+    RegisterClass(&g_window_data.s_wc);
 
     if (g_window_data.dst_width == 0)
         g_window_data.dst_width = width;
@@ -296,18 +292,18 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
 
     ShowWindow(g_window_data.window, SW_NORMAL);
 
-    s_bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
-    s_bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    s_bitmapInfo->bmiHeader.biPlanes      = 1;
-    s_bitmapInfo->bmiHeader.biBitCount    = 32;
-    s_bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
-    s_bitmapInfo->bmiHeader.biWidth       = g_window_data.buffer_width;
-    s_bitmapInfo->bmiHeader.biHeight      = -(LONG)g_window_data.buffer_height;
-    s_bitmapInfo->bmiColors[0].rgbRed     = 0xff;
-    s_bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
-    s_bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
+    g_window_data.s_bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
+    g_window_data.s_bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    g_window_data.s_bitmapInfo->bmiHeader.biPlanes      = 1;
+    g_window_data.s_bitmapInfo->bmiHeader.biBitCount    = 32;
+    g_window_data.s_bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
+    g_window_data.s_bitmapInfo->bmiHeader.biWidth       = g_window_data.buffer_width;
+    g_window_data.s_bitmapInfo->bmiHeader.biHeight      = -(LONG)g_window_data.buffer_height;
+    g_window_data.s_bitmapInfo->bmiColors[0].rgbRed     = 0xff;
+    g_window_data.s_bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
+    g_window_data.s_bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
 
-    s_hdc = GetDC(g_window_data.window);
+    g_window_data.s_hdc = GetDC(g_window_data.window);
 
     if (g_keyboard_func == 0x0) {
         mfb_keyboard_callback(keyboard_default);
@@ -351,17 +347,17 @@ int mfb_update(void* buffer)
 void mfb_close()
 {
     g_window_data.draw_buffer = 0x0;
-    if (s_bitmapInfo != 0x0) {
-        free(s_bitmapInfo);
+    if (g_window_data.s_bitmapInfo != 0x0) {
+        free(g_window_data.s_bitmapInfo);
     }
-    if (g_window_data.window != 0 && s_hdc != 0) {
-        ReleaseDC(g_window_data.window, s_hdc);
+    if (g_window_data.window != 0 && g_window_data.s_hdc != 0) {
+        ReleaseDC(g_window_data.window, g_window_data.s_hdc);
         DestroyWindow(g_window_data.window);
     }
 
     g_window_data.window = 0;
-    s_hdc = 0;
-    s_bitmapInfo = 0x0;
+    g_window_data.s_hdc = 0;
+    g_window_data.s_bitmapInfo = 0x0;
     g_window_data.close = true;
 }
 
@@ -377,8 +373,8 @@ void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_mod() {
-    int mods = 0;
+uint32_t translate_mod() {
+    uint32_t mods = 0;
 
     if (GetKeyState(VK_SHIFT) & 0x8000)
         mods |= KB_MOD_SHIFT;
@@ -531,7 +527,7 @@ void init_keycodes() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_key(unsigned int wParam, unsigned long lParam) {
+Key translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == VK_CONTROL) {
         MSG next;
         DWORD time;
@@ -551,7 +547,7 @@ int translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == VK_PROCESSKEY)
         return KB_KEY_UNKNOWN;
 
-    return keycodes[HIWORD(lParam) & 0x1FF];
+    return (Key) keycodes[HIWORD(lParam) & 0x1FF];
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
