@@ -502,7 +502,7 @@ mfb_open(const char *title, int width, int height)
 
     init_keycodes();
 
-    if (wl_display_roundtrip(g_window_data.display) == -1 || wl_display_roundtrip(g_window_data.display) == -1)
+    if (wl_display_dispatch(g_window_data.display) == -1 || wl_display_roundtrip(g_window_data.display) == -1)
     {
         return -1;
     }
@@ -623,7 +623,7 @@ mfb_update(void *buffer)
     wl_surface_commit(g_window_data.surface);
 
     while (!done && g_window_data.close == false) {
-        if (wl_display_dispatch(g_window_data.display) == -1)
+    if (wl_display_dispatch(g_window_data.display) == -1 || wl_display_roundtrip(g_window_data.display) == -1)
         {
             wl_callback_destroy(frame);
             return -1;
