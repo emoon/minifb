@@ -2,9 +2,7 @@
 
 #include "MiniFB.h"
 
-extern void *g_user_data;
-
-#define kCall(f, ...)   if((f)) (f)(g_user_data, __VA_ARGS__);
+#define kCall(f, ...)   if((f)) (f)((struct Window *) window_data, __VA_ARGS__);
 #define kUnused(var)    (void) var;
 
 #if defined(__cplusplus)
@@ -13,7 +11,7 @@ extern "C" {
 
     short int keycodes[512];
     void init_keycodes();
-    void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed);
+    void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed);
 
     extern mfb_active_func          g_active_func;
     extern mfb_resize_func          g_resize_func;

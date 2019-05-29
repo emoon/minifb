@@ -6,67 +6,67 @@
 #include "MiniFB.h"
 
 template <class T>
-void mfb_active_callback(T *obj, void (T::*method)(void *, bool));
+void mfb_active_callback(T *obj, void (T::*method)(struct Window *, bool));
 
 template <class T>
-void mfb_resize_callback(T *obj, void (T::*method)(void *, int, int));
+void mfb_resize_callback(T *obj, void (T::*method)(struct Window *, int, int));
 
 template <class T>
-void mfb_keyboard_callback(T *obj, void (T::*method)(void *, Key, KeyMod, bool));
+void mfb_keyboard_callback(T *obj, void (T::*method)(struct Window *, Key, KeyMod, bool));
 
 template <class T>
-void mfb_char_input_callback(T *obj, void (T::*method)(void *, unsigned int));
+void mfb_char_input_callback(T *obj, void (T::*method)(struct Window *, unsigned int));
 
 template <class T>
-void mfb_mouse_button_callback(T *obj, void (T::*method)(void *, MouseButton, KeyMod, bool));
+void mfb_mouse_button_callback(T *obj, void (T::*method)(struct Window *, MouseButton, KeyMod, bool));
 
 template <class T>
-void mfb_mouse_move_callback(T *obj, void (T::*method)(void *, int, int));
+void mfb_mouse_move_callback(T *obj, void (T::*method)(struct Window *, int, int));
 
 template <class T>
-void mfb_mouse_scroll_callback(T *obj, void (T::*method)(void *, KeyMod, float, float));
+void mfb_mouse_scroll_callback(T *obj, void (T::*method)(struct Window *, KeyMod, float, float));
 
 //-------------------------------------
 // To avoid clumsy hands
 //-------------------------------------
 class Stub {
     template <class T>
-    friend void mfb_active_callback(T *obj, void (T::*method)(void *, bool));
+    friend void mfb_active_callback(T *obj, void (T::*method)(struct Window *, bool));
     template <class T>
-    friend void mfb_resize_callback(T *obj, void (T::*method)(void *, int, int));
+    friend void mfb_resize_callback(T *obj, void (T::*method)(struct Window *, int, int));
     template <class T>
-    friend void mfb_mouse_button_callback(T *obj, void (T::*method)(void *, MouseButton, KeyMod, bool));
+    friend void mfb_mouse_button_callback(T *obj, void (T::*method)(struct Window *, MouseButton, KeyMod, bool));
     template <class T>
-    friend void mfb_keyboard_callback(T *obj, void (T::*method)(void *, Key, KeyMod, bool));
+    friend void mfb_keyboard_callback(T *obj, void (T::*method)(struct Window *, Key, KeyMod, bool));
     template <class T>
-    friend void mfb_char_input_callback(T *obj, void (T::*method)(void *, unsigned int));
+    friend void mfb_char_input_callback(T *obj, void (T::*method)(struct Window *, unsigned int));
     template <class T>
-    friend void mfb_mouse_button_callback(T *obj, void (T::*method)(void *, MouseButton, KeyMod, bool));
+    friend void mfb_mouse_button_callback(T *obj, void (T::*method)(struct Window *, MouseButton, KeyMod, bool));
     template <class T>
-    friend void mfb_mouse_move_callback(T *obj, void (T::*method)(void *, int, int));
+    friend void mfb_mouse_move_callback(T *obj, void (T::*method)(struct Window *, int, int));
     template <class T>
-    friend void mfb_mouse_scroll_callback(T *obj, void (T::*method)(void *, KeyMod, float, float));
+    friend void mfb_mouse_scroll_callback(T *obj, void (T::*method)(struct Window *, KeyMod, float, float));
 
-    static void active_stub(void *user_data, bool isActive);
-    static void resize_stub(void *user_data, int width, int height);
-    static void keyboard_stub(void *user_data, Key key, KeyMod mod, bool isPressed);
-    static void char_input_stub(void *user_data, unsigned int);
-    static void mouse_btn_stub(void *user_data, MouseButton button, KeyMod mod, bool isPressed);
-    static void mouse_move_stub(void *user_data, int x, int y);
-    static void scroll_stub(void *user_data, KeyMod mod, float deltaX, float deltaY);
+    static void active_stub(struct Window *window, bool isActive);
+    static void resize_stub(struct Window *window, int width, int height);
+    static void keyboard_stub(struct Window *window, Key key, KeyMod mod, bool isPressed);
+    static void char_input_stub(struct Window *window, unsigned int);
+    static void mouse_btn_stub(struct Window *window, MouseButton button, KeyMod mod, bool isPressed);
+    static void mouse_move_stub(struct Window *window, int x, int y);
+    static void scroll_stub(struct Window *window, KeyMod mod, float deltaX, float deltaY);
 
-    static std::function<void(void *user_data, bool)>                        m_active;
-    static std::function<void(void *user_data, int, int)>                    m_resize;
-    static std::function<void(void *user_data, Key, KeyMod, bool)>           m_keyboard;
-    static std::function<void(void *user_data, unsigned int)>                m_char_input;
-    static std::function<void(void *user_data, MouseButton, KeyMod, bool)>   m_mouse_btn;
-    static std::function<void(void *user_data, int, int)>                    m_mouse_move;
-    static std::function<void(void *user_data, KeyMod, float, float)>        m_scroll;
+    static std::function<void(struct Window *window, bool)>                        m_active;
+    static std::function<void(struct Window *window, int, int)>                    m_resize;
+    static std::function<void(struct Window *window, Key, KeyMod, bool)>           m_keyboard;
+    static std::function<void(struct Window *window, unsigned int)>                m_char_input;
+    static std::function<void(struct Window *window, MouseButton, KeyMod, bool)>   m_mouse_btn;
+    static std::function<void(struct Window *window, int, int)>                    m_mouse_move;
+    static std::function<void(struct Window *window, KeyMod, float, float)>        m_scroll;
 };
 
 //-------------------------------------
 template <class T>
-inline void mfb_active_callback(T *obj, void (T::*method)(void *user_data, bool)) {
+inline void mfb_active_callback(T *obj, void (T::*method)(struct Window *window, bool)) {
     using namespace std::placeholders;
 
     Stub::m_active = std::bind(method, obj, _1, _2);
@@ -74,7 +74,7 @@ inline void mfb_active_callback(T *obj, void (T::*method)(void *user_data, bool)
 }
 
 template <class T>
-inline void mfb_resize_callback(T *obj, void (T::*method)(void *user_data, int, int)) {
+inline void mfb_resize_callback(T *obj, void (T::*method)(struct Window *window, int, int)) {
     using namespace std::placeholders;
 
     Stub::m_resize = std::bind(method, obj, _1, _2, _3);
@@ -82,7 +82,7 @@ inline void mfb_resize_callback(T *obj, void (T::*method)(void *user_data, int, 
 }
 
 template <class T>
-inline void mfb_keyboard_callback(T *obj, void (T::*method)(void *user_data, Key, KeyMod, bool)) {
+inline void mfb_keyboard_callback(T *obj, void (T::*method)(struct Window *window, Key, KeyMod, bool)) {
     using namespace std::placeholders;
 
     Stub::m_keyboard = std::bind(method, obj, _1, _2, _3, _4);
@@ -90,7 +90,7 @@ inline void mfb_keyboard_callback(T *obj, void (T::*method)(void *user_data, Key
 }
 
 template <class T>
-inline void mfb_char_input_callback(T *obj, void (T::*method)(void *user_data, unsigned int)) {
+inline void mfb_char_input_callback(T *obj, void (T::*method)(struct Window *window, unsigned int)) {
     using namespace std::placeholders;
 
     Stub::m_char_input = std::bind(method, obj, _1, _2);
@@ -98,7 +98,7 @@ inline void mfb_char_input_callback(T *obj, void (T::*method)(void *user_data, u
 }
 
 template <class T>
-inline void mfb_mouse_button_callback(T *obj, void (T::*method)(void *user_data, MouseButton, KeyMod, bool)) {
+inline void mfb_mouse_button_callback(T *obj, void (T::*method)(struct Window *window, MouseButton, KeyMod, bool)) {
     using namespace std::placeholders;
 
     Stub::m_mouse_btn = std::bind(method, obj, _1, _2, _3, _4);
@@ -106,7 +106,7 @@ inline void mfb_mouse_button_callback(T *obj, void (T::*method)(void *user_data,
 }
 
 template <class T>
-inline void mfb_mouse_move_callback(T *obj, void (T::*method)(void *user_data, int, int)) {
+inline void mfb_mouse_move_callback(T *obj, void (T::*method)(struct Window *window, int, int)) {
     using namespace std::placeholders;
 
     Stub::m_mouse_move = std::bind(method, obj, _1, _2, _3);
@@ -114,7 +114,7 @@ inline void mfb_mouse_move_callback(T *obj, void (T::*method)(void *user_data, i
 }
 
 template <class T>
-inline void mfb_mouse_scroll_callback(T *obj, void (T::*method)(void *user_data, KeyMod, float, float)) {
+inline void mfb_mouse_scroll_callback(T *obj, void (T::*method)(struct Window *window, KeyMod, float, float)) {
     using namespace std::placeholders;
 
     Stub::m_scroll = std::bind(method, obj, _1, _2, _3, _4);

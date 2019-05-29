@@ -3,6 +3,14 @@
 #include <stdbool.h>
 
 typedef enum {
+    STATE_OK             =  0,
+    STATE_EXIT           = -1,
+    STATE_INVALID_WINDOW = -2,
+    STATE_INVALID_BUFFER = -3,
+    STATE_INTERNAL_ERROR = -4,
+} UpdateState;
+
+typedef enum {
     MOUSE_BTN_0, // No mouse button
     MOUSE_BTN_1,
     MOUSE_BTN_2,

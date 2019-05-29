@@ -43,7 +43,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 StretchDIBits(g_window_data.s_hdc, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.draw_buffer, 
                               g_window_data.s_bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
-                ValidateRect(hWnd, NULL);
+                ValidateRect(hWnd, 0x0);
             }
 
             break;
@@ -188,14 +188,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int mfb_open_ex(const char* title, int width, int height, int flags) {
+int mfb_open_ex(const char *title, int width, int height, int flags) {
     RECT rect = { 0 };
     int  x, y;
 
     init_keycodes();
 
-    g_window_data.buffer_width = width;
+    g_window_data.buffer_width  = width;
     g_window_data.buffer_height = height;
+    g_window_data.buffer_stride = width * 4;
 
     s_window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
     if (flags & WF_FULLSCREEN) {
@@ -312,13 +313,13 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
     return 1;
 }
 
-int mfb_open(const char* title, int width, int height) {
+int mfb_open(const char *title, int width, int height) {
     return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int mfb_update(void* buffer)
+UpdateState mfb_update(void* buffer)
 {
     MSG msg;
     
@@ -330,7 +331,7 @@ int mfb_update(void* buffer)
 
     g_window_data.draw_buffer = buffer;
 
-    InvalidateRect(g_window_data.window, NULL, TRUE);
+    InvalidateRect(g_window_data.window, 0x0, TRUE);
     SendMessage(g_window_data.window, WM_PAINT, 0, 0);
 
     while (g_window_data.close == false && PeekMessage(&msg, g_window_data.window, 0, 0, PM_REMOVE))
@@ -363,7 +364,7 @@ void mfb_close()
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
+void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed) {
     kUnused(user_data);
     kUnused(mod);
     kUnused(isPressed);
@@ -536,7 +537,7 @@ Key translate_key(unsigned int wParam, unsigned long lParam) {
             return KB_KEY_RIGHT_CONTROL;
 
         time = GetMessageTime();
-        if (PeekMessageW(&next, NULL, 0, 0, PM_NOREMOVE))
+        if (PeekMessageW(&next, 0x0, 0, 0, PM_NOREMOVE))
             if (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN || next.message == WM_KEYUP || next.message == WM_SYSKEYUP)
                 if (next.wParam == VK_MENU && (next.lParam & 0x01000000) && next.time == time)
                     return KB_KEY_UNKNOWN;

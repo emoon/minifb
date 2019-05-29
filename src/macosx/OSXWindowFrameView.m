@@ -3,28 +3,24 @@
 #include "OSXWindowData.h"
 #include <MiniFB_internal.h>
 
-extern SWindowData  g_window_data;
-
 #if defined(USE_METAL_API)
 #import <MetalKit/MetalKit.h>
 
-id<MTLDevice> g_metal_device;
-id<MTLCommandQueue> g_command_queue;
-id<MTLLibrary> g_library;
-id<MTLRenderPipelineState> g_pipeline_state;
+extern id<MTLDevice>  g_metal_device;
+extern id<MTLLibrary> g_library;
 
 extern Vertex gVertices[4];
 
 @implementation WindowViewController
 
--(void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size
+- (void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size
 {
 	(void)view;
 	(void)size;
     // resize
 }
 
--(void)drawInMTKView:(nonnull MTKView *)view
+- (void)drawInMTKView:(nonnull MTKView *)view
 {
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     //   by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
@@ -42,7 +38,9 @@ extern Vertex gVertices[4];
                 mipmapLevel:0 withBytes:m_draw_buffer bytesPerRow:bytesPerRow];
 
     // Create a new command buffer for each render pass to the current drawable
-    id<MTLCommandBuffer> commandBuffer = [g_command_queue commandBuffer];
+    OSXWindow     *window          = (OSXWindow *) view.window;
+    OSXWindowData *window_data_osx = (OSXWindowData *) window->window_data->specific;
+    id<MTLCommandBuffer> commandBuffer = [window_data_osx->metal.command_queue commandBuffer];
     commandBuffer.label = @"minifb_command_buffer";
 
     // Add completion hander which signals _inFlightSemaphore when Metal and the GPU has fully
@@ -69,7 +67,9 @@ extern Vertex gVertices[4];
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
-        [renderEncoder setRenderPipelineState:g_pipeline_state];
+        OSXWindow     *window          = (OSXWindow *) view.window;
+        OSXWindowData *window_data_osx = (OSXWindowData *) window->window_data->specific;
+        [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
         [renderEncoder setVertexBytes:gVertices
                        length:sizeof(gVertices)
@@ -103,7 +103,7 @@ extern Vertex gVertices[4];
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(USE_METAL_API)
--(void)updateTrackingAreas
+- (void)updateTrackingAreas
 {
     if(trackingArea != nil) {
         [self removeTrackingArea:trackingArea];
@@ -142,16 +142,20 @@ extern Vertex gVertices[4];
 {
 	(void)rect;
 
-	if (!g_window_data.window || !g_window_data.draw_buffer)
+    if(!window_data)
+        return;
+
+    OSXWindowData *window_data_osx = (OSXWindowData *) window_data->specific;    
+	if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
 		return;
 
 	CGContextRef context = [[NSGraphicsContext currentContext] graphicsPort];
 
 	CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-	CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, g_window_data.draw_buffer, g_window_data.buffer_width * g_window_data.buffer_height * 4, NULL); 
+	CGDataProviderRef provider = CGDataProviderCreateWithData(0x0, window_data->draw_buffer, window_data->buffer_width * window_data->buffer_height * 4, 0x0); 
 
-	CGImageRef img = CGImageCreate(g_window_data.buffer_width, g_window_data.buffer_height, 8, 32, g_window_data.buffer_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little, 
-								   provider, NULL, false, kCGRenderingIntentDefault);
+	CGImageRef img = CGImageCreate(window_data->buffer_width, window_data->buffer_height, 8, 32, window_data->buffer_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little, 
+								   provider, 0x0, false, kCGRenderingIntentDefault);
 
     const CGFloat components[] = {0.0f, 0.0f, 0.0f, 1.0f};
     const CGColorRef black = CGColorCreate(space, components);
@@ -159,12 +163,12 @@ extern Vertex gVertices[4];
 	CGColorSpaceRelease(space);
 	CGDataProviderRelease(provider);
 
-    if(g_window_data.dst_offset_x != 0 || g_window_data.dst_offset_y != 0 || g_window_data.dst_width != g_window_data.window_width || g_window_data.dst_height != g_window_data.window_height) {
+    if(window_data->dst_offset_x != 0 || window_data->dst_offset_y != 0 || window_data->dst_width != window_data->window_width || window_data->dst_height != window_data->window_height) {
         CGContextSetFillColorWithColor(context, black);
-        CGContextFillRect(context, CGRectMake(0, 0, g_window_data.window_width, g_window_data.window_height));
+        CGContextFillRect(context, CGRectMake(0, 0, window_data->window_width, window_data->window_height));
     }
     
-	CGContextDrawImage(context, CGRectMake(g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height), img);
+	CGContextDrawImage(context, CGRectMake(window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height), img);
 
 	CGImageRelease(img);
 }
@@ -183,7 +187,7 @@ extern Vertex gVertices[4];
 - (void)mouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +195,7 @@ extern Vertex gVertices[4];
 - (void)mouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,7 +203,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_2, g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +211,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -215,7 +219,7 @@ extern Vertex gVertices[4];
 - (void)otherMouseDown:(NSEvent *)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, true);
+    kCall(g_mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,14 +227,14 @@ extern Vertex gVertices[4];
 - (void)otherMouseUp:(NSEvent *)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, false);
+    kCall(g_mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)scrollWheel:(NSEvent *)event
 {
-    kCall(g_mouse_wheel_func, g_window_data.mod_keys, [event deltaX], [event deltaY]);
+    kCall(g_mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

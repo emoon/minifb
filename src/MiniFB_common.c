@@ -1,5 +1,5 @@
 #include "MiniFB.h"
-
+#include "WindowData.h"
 //-------------------------------------
 mfb_active_func         g_active_func      = 0x0;
 mfb_resize_func         g_resize_func      = 0x0;
@@ -8,8 +8,6 @@ mfb_char_input_func     g_char_input_func  = 0x0;
 mfb_mouse_btn_func      g_mouse_btn_func   = 0x0;
 mfb_mouse_move_func     g_mouse_move_func  = 0x0;
 mfb_mouse_scroll_func   g_mouse_wheel_func = 0x0;
-
-void                    *g_user_data       = 0x0;
 
 //-------------------------------------
 void mfb_active_callback(mfb_active_func callback) {
@@ -47,6 +45,12 @@ void mfb_mouse_scroll_callback(mfb_mouse_scroll_func callback) {
 }
 
 //-------------------------------------
-void mfb_set_user_data(void *user_data) {
-    g_user_data = user_data;
+void mfb_set_user_data(struct Window *window, void *user_data) {
+    SWindowData *window_data = (SWindowData *) window;
+    window_data->user_data = user_data;
+}
+
+void *mfb_get_user_data(struct Window *window) {
+    SWindowData *window_data = (SWindowData *) window;
+    return window_data->user_data;
 }

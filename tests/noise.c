@@ -11,16 +11,15 @@ static unsigned int s_buffer[WIDTH * HEIGHT];
 //-------------------------------------
 // C interface
 //-------------------------------------
-void active(void *user_data, bool isActive) {
-    kUnused(user_data);
+void active(struct Window *window, bool isActive) {
+    kUnused(window);
     fprintf(stdout, "active: %d\n", isActive);
 }
 
-void resize(void *user_data, int width, int height) {
+void resize(struct Window *window, int width, int height) {
     uint32_t x = 0;
     uint32_t y = 0;
 
-    kUnused(user_data);
     fprintf(stdout, "resize: %d, %d\n", width, height);
     if(width > WIDTH) {
         x = (width - WIDTH) >> 1;
@@ -30,36 +29,35 @@ void resize(void *user_data, int width, int height) {
         y = (height - HEIGHT) >> 1;
         height = HEIGHT;
     }
-    mfb_set_viewport(x, y, width, height);
+    mfb_set_viewport(window, x, y, width, height);
 }
 
-void keyboard(void *user_data, Key key, KeyMod mod, bool isPressed) {
-    kUnused(user_data);
+void keyboard(struct Window *window, Key key, KeyMod mod, bool isPressed) {
     fprintf(stdout, "keyboard: key: %d (pressed: %d) [KeyMod: %x]\n", key, isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
-        mfb_close();
+        mfb_close(window);
     }    
 }
 
-void char_input(void *user_data, unsigned int charCode) {
-    kUnused(user_data);
+void char_input(struct Window *window, unsigned int charCode) {
+    kUnused(window);
     fprintf(stdout, "charCode: %d\n", charCode);
 }
 
-void mouse_btn(void *user_data, MouseButton button, KeyMod mod, bool isPressed) {
-    kUnused(user_data);
+void mouse_btn(struct Window *window, MouseButton button, KeyMod mod, bool isPressed) {
+    kUnused(window);
     fprintf(stdout, "mouse_btn: button: %d (pressed: %d) [KeyMod: %x]\n", button, isPressed, mod);
 }
 
-void mouse_move(void *user_data, int x, int y) {
-    kUnused(user_data);
+void mouse_move(struct Window *window, int x, int y) {
+    kUnused(window);
     kUnused(x);
     kUnused(y);
     //fprintf(stdout, "mouse_move: %d, %d\n", x, y);
 }
 
-void mouse_scroll(void *user_data, KeyMod mod, float deltaX, float deltaY) {
-    kUnused(user_data);
+void mouse_scroll(struct Window *window, KeyMod mod, float deltaX, float deltaY) {
+    kUnused(window);
     fprintf(stdout, "mouse_scroll: x: %f, y: %f [KeyMod: %x]\n", deltaX, deltaY, mod);
 }
 
@@ -70,32 +68,32 @@ void mouse_scroll(void *user_data, KeyMod mod, float deltaX, float deltaY) {
 
 class Events {
 public:
-    void active(void *user_data, bool isActive) {
-        ::active(user_data, isActive);
+    void active(struct Window *window, bool isActive) {
+        ::active(window, isActive);
     }
 
-    void resize(void *user_data, int width, int height) {
-        ::resize(user_data, width, height);
+    void resize(struct Window *window, int width, int height) {
+        ::resize(window, width, height);
     }
 
-    void keyboard(void *user_data, Key key, KeyMod mod, bool isPressed) {
-        ::keyboard(user_data, key, mod, isPressed);
+    void keyboard(struct Window *window, Key key, KeyMod mod, bool isPressed) {
+        ::keyboard(window, key, mod, isPressed);
     }
 
-    void char_input(void *user_data, unsigned int charCode) {
-        ::char_input(user_data, charCode);
+    void char_input(struct Window *window, unsigned int charCode) {
+        ::char_input(window, charCode);
     }
 
-    void mouse_btn(void *user_data, MouseButton button, KeyMod mod, bool isPressed) {
-        ::mouse_btn(user_data, button, mod, isPressed);
+    void mouse_btn(struct Window *window, MouseButton button, KeyMod mod, bool isPressed) {
+        ::mouse_btn(window, button, mod, isPressed);
     }
 
-    void mouse_move(void *user_data, int x, int y) {
-        ::mouse_move(user_data, x, y);
+    void mouse_move(struct Window *window, int x, int y) {
+        ::mouse_move(window, x, y);
     }
 
-    void mouse_scroll(void *user_data, KeyMod mod, float deltaX, float deltaY) {
-        ::mouse_scroll(user_data, mod, deltaX, deltaY);
+    void mouse_scroll(struct Window *window, KeyMod mod, float deltaX, float deltaY) {
+        ::mouse_scroll(window, mod, deltaX, deltaY);
     }
 };
 
@@ -131,12 +129,14 @@ int main()
 
 #endif
 
-    if (!mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE))
+    struct Window *window = mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    if (!window)
         return 0;
 
     for (;;)
     {
-        int i, state;
+        int         i;
+        UpdateState state;
 
         for (i = 0; i < WIDTH * HEIGHT; ++i)
         {
@@ -151,13 +151,13 @@ int main()
             s_buffer[i] = MFB_RGB(noise, noise, noise); 
         }
 
-        state = mfb_update(s_buffer);
+        state = mfb_update(window, s_buffer);
 
-        if (state < 0)
+        if (state != STATE_OK)
             break;
     }
 
-    mfb_close();
+    mfb_close(window);
 
     return 0;
 }
