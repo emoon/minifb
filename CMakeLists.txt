@@ -55,7 +55,7 @@ add_library(minifb STATIC
 )
 
 add_executable(noise 
-    tests/noise2.cpp
+    tests/noise.c
 )
 
 target_link_libraries(noise minifb)

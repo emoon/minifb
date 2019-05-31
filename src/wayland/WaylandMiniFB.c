@@ -518,17 +518,25 @@ static const struct wl_registry_listener registry_listener = {
 static void
 handle_ping(void *data, struct wl_shell_surface *shell_surface, uint32_t serial)
 {
+    kUnused(data);
     wl_shell_surface_pong(shell_surface, serial);
 }
 
 static void
 handle_configure(void *data, struct wl_shell_surface *shell_surface, uint32_t edges, int32_t width, int32_t height)
 {
+    kUnused(data);
+    kUnused(shell_surface);
+    kUnused(edges);
+    kUnused(width);
+    kUnused(height);
 }
 
 static void
 handle_popup_done(void *data, struct wl_shell_surface *shell_surface)
 {
+    kUnused(data);
+    kUnused(shell_surface);
 }
 
 static const struct wl_shell_surface_listener shell_surface_listener = {
@@ -703,7 +711,7 @@ mfb_update(struct Window *window, void *buffer)
     wl_surface_commit(window_data_way->surface);
 
     while (!done && window_data->close == false) {
-        if (wl_display_dispatch(window_data.display) == -1 || wl_display_roundtrip(window_data.display) == -1)
+        if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1)
         {
             wl_callback_destroy(frame_callback);
             return STATE_INTERNAL_ERROR;
