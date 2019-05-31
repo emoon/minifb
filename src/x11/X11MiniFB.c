@@ -10,7 +10,7 @@
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
 #include "WindowData.h"
-#include "X11WindowData.h"
+#include "WindowData_X11.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,8 +31,8 @@ mfb_open_ex(const char *title, int width, int height, int flags) {
     SWindowData *window_data = malloc(sizeof(SWindowData));
     memset(window_data, 0, sizeof(SWindowData));
 
-    X11WindowData *window_data_x11 = malloc(sizeof(X11WindowData));
-    memset(window_data_x11, 0, sizeof(X11WindowData));
+    SWindowData_X11 *window_data_x11 = malloc(sizeof(SWindowData_X11));
+    memset(window_data_x11, 0, sizeof(SWindowData_X11));
     window_data->specific = window_data_x11;
 
     window_data_x11->display = XOpenDisplay(0);
@@ -199,7 +199,7 @@ int translate_mod_ex(int key, int state, int is_pressed);
 static void processEvents(SWindowData *window_data)
 {
 	XEvent          event;
-    X11WindowData   *window_data_x11 = (X11WindowData *) window_data->specific;
+    SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
 	while ((window_data->close == false) && XPending(window_data_x11->display)) {
 		XNextEvent(window_data_x11->display, &event);
@@ -308,7 +308,7 @@ UpdateState mfb_update(struct Window *window, void* buffer)
         return STATE_INVALID_BUFFER;
     }
 
-    X11WindowData *window_data_x11 = (X11WindowData *) window_data->specific;
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
     if (window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
         if(window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
@@ -349,14 +349,14 @@ void destroy(SWindowData *window_data)
 {
     if(window_data != 0x0) {
         if(window_data->specific != 0x0) {
-            X11WindowData   *window_data_x11 = (X11WindowData *) window_data->specific;
+            SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
             if(window_data_x11->image != 0x0) {
                 window_data_x11->image->data = 0x0;
                 XDestroyImage(window_data_x11->image);
                 XDestroyWindow(window_data_x11->display, window_data_x11->window);
                 XCloseDisplay(window_data_x11->display);
             }
-            memset(window_data_x11, 0, sizeof(X11WindowData));
+            memset(window_data_x11, 0, sizeof(SWindowData_X11));
             free(window_data_x11);
         }
         memset(window_data, 0, sizeof(SWindowData));
@@ -539,7 +539,7 @@ static int translateKeyCodeA(int keySym) {
     return KB_KEY_UNKNOWN;
 }
 
-void init_keycodes(X11WindowData *window_data_x11) {
+void init_keycodes(SWindowData_X11 *window_data_x11) {
     size_t i;
     int keySym;
 

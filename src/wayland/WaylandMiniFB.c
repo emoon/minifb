@@ -2,7 +2,7 @@
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
-#include "WaylandWindowData.h"
+#include "WindowData_Way.h"
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -25,9 +25,9 @@ destroy_window_data(SWindowData *window_data)
     if(window_data == 0x0)
         return;
 
-    WaylandWindowData   *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if(window_data_way != 0x0) {
-        memset(window_data_way, 0, sizeof(WaylandWindowData));
+        memset(window_data_way, 0, sizeof(SWindowData_Way));
         free(window_data_way);
     }
     memset(window_data, 0, sizeof(SWindowData));
@@ -40,7 +40,7 @@ destroy(SWindowData *window_data)
     if(window_data == 0x0)
         return;
     
-    WaylandWindowData *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == 0x0 || window_data_way->display == 0x0) {
         destroy_window_data(window_data);
         return;
@@ -240,7 +240,7 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     struct wl_cursor_image *image;
 
     SWindowData *window_data = (SWindowData *) data;
-    WaylandWindowData *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
 
     image  = window_data_way->default_cursor->images[0];
     buffer = wl_cursor_image_get_buffer(image);
@@ -403,7 +403,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     kUnused(data);
 
     SWindowData         *window_data = (SWindowData *) data;
-    WaylandWindowData   *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_way->keyboard)
     {
         window_data_way->keyboard = wl_seat_get_keyboard(seat);
@@ -453,7 +453,7 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
     kUnused(shm);
 
     SWindowData         *window_data     = (SWindowData *) data;
-    WaylandWindowData   *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way->shm_format == -1u)
     {
         switch (format)
@@ -482,7 +482,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     kUnused(version);
 
     SWindowData         *window_data     = (SWindowData *) data;
-    WaylandWindowData   *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (strcmp(iface, "wl_compositor") == 0)
     {
         window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
@@ -554,8 +554,8 @@ mfb_open(const char *title, int width, int height)
     SWindowData *window_data = malloc(sizeof(SWindowData));
     memset(window_data, 0, sizeof(SWindowData));
 
-    WaylandWindowData *window_data_way = malloc(sizeof(WaylandWindowData));
-    memset(window_data_way, 0, sizeof(WaylandWindowData));
+    SWindowData_Way *window_data_way = malloc(sizeof(SWindowData_Way));
+    memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data->specific = window_data_way;
 
     window_data_way->shm_format = -1u;
@@ -686,7 +686,7 @@ mfb_update(struct Window *window, void *buffer)
         return STATE_INVALID_BUFFER;
     }
 
-    WaylandWindowData   *window_data_way = (WaylandWindowData *) window_data->specific;
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
         return STATE_INTERNAL_ERROR;
 

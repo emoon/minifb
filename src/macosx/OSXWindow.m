@@ -1,6 +1,6 @@
 #import "OSXWindow.h"
 #import "OSXWindowFrameView.h"
-#include "OSXWindowData.h"
+#include "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
 
@@ -166,7 +166,7 @@ extern short int    g_keycodes[512];
 {
     kUnused(notification);
 
-    OSXWindowData *window_data_osx = (OSXWindowData *) window_data->specific;
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
     if(window_data_osx->active == true) {
         window_data_osx->active = false;
         kCall(g_active_func, false);

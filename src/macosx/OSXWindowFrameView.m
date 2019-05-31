@@ -1,6 +1,6 @@
 #import "OSXWindowFrameView.h"
 #import "OSXWindow.h"
-#include "OSXWindowData.h"
+#include "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 
 #if defined(USE_METAL_API)
@@ -39,7 +39,7 @@ extern Vertex gVertices[4];
 
     // Create a new command buffer for each render pass to the current drawable
     OSXWindow     *window          = (OSXWindow *) view.window;
-    OSXWindowData *window_data_osx = (OSXWindowData *) window->window_data->specific;
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
     id<MTLCommandBuffer> commandBuffer = [window_data_osx->metal.command_queue commandBuffer];
     commandBuffer.label = @"minifb_command_buffer";
 
@@ -68,7 +68,7 @@ extern Vertex gVertices[4];
 
         // Set render command encoder state
         OSXWindow     *window          = (OSXWindow *) view.window;
-        OSXWindowData *window_data_osx = (OSXWindowData *) window->window_data->specific;
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
         [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
         [renderEncoder setVertexBytes:gVertices
@@ -145,7 +145,7 @@ extern Vertex gVertices[4];
     if(!window_data)
         return;
 
-    OSXWindowData *window_data_osx = (OSXWindowData *) window_data->specific;    
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;    
 	if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
 		return;
 

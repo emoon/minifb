@@ -17,4 +17,4 @@ typedef struct {
     XImage      *image_scaler;
     uint32_t    image_scaler_width;
     uint32_t    image_scaler_height;
-} X11WindowData;
+} SWindowData_X11;

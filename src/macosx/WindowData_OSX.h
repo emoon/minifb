@@ -18,4 +18,4 @@ typedef struct {
         } metal;
 #endif        
     bool        active;
-} OSXWindowData;
+} SWindowData_OSX;

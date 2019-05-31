@@ -5,6 +5,7 @@ include_directories(include src)
 
 file(GLOB SrcLib       "src/*.c" 
                        "src/*.cpp" 
+                       "src/*.h"
                        "include/*.h")
 file(GLOB SrcWindows   "src/windows/*.c" 
                        "src/windows/*.h")

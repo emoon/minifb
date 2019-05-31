@@ -1,6 +1,6 @@
 #include "OSXWindow.h"
 #include "OSXWindowFrameView.h"
-#include "OSXWindowData.h"
+#include "WindowData_OSX.h"
 #include <MiniFB.h>
 #include <MiniFB_enums.h>
 #include <Cocoa/Cocoa.h>
@@ -84,7 +84,7 @@ NSString* g_shadersSrc = @
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(USE_METAL_API)
-static bool create_shaders(OSXWindowData *window_data_osx) {
+static bool create_shaders(SWindowData_OSX *window_data_osx) {
     // Error
     NSError* nsError = 0x0;
     NSError** nsErrorPtr = &nsError;
@@ -151,8 +151,8 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags)
     SWindowData *window_data = malloc(sizeof(SWindowData));
     memset(window_data, 0, sizeof(SWindowData));
 
-    OSXWindowData *window_data_osx = malloc(sizeof(OSXWindowData));
-    memset(window_data_osx, 0, sizeof(OSXWindowData));
+    SWindowData_OSX *window_data_osx = malloc(sizeof(SWindowData_OSX));
+    memset(window_data_osx, 0, sizeof(SWindowData_OSX));
     window_data->specific = window_data_osx;
 
     window_data->window_width  = width;
@@ -176,7 +176,7 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags)
         return 0x0;
     }
 
-    if (!create_shaders((OSXWindowData *) window_data->specific)) {
+    if (!create_shaders((SWindowData_OSX *) window_data->specific)) {
         return 0x0;
     }
 #endif
@@ -283,9 +283,9 @@ static void destroy_window_data(SWindowData *window_data)
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
-    OSXWindowData   *window_data_osx = (OSXWindowData *) window_data->specific;
+    SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
     if(window_data_osx != 0x0) {
-        memset(window_data_osx, 0, sizeof(OSXWindowData));
+        memset(window_data_osx, 0, sizeof(SWindowData_OSX));
         free(window_data_osx);
     }
     memset(window_data, 0, sizeof(SWindowData));
@@ -339,7 +339,7 @@ UpdateState mfb_update(struct Window *window, void* buffer)
 
     update_events(window_data);
     if(window_data->close == false) {
-        OSXWindowData *window_data_osx = (OSXWindowData *) window_data->specific;
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
         [[window_data_osx->window contentView] setNeedsDisplay:YES];
     }
 
