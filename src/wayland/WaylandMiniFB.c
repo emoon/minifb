@@ -703,7 +703,7 @@ mfb_update(struct Window *window, void *buffer)
     wl_surface_commit(window_data_way->surface);
 
     while (!done && window_data->close == false) {
-        if (wl_display_dispatch(g_window_data.display) == -1 || wl_display_roundtrip(g_window_data.display) == -1)
+        if (wl_display_dispatch(window_data.display) == -1 || wl_display_roundtrip(window_data.display) == -1)
         {
             wl_callback_destroy(frame_callback);
             return STATE_INTERNAL_ERROR;
