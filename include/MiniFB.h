@@ -47,6 +47,8 @@ void mfb_mouse_button_callback(mfb_mouse_btn_func callback);
 void mfb_mouse_move_callback(mfb_mouse_move_func callback);
 void mfb_mouse_scroll_callback(mfb_mouse_scroll_func callback);
 
+const char *mfb_get_key_name(Key key);
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus
