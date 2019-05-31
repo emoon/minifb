@@ -33,7 +33,7 @@ void resize(struct Window *window, int width, int height) {
 }
 
 void keyboard(struct Window *window, Key key, KeyMod mod, bool isPressed) {
-    fprintf(stdout, "keyboard: key: %d (pressed: %d) [KeyMod: %x]\n", key, isPressed, mod);
+    fprintf(stdout, "keyboard: key: %s (pressed: %d) [KeyMod: %x]\n", mfb_get_key_name(key), isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
         mfb_close(window);
     }    
