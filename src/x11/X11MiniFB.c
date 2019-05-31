@@ -364,14 +364,6 @@ void destroy(SWindowData *window_data)
     }
 }
 
-void mfb_close(struct Window *window)
-{
-    if(window != 0x0) {
-        SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
-    }
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern short int keycodes[512];

@@ -266,16 +266,6 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void mfb_close(struct Window *window)
-{
-    if(window != 0x0) {
-        SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 static void destroy_window_data(SWindowData *window_data) 
 {
     if(window_data == 0x0)

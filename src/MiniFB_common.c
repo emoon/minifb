@@ -50,7 +50,18 @@ void mfb_set_user_data(struct Window *window, void *user_data) {
     window_data->user_data = user_data;
 }
 
+//-------------------------------------
 void *mfb_get_user_data(struct Window *window) {
     SWindowData *window_data = (SWindowData *) window;
     return window_data->user_data;
 }
+
+//-------------------------------------
+void mfb_close(struct Window *window)
+{
+    if(window != 0x0) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->close = true;
+    }
+}
+

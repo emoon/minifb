@@ -390,14 +390,6 @@ UpdateState mfb_update(struct Window *window, void* buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void mfb_close(struct Window *window)
-{
-    if(window != 0x0) {
-        SWindowData *window_data = (SWindowData *)window;
-        window_data->close = true;
-    }
-}
-
 void destroy_window_data(SWindowData *window_data) {
     if(window_data == 0x0)
         return;
