@@ -1,38 +1,54 @@
 #include <MiniFB_cpp.h>
 #include <MiniFB_enums.h>
+#include <vector>
 
-std::function<void(struct Window *, bool)>                       Stub::m_active;
-std::function<void(struct Window *, int, int)>                   Stub::m_resize;
-std::function<void(struct Window *, Key, KeyMod, bool)>          Stub::m_keyboard;
-std::function<void(struct Window *, unsigned int)>               Stub::m_char_input;
-std::function<void(struct Window *, MouseButton, KeyMod, bool)>  Stub::m_mouse_btn;
-std::function<void(struct Window *, int, int)>                   Stub::m_mouse_move;
-std::function<void(struct Window *, KeyMod, float, float)>       Stub::m_scroll;
+Stub *
+Stub::GetInstance(struct Window *window) {
+    static std::vector<Stub *>  s_instances;
+
+    for(Stub *instance : s_instances) {
+        if(instance->m_window == window) {
+            return instance;
+        }
+    }
+
+    s_instances.push_back(new Stub);
+    s_instances.back()->m_window = window;
+
+    return s_instances.back();
+}
 
 void Stub::active_stub(struct Window *window, bool isActive) {
-    m_active(window, isActive);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_active(window, isActive);
 }
 
 void Stub::resize_stub(struct Window *window, int width, int height) {
-    m_resize(window, width, height);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_resize(window, width, height);
 }
 
 void Stub::keyboard_stub(struct Window *window, Key key, KeyMod mod, bool isPressed) {
-    m_keyboard(window, key, mod, isPressed);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_keyboard(window, key, mod, isPressed);
 }
 
 void Stub::char_input_stub(struct Window *window, unsigned int code) {
-    m_char_input(window, code);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_char_input(window, code);
 }
 
 void Stub::mouse_btn_stub(struct Window *window, MouseButton button, KeyMod mod, bool isPressed) {
-    m_mouse_btn(window, button, mod, isPressed);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_mouse_btn(window, button, mod, isPressed);
 }
 
 void Stub::mouse_move_stub(struct Window *window, int x, int y) {
-    m_mouse_move(window, x, y);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_mouse_move(window, x, y);
 }
 
 void Stub::scroll_stub(struct Window *window, KeyMod mod, float deltaX, float deltaY) {
-    m_scroll(window, mod, deltaX, deltaY);
+    Stub    *stub = Stub::GetInstance(window);
+    stub->m_scroll(window, mod, deltaX, deltaY);
 }

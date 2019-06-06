@@ -38,6 +38,14 @@ extern short int    g_keycodes[512];
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+- (void) removeWindowData {
+    self->window_data = 0x0;
+    OSXWindowFrameView *view = (OSXWindowFrameView *) self->childContentView.superview;
+    view->window_data = 0x0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 - (void)dealloc
 {
     [[NSNotificationCenter defaultCenter]
@@ -95,22 +103,22 @@ extern short int    g_keycodes[512];
         if(keyCode != KB_KEY_UNKNOWN) {
             mod_keys_aux = mod_keys ^ window_data->mod_keys;
             if(mod_keys_aux & KB_MOD_CAPS_LOCK) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
             }
             if(mod_keys_aux & KB_MOD_SHIFT) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
             }
             if(mod_keys_aux & KB_MOD_CONTROL) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
             }
             if(mod_keys_aux & KB_MOD_ALT) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
             }
             if(mod_keys_aux & KB_MOD_SUPER) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
             }
             if(mod_keys_aux & KB_MOD_NUM_LOCK) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
             }
         }
     }
@@ -124,7 +132,7 @@ extern short int    g_keycodes[512];
 - (void)keyDown:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(g_keyboard_func, keyCode, window_data->mod_keys, true);
+    kCall(keyboard_func, keyCode, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +140,7 @@ extern short int    g_keycodes[512];
 - (void)keyUp:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(g_keyboard_func, keyCode, window_data->mod_keys, false);
+    kCall(keyboard_func, keyCode, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +164,7 @@ extern short int    g_keycodes[512];
         if ((code & 0xff00) == 0xf700)
             continue;
 
-        kCall(g_char_input_func, code);
+        kCall(char_input_func, code);
     }
 }
 
@@ -169,7 +177,7 @@ extern short int    g_keycodes[512];
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
     if(window_data_osx->active == true) {
         window_data_osx->active = false;
-        kCall(g_active_func, false);
+        kCall(active_func, false);
     }
 }
 
@@ -219,18 +227,20 @@ extern short int    g_keycodes[512];
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(g_active_func, true);
+    kCall(active_func, true);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(g_active_func, false);
+    kCall(active_func, false);
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
     kUnused(notification);
-    window_data->close = true;
+    if(window_data) {
+        window_data->close = true;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +282,7 @@ extern short int    g_keycodes[512];
     window_data->window_width  = size.width;
     window_data->window_height = size.height;
 
-    kCall(g_resize_func, size.width, size.height);
+    kCall(resize_func, size.width, size.height);
 }
 
 @end

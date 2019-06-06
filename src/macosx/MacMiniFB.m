@@ -272,9 +272,13 @@ static void destroy_window_data(SWindowData *window_data)
         return;
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-
+    
     SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
     if(window_data_osx != 0x0) {
+        OSXWindow   *window = window_data_osx->window;
+        [window removeWindowData];
+        [window performClose:nil];
+
         memset(window_data_osx, 0, sizeof(SWindowData_OSX));
         free(window_data_osx);
     }

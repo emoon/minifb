@@ -22,6 +22,11 @@ extern Vertex gVertices[4];
 
 - (void)drawInMTKView:(nonnull MTKView *)view
 {
+    OSXWindow   *window = (OSXWindow *) view.window;
+    if(window->window_data == 0x0) {
+        return;
+    }
+
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     //   by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
     dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);
@@ -38,7 +43,6 @@ extern Vertex gVertices[4];
                 mipmapLevel:0 withBytes:m_draw_buffer bytesPerRow:bytesPerRow];
 
     // Create a new command buffer for each render pass to the current drawable
-    OSXWindow     *window          = (OSXWindow *) view.window;
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
     id<MTLCommandBuffer> commandBuffer = [window_data_osx->metal.command_queue commandBuffer];
     commandBuffer.label = @"minifb_command_buffer";
@@ -187,7 +191,7 @@ extern Vertex gVertices[4];
 - (void)mouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,7 +199,7 @@ extern Vertex gVertices[4];
 - (void)mouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,7 +207,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+    kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,7 +215,7 @@ extern Vertex gVertices[4];
 - (void)rightMouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -219,7 +223,7 @@ extern Vertex gVertices[4];
 - (void)otherMouseDown:(NSEvent *)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -227,14 +231,14 @@ extern Vertex gVertices[4];
 - (void)otherMouseUp:(NSEvent *)event
 {
     (void)event;
-    kCall(g_mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)scrollWheel:(NSEvent *)event
 {
-    kCall(g_mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+    kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,7 +262,7 @@ extern Vertex gVertices[4];
 {
     NSPoint point = [event locationInWindow];
     //NSPoint localPoint = [self convertPoint:point fromView:nil];
-    kCall(g_mouse_move_func, point.x, point.y);
+    kCall(mouse_move_func, point.x, point.y);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

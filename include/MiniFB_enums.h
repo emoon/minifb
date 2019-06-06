@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+// Enums
 typedef enum {
     STATE_OK             =  0,
     STATE_EXIT           = -1,
@@ -169,3 +170,16 @@ typedef enum {
     WF_BORDERLESS         = 0x08,
     WF_ALWAYS_ON_TOP      = 0x10,
 } WindowFlags;
+
+// Opaque pointer
+struct Window;
+
+// Event callbacks
+typedef void(*mfb_active_func)(struct Window *window, bool isActive);
+typedef void(*mfb_resize_func)(struct Window *window, int width, int height);
+typedef void(*mfb_keyboard_func)(struct Window *window, Key key, KeyMod mod, bool isPressed);
+typedef void(*mfb_char_input_func)(struct Window *window, unsigned int code);
+typedef void(*mfb_mouse_btn_func)(struct Window *window, MouseButton button, KeyMod mod, bool isPressed);
+typedef void(*mfb_mouse_move_func)(struct Window *window, int x, int y);
+typedef void(*mfb_mouse_scroll_func)(struct Window *window, KeyMod mod, float deltaX, float deltaY);
+

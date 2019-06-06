@@ -13,4 +13,6 @@
                   backing:(NSBackingStoreType)bufferingType
                     defer:(BOOL)deferCreation
                windowData:(SWindowData *) windowData;
+
+- (void) removeWindowData;
 @end

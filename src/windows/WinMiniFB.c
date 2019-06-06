@@ -77,7 +77,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 if (kb_key == KB_KEY_UNKNOWN)
                     return FALSE;
 
-                kCall(g_keyboard_func, kb_key, window_data->mod_keys, is_pressed);
+                kCall(keyboard_func, kb_key, window_data->mod_keys, is_pressed);
             }
             break;
         }
@@ -94,7 +94,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     return TRUE;
                 }
 
-                kCall(g_char_input_func, wParam);
+                kCall(char_input_func, wParam);
             }
             break;
         }
@@ -139,14 +139,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                         is_pressed = 1;
                     }
                 }
-                kCall(g_mouse_btn_func, button, window_data->mod_keys, is_pressed);
+                kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
             }
             break;
         }
 
         case WM_MOUSEWHEEL:
             if(window_data) {
-                kCall(g_mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
+                kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             }
             break;
 
@@ -154,7 +154,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
             if(window_data) {
-                kCall(g_mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
+                kCall(mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
             }
             break;
 
@@ -169,7 +169,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
                 }
-                kCall(g_mouse_move_func, ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam)));
+                kCall(mouse_move_func, ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam)));
             }
             break;
 
@@ -188,19 +188,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 window_data->window_width = window_data->dst_width;
                 window_data->window_height = window_data->dst_height;
                 BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
-                kCall(g_resize_func, window_data->dst_width, window_data->dst_height);
+                kCall(resize_func, window_data->dst_width, window_data->dst_height);
             }
             break;
 
         case WM_SETFOCUS:
             if(window_data) {
-                kCall(g_active_func, true);
+                kCall(active_func, true);
             }
             break;
 
         case WM_KILLFOCUS:
             if(window_data) {
-                kCall(g_active_func, false);
+                kCall(active_func, false);
             }
             break;
 
@@ -342,9 +342,7 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags) 
 
     window_data_win->hdc = GetDC(window_data_win->window);
 
-    if (g_keyboard_func == 0x0) {
-        mfb_keyboard_callback(keyboard_default);
-    }
+    mfb_keyboard_callback(window_data, keyboard_default);
 
     return (struct Window *) window_data;
 }

@@ -175,9 +175,7 @@ mfb_open_ex(const char *title, int width, int height, int flags) {
 
     window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, width, height, 32, width * 4);
 
-    if (g_keyboard_func == 0x0) {
-        mfb_keyboard_callback(keyboard_default);
-    }
+    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
 
     printf("Window created using X11 API\n");
 
@@ -212,7 +210,7 @@ static void processEvents(SWindowData *window_data)
 				int is_pressed = (event.type == KeyPress);
 				window_data->mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
 
-				kCall(g_keyboard_func, kb_key, window_data->mod_keys, is_pressed);
+				kCall(keyboard_func, kb_key, window_data->mod_keys, is_pressed);
 			}
 			break;
 
@@ -226,32 +224,32 @@ static void processEvents(SWindowData *window_data)
 					case Button1:
 					case Button2:
 					case Button3:
-						kCall(g_mouse_btn_func, button, window_data->mod_keys, is_pressed);
+						kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
 						break;
 
 					case Button4:
-						kCall(g_mouse_wheel_func, window_data->mod_keys, 0.0f, 1.0f);
+						kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, 1.0f);
 						break;
 					case Button5:
-						kCall(g_mouse_wheel_func, window_data->mod_keys, 0.0f, -1.0f);
+						kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, -1.0f);
 						break;
 
 					case 6:
-						kCall(g_mouse_wheel_func, window_data->mod_keys, 1.0f, 0.0f);
+						kCall(mouse_wheel_func, window_data->mod_keys, 1.0f, 0.0f);
 						break;
 					case 7:
-						kCall(g_mouse_wheel_func, window_data->mod_keys, -1.0f, 0.0f);
+						kCall(mouse_wheel_func, window_data->mod_keys, -1.0f, 0.0f);
 						break;
 
 					default:
-						kCall(g_mouse_btn_func, button - 4, window_data->mod_keys, is_pressed);
+						kCall(mouse_btn_func, button - 4, window_data->mod_keys, is_pressed);
 						break;
 				}
 			}
 			break;
 
 			case MotionNotify:
-				kCall(g_mouse_move_func, event.xmotion.x, event.xmotion.y);
+				kCall(mouse_move_func, event.xmotion.x, event.xmotion.y);
 				break;
 
 			case ConfigureNotify: 
@@ -264,7 +262,7 @@ static void processEvents(SWindowData *window_data)
 				window_data->dst_height   = window_data->window_height;
 
 				XClearWindow(window_data_x11->display, window_data_x11->window);
-				kCall(g_resize_func, window_data->window_width, window_data->window_height);
+				kCall(resize_func, window_data->window_width, window_data->window_height);
 			}
 			break;
 
@@ -273,11 +271,11 @@ static void processEvents(SWindowData *window_data)
 			break;
 
 			case FocusIn:
-				kCall(g_active_func, true);
+				kCall(active_func, true);
 				break;
 
 			case FocusOut:
-				kCall(g_active_func, false);
+				kCall(active_func, false);
 				break;
 
 			case DestroyNotify:
