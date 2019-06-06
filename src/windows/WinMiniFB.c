@@ -342,7 +342,7 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags) 
 
     window_data_win->hdc = GetDC(window_data_win->window);
 
-    mfb_keyboard_callback(window_data, keyboard_default);
+    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
 
     return (struct Window *) window_data;
 }

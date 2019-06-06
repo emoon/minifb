@@ -228,10 +228,13 @@ public:
 int main()
 {
     int noise, carry, seed = 0xbeef;
+    int id1 = 1, id2 = 2;
 
     struct Window *window1 = mfb_open_ex("Noise Test", WIDTH_A, HEIGHT_A, WF_RESIZABLE);
     if (!window1)
         return 0;
+
+    mfb_set_user_data(window1, &id1);
 
 #if defined(__cplusplus)
 
@@ -261,17 +264,19 @@ int main()
     if (!window2)
         return 0;
 
+    mfb_set_user_data(window2, &id2);
+
 #if defined(__cplusplus)
 
     Events2 e2;
 
     mfb_active_callback(window2, &e2, &Events2::active);
-    // mfb_resize_callback(window2, &e2, &Events::resize);
-    // mfb_keyboard_callback(window2, &e2, &Events::keyboard);
-    // mfb_char_input_callback(window2, &e2, &Events::char_input);
-    // mfb_mouse_button_callback(window2, &e2, &Events::mouse_btn);
-    // mfb_mouse_move_callback(window2, &e2, &Events::mouse_move);
-    // mfb_mouse_scroll_callback(window2, &e2, &Events::mouse_scroll);
+    mfb_resize_callback(window2, &e2, &Events::resize);
+    mfb_keyboard_callback(window2, &e2, &Events::keyboard);
+    mfb_char_input_callback(window2, &e2, &Events::char_input);
+    mfb_mouse_button_callback(window2, &e2, &Events::mouse_btn);
+    mfb_mouse_move_callback(window2, &e2, &Events::mouse_move);
+    mfb_mouse_scroll_callback(window2, &e2, &Events::mouse_scroll);
 
 #else
 
@@ -284,10 +289,7 @@ int main()
     mfb_mouse_scroll_callback(window2, mouse_scroll2);
 
 #endif
-
-    int id1 = 1, id2 = 2;
-    mfb_set_user_data(window1, &id1);
-    mfb_set_user_data(window2, &id2);
+    mfb_keyboard_callback(window2, 0x0);
 
     for (;;)
     {
