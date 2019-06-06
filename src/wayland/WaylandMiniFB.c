@@ -647,6 +647,8 @@ mfb_open(const char *title, int width, int height)
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     wl_surface_commit(window_data_way->surface);
 
+    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
+
     printf("Window created using Wayland API\n");
 
     return (struct Window *) window_data;

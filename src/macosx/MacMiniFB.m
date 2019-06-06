@@ -253,6 +253,8 @@ struct Window *mfb_open_ex(const char *title, int width, int height, int flags)
     [NSApp finishLaunching];
 #endif
 
+    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
+
 #if defined(USE_METAL_API)
     NSLog(@"Window created using Metal API");
 #else
