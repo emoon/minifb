@@ -98,11 +98,13 @@ MacOS X Mojave does not support Cocoa framework as expected. For that reason now
 To enable it just compile defining the preprocessor macro USE_METAL_API.
 
 If you use CMake just enable the flag:
+
 	mkdir build
 	cd build
 	cmake .. -DUSE_METAL_API=ON
 
-or if you don't want to use Metal API
+or if you don't want to use Metal API:
+
 	mkdir build
 	cd build
 	cmake .. -DUSE_METAL_API=OFF
@@ -122,6 +124,7 @@ x11 (FreeBSD, Linux, *nix)
 gcc and x11-dev libs needs to be installed. To build the code run tundra2 x11-gcc-debug and you should be able to run t2-output/x11-gcc-debug-default/noise
 
 If you use CMake just disable the flag:
+
 	mkdir build
 	cd build
 	cmake .. -DUSE_WAYLAND_API=OFF
@@ -133,6 +136,7 @@ wayland (Linux)
 Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
 
 If you use CMake just enable the flag:
+
 	mkdir build
 	cd build
 	cmake .. -DUSE_WAYLAND_API=ON
