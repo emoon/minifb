@@ -1,5 +1,6 @@
 #include "MiniFB.h"
 #include "WindowData.h"
+#include <MiniFB_internal.h>
 
 //-------------------------------------
 void mfb_active_callback(struct Window *window, mfb_active_func callback) {
@@ -83,6 +84,17 @@ void mfb_close(struct Window *window)
         window_data->close = true;
     }
 }
+
+//-------------------------------------
+void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed) {
+    kUnused(mod);
+    kUnused(isPressed);
+    if (key == KB_KEY_ESCAPE) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->close = true;
+    }
+}
+
 
 //-------------------------------------
 const char *mfb_get_key_name(Key key) {

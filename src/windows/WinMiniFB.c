@@ -411,17 +411,6 @@ void destroy_window_data(SWindowData *window_data) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed) {
-    kUnused(mod);
-    kUnused(isPressed);
-    if (key == KB_KEY_ESCAPE) {
-        SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 uint32_t translate_mod() {
     uint32_t mods = 0;
 

@@ -28,10 +28,10 @@ mfb_open_ex(const char *title, int width, int height, int flags) {
     XSizeHints sizeHints;
     Visual* visual;
 
-    SWindowData *window_data = malloc(sizeof(SWindowData));
+    SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_X11 *window_data_x11 = malloc(sizeof(SWindowData_X11));
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
     memset(window_data_x11, 0, sizeof(SWindowData_X11));
     window_data->specific = window_data_x11;
 
@@ -206,43 +206,43 @@ static void processEvents(SWindowData *window_data)
 			case KeyPress:
 			case KeyRelease: 
 			{
-				int kb_key     = translate_key(event.xkey.keycode);
+				Key kb_key     = (Key) translate_key(event.xkey.keycode);
 				int is_pressed = (event.type == KeyPress);
 				window_data->mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
 
-				kCall(keyboard_func, kb_key, window_data->mod_keys, is_pressed);
+				kCall(keyboard_func, kb_key, (KeyMod) window_data->mod_keys, is_pressed);
 			}
 			break;
 
 			case ButtonPress:
 			case ButtonRelease:
 			{
-				MouseButton button     = event.xbutton.button;
+				MouseButton button     = (MouseButton) event.xbutton.button;
 				int          is_pressed = (event.type == ButtonPress);
 				window_data->mod_keys = translate_mod(event.xkey.state);
 				switch (button) {
 					case Button1:
 					case Button2:
 					case Button3:
-						kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
+						kCall(mouse_btn_func, button, (KeyMod) window_data->mod_keys, is_pressed);
 						break;
 
 					case Button4:
-						kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, 1.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, 1.0f);
 						break;
 					case Button5:
-						kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, -1.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, -1.0f);
 						break;
 
 					case 6:
-						kCall(mouse_wheel_func, window_data->mod_keys, 1.0f, 0.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 1.0f, 0.0f);
 						break;
 					case 7:
-						kCall(mouse_wheel_func, window_data->mod_keys, -1.0f, 0.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, -1.0f, 0.0f);
 						break;
 
 					default:
-						kCall(mouse_btn_func, button - 4, window_data->mod_keys, is_pressed);
+						kCall(mouse_btn_func, (MouseButton) (button - 4), (KeyMod) window_data->mod_keys, is_pressed);
 						break;
 				}
 			}
@@ -327,8 +327,8 @@ UpdateState mfb_update(struct Window *window, void* buffer)
     }
 
     if(window_data_x11->image_scaler != 0x0) {
-        stretch_image(buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
-        window_data_x11->image_scaler->data = window_data_x11->image_buffer;
+        stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
+        window_data_x11->image_scaler->data = (char *) window_data_x11->image_buffer;
 	    XPutImage(window_data_x11->display, window_data_x11->window, window_data_x11->gc, window_data_x11->image_scaler, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     }
     else {
@@ -622,17 +622,6 @@ int translate_mod_ex(int key, int state, int is_pressed) {
     }
 
     return mod_keys;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed) {
-    kUnused(mod);
-    kUnused(isPressed);
-    if (key == KB_KEY_ESCAPE) {
-        SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
