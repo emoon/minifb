@@ -1,4 +1,9 @@
 #import "OSXWindowFrameView.h"
+#import "OSXWindow.h"
+#include "OSXWindowData.h"
+#include <MiniFB_internal.h>
+
+extern SWindowData  g_window_data;
 
 #if defined(USE_METAL_API)
 #import <MetalKit/MetalKit.h>
@@ -7,6 +12,8 @@ id<MTLDevice> g_metal_device;
 id<MTLCommandQueue> g_command_queue;
 id<MTLLibrary> g_library;
 id<MTLRenderPipelineState> g_pipeline_state;
+
+extern Vertex gVertices[4];
 
 @implementation WindowViewController
 
@@ -54,7 +61,7 @@ id<MTLRenderPipelineState> g_pipeline_state;
 
     if (renderPassDescriptor != nil)
     {
-		renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(1.0, 0.0, 0.0, 1.0);
+		renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 
         // Create a render command encoder so we can render into something
         id<MTLRenderCommandEncoder> renderEncoder =
@@ -64,12 +71,19 @@ id<MTLRenderPipelineState> g_pipeline_state;
         // Set render command encoder state
         [renderEncoder setRenderPipelineState:g_pipeline_state];
 
+        [renderEncoder setVertexBytes:gVertices
+                       length:sizeof(gVertices)
+                      atIndex:0];
+
         [renderEncoder setFragmentTexture:m_texture_buffers[m_current_buffer] atIndex:0];
 
         // Draw the vertices of our quads
-        [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+        // [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+        //                   vertexStart:0
+        //                   vertexCount:3];
+        [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
                           vertexStart:0
-                          vertexCount:3];
+                          vertexCount:4];
 
         // We're done encoding commands
         [renderEncoder endEncoding];
@@ -104,9 +118,6 @@ id<MTLRenderPipelineState> g_pipeline_state;
     [self addTrackingArea:trackingArea];
 }
 #else 
-extern void* g_updateBuffer;
-extern int g_width;
-extern int g_height;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -131,25 +142,178 @@ extern int g_height;
 {
 	(void)rect;
 
-	if (!g_updateBuffer)
+	if (!g_window_data.window || !g_window_data.draw_buffer)
 		return;
 
 	CGContextRef context = [[NSGraphicsContext currentContext] graphicsPort];
 
 	CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-	CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, g_updateBuffer, g_width * g_height * 4, NULL); 
+	CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, g_window_data.draw_buffer, g_window_data.buffer_width * g_window_data.buffer_height * 4, NULL); 
 
-	CGImageRef img = CGImageCreate(g_width, g_height, 8, 32, g_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little, 
+	CGImageRef img = CGImageCreate(g_window_data.buffer_width, g_window_data.buffer_height, 8, 32, g_window_data.buffer_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little, 
 								   provider, NULL, false, kCGRenderingIntentDefault);
+
+    const CGFloat components[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    const CGColorRef black = CGColorCreate(space, components);
 
 	CGColorSpaceRelease(space);
 	CGDataProviderRelease(provider);
 
-	CGContextDrawImage(context, CGRectMake(0, 0, g_width, g_height), img);
+    if(g_window_data.dst_offset_x != 0 || g_window_data.dst_offset_y != 0 || g_window_data.dst_width != g_window_data.window_width || g_window_data.dst_height != g_window_data.window_height) {
+        CGContextSetFillColorWithColor(context, black);
+        CGContextFillRect(context, CGRectMake(0, 0, g_window_data.window_width, g_window_data.window_height));
+    }
+    
+	CGContextDrawImage(context, CGRectMake(g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height), img);
 
 	CGImageRelease(img);
 }
 #endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (BOOL)acceptsFirstMouse:(NSEvent *)event
+{
+    (void)event;
+    return YES;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)mouseDown:(NSEvent*)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, true);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)mouseUp:(NSEvent*)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)rightMouseDown:(NSEvent*)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, MOUSE_BTN_2, g_window_data.mod_keys, true);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)rightMouseUp:(NSEvent*)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, MOUSE_BTN_1, g_window_data.mod_keys, false);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)otherMouseDown:(NSEvent *)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, true);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)otherMouseUp:(NSEvent *)event
+{
+    (void)event;
+    kCall(g_mouse_btn_func, [event buttonNumber], g_window_data.mod_keys, false);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)scrollWheel:(NSEvent *)event
+{
+    kCall(g_mouse_wheel_func, g_window_data.mod_keys, [event deltaX], [event deltaY]);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)mouseDragged:(NSEvent *)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)rightMouseDragged:(NSEvent *)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)otherMouseDragged:(NSEvent *)event
+{
+    [self mouseMoved:event];
+}
+
+- (void)mouseMoved:(NSEvent *)event
+{
+    NSPoint point = [event locationInWindow];
+    //NSPoint localPoint = [self convertPoint:point fromView:nil];
+    kCall(g_mouse_move_func, point.x, point.y);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)mouseExited:(NSEvent *)event
+{
+    (void)event;
+    //printf("mouse exit\n");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)mouseEntered:(NSEvent *)event
+{
+    (void)event;
+    //printf("mouse enter\n");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (BOOL)canBecomeKeyView
+{
+    return YES;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (NSView *)nextValidKeyView
+{
+    return self;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (NSView *)previousValidKeyView
+{
+    return self;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (BOOL)acceptsFirstResponder
+{
+    return YES;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)viewDidMoveToWindow
+{
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [super dealloc];
+}
 
 @end
 
