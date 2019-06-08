@@ -4,14 +4,15 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
-#include "X11WindowData.h"
+#include "WindowData.h"
+#include "WindowData_X11.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-SWindowData g_window_data  = { 0 };
 
 extern void 
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
@@ -19,26 +20,34 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int mfb_open_ex(const char* title, int width, int height, int flags) {
+struct Window *
+mfb_open_ex(const char *title, int width, int height, int flags) {
     int depth, i, formatCount, convDepth = -1;
     XPixmapFormatValues* formats;
     XSetWindowAttributes windowAttributes;
     XSizeHints sizeHints;
     Visual* visual;
 
-    g_window_data.display = XOpenDisplay(0);
-    if (!g_window_data.display)
-        return -1;
+    SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
+    memset(window_data, 0, sizeof(SWindowData));
+
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
+    memset(window_data_x11, 0, sizeof(SWindowData_X11));
+    window_data->specific = window_data_x11;
+
+    window_data_x11->display = XOpenDisplay(0);
+    if (!window_data_x11->display)
+        return 0x0;
     
-    init_keycodes();
+    init_keycodes(window_data_x11);
 
-    g_window_data.screen = DefaultScreen(g_window_data.display);
+    window_data_x11->screen = DefaultScreen(window_data_x11->display);
 
-    visual   = DefaultVisual(g_window_data.display, g_window_data.screen);
-    formats  = XListPixmapFormats(g_window_data.display, &formatCount);
-    depth    = DefaultDepth(g_window_data.display, g_window_data.screen);
+    visual   = DefaultVisual(window_data_x11->display, window_data_x11->screen);
+    formats  = XListPixmapFormats(window_data_x11->display, &formatCount);
+    depth    = DefaultDepth(window_data_x11->display, window_data_x11->screen);
 
-    Window defaultRootWindow = DefaultRootWindow(g_window_data.display);
+    Window defaultRootWindow = DefaultRootWindow(window_data_x11->display);
 
     for (i = 0; i < formatCount; ++i)
     {
@@ -54,28 +63,29 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
     // We only support 32-bit right now
     if (convDepth != 32)
     {
-        XCloseDisplay(g_window_data.display);
-        return -1;
+        XCloseDisplay(window_data_x11->display);
+        return 0x0;
     }
 
-    int screenWidth  = DisplayWidth(g_window_data.display, g_window_data.screen);
-    int screenHeight = DisplayHeight(g_window_data.display, g_window_data.screen);
+    int screenWidth  = DisplayWidth(window_data_x11->display, window_data_x11->screen);
+    int screenHeight = DisplayHeight(window_data_x11->display, window_data_x11->screen);
 
-    windowAttributes.border_pixel     = BlackPixel(g_window_data.display, g_window_data.screen);
-    windowAttributes.background_pixel = BlackPixel(g_window_data.display, g_window_data.screen);
+    windowAttributes.border_pixel     = BlackPixel(window_data_x11->display, window_data_x11->screen);
+    windowAttributes.background_pixel = BlackPixel(window_data_x11->display, window_data_x11->screen);
     windowAttributes.backing_store    = NotUseful;
 
     int posX, posY;
     int windowWidth, windowHeight;
 
-    g_window_data.window_width  = width;
-    g_window_data.window_height = height;
-    g_window_data.buffer_width  = width;
-    g_window_data.buffer_height = height;
-    g_window_data.dst_offset_x  = 0;
-    g_window_data.dst_offset_y  = 0;
-    g_window_data.dst_width     = width;
-    g_window_data.dst_height    = height;
+    window_data->window_width  = width;
+    window_data->window_height = height;
+    window_data->buffer_width  = width;
+    window_data->buffer_height = height;
+    window_data->buffer_stride = width * 4;
+    window_data->dst_offset_x  = 0;
+    window_data->dst_offset_y  = 0;
+    window_data->dst_width     = width;
+    window_data->dst_height    = height;
 
     if (flags & WF_FULLSCREEN_DESKTOP) {
         posX         = 0;
@@ -90,8 +100,8 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         windowHeight = height;
     }
 
-    g_window_data.window = XCreateWindow(
-                    g_window_data.display, 
+    window_data_x11->window = XCreateWindow(
+                    window_data_x11->display, 
                     defaultRootWindow, 
                     posX, posY, 
                     windowWidth, windowHeight, 
@@ -101,10 +111,10 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
                     visual, 
                     CWBackPixel | CWBorderPixel | CWBackingStore,
                     &windowAttributes);
-    if (!g_window_data.window)
-        return 0;
+    if (!window_data_x11->window)
+        return 0x0;
 
-    XSelectInput(g_window_data.display, g_window_data.window, 
+    XSelectInput(window_data_x11->display, window_data_x11->window, 
         KeyPressMask | KeyReleaseMask 
         | ButtonPressMask | ButtonReleaseMask | PointerMotionMask 
         | StructureNotifyMask | ExposureMask 
@@ -112,7 +122,7 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         | EnterWindowMask | LeaveWindowMask
     );
 
-    XStoreName(g_window_data.display, g_window_data.window, title);
+    XStoreName(window_data_x11->display, window_data_x11->window, title);
 
     if (flags & WF_BORDERLESS) {
         struct StyleHints {
@@ -128,18 +138,18 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
             .inputMode   = 0,
             .status      = 0,
         };
-        Atom sh_p = XInternAtom(g_window_data.display, "_MOTIF_WM_HINTS", True);
-        XChangeProperty(g_window_data.display, g_window_data.window, sh_p, sh_p, 32, PropModeReplace, (unsigned char*)&sh, 5);
+        Atom sh_p = XInternAtom(window_data_x11->display, "_MOTIF_WM_HINTS", True);
+        XChangeProperty(window_data_x11->display, window_data_x11->window, sh_p, sh_p, 32, PropModeReplace, (unsigned char*)&sh, 5);
     }
 
     if (flags & WF_ALWAYS_ON_TOP) {
-        Atom sa_p = XInternAtom(g_window_data.display, "_NET_WM_STATE_ABOVE", False);
-        XChangeProperty(g_window_data.display, g_window_data.window, XInternAtom(g_window_data.display, "_NET_WM_STATE", False), XA_ATOM, 32, PropModeReplace, (unsigned char *)&sa_p, 1);
+        Atom sa_p = XInternAtom(window_data_x11->display, "_NET_WM_STATE_ABOVE", False);
+        XChangeProperty(window_data_x11->display, window_data_x11->window, XInternAtom(window_data_x11->display, "_NET_WM_STATE", False), XA_ATOM, 32, PropModeReplace, (unsigned char *)&sa_p, 1);
     }
 
     if (flags & WF_FULLSCREEN) {
-        Atom sf_p = XInternAtom(g_window_data.display, "_NET_WM_STATE_FULLSCREEN", True);
-        XChangeProperty(g_window_data.display, g_window_data.window, XInternAtom(g_window_data.display, "_NET_WM_STATE", True), XA_ATOM, 32, PropModeReplace, (unsigned char*)&sf_p, 1);
+        Atom sf_p = XInternAtom(window_data_x11->display, "_NET_WM_STATE_FULLSCREEN", True);
+        XChangeProperty(window_data_x11->display, window_data_x11->window, XInternAtom(window_data_x11->display, "_NET_WM_STATE", True), XA_ATOM, 32, PropModeReplace, (unsigned char*)&sf_p, 1);
     }
 
     sizeHints.flags      = PPosition | PMinSize | PMaxSize;
@@ -156,25 +166,24 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         sizeHints.max_height = height;
     }
 
-    XSetWMNormalHints(g_window_data.display, g_window_data.window, &sizeHints);
-    XClearWindow(g_window_data.display, g_window_data.window);
-    XMapRaised(g_window_data.display, g_window_data.window);
-    XFlush(g_window_data.display);
+    XSetWMNormalHints(window_data_x11->display, window_data_x11->window, &sizeHints);
+    XClearWindow(window_data_x11->display, window_data_x11->window);
+    XMapRaised(window_data_x11->display, window_data_x11->window);
+    XFlush(window_data_x11->display);
 
-    g_window_data.gc = DefaultGC(g_window_data.display, g_window_data.screen);
+    window_data_x11->gc = DefaultGC(window_data_x11->display, window_data_x11->screen);
 
-    g_window_data.image = XCreateImage(g_window_data.display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, width * 4);
+    window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, width, height, 32, width * 4);
 
-    if (g_keyboard_func == 0x0) {
-        mfb_keyboard_callback(keyboard_default);
-    }
+    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
 
     printf("Window created using X11 API\n");
 
-    return 1;    
+    return (struct Window *) window_data;
 }
 
-int mfb_open(const char* title, int width, int height)
+struct Window *
+mfb_open(const char *title, int width, int height)
 {
 	return mfb_open_ex(title, width, height, 0);
 }
@@ -185,74 +194,75 @@ int translate_key(int scancode);
 int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
-static int processEvents()
+static void processEvents(SWindowData *window_data)
 {
-	XEvent event;
+	XEvent          event;
+    SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
-	while ((g_window_data.close == false) && XPending(g_window_data.display)) {
-		XNextEvent(g_window_data.display, &event);
+	while ((window_data->close == false) && XPending(window_data_x11->display)) {
+		XNextEvent(window_data_x11->display, &event);
 
 		switch (event.type) {
 			case KeyPress:
 			case KeyRelease: 
 			{
-				int kb_key     = translate_key(event.xkey.keycode);
+				Key kb_key     = (Key) translate_key(event.xkey.keycode);
 				int is_pressed = (event.type == KeyPress);
-				g_window_data.mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
+				window_data->mod_keys = translate_mod_ex(kb_key, event.xkey.state, is_pressed);
 
-				kCall(g_keyboard_func, kb_key, g_window_data.mod_keys, is_pressed);
+				kCall(keyboard_func, kb_key, (KeyMod) window_data->mod_keys, is_pressed);
 			}
 			break;
 
 			case ButtonPress:
 			case ButtonRelease:
 			{
-				MouseButton button     = event.xbutton.button;
+				MouseButton button     = (MouseButton) event.xbutton.button;
 				int          is_pressed = (event.type == ButtonPress);
-				g_window_data.mod_keys = translate_mod(event.xkey.state);
+				window_data->mod_keys = translate_mod(event.xkey.state);
 				switch (button) {
 					case Button1:
 					case Button2:
 					case Button3:
-						kCall(g_mouse_btn_func, button, g_window_data.mod_keys, is_pressed);
+						kCall(mouse_btn_func, button, (KeyMod) window_data->mod_keys, is_pressed);
 						break;
 
 					case Button4:
-						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 0.0f, 1.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, 1.0f);
 						break;
 					case Button5:
-						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 0.0f, -1.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, -1.0f);
 						break;
 
 					case 6:
-						kCall(g_mouse_wheel_func, g_window_data.mod_keys, 1.0f, 0.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 1.0f, 0.0f);
 						break;
 					case 7:
-						kCall(g_mouse_wheel_func, g_window_data.mod_keys, -1.0f, 0.0f);
+						kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, -1.0f, 0.0f);
 						break;
 
 					default:
-						kCall(g_mouse_btn_func, button - 4, g_window_data.mod_keys, is_pressed);
+						kCall(mouse_btn_func, (MouseButton) (button - 4), (KeyMod) window_data->mod_keys, is_pressed);
 						break;
 				}
 			}
 			break;
 
 			case MotionNotify:
-				kCall(g_mouse_move_func, event.xmotion.x, event.xmotion.y);
+				kCall(mouse_move_func, event.xmotion.x, event.xmotion.y);
 				break;
 
 			case ConfigureNotify: 
 			{
-				g_window_data.window_width  = event.xconfigure.width;
-				g_window_data.window_height = event.xconfigure.height;
-				g_window_data.dst_offset_x = 0;
-				g_window_data.dst_offset_y = 0;
-				g_window_data.dst_width    = g_window_data.window_width;
-				g_window_data.dst_height   = g_window_data.window_height;
+				window_data->window_width  = event.xconfigure.width;
+				window_data->window_height = event.xconfigure.height;
+				window_data->dst_offset_x = 0;
+				window_data->dst_offset_y = 0;
+				window_data->dst_width    = window_data->window_width;
+				window_data->dst_height   = window_data->window_height;
 
-				XClearWindow(g_window_data.display, g_window_data.window);
-				kCall(g_resize_func, g_window_data.window_width, g_window_data.window_height);
+				XClearWindow(window_data_x11->display, window_data_x11->window);
+				kCall(resize_func, window_data->window_width, window_data->window_height);
 			}
 			break;
 
@@ -261,83 +271,95 @@ static int processEvents()
 			break;
 
 			case FocusIn:
-				kCall(g_active_func, true);
+				kCall(active_func, true);
 				break;
 
 			case FocusOut:
-				kCall(g_active_func, false);
+				kCall(active_func, false);
 				break;
 
 			case DestroyNotify:
-				return -1;
+				window_data->close = true;
+                return;
 				break;
 		}
 	}
-
-	if(g_window_data.close == true)
-		return -1;
-
-	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int mfb_update(void* buffer)
+void destroy(SWindowData *window_data);
+
+UpdateState mfb_update(struct Window *window, void* buffer)
 {
-    if (buffer == 0x0) {
-        return -2;
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
     }
 
-    if (g_window_data.buffer_width != g_window_data.dst_width || g_window_data.buffer_height != g_window_data.dst_height) {
-        if(g_window_data.image_scaler_width != g_window_data.dst_width || g_window_data.image_scaler_height != g_window_data.dst_height) {
-            if(g_window_data.image_scaler != 0x0) {
-                g_window_data.image_scaler->data = 0x0;
-                XDestroyImage(g_window_data.image_scaler);
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy(window_data);
+        return STATE_EXIT;
+    }
+
+    if(buffer == 0x0) {
+        return STATE_INVALID_BUFFER;
+    }
+
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+
+    if (window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
+        if(window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
+            if(window_data_x11->image_scaler != 0x0) {
+                window_data_x11->image_scaler->data = 0x0;
+                XDestroyImage(window_data_x11->image_scaler);
             }
-            if(g_window_data.image_buffer != 0x0) {
-                free(g_window_data.image_buffer);
-                g_window_data.image_buffer = 0x0;
+            if(window_data_x11->image_buffer != 0x0) {
+                free(window_data_x11->image_buffer);
+                window_data_x11->image_buffer = 0x0;
             }
-            int depth = DefaultDepth(g_window_data.display, g_window_data.screen);
-            g_window_data.image_buffer = malloc(g_window_data.dst_width * g_window_data.dst_height * 4);
-            g_window_data.image_scaler_width  = g_window_data.dst_width;
-            g_window_data.image_scaler_height = g_window_data.dst_height;
-            g_window_data.image_scaler = XCreateImage(g_window_data.display, CopyFromParent, depth, ZPixmap, 0, NULL, g_window_data.image_scaler_width, g_window_data.image_scaler_height, 32, g_window_data.image_scaler_width * 4);
+            int depth = DefaultDepth(window_data_x11->display, window_data_x11->screen);
+            window_data_x11->image_buffer = malloc(window_data->dst_width * window_data->dst_height * 4);
+            window_data_x11->image_scaler_width  = window_data->dst_width;
+            window_data_x11->image_scaler_height = window_data->dst_height;
+            window_data_x11->image_scaler = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, window_data_x11->image_scaler_width, window_data_x11->image_scaler_height, 32, window_data_x11->image_scaler_width * 4);
         }
     }
 
-    if(g_window_data.image_scaler != 0x0) {
-        stretch_image(buffer, 0, 0, g_window_data.buffer_width, g_window_data.buffer_height, g_window_data.buffer_width, g_window_data.image_buffer, 0, 0, g_window_data.dst_width, g_window_data.dst_height, g_window_data.dst_width);
-        g_window_data.image_scaler->data = g_window_data.image_buffer;
-	    XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image_scaler, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    if(window_data_x11->image_scaler != 0x0) {
+        stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
+        window_data_x11->image_scaler->data = (char *) window_data_x11->image_buffer;
+	    XPutImage(window_data_x11->display, window_data_x11->window, window_data_x11->gc, window_data_x11->image_scaler, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     }
     else {
-    	g_window_data.image->data = (char *) buffer;
-	    XPutImage(g_window_data.display, g_window_data.window, g_window_data.gc, g_window_data.image, 0, 0, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
+    	window_data_x11->image->data = (char *) buffer;
+	    XPutImage(window_data_x11->display, window_data_x11->window, window_data_x11->gc, window_data_x11->image, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     }
-	XFlush(g_window_data.display);
-
-	if (processEvents() < 0)
-		return -1;
-
-	return 0;
+	XFlush(window_data_x11->display);
+	processEvents(window_data);
+    
+	return STATE_OK;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void mfb_close(void)
+void destroy(SWindowData *window_data) 
 {
-	if(g_window_data.image != 0x0) {
-		g_window_data.image->data = 0x0;
-        XDestroyImage(g_window_data.image);
-		XDestroyWindow(g_window_data.display, g_window_data.window);
-		XCloseDisplay(g_window_data.display);
-
-		g_window_data.image  = 0x0;
-		g_window_data.display = 0x0;
-		g_window_data.window  = 0;
-	}
-	g_window_data.close = true;
+    if(window_data != 0x0) {
+        if(window_data->specific != 0x0) {
+            SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+            if(window_data_x11->image != 0x0) {
+                window_data_x11->image->data = 0x0;
+                XDestroyImage(window_data_x11->image);
+                XDestroyWindow(window_data_x11->display, window_data_x11->window);
+                XCloseDisplay(window_data_x11->display);
+            }
+            memset(window_data_x11, 0, sizeof(SWindowData_X11));
+            free(window_data_x11);
+        }
+        memset(window_data, 0, sizeof(SWindowData));
+        free(window_data);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -507,7 +529,7 @@ static int translateKeyCodeA(int keySym) {
     return KB_KEY_UNKNOWN;
 }
 
-void init_keycodes() {
+void init_keycodes(SWindowData_X11 *window_data_x11) {
     size_t i;
     int keySym;
 
@@ -518,10 +540,10 @@ void init_keycodes() {
     // Valid key code range is  [8,255], according to the Xlib manual
     for(int i=8; i<=255; ++i) {
         // Try secondary keysym, for numeric keypad keys
-         keySym  = XkbKeycodeToKeysym(g_window_data.display, i, 0, 1);
+         keySym  = XkbKeycodeToKeysym(window_data_x11->display, i, 0, 1);
          keycodes[i] = translateKeyCodeB(keySym);
          if(keycodes[i] == KB_KEY_UNKNOWN) {
-            keySym = XkbKeycodeToKeysym(g_window_data.display, i, 0, 0);
+            keySym = XkbKeycodeToKeysym(window_data_x11->display, i, 0, 0);
             keycodes[i] = translateKeyCodeA(keySym);
          }
     }
@@ -604,29 +626,20 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
-    kUnused(user_data);
-    kUnused(mod);
-    kUnused(isPressed);
-    if (key == KB_KEY_ESCAPE) {
-        g_window_data.close = true;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool mfb_set_viewport(unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
+bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
 {
-    if(offset_x + width > g_window_data.window_width) {
+    SWindowData *window_data = (SWindowData *) window;
+
+    if(offset_x + width > window_data->window_width) {
         return false;
     }
-    if(offset_y + height > g_window_data.window_height) {
+    if(offset_y + height > window_data->window_height) {
         return false;
     }
 
-    g_window_data.dst_offset_x = offset_x;
-    g_window_data.dst_offset_y = offset_y;
-    g_window_data.dst_width    = width;
-    g_window_data.dst_height   = height;
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
     return true;
 }
