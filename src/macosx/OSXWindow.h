@@ -2,15 +2,9 @@
 
 // @class OSXWindowFrameView;
 
-@interface OSXWindow : NSWindow
+@interface OSXWindow : NSWindow<NSWindowDelegate>
 {
-	NSView* childContentView;
-	@public bool closed;
-#if defined(USE_METAL_API)
-	@public int width;
-	@public int height;
-	@public void* draw_buffer;
-#endif
+    NSView  *childContentView;
 }
 
 @end
