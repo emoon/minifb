@@ -572,12 +572,28 @@ mfb_open(const char *title, int width, int height)
     wl_surface_damage(g_window_data.surface, g_window_data.dst_offset_x, g_window_data.dst_offset_y, g_window_data.dst_width, g_window_data.dst_height);
     wl_surface_commit(g_window_data.surface);
 
+    if (g_keyboard_func == 0x0) {
+        mfb_keyboard_callback(keyboard_default);
+    }
+
+    printf("Window created using Wayland API\n");
+
     return 1;
 
 out:
     close(fd);
     destroy();
     return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
+    kUnused(mod);
+    kUnused(isPressed);
+    if (key == KB_KEY_ESCAPE)
+        g_window_data.close = true;
 }
 
 // done event

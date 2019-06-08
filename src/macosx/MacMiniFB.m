@@ -3,6 +3,7 @@
 #include "OSXWindowData.h"
 #include <MiniFB.h>
 #include <MiniFB_enums.h>
+#include <MiniFB_internal.h>
 #include <Cocoa/Cocoa.h>
 #if defined(USE_METAL_API)
 #include <Carbon/Carbon.h>
@@ -248,13 +249,29 @@ int mfb_open_ex(const char* name, int width, int height, int flags)
 	[NSApp finishLaunching];
 #endif
 
+    if (g_keyboard_func == 0x0) {
+        mfb_keyboard_callback(keyboard_default);
+    }
+
 #if defined(USE_METAL_API)
     NSLog(@"Window created using Metal API");
+#else
+    NSLog(@"Window created using Cocoa API");
 #endif
 
 	[pool drain];
 
 	return 1;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void keyboard_default(void *user_data, Key key, KeyMod mod, bool isPressed) {
+    kUnused(user_data);
+    kUnused(mod);
+    kUnused(isPressed);
+    if (key == KB_KEY_ESCAPE)
+        g_window_data.close = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

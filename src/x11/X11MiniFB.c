@@ -169,6 +169,8 @@ int mfb_open_ex(const char* title, int width, int height, int flags) {
         mfb_keyboard_callback(keyboard_default);
     }
 
+    printf("Window created using X11 API\n");
+
     return 1;    
 }
 
