@@ -99,7 +99,7 @@ int main()
     mfb_set_user_data(window_a, (void *) "Window A");
 
     //--
-    struct Window *window_b = mfb_open_ex("Window B", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
+    struct Window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
     if (!window_b)
         return 0;
 
@@ -111,7 +111,7 @@ int main()
     mfb_mouse_move_callback(window_b, mouse_move);
     mfb_mouse_scroll_callback(window_b, mouse_scroll);
 
-    mfb_set_user_data(window_b, (void *) "Input Events Test");
+    mfb_set_user_data(window_b, (void *) "Window B");
 
     // Generate pallete for plasma effect
     uint32_t    pallete[512];
