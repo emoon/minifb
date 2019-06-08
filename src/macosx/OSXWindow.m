@@ -1,22 +1,20 @@
 #import "OSXWindow.h"
 #import "OSXWindowFrameView.h"
-#include "OSXWindowData.h"
+#include "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
 
-extern SWindowData  g_window_data;
 extern short int    g_keycodes[512];
-
-bool gActive = false;
 
 @implementation OSXWindow
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (id)initWithContentRect:(NSRect)contentRect
-    styleMask:(NSWindowStyleMask)windowStyle
-    backing:(NSBackingStoreType)bufferingType
-    defer:(BOOL)deferCreation
+                styleMask:(NSWindowStyleMask)windowStyle
+                  backing:(NSBackingStoreType)bufferingType
+                    defer:(BOOL)deferCreation
+               windowData:(SWindowData *) windowData
 {
     self = [super
         initWithContentRect:contentRect
@@ -30,8 +28,20 @@ bool gActive = false;
         [self setBackgroundColor:[NSColor clearColor]];
         
         self.delegate = self;
+        
+        self->window_data = windowData;
+        OSXWindowFrameView *view = (OSXWindowFrameView *) self->childContentView.superview;
+        view->window_data = windowData;
     }
     return self;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void) removeWindowData {
+    self->window_data = 0x0;
+    OSXWindowFrameView *view = (OSXWindowFrameView *) self->childContentView.superview;
+    view->window_data = 0x0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +72,7 @@ bool gActive = false;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
--(void)flagsChanged:(NSEvent *)event
+- (void)flagsChanged:(NSEvent *)event
 {
     const uint32_t flags = [event modifierFlags];
     uint32_t	mod_keys = 0, mod_keys_aux = 0;
@@ -88,32 +98,31 @@ bool gActive = false;
         mod_keys |= KB_MOD_NUM_LOCK;
     }
 
-    if(mod_keys != g_window_data.mod_keys) {
+    if(mod_keys != window_data->mod_keys) {
         short int keyCode = keycodes[[event keyCode] & 0x1ff];
         if(keyCode != KB_KEY_UNKNOWN) {
-            mod_keys_aux = mod_keys ^ g_window_data.mod_keys;
+            mod_keys_aux = mod_keys ^ window_data->mod_keys;
             if(mod_keys_aux & KB_MOD_CAPS_LOCK) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CAPS_LOCK) != 0);
             }
             if(mod_keys_aux & KB_MOD_SHIFT) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SHIFT) != 0);
             }
             if(mod_keys_aux & KB_MOD_CONTROL) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_CONTROL) != 0);
             }
             if(mod_keys_aux & KB_MOD_ALT) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_ALT) != 0);
             }
             if(mod_keys_aux & KB_MOD_SUPER) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_SUPER) != 0);
             }
             if(mod_keys_aux & KB_MOD_NUM_LOCK) {
-                kCall(g_keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
+                kCall(keyboard_func, keyCode, mod_keys, (mod_keys & KB_MOD_NUM_LOCK) != 0);
             }
         }
     }
-    g_window_data.mod_keys = mod_keys;
-    //NSLog(@"KeyCode: %d (%x) - %x", [event keyCode], [event keyCode], flags);
+    window_data->mod_keys = mod_keys;
 
     [super flagsChanged:event];
 }
@@ -123,7 +132,7 @@ bool gActive = false;
 - (void)keyDown:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(g_keyboard_func, keyCode, g_window_data.mod_keys, true);
+    kCall(keyboard_func, keyCode, window_data->mod_keys, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +140,7 @@ bool gActive = false;
 - (void)keyUp:(NSEvent *)event
 {
     short int keyCode = keycodes[[event keyCode] & 0x1ff];
-    kCall(g_keyboard_func, keyCode, g_window_data.mod_keys, false);
+    kCall(keyboard_func, keyCode, window_data->mod_keys, false);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,7 +164,7 @@ bool gActive = false;
         if ((code & 0xff00) == 0xf700)
             continue;
 
-        kCall(g_char_input_func, code);
+        kCall(char_input_func, code);
     }
 }
 
@@ -165,9 +174,10 @@ bool gActive = false;
 {
     kUnused(notification);
 
-    if(gActive == true) {
-        gActive = false;
-        kCall(g_active_func, false);
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+    if(window_data_osx->active == true) {
+        window_data_osx->active = false;
+        kCall(active_func, false);
     }
 }
 
@@ -217,18 +227,20 @@ bool gActive = false;
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(g_active_func, true);
+    kCall(active_func, true);
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
     kUnused(notification);
-    kCall(g_active_func, false);
+    kCall(active_func, false);
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
     kUnused(notification);
-    g_window_data.close = true;
+    if(window_data) {
+        window_data->close = true;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,7 +270,7 @@ bool gActive = false;
 
 - (void)willClose
 {
-    g_window_data.close = true;
+    window_data->close = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,10 +279,10 @@ bool gActive = false;
     kUnused(notification);
     CGSize size = [self contentRectForFrameRect:[self frame]].size;
 
-    g_window_data.window_width  = size.width;
-    g_window_data.window_height = size.height;
+    window_data->window_width  = size.width;
+    window_data->window_height = size.height;
 
-    kCall(g_resize_func, size.width, size.height);
+    kCall(resize_func, size.width, size.height);
 }
 
 @end

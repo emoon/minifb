@@ -54,4 +54,4 @@ typedef struct
 
     uint32_t                mod_keys;
     bool                    close;
-} SWindowData;
+} SWindowData_Way;
