@@ -78,7 +78,7 @@ Additionally you can set data per window and recover it
 	myData = (someCast *) mfb_get_user_data(window);
 
 
-First the code creates window with the mfb_open call that is used to display the data, next it's the applications resposiblity to allocate a buffer (which has to be at least the size of the window and in 32-bit) Next when calling mfb_update function the buffer will be copied over to the window and displayed. Currently the mfb_update will return -1 if ESC key is pressed but later on it will support to return a key code for a pressed button. See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete example
+First the code creates window with the mfb_open call that is used to display the data, next it's the applications responsibility to allocate a buffer (which has to be at least the size of the window and in 32-bit) Next when calling mfb_update function the buffer will be copied over to the window and displayed. Currently the mfb_update will return -1 if ESC key is pressed but later on it will support to return a key code for a pressed button. See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete example
 
 MiniFB has been tested on Windows, Mac OS X and Linux but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
 
