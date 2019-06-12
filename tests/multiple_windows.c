@@ -1,8 +1,10 @@
 #include <MiniFB.h>
 #include <stdio.h>
 #include <stdint.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 
+#define kPI             3.14159265358979323846f
 #define kUnused(var)    (void) var;
 
 #define WIDTH_A      800
@@ -117,7 +119,7 @@ int main()
     uint32_t    pallete[512];
     float       inc = 90.0f / 64.0f;
     for(uint32_t c=0; c<64; ++c) {
-        int32_t col = (255.0f * sinf(c * inc * M_PI / 180.0f)) + 0.5f;
+        int32_t col = (int32_t) ((255.0f * sinf(c * inc * kPI / 180.0f)) + 0.5f);
         pallete[64*0 + c] = MFB_RGB(col,     0,       0);
         pallete[64*1 + c] = MFB_RGB(255,     col,     0);
         pallete[64*2 + c] = MFB_RGB(255-col, 255,     0);
@@ -151,13 +153,13 @@ int main()
         }
 
         //--
-        time_x = sinf(time * M_PI / 180.0f);
-        time_y = cosf(time * M_PI / 180.0f);
+        time_x = sinf(time * kPI / 180.0f);
+        time_y = cosf(time * kPI / 180.0f);
         i = 0;
         for(y=0; y<HEIGHT_B; ++y) {
-            dy = cosf((y * time_y) * M_PI / 180.0f);                // [-1, 1]
+            dy = cosf((y * time_y) * kPI / 180.0f);                // [-1, 1]
             for(x=0; x<WIDTH_B; ++x) {
-                dx = sinf((x * time_x) * M_PI / 180.0f);            // [-1, 1]
+                dx = sinf((x * time_x) * kPI / 180.0f);            // [-1, 1]
 
                 index = (int) ((2.0f + dx + dy) * 0.25f * 511.0f);  // [0, 511]
                 g_buffer_b[i++] = pallete[index];

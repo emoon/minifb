@@ -77,7 +77,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 if (key_code == KB_KEY_UNKNOWN)
                     return FALSE;
 
-                windowData->key_status[key_code] = is_pressed;
+                window_data->key_status[key_code] = is_pressed;
                 kCall(keyboard_func, key_code, window_data->mod_keys, is_pressed);
             }
             break;
@@ -278,7 +278,7 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
             rect.right += rect.left;
             rect.left = 0;
         }
-        if (rect.bottom > height) {
+        if (rect.bottom > (LONG) height) {
             height -= (rect.bottom - height);
             rect.bottom += (rect.bottom - height);
             rect.top = 0;
