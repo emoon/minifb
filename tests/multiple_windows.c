@@ -88,13 +88,13 @@ int main()
     if (!window_a)
         return 0;
 
-    mfb_active_callback(window_a, active);
-    mfb_resize_callback(window_a, resize);
-    mfb_keyboard_callback(window_a, keyboard);
-    mfb_char_input_callback(window_a, char_input);
-    mfb_mouse_button_callback(window_a, mouse_btn);
-    mfb_mouse_move_callback(window_a, mouse_move);
-    mfb_mouse_scroll_callback(window_a, mouse_scroll);
+    mfb_set_active_callback(window_a, active);
+    mfb_set_resize_callback(window_a, resize);
+    mfb_set_keyboard_callback(window_a, keyboard);
+    mfb_set_char_input_callback(window_a, char_input);
+    mfb_set_mouse_button_callback(window_a, mouse_btn);
+    mfb_set_mouse_move_callback(window_a, mouse_move);
+    mfb_set_mouse_scroll_callback(window_a, mouse_scroll);
 
     mfb_set_user_data(window_a, (void *) "Window A");
 
@@ -103,13 +103,13 @@ int main()
     if (!window_b)
         return 0;
 
-    mfb_active_callback(window_b, active);
-    mfb_resize_callback(window_b, resize);
-    mfb_keyboard_callback(window_b, keyboard);
-    mfb_char_input_callback(window_b, char_input);
-    mfb_mouse_button_callback(window_b, mouse_btn);
-    mfb_mouse_move_callback(window_b, mouse_move);
-    mfb_mouse_scroll_callback(window_b, mouse_scroll);
+    mfb_set_active_callback(window_b, active);
+    mfb_set_resize_callback(window_b, resize);
+    mfb_set_keyboard_callback(window_b, keyboard);
+    mfb_set_char_input_callback(window_b, char_input);
+    mfb_set_mouse_button_callback(window_b, mouse_btn);
+    mfb_set_mouse_move_callback(window_b, mouse_move);
+    mfb_set_mouse_scroll_callback(window_b, mouse_scroll);
 
     mfb_set_user_data(window_b, (void *) "Window B");
 

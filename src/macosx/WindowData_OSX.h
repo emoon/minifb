@@ -17,5 +17,4 @@ typedef struct {
             id<MTLRenderPipelineState>  pipeline_state; 
         } metal;
 #endif        
-    bool        active;
 } SWindowData_OSX;
