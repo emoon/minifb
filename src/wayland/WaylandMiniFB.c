@@ -287,7 +287,9 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
 
     //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
     SWindowData *window_data = (SWindowData *) data;
-    kCall(mouse_move_func, sx >> 24, sy >> 24);
+    window_data->mouse_pos_x = sx >> 24;
+    window_data->mouse_pos_y = sy >> 24;
+    kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
 }
 
 // Mouse button click and release notifications.

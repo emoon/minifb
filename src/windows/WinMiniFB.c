@@ -170,7 +170,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
                 }
-                kCall(mouse_move_func, ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam)));
+                window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
+                window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
+                kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
             }
             break;
 
@@ -244,7 +246,7 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
         s_window_style = WS_POPUP & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
 
-        DEVMODE settings;
+        DEVMODE settings = { 0 };
         EnumDisplaySettings(0, 0, &settings);
         settings.dmPelsWidth  = GetSystemMetrics(SM_CXSCREEN);
         settings.dmPelsHeight = GetSystemMetrics(SM_CYSCREEN);

@@ -30,6 +30,8 @@ void mfb_set_mouse_scroll_callback(struct Window *window, T *obj, void (T::*meth
 // To avoid clumsy hands
 //-------------------------------------
 class Stub {
+    Stub() : m_window(0x0) {}
+
     template <class T>
     friend void mfb_set_active_callback(struct Window *window, T *obj, void (T::*method)(struct Window *, bool));
     template <class T>

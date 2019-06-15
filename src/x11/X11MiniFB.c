@@ -250,6 +250,8 @@ static void processEvents(SWindowData *window_data)
             break;
 
             case MotionNotify:
+                window_data->mouse_pos_x = event.xmotion.x;
+                window_data->mouse_pos_y = event.xmotion.y;
                 kCall(mouse_move_func, event.xmotion.x, event.xmotion.y);
                 break;
 
