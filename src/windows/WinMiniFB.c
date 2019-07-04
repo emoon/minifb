@@ -19,7 +19,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     LRESULT res = 0;
 
-    SWindowData     *window_data     = (SWindowData *) GetWindowLongPtr(hWnd, GWL_USERDATA);
+    SWindowData     *window_data     = (SWindowData *) GetWindowLongPtr(hWnd, GWLP_USERDATA);
     SWindowData_Win *window_data_win = 0x0;
     if(window_data != 0x0) {
         window_data_win = (SWindowData_Win *) window_data->specific;
