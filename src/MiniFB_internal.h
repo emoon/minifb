@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-    short int keycodes[512];
+    extern short int g_keycodes[512];
     void init_keycodes();
     void keyboard_default(struct Window *window, Key key, KeyMod mod, bool isPressed);
 

@@ -102,6 +102,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(keys);
 
     SWindowData *window_data = (SWindowData *) data;
+    window_data->is_active = true;
     kCall(active_func, true);
 }
 
@@ -116,6 +117,7 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
+    window_data->is_active = false;
     kCall(active_func, false);
 }
 
@@ -134,9 +136,9 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
     SWindowData *window_data = (SWindowData *) data;
     if(key < 512) {
-        Key    kb_key     = (Key) keycodes[key];
+        Key    key_code    = (Key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        switch (kb_key)
+        switch (key_code)
         {
             case KB_KEY_LEFT_SHIFT:
             case KB_KEY_RIGHT_SHIFT:
@@ -171,7 +173,8 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 break;
         }
 
-        kCall(keyboard_func, kb_key, (KeyMod)window_data->mod_keys, is_pressed);
+        window_data->key_status[key_code] = is_pressed;
+        kCall(keyboard_func, key_code, (KeyMod)window_data->mod_keys, is_pressed);
     }
 }
 
@@ -284,7 +287,9 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
 
     //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
     SWindowData *window_data = (SWindowData *) data;
-    kCall(mouse_move_func, sx >> 24, sy >> 24);
+    window_data->mouse_pos_x = sx >> 24;
+    window_data->mouse_pos_y = sy >> 24;
+    kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
 }
 
 // Mouse button click and release notifications.
@@ -314,7 +319,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 
     //printf("Pointer button '%d'(%d)\n", button, state);
     SWindowData *window_data = (SWindowData *) data;
-    kCall(mouse_btn_func, button - BTN_MOUSE + 1, window_data->mod_keys, state == 1);
+    kCall(mouse_btn_func, (MouseButton) (button - BTN_MOUSE + 1), (KeyMod) window_data->mod_keys, state == 1);
 }
 
 //  Scroll and other axis notifications.
@@ -347,10 +352,10 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
     SWindowData *window_data = (SWindowData *) data;
     if(axis == 0) {
-        kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, -(value / 256.0f));
+        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, -(value / 256.0f));
     }
     else if(axis == 1) {
-        kCall(mouse_wheel_func, window_data->mod_keys, -(value / 256.0f), 0.0f);
+        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, -(value / 256.0f), 0.0f);
     }
 }
 
@@ -548,21 +553,21 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Window * 
-mfb_open_ex(const char *title, int width, int height, int flags) {
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     // TODO: Not yet
     kUnused(flags);
     return mfb_open(title, width, height);
 }
 
 struct Window * 
-mfb_open(const char *title, int width, int height)
+mfb_open(const char *title, unsigned width, unsigned height)
 {
     int fd = -1;
 
-    SWindowData *window_data = malloc(sizeof(SWindowData));
+    SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Way *window_data_way = malloc(sizeof(SWindowData_Way));
+    SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
     memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data->specific = window_data_way;
 
@@ -643,11 +648,11 @@ mfb_open(const char *title, int width, int height)
         wl_shell_surface_set_toplevel(window_data_way->shell_surface);
     }
 
-    wl_surface_attach(window_data_way->surface, window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
+    wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     wl_surface_commit(window_data_way->surface);
 
-    mfb_keyboard_callback((struct Window *) window_data, keyboard_default);
+    mfb_set_keyboard_callback((struct Window *) window_data, keyboard_default);
 
     printf("Window created using Wayland API\n");
 
@@ -703,7 +708,7 @@ mfb_update(struct Window *window, void *buffer)
     // update shm buffer
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
-    wl_surface_attach(window_data_way->surface, window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
+    wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     struct wl_callback *frame_callback = wl_surface_frame(window_data_way->surface);
     if (!frame_callback) {
@@ -725,132 +730,132 @@ mfb_update(struct Window *window, void *buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern short int keycodes[512];
+extern short int g_keycodes[512];
 
 void 
 init_keycodes(void)
 {
     // Clear keys
-    for (size_t i = 0; i < sizeof(keycodes) / sizeof(keycodes[0]); ++i) 
-        keycodes[i] = 0;
+    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
+        g_keycodes[i] = 0;
 
-    keycodes[KEY_GRAVE]      = KB_KEY_GRAVE_ACCENT;
-    keycodes[KEY_1]          = KB_KEY_1;
-    keycodes[KEY_2]          = KB_KEY_2;
-    keycodes[KEY_3]          = KB_KEY_3;
-    keycodes[KEY_4]          = KB_KEY_4;
-    keycodes[KEY_5]          = KB_KEY_5;
-    keycodes[KEY_6]          = KB_KEY_6;
-    keycodes[KEY_7]          = KB_KEY_7;
-    keycodes[KEY_8]          = KB_KEY_8;
-    keycodes[KEY_9]          = KB_KEY_9;
-    keycodes[KEY_0]          = KB_KEY_0;
-    keycodes[KEY_SPACE]      = KB_KEY_SPACE;
-    keycodes[KEY_MINUS]      = KB_KEY_MINUS;
-    keycodes[KEY_EQUAL]      = KB_KEY_EQUAL;
-    keycodes[KEY_Q]          = KB_KEY_Q;
-    keycodes[KEY_W]          = KB_KEY_W;
-    keycodes[KEY_E]          = KB_KEY_E;
-    keycodes[KEY_R]          = KB_KEY_R;
-    keycodes[KEY_T]          = KB_KEY_T;
-    keycodes[KEY_Y]          = KB_KEY_Y;
-    keycodes[KEY_U]          = KB_KEY_U;
-    keycodes[KEY_I]          = KB_KEY_I;
-    keycodes[KEY_O]          = KB_KEY_O;
-    keycodes[KEY_P]          = KB_KEY_P;
-    keycodes[KEY_LEFTBRACE]  = KB_KEY_LEFT_BRACKET;
-    keycodes[KEY_RIGHTBRACE] = KB_KEY_RIGHT_BRACKET;
-    keycodes[KEY_A]          = KB_KEY_A;
-    keycodes[KEY_S]          = KB_KEY_S;
-    keycodes[KEY_D]          = KB_KEY_D;
-    keycodes[KEY_F]          = KB_KEY_F;
-    keycodes[KEY_G]          = KB_KEY_G;
-    keycodes[KEY_H]          = KB_KEY_H;
-    keycodes[KEY_J]          = KB_KEY_J;
-    keycodes[KEY_K]          = KB_KEY_K;
-    keycodes[KEY_L]          = KB_KEY_L;
-    keycodes[KEY_SEMICOLON]  = KB_KEY_SEMICOLON;
-    keycodes[KEY_APOSTROPHE] = KB_KEY_APOSTROPHE;
-    keycodes[KEY_Z]          = KB_KEY_Z;
-    keycodes[KEY_X]          = KB_KEY_X;
-    keycodes[KEY_C]          = KB_KEY_C;
-    keycodes[KEY_V]          = KB_KEY_V;
-    keycodes[KEY_B]          = KB_KEY_B;
-    keycodes[KEY_N]          = KB_KEY_N;
-    keycodes[KEY_M]          = KB_KEY_M;
-    keycodes[KEY_COMMA]      = KB_KEY_COMMA;
-    keycodes[KEY_DOT]        = KB_KEY_PERIOD;
-    keycodes[KEY_SLASH]      = KB_KEY_SLASH;
-    keycodes[KEY_BACKSLASH]  = KB_KEY_BACKSLASH;
-    keycodes[KEY_ESC]        = KB_KEY_ESCAPE;
-    keycodes[KEY_TAB]        = KB_KEY_TAB;
-    keycodes[KEY_LEFTSHIFT]  = KB_KEY_LEFT_SHIFT;
-    keycodes[KEY_RIGHTSHIFT] = KB_KEY_RIGHT_SHIFT;
-    keycodes[KEY_LEFTCTRL]   = KB_KEY_LEFT_CONTROL;
-    keycodes[KEY_RIGHTCTRL]  = KB_KEY_RIGHT_CONTROL;
-    keycodes[KEY_LEFTALT]    = KB_KEY_LEFT_ALT;
-    keycodes[KEY_RIGHTALT]   = KB_KEY_RIGHT_ALT;
-    keycodes[KEY_LEFTMETA]   = KB_KEY_LEFT_SUPER;
-    keycodes[KEY_RIGHTMETA]  = KB_KEY_RIGHT_SUPER;
-    keycodes[KEY_MENU]       = KB_KEY_MENU;
-    keycodes[KEY_NUMLOCK]    = KB_KEY_NUM_LOCK;
-    keycodes[KEY_CAPSLOCK]   = KB_KEY_CAPS_LOCK;
-    keycodes[KEY_PRINT]      = KB_KEY_PRINT_SCREEN;
-    keycodes[KEY_SCROLLLOCK] = KB_KEY_SCROLL_LOCK;
-    keycodes[KEY_PAUSE]      = KB_KEY_PAUSE;
-    keycodes[KEY_DELETE]     = KB_KEY_DELETE;
-    keycodes[KEY_BACKSPACE]  = KB_KEY_BACKSPACE;
-    keycodes[KEY_ENTER]      = KB_KEY_ENTER;
-    keycodes[KEY_HOME]       = KB_KEY_HOME;
-    keycodes[KEY_END]        = KB_KEY_END;
-    keycodes[KEY_PAGEUP]     = KB_KEY_PAGE_UP;
-    keycodes[KEY_PAGEDOWN]   = KB_KEY_PAGE_DOWN;
-    keycodes[KEY_INSERT]     = KB_KEY_INSERT;
-    keycodes[KEY_LEFT]       = KB_KEY_LEFT;
-    keycodes[KEY_RIGHT]      = KB_KEY_RIGHT;
-    keycodes[KEY_DOWN]       = KB_KEY_DOWN;
-    keycodes[KEY_UP]         = KB_KEY_UP;
-    keycodes[KEY_F1]         = KB_KEY_F1;
-    keycodes[KEY_F2]         = KB_KEY_F2;
-    keycodes[KEY_F3]         = KB_KEY_F3;
-    keycodes[KEY_F4]         = KB_KEY_F4;
-    keycodes[KEY_F5]         = KB_KEY_F5;
-    keycodes[KEY_F6]         = KB_KEY_F6;
-    keycodes[KEY_F7]         = KB_KEY_F7;
-    keycodes[KEY_F8]         = KB_KEY_F8;
-    keycodes[KEY_F9]         = KB_KEY_F9;
-    keycodes[KEY_F10]        = KB_KEY_F10;
-    keycodes[KEY_F11]        = KB_KEY_F11;
-    keycodes[KEY_F12]        = KB_KEY_F12;
-    keycodes[KEY_F13]        = KB_KEY_F13;
-    keycodes[KEY_F14]        = KB_KEY_F14;
-    keycodes[KEY_F15]        = KB_KEY_F15;
-    keycodes[KEY_F16]        = KB_KEY_F16;
-    keycodes[KEY_F17]        = KB_KEY_F17;
-    keycodes[KEY_F18]        = KB_KEY_F18;
-    keycodes[KEY_F19]        = KB_KEY_F19;
-    keycodes[KEY_F20]        = KB_KEY_F20;
-    keycodes[KEY_F21]        = KB_KEY_F21;
-    keycodes[KEY_F22]        = KB_KEY_F22;
-    keycodes[KEY_F23]        = KB_KEY_F23;
-    keycodes[KEY_F24]        = KB_KEY_F24;
-    keycodes[KEY_KPSLASH]    = KB_KEY_KP_DIVIDE;
-    keycodes[KEY_KPDOT]      = KB_KEY_KP_MULTIPLY;
-    keycodes[KEY_KPMINUS]    = KB_KEY_KP_SUBTRACT;
-    keycodes[KEY_KPPLUS]     = KB_KEY_KP_ADD;
-    keycodes[KEY_KP0]        = KB_KEY_KP_0;
-    keycodes[KEY_KP1]        = KB_KEY_KP_1;
-    keycodes[KEY_KP2]        = KB_KEY_KP_2;
-    keycodes[KEY_KP3]        = KB_KEY_KP_3;
-    keycodes[KEY_KP4]        = KB_KEY_KP_4;
-    keycodes[KEY_KP5]        = KB_KEY_KP_5;
-    keycodes[KEY_KP6]        = KB_KEY_KP_6;
-    keycodes[KEY_KP7]        = KB_KEY_KP_7;
-    keycodes[KEY_KP8]        = KB_KEY_KP_8;
-    keycodes[KEY_KP9]        = KB_KEY_KP_9;
-    keycodes[KEY_KPCOMMA]    = KB_KEY_KP_DECIMAL;
-    keycodes[KEY_KPEQUAL]    = KB_KEY_KP_EQUAL;
-    keycodes[KEY_KPENTER]    = KB_KEY_KP_ENTER;
+    g_keycodes[KEY_GRAVE]      = KB_KEY_GRAVE_ACCENT;
+    g_keycodes[KEY_1]          = KB_KEY_1;
+    g_keycodes[KEY_2]          = KB_KEY_2;
+    g_keycodes[KEY_3]          = KB_KEY_3;
+    g_keycodes[KEY_4]          = KB_KEY_4;
+    g_keycodes[KEY_5]          = KB_KEY_5;
+    g_keycodes[KEY_6]          = KB_KEY_6;
+    g_keycodes[KEY_7]          = KB_KEY_7;
+    g_keycodes[KEY_8]          = KB_KEY_8;
+    g_keycodes[KEY_9]          = KB_KEY_9;
+    g_keycodes[KEY_0]          = KB_KEY_0;
+    g_keycodes[KEY_SPACE]      = KB_KEY_SPACE;
+    g_keycodes[KEY_MINUS]      = KB_KEY_MINUS;
+    g_keycodes[KEY_EQUAL]      = KB_KEY_EQUAL;
+    g_keycodes[KEY_Q]          = KB_KEY_Q;
+    g_keycodes[KEY_W]          = KB_KEY_W;
+    g_keycodes[KEY_E]          = KB_KEY_E;
+    g_keycodes[KEY_R]          = KB_KEY_R;
+    g_keycodes[KEY_T]          = KB_KEY_T;
+    g_keycodes[KEY_Y]          = KB_KEY_Y;
+    g_keycodes[KEY_U]          = KB_KEY_U;
+    g_keycodes[KEY_I]          = KB_KEY_I;
+    g_keycodes[KEY_O]          = KB_KEY_O;
+    g_keycodes[KEY_P]          = KB_KEY_P;
+    g_keycodes[KEY_LEFTBRACE]  = KB_KEY_LEFT_BRACKET;
+    g_keycodes[KEY_RIGHTBRACE] = KB_KEY_RIGHT_BRACKET;
+    g_keycodes[KEY_A]          = KB_KEY_A;
+    g_keycodes[KEY_S]          = KB_KEY_S;
+    g_keycodes[KEY_D]          = KB_KEY_D;
+    g_keycodes[KEY_F]          = KB_KEY_F;
+    g_keycodes[KEY_G]          = KB_KEY_G;
+    g_keycodes[KEY_H]          = KB_KEY_H;
+    g_keycodes[KEY_J]          = KB_KEY_J;
+    g_keycodes[KEY_K]          = KB_KEY_K;
+    g_keycodes[KEY_L]          = KB_KEY_L;
+    g_keycodes[KEY_SEMICOLON]  = KB_KEY_SEMICOLON;
+    g_keycodes[KEY_APOSTROPHE] = KB_KEY_APOSTROPHE;
+    g_keycodes[KEY_Z]          = KB_KEY_Z;
+    g_keycodes[KEY_X]          = KB_KEY_X;
+    g_keycodes[KEY_C]          = KB_KEY_C;
+    g_keycodes[KEY_V]          = KB_KEY_V;
+    g_keycodes[KEY_B]          = KB_KEY_B;
+    g_keycodes[KEY_N]          = KB_KEY_N;
+    g_keycodes[KEY_M]          = KB_KEY_M;
+    g_keycodes[KEY_COMMA]      = KB_KEY_COMMA;
+    g_keycodes[KEY_DOT]        = KB_KEY_PERIOD;
+    g_keycodes[KEY_SLASH]      = KB_KEY_SLASH;
+    g_keycodes[KEY_BACKSLASH]  = KB_KEY_BACKSLASH;
+    g_keycodes[KEY_ESC]        = KB_KEY_ESCAPE;
+    g_keycodes[KEY_TAB]        = KB_KEY_TAB;
+    g_keycodes[KEY_LEFTSHIFT]  = KB_KEY_LEFT_SHIFT;
+    g_keycodes[KEY_RIGHTSHIFT] = KB_KEY_RIGHT_SHIFT;
+    g_keycodes[KEY_LEFTCTRL]   = KB_KEY_LEFT_CONTROL;
+    g_keycodes[KEY_RIGHTCTRL]  = KB_KEY_RIGHT_CONTROL;
+    g_keycodes[KEY_LEFTALT]    = KB_KEY_LEFT_ALT;
+    g_keycodes[KEY_RIGHTALT]   = KB_KEY_RIGHT_ALT;
+    g_keycodes[KEY_LEFTMETA]   = KB_KEY_LEFT_SUPER;
+    g_keycodes[KEY_RIGHTMETA]  = KB_KEY_RIGHT_SUPER;
+    g_keycodes[KEY_MENU]       = KB_KEY_MENU;
+    g_keycodes[KEY_NUMLOCK]    = KB_KEY_NUM_LOCK;
+    g_keycodes[KEY_CAPSLOCK]   = KB_KEY_CAPS_LOCK;
+    g_keycodes[KEY_PRINT]      = KB_KEY_PRINT_SCREEN;
+    g_keycodes[KEY_SCROLLLOCK] = KB_KEY_SCROLL_LOCK;
+    g_keycodes[KEY_PAUSE]      = KB_KEY_PAUSE;
+    g_keycodes[KEY_DELETE]     = KB_KEY_DELETE;
+    g_keycodes[KEY_BACKSPACE]  = KB_KEY_BACKSPACE;
+    g_keycodes[KEY_ENTER]      = KB_KEY_ENTER;
+    g_keycodes[KEY_HOME]       = KB_KEY_HOME;
+    g_keycodes[KEY_END]        = KB_KEY_END;
+    g_keycodes[KEY_PAGEUP]     = KB_KEY_PAGE_UP;
+    g_keycodes[KEY_PAGEDOWN]   = KB_KEY_PAGE_DOWN;
+    g_keycodes[KEY_INSERT]     = KB_KEY_INSERT;
+    g_keycodes[KEY_LEFT]       = KB_KEY_LEFT;
+    g_keycodes[KEY_RIGHT]      = KB_KEY_RIGHT;
+    g_keycodes[KEY_DOWN]       = KB_KEY_DOWN;
+    g_keycodes[KEY_UP]         = KB_KEY_UP;
+    g_keycodes[KEY_F1]         = KB_KEY_F1;
+    g_keycodes[KEY_F2]         = KB_KEY_F2;
+    g_keycodes[KEY_F3]         = KB_KEY_F3;
+    g_keycodes[KEY_F4]         = KB_KEY_F4;
+    g_keycodes[KEY_F5]         = KB_KEY_F5;
+    g_keycodes[KEY_F6]         = KB_KEY_F6;
+    g_keycodes[KEY_F7]         = KB_KEY_F7;
+    g_keycodes[KEY_F8]         = KB_KEY_F8;
+    g_keycodes[KEY_F9]         = KB_KEY_F9;
+    g_keycodes[KEY_F10]        = KB_KEY_F10;
+    g_keycodes[KEY_F11]        = KB_KEY_F11;
+    g_keycodes[KEY_F12]        = KB_KEY_F12;
+    g_keycodes[KEY_F13]        = KB_KEY_F13;
+    g_keycodes[KEY_F14]        = KB_KEY_F14;
+    g_keycodes[KEY_F15]        = KB_KEY_F15;
+    g_keycodes[KEY_F16]        = KB_KEY_F16;
+    g_keycodes[KEY_F17]        = KB_KEY_F17;
+    g_keycodes[KEY_F18]        = KB_KEY_F18;
+    g_keycodes[KEY_F19]        = KB_KEY_F19;
+    g_keycodes[KEY_F20]        = KB_KEY_F20;
+    g_keycodes[KEY_F21]        = KB_KEY_F21;
+    g_keycodes[KEY_F22]        = KB_KEY_F22;
+    g_keycodes[KEY_F23]        = KB_KEY_F23;
+    g_keycodes[KEY_F24]        = KB_KEY_F24;
+    g_keycodes[KEY_KPSLASH]    = KB_KEY_KP_DIVIDE;
+    g_keycodes[KEY_KPDOT]      = KB_KEY_KP_MULTIPLY;
+    g_keycodes[KEY_KPMINUS]    = KB_KEY_KP_SUBTRACT;
+    g_keycodes[KEY_KPPLUS]     = KB_KEY_KP_ADD;
+    g_keycodes[KEY_KP0]        = KB_KEY_KP_0;
+    g_keycodes[KEY_KP1]        = KB_KEY_KP_1;
+    g_keycodes[KEY_KP2]        = KB_KEY_KP_2;
+    g_keycodes[KEY_KP3]        = KB_KEY_KP_3;
+    g_keycodes[KEY_KP4]        = KB_KEY_KP_4;
+    g_keycodes[KEY_KP5]        = KB_KEY_KP_5;
+    g_keycodes[KEY_KP6]        = KB_KEY_KP_6;
+    g_keycodes[KEY_KP7]        = KB_KEY_KP_7;
+    g_keycodes[KEY_KP8]        = KB_KEY_KP_8;
+    g_keycodes[KEY_KP9]        = KB_KEY_KP_9;
+    g_keycodes[KEY_KPCOMMA]    = KB_KEY_KP_DECIMAL;
+    g_keycodes[KEY_KPEQUAL]    = KB_KEY_KP_EQUAL;
+    g_keycodes[KEY_KPENTER]    = KB_KEY_KP_ENTER;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
