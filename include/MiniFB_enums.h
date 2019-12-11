@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <stdbool.h>
 
 // Enums
@@ -20,12 +21,10 @@ typedef enum {
     MOUSE_BTN_5,
     MOUSE_BTN_6,
     MOUSE_BTN_7,
-    MOUSE_BTN_8
 } MouseButton;
-#define MOUSE_LAST   MOUSE_BTN_8
-#define MOUSE_LEFT   MOUSE_BTN_0
-#define MOUSE_RIGHT  MOUSE_BTN_1
-#define MOUSE_MIDDLE MOUSE_BTN_2
+#define MOUSE_LEFT   MOUSE_BTN_1
+#define MOUSE_RIGHT  MOUSE_BTN_2
+#define MOUSE_MIDDLE MOUSE_BTN_3
 
 typedef enum {
     KB_KEY_UNKNOWN       = -1,
@@ -155,12 +154,12 @@ typedef enum {
 #define KB_KEY_LAST     KB_KEY_MENU
 
 typedef enum {
-    KB_MOD_SHIFT     = 0x0001,
-    KB_MOD_CONTROL   = 0x0002,
-    KB_MOD_ALT       = 0x0004,
-    KB_MOD_SUPER     = 0x0008,
-    KB_MOD_CAPS_LOCK = 0x0010,
-    KB_MOD_NUM_LOCK  = 0x0020
+    KB_MOD_SHIFT        = 0x0001,
+    KB_MOD_CONTROL      = 0x0002,
+    KB_MOD_ALT          = 0x0004,
+    KB_MOD_SUPER        = 0x0008,
+    KB_MOD_CAPS_LOCK    = 0x0010,
+    KB_MOD_NUM_LOCK     = 0x0020
 } KeyMod;
 
 typedef enum {
@@ -179,7 +178,7 @@ typedef void(*mfb_active_func)(struct Window *window, bool isActive);
 typedef void(*mfb_resize_func)(struct Window *window, int width, int height);
 typedef void(*mfb_keyboard_func)(struct Window *window, Key key, KeyMod mod, bool isPressed);
 typedef void(*mfb_char_input_func)(struct Window *window, unsigned int code);
-typedef void(*mfb_mouse_btn_func)(struct Window *window, MouseButton button, KeyMod mod, bool isPressed);
+typedef void(*mfb_mouse_button_func)(struct Window *window, MouseButton button, KeyMod mod, bool isPressed);
 typedef void(*mfb_mouse_move_func)(struct Window *window, int x, int y);
 typedef void(*mfb_mouse_scroll_func)(struct Window *window, KeyMod mod, float deltaX, float deltaY);
 

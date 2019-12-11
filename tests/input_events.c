@@ -94,13 +94,13 @@ int main()
     if (!window)
         return 0;
 
-    mfb_active_callback(window, active);
-    mfb_resize_callback(window, resize);
-    mfb_keyboard_callback(window, keyboard);
-    mfb_char_input_callback(window, char_input);
-    mfb_mouse_button_callback(window, mouse_btn);
-    mfb_mouse_move_callback(window, mouse_move);
-    mfb_mouse_scroll_callback(window, mouse_scroll);
+    mfb_set_active_callback(window, active);
+    mfb_set_resize_callback(window, resize);
+    mfb_set_keyboard_callback(window, keyboard);
+    mfb_set_char_input_callback(window, char_input);
+    mfb_set_mouse_button_callback(window, mouse_btn);
+    mfb_set_mouse_move_callback(window, mouse_move);
+    mfb_set_mouse_scroll_callback(window, mouse_scroll);
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 

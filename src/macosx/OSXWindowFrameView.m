@@ -262,6 +262,8 @@ extern Vertex gVertices[4];
 {
     NSPoint point = [event locationInWindow];
     //NSPoint localPoint = [self convertPoint:point fromView:nil];
+    window_data->mouse_pos_x = point.x;
+    window_data->mouse_pos_y = point.y;
     kCall(mouse_move_func, point.x, point.y);
 }
 
