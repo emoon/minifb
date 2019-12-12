@@ -345,6 +345,29 @@ UpdateState mfb_update(struct Window *window, void *buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+UpdateState mfb_update_events(struct Window *window)
+{
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
+    }
+
+    update_events(window_data);
+    if(window_data->close == false) {
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+        [[window_data_osx->window contentView] setNeedsDisplay:YES];
+    }
+
+    return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
 {
     SWindowData *window_data = (SWindowData *) window;

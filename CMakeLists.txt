@@ -18,7 +18,7 @@ file(GLOB SrcWayland   "src/wayland/*.c")
 file(GLOB SrcX11       "src/x11/*.c")
 
 if (NOT MSVC)
-    set (CMAKE_C_FLAGS "-g -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function")
+    set (CMAKE_C_FLAGS "-g -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
     set (CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11")
     set (CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
     set (CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")

@@ -718,11 +718,36 @@ mfb_update(struct Window *window, void *buffer)
     wl_surface_commit(window_data_way->surface);
 
     while (!done && window_data->close == false) {
-        if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1)
-        {
+        if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
             wl_callback_destroy(frame_callback);
             return STATE_INTERNAL_ERROR;
         }
+    }
+
+    return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+UpdateState 
+mfb_update_events(struct Window *window)
+{
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy(window_data);
+        return STATE_EXIT;
+    }
+
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
+        return STATE_INTERNAL_ERROR;
+
+    if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
+        return STATE_INTERNAL_ERROR;
     }
 
     return STATE_OK;

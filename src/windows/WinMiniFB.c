@@ -15,13 +15,12 @@ uint32_t translate_mod();
 Key translate_key(unsigned int wParam, unsigned long lParam);
 void destroy_window_data(SWindowData *window_data);
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT res = 0;
 
     SWindowData     *window_data     = (SWindowData *) GetWindowLongPtr(hWnd, GWLP_USERDATA);
     SWindowData_Win *window_data_win = 0x0;
-    if(window_data != 0x0) {
+    if (window_data != 0x0) {
         window_data_win = (SWindowData_Win *) window_data->specific;
     }
 
@@ -31,18 +30,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             if (window_data && window_data->draw_buffer && window_data_win)
             {
-                //if(window_data->dst_offset_x > 0) {
+                //if (window_data->dst_offset_x > 0) {
                 //    BitBlt(window_data_win->hdc, 0, window_data->dst_offset_y, window_data->dst_offset_x, window_data->dst_height, 0, 0, 0, BLACKNESS);
                 //}
-                //if(window_data->dst_offset_y > 0) {
+                //if (window_data->dst_offset_y > 0) {
                 //    BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->dst_offset_y, 0, 0, 0, BLACKNESS);
                 //}
                 //uint32_t offsetY = window_data->dst_offset_y + window_data->dst_height;
-                //if(offsetY < window_data->window_height) {
+                //if (offsetY < window_data->window_height) {
                 //    BitBlt(window_data_win->hdc, 0, offsetY, window_data->window_width, window_data->window_height - offsetY, 0, 0, 0, BLACKNESS);
                 //}
                 //uint32_t offsetX = window_data->dst_offset_x + window_data->dst_width;
-                //if(offsetX < window_data->window_width) {
+                //if (offsetX < window_data->window_width) {
                 //    BitBlt(window_data_win->hdc, offsetX, window_data->dst_offset_y, window_data->window_width - offsetX, window_data->dst_height, 0, 0, 0, BLACKNESS);
                 //}
 
@@ -58,7 +57,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_DESTROY:
         case WM_CLOSE:
         {
-            if(window_data) {
+            if (window_data) {
                 window_data->close = true;
             }
             break;
@@ -69,7 +68,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_KEYUP:
         case WM_SYSKEYUP:
         {
-            if(window_data) {
+            if (window_data) {
                 Key key_code            = translate_key((unsigned int)wParam, (unsigned long)lParam);
                 int is_pressed         = !((lParam >> 31) & 1);
                 window_data->mod_keys = translate_mod();
@@ -88,14 +87,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_UNICHAR: 
         {
 
-            if(window_data) {
-                if(message == WM_UNICHAR && wParam == UNICODE_NOCHAR) {
+            if (window_data) {
+                if (message == WM_UNICHAR && wParam == UNICODE_NOCHAR) {
                     // WM_UNICHAR is not sent by Windows, but is sent by some third-party input method engine
                     // Returning TRUE here announces support for this message
                     return TRUE;
                 }
 
-                kCall(char_input_func, wParam);
+                kCall(char_input_func, (unsigned int) wParam);
             }
             break;
         }
@@ -113,7 +112,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_XBUTTONDOWN:
         case WM_XBUTTONDBLCLK:
         {
-            if(window_data) {
+            if (window_data) {
                 MouseButton button = MOUSE_BTN_0;
                 window_data->mod_keys = translate_mod();
                 int          is_pressed = 0;
@@ -136,7 +135,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 default:
                     button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MOUSE_BTN_5 : MOUSE_BTN_6);
-                    if(message == WM_XBUTTONDOWN) {
+                    if (message == WM_XBUTTONDOWN) {
                         is_pressed = 1;
                     }
                 }
@@ -146,7 +145,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
 
         case WM_MOUSEWHEEL:
-            if(window_data) {
+            if (window_data) {
                 kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             }
             break;
@@ -154,14 +153,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case WM_MOUSEHWHEEL:
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
-            if(window_data) {
+            if (window_data) {
                 kCall(mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
             }
             break;
 
         case WM_MOUSEMOVE:
-            if(window_data) {
-                if(window_data_win->mouse_inside == false) {
+            if (window_data) {
+                if (window_data_win->mouse_inside == false) {
                     window_data_win->mouse_inside = true;
                     TRACKMOUSEEVENT tme;
                     ZeroMemory(&tme, sizeof(tme));
@@ -177,13 +176,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case WM_MOUSELEAVE:
-            if(window_data) {
+            if (window_data) {
                 window_data_win->mouse_inside = false;
             }
             break;
 
         case WM_SIZE:
-            if(window_data) {
+            if (window_data) {
                 window_data->dst_offset_x = 0;
                 window_data->dst_offset_y = 0;
                 window_data->dst_width = LOWORD(lParam);
@@ -196,14 +195,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
 
         case WM_SETFOCUS:
-            if(window_data) {
+            if (window_data) {
                 window_data->is_active = true;
                 kCall(active_func, true);
             }
             break;
 
         case WM_KILLFOCUS:
-            if(window_data) {
+            if (window_data) {
                 window_data->is_active = false;
                 kCall(active_func, false);
             }
@@ -358,21 +357,20 @@ struct Window *mfb_open(const char *title, unsigned width, unsigned height) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update(struct Window *window, void *buffer)
-{
+UpdateState mfb_update(struct Window *window, void *buffer) {
     MSG msg;
     
-    if(window == 0x0) {
+    if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *)window;
-    if(window_data->close) {
+    if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
-    if(buffer == 0x0) {
+    if (buffer == 0x0) {
         return STATE_INVALID_BUFFER;
     }
 
@@ -382,8 +380,31 @@ UpdateState mfb_update(struct Window *window, void *buffer)
     InvalidateRect(window_data_win->window, 0x0, TRUE);
     SendMessage(window_data_win->window, WM_PAINT, 0, 0);
 
-    while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE))
-    {
+    while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+UpdateState mfb_update_events(struct Window *window) {
+    MSG msg;
+    
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *)window;
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
+    }
+
+    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+    while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -394,16 +415,17 @@ UpdateState mfb_update(struct Window *window, void *buffer)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void destroy_window_data(SWindowData *window_data) {
-    if(window_data == 0x0)
+    if (window_data == 0x0)
         return;
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
 
     window_data->draw_buffer = 0x0;
-    if(window_data_win->bitmapInfo != 0x0) {
+    if (window_data_win->bitmapInfo != 0x0) {
         free(window_data_win->bitmapInfo);
     }
-    if(window_data_win->window != 0 && window_data_win->hdc != 0) {
+
+    if (window_data_win->window != 0 && window_data_win->hdc != 0) {
         ReleaseDC(window_data_win->window, window_data_win->hdc);
         DestroyWindow(window_data_win->window);
     }
@@ -595,14 +617,13 @@ Key translate_key(unsigned int wParam, unsigned long lParam) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)
-{
+bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
 
-    if(offset_x + width > window_data->window_width) {
+    if (offset_x + width > window_data->window_width) {
         return false;
     }
-    if(offset_y + height > window_data->window_height) {
+    if (offset_y + height > window_data->window_height) {
         return false;
     }
 

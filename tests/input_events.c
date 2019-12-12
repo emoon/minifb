@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define kUnused(var)    (void) var;
+#define kUnused(var)    (void) var
 
 #define WIDTH      800
 #define HEIGHT     600
 static unsigned int g_buffer[WIDTH * HEIGHT];
+static bool         g_active = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,6 +17,7 @@ void active(struct Window *window, bool isActive) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > active: %d\n", window_title, isActive);
+    g_active = isActive;
 }
 
 void resize(struct Window *window, int width, int height) {
@@ -109,20 +111,26 @@ int main()
         int         i;
         UpdateState state;
 
-        for (i = 0; i < WIDTH * HEIGHT; ++i)
+        if(g_active) 
         {
-            noise = seed;
-            noise >>= 3;
-            noise ^= seed;
-            carry = noise & 1;
-            noise >>= 1;
-            seed >>= 1;
-            seed |= (carry << 30);
-            noise &= 0xFF;
-            g_buffer[i] = MFB_RGB(noise, noise, noise); 
-        }
+            for (i = 0; i < WIDTH * HEIGHT; ++i)
+            {
+                noise = seed;
+                noise >>= 3;
+                noise ^= seed;
+                carry = noise & 1;
+                noise >>= 1;
+                seed >>= 1;
+                seed |= (carry << 30);
+                noise &= 0xFF;
+                g_buffer[i] = MFB_RGB(noise, noise, noise); 
+            }
 
-        state = mfb_update(window, g_buffer);
+            state = mfb_update(window, g_buffer);
+        }
+        else {
+            state = mfb_update_events(window);
+        }
         if (state != STATE_OK) {
             window = 0x0;
             break;
