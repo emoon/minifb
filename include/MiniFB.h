@@ -17,9 +17,14 @@ extern "C" {
 struct Window * mfb_open(const char *title, unsigned width, unsigned height);
 struct Window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);
 
-// Update the display. Input buffer is assumed to be a 32-bit buffer of the size given in the open call
-// Will return a negative status if something went wrong or the user want to exit.
+// Update the display
+// Input buffer is assumed to be a 32-bit buffer of the size given in the open call
+// Will return a negative status if something went wrong or the user want to exit
+// Also updates the window events
 UpdateState     mfb_update(struct Window *window, void *buffer);
+
+// Only updates the window events
+UpdateState     mfb_update_events(struct Window *window);
 
 // Close the window
 void            mfb_close(struct Window *window);

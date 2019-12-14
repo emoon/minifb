@@ -157,7 +157,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     sizeHints.y          = 0;
     sizeHints.min_width  = width;
     sizeHints.min_height = height;
-    if(flags & WF_RESIZABLE) {
+    if (flags & WF_RESIZABLE) {
         sizeHints.max_width  = screenWidth;
         sizeHints.max_height = screenHeight;
     }
@@ -183,8 +183,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 }
 
 struct Window *
-mfb_open(const char *title, unsigned width, unsigned height)
-{
+mfb_open(const char *title, unsigned width, unsigned height) {
     return mfb_open_ex(title, width, height, 0);
 }
 
@@ -194,8 +193,7 @@ int translate_key(int scancode);
 int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
-static void processEvents(SWindowData *window_data)
-{
+static void processEvents(SWindowData *window_data) {
     XEvent          event;
     SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
@@ -295,31 +293,30 @@ static void processEvents(SWindowData *window_data)
 
 void destroy(SWindowData *window_data);
 
-UpdateState mfb_update(struct Window *window, void *buffer)
-{
-    if(window == 0x0) {
+UpdateState mfb_update(struct Window *window, void *buffer) {
+    if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         destroy(window_data);
         return STATE_EXIT;
     }
 
-    if(buffer == 0x0) {
+    if (buffer == 0x0) {
         return STATE_INVALID_BUFFER;
     }
 
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
     if (window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
-        if(window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
-            if(window_data_x11->image_scaler != 0x0) {
+        if (window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
+            if (window_data_x11->image_scaler != 0x0) {
                 window_data_x11->image_scaler->data = 0x0;
                 XDestroyImage(window_data_x11->image_scaler);
             }
-            if(window_data_x11->image_buffer != 0x0) {
+            if (window_data_x11->image_buffer != 0x0) {
                 free(window_data_x11->image_buffer);
                 window_data_x11->image_buffer = 0x0;
             }
@@ -331,7 +328,7 @@ UpdateState mfb_update(struct Window *window, void *buffer)
         }
     }
 
-    if(window_data_x11->image_scaler != 0x0) {
+    if (window_data_x11->image_scaler != 0x0) {
         stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
         window_data_x11->image_scaler->data = (char *) window_data_x11->image_buffer;
         XPutImage(window_data_x11->display, window_data_x11->window, window_data_x11->gc, window_data_x11->image_scaler, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
@@ -348,12 +345,31 @@ UpdateState mfb_update(struct Window *window, void *buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void destroy(SWindowData *window_data) 
-{
-    if(window_data != 0x0) {
-        if(window_data->specific != 0x0) {
+UpdateState mfb_update_events(struct Window *window) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data->close) {
+        destroy(window_data);
+        return STATE_EXIT;
+    }
+
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    XFlush(window_data_x11->display);
+    processEvents(window_data);
+    
+    return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void destroy(SWindowData *window_data)  {
+    if (window_data != 0x0) {
+        if (window_data->specific != 0x0) {
             SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-            if(window_data_x11->image != 0x0) {
+            if (window_data_x11->image != 0x0) {
                 window_data_x11->image->data = 0x0;
                 XDestroyImage(window_data_x11->image);
                 XDestroyWindow(window_data_x11->display, window_data_x11->window);
@@ -543,11 +559,11 @@ void init_keycodes(SWindowData_X11 *window_data_x11) {
         g_keycodes[i] = KB_KEY_UNKNOWN;
 
     // Valid key code range is  [8,255], according to the Xlib manual
-    for(int i=8; i<=255; ++i) {
+    for (int i=8; i<=255; ++i) {
         // Try secondary keysym, for numeric keypad keys
          keySym  = XkbKeycodeToKeysym(window_data_x11->display, i, 0, 1);
          g_keycodes[i] = translateKeyCodeB(keySym);
-         if(g_keycodes[i] == KB_KEY_UNKNOWN) {
+         if (g_keycodes[i] == KB_KEY_UNKNOWN) {
             keySym = XkbKeycodeToKeysym(window_data_x11->display, i, 0, 0);
             g_keycodes[i] = translateKeyCodeA(keySym);
          }
@@ -595,7 +611,7 @@ int translate_mod_ex(int key, int state, int is_pressed) {
     {
         case KB_KEY_LEFT_SHIFT:
         case KB_KEY_RIGHT_SHIFT:
-            if(is_pressed)
+            if (is_pressed)
                 mod_keys |= KB_MOD_SHIFT;
             else
                 mod_keys &= ~KB_MOD_SHIFT;
@@ -603,7 +619,7 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
         case KB_KEY_LEFT_CONTROL:
         case KB_KEY_RIGHT_CONTROL:
-            if(is_pressed)
+            if (is_pressed)
                 mod_keys |= KB_MOD_CONTROL;
             else
                 mod_keys &= ~KB_MOD_CONTROL;
@@ -611,7 +627,7 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
         case KB_KEY_LEFT_ALT:
         case KB_KEY_RIGHT_ALT:
-            if(is_pressed)
+            if (is_pressed)
                 mod_keys |= KB_MOD_ALT;
             else
                 mod_keys &= ~KB_MOD_ALT;
@@ -619,7 +635,7 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
         case KB_KEY_LEFT_SUPER:
         case KB_KEY_RIGHT_SUPER:
-            if(is_pressed)
+            if (is_pressed)
                 mod_keys |= KB_MOD_SUPER;
             else
                 mod_keys &= ~KB_MOD_SUPER;
@@ -631,14 +647,13 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
-{
+bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
     SWindowData *window_data = (SWindowData *) window;
 
-    if(offset_x + width > window_data->window_width) {
+    if (offset_x + width > window_data->window_width) {
         return false;
     }
-    if(offset_y + height > window_data->window_height) {
+    if (offset_y + height > window_data->window_height) {
         return false;
     }
 
@@ -646,5 +661,6 @@ bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_
     window_data->dst_offset_y = offset_y;
     window_data->dst_width    = width;
     window_data->dst_height   = height;
+    
     return true;
 }
