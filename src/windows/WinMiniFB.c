@@ -69,14 +69,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_SYSKEYUP:
         {
             if (window_data) {
-                Key key_code            = translate_key((unsigned int)wParam, (unsigned long)lParam);
-                int is_pressed         = !((lParam >> 31) & 1);
+                Key key_code          = translate_key((unsigned int)wParam, (unsigned long)lParam);
+                int is_pressed        = !((lParam >> 31) & 1);
                 window_data->mod_keys = translate_mod();
 
                 if (key_code == KB_KEY_UNKNOWN)
                     return FALSE;
 
-                window_data->key_status[key_code] = is_pressed;
+                window_data->key_status[key_code] = (uint8_t) is_pressed;
                 kCall(keyboard_func, key_code, window_data->mod_keys, is_pressed);
             }
             break;
@@ -221,14 +221,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
 struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
-    int  x, y;
+    int  x = 0, y = 0;
 
     init_keycodes();
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
+    if (window_data == 0x0) {
+        return 0x0;
+    }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Win *window_data_win = malloc(sizeof(SWindowData_Win));
+    if(window_data_win == 0x0) {
+        free(window_data);
+        return 0x0;
+    }
     memset(window_data_win, 0, sizeof(SWindowData_Win));
     window_data->specific = window_data_win;
 
@@ -239,8 +246,6 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
     s_window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
     if (flags & WF_FULLSCREEN) {
         flags = WF_FULLSCREEN;  // Remove all other flags
-        x = 0;
-        y = 0;
         rect.right  = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
         s_window_style = WS_POPUP & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
@@ -284,8 +289,6 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
             rect.bottom += (rect.bottom - height);
             rect.top = 0;
         }
-        x = 0;
-        y = 0;
     }
     else if (!(flags & WF_FULLSCREEN)) {
         rect.right  = width;
@@ -323,8 +326,11 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
         window_data->window_width, window_data->window_height,
         0, 0, 0, 0);
 
-    if (!window_data_win->window)
+    if (!window_data_win->window) {
+        free(window_data);
+        free(window_data_win);
         return 0x0;
+    }
 
     SetWindowLongPtr(window_data_win->window, GWLP_USERDATA, (LONG_PTR) window_data);
 
@@ -334,6 +340,11 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
     ShowWindow(window_data_win->window, SW_NORMAL);
 
     window_data_win->bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
+    if(window_data_win->bitmapInfo == 0x0) {
+        free(window_data);
+        free(window_data_win);
+        return 0x0;
+    }
     window_data_win->bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
     window_data_win->bitmapInfo->bmiHeader.biPlanes      = 1;
     window_data_win->bitmapInfo->bmiHeader.biBitCount    = 32;

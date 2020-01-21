@@ -565,17 +565,27 @@ mfb_open(const char *title, unsigned width, unsigned height)
     int fd = -1;
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
+    if(window_data == 0x0) {
+        return 0x0;
+    }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
+    if(window_data_way == 0x0) {
+        free(window_data);
+        return 0x0;
+    }
     memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data->specific = window_data_way;
 
     window_data_way->shm_format = -1u;
 
     window_data_way->display = wl_display_connect(0x0);
-    if (!window_data_way->display)
+    if (!window_data_way->display) {
+        free(window_data);
+        free(window_data_way);
         return 0x0;
+    }
     window_data_way->registry = wl_display_get_registry(window_data_way->display);
     wl_registry_add_listener(window_data_way->registry, &registry_listener, window_data);
 
