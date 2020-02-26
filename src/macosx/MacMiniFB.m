@@ -55,7 +55,7 @@ NSString* g_shadersSrc = @
         "float4 position [[position]];\n"
     "};\n"
 
-    "vertex VertexOutput vertFunc2(unsigned int vID[[vertex_id]], device Vertex *pos [[buffer(0)]])\n"
+    "vertex VertexOutput vertFunc2(unsigned int vID[[vertex_id]], const device Vertex *pos [[buffer(0)]])\n"
     "{\n"
         "VertexOutput out;\n"
 
