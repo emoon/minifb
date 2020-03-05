@@ -416,6 +416,9 @@ UpdateState mfb_update_events(struct Window *window) {
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
     while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
+        if(msg.message == WM_PAINT)
+            return;
+
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
