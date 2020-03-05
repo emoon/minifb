@@ -49,12 +49,12 @@ const char *    mfb_get_key_name(Key key);
 bool            mfb_is_window_active(struct Window *window);
 unsigned        mfb_get_window_width(struct Window *window);
 unsigned        mfb_get_window_height(struct Window *window);
-int             mfb_get_mouse_x(struct Window *window);            // Last mouse pos X
-int             mfb_get_mouse_y(struct Window *window);            // Last mouse pos Y
-float           mfb_get_mouse_scrool_x(struct Window *window);     // Mouse wheel X as a sum. When you call this function it resets.
-float           mfb_get_mouse_scrool_y(struct Window *window);     // Mouse wheel Y as a sum. When you call this function it resets.
-const uint8_t * mfb_get_mouse_button_buffer(struct Window *window);  // One byte for every button. Press (1), Release 0.
-const uint8_t * mfb_get_key_buffer(struct Window *window);           // One byte for every key. Press (1), Release 0.
+int             mfb_get_mouse_x(struct Window *window);             // Last mouse pos X
+int             mfb_get_mouse_y(struct Window *window);             // Last mouse pos Y
+float           mfb_get_mouse_scroll_x(struct Window *window);      // Mouse wheel X as a sum. When you call this function it resets.
+float           mfb_get_mouse_scroll_y(struct Window *window);      // Mouse wheel Y as a sum. When you call this function it resets.
+const uint8_t * mfb_get_mouse_button_buffer(struct Window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+const uint8_t * mfb_get_key_buffer(struct Window *window);          // One byte for every key. Press (1), Release 0.
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

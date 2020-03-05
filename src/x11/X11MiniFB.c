@@ -29,15 +29,25 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     Visual* visual;
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
+    if (!window_data) {
+        return 0x0;
+    }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
+    if (!window_data_x11) {
+        free(window_data);
+        return 0x0;
+    }
     memset(window_data_x11, 0, sizeof(SWindowData_X11));
     window_data->specific = window_data_x11;
 
     window_data_x11->display = XOpenDisplay(0);
-    if (!window_data_x11->display)
+    if (!window_data_x11->display) {
+        free(window_data);
+        free(window_data_x11);
         return 0x0;
+    }
     
     init_keycodes(window_data_x11);
 
@@ -322,6 +332,9 @@ UpdateState mfb_update(struct Window *window, void *buffer) {
             }
             int depth = DefaultDepth(window_data_x11->display, window_data_x11->screen);
             window_data_x11->image_buffer = malloc(window_data->dst_width * window_data->dst_height * 4);
+            if(window_data_x11->image_buffer == 0x0) {
+                return STATE_INTERNAL_ERROR;
+            }
             window_data_x11->image_scaler_width  = window_data->dst_width;
             window_data_x11->image_scaler_height = window_data->dst_height;
             window_data_x11->image_scaler = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, window_data_x11->image_scaler_width, window_data_x11->image_scaler_height, 32, window_data_x11->image_scaler_width * 4);
@@ -551,15 +564,15 @@ static int translateKeyCodeA(int keySym) {
 }
 
 void init_keycodes(SWindowData_X11 *window_data_x11) {
-    size_t i;
-    int keySym;
+    size_t  i;
+    int     keySym;
 
     // Clear keys
     for (i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
         g_keycodes[i] = KB_KEY_UNKNOWN;
 
     // Valid key code range is  [8,255], according to the Xlib manual
-    for (int i=8; i<=255; ++i) {
+    for (i=8; i<=255; ++i) {
         // Try secondary keysym, for numeric keypad keys
          keySym  = XkbKeycodeToKeysym(window_data_x11->display, i, 0, 1);
          g_keycodes[i] = translateKeyCodeB(keySym);

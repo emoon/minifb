@@ -144,7 +144,7 @@ int mfb_get_mouse_y(struct Window *window) {
 }
 
 //-------------------------------------
-float mfb_get_mouse_scrool_x(struct Window *window) {
+float mfb_get_mouse_scroll_x(struct Window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_wheel_x;
@@ -153,7 +153,7 @@ float mfb_get_mouse_scrool_x(struct Window *window) {
 }
 
 //-------------------------------------
-float mfb_get_mouse_scrool_y(struct Window *window) {
+float mfb_get_mouse_scroll_y(struct Window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_wheel_y;
