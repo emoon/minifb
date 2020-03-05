@@ -3,7 +3,7 @@ MiniFB
 
 MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy to render (32-bit) pixels in a window. An example is the best way to show how it works:
 
-	struct Window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
+	struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
 	if (!window)
 		return 0;
 
@@ -22,43 +22,46 @@ MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy t
 
 Furthermore, you can add callbacks to the windows:
 
-	void active(struct Window *window, bool isActive) {
+	void active(struct mfb_window *window, bool isActive) {
 		...
 	}
 
-	void resize(struct Window *window, int width, int height) {
+	void resize(struct mfb_window *window, int width, int height) {
 		...
 		// Optionally you can also change the viewport size
 		mfb_set_viewport(window, x, y, width, height);
 	}
 
-	void keyboard(struct Window *window, Key key, KeyMod mod, bool isPressed) {
+	void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
 		...
 		// Remember to close the window in some way
 		if(key == KB_KEY_ESCAPE) {
 			mfb_close(window);
 		}
+
+		fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
+
 	}
 
-	void char_input(struct Window *window, unsigned int charCode) {
+	void char_input(struct mfb_window *window, unsigned int charCode) {
 		...
 	}
 
-	void mouse_btn(struct Window *window, MouseButton button, KeyMod mod, bool isPressed) {
+	void mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
 		...
 	}
 
 	// Use wisely this event. It can be sent too often
-	void mouse_move(struct Window *window, int x, int y) {
+	void mouse_move(struct mfb_window *window, int x, int y) {
 		...
 	}
 
 	// Mouse wheel
-	void mouse_scroll(struct Window *window, KeyMod mod, float deltaX, float deltaY) {
+	void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
 		...
 	}
 
-	struct Window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
+	struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
 	if (!window)
 		return 0;
 
@@ -76,6 +79,24 @@ Additionally you can set data per window and recover it
 	mfb_set_user_data(window, (void *) myData);
 	...
 	myData = (someCast *) mfb_get_user_data(window);
+
+
+Finally, you can get information about the events in the window directly:
+
+	bool                mfb_is_window_active(struct mfb_window *window);
+	
+	unsigned            mfb_get_window_width(struct mfb_window *window);
+	unsigned            mfb_get_window_height(struct mfb_window *window);
+
+	int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
+	int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+
+	float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel X as a sum. When you call this function it resets.
+	float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel Y as a sum. When you call this function it resets.
+
+	const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+
+	const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
 
 
 First the code creates window with the mfb_open call that is used to display the data, next it's the applications responsibility to allocate a buffer (which has to be at least the size of the window and in 32-bit) Next when calling mfb_update function the buffer will be copied over to the window and displayed. Currently the mfb_update will return -1 if ESC key is pressed but later on it will support to return a key code for a pressed button. See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete example

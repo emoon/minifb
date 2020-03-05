@@ -4,7 +4,8 @@
 //#define kUseBilinearInterpolation
 
 #if defined(kUseBilinearInterpolation)
-static uint32_t interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uint32_t srcOffsetY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch) {
+static uint32_t 
+interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uint32_t srcOffsetY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch) {
     uint32_t incX = x + 1 < srcWidth ? 1 : 0;
     uint32_t incY = y + 1 < srcHeight ? srcPitch : 0;
     uint8_t *p00 = (uint8_t *) &srcImage[(srcOffsetX >> 16)];
@@ -38,8 +39,9 @@ static uint32_t interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t
 #endif
 
 // Only for 32 bits images
-void stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
-                  uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch) {
+void 
+stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
+              uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch) {
 
     uint32_t    x, y;
     uint32_t    srcOffsetX, srcOffsetY;

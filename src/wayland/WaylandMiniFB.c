@@ -136,7 +136,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
     SWindowData *window_data = (SWindowData *) data;
     if(key < 512) {
-        Key    key_code    = (Key) g_keycodes[key];
+        mfb_key key_code = (mfb_key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
         switch (key_code)
         {
@@ -174,7 +174,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
         }
 
         window_data->key_status[key_code] = is_pressed;
-        kCall(keyboard_func, key_code, (KeyMod)window_data->mod_keys, is_pressed);
+        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
     }
 }
 
@@ -210,7 +210,8 @@ keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int
     kUnused(delay);
 }
 
-static const struct wl_keyboard_listener keyboard_listener = {
+static const struct 
+wl_keyboard_listener keyboard_listener = {
     .keymap      = keyboard_keymap,
     .enter       = keyboard_enter,
     .leave       = keyboard_leave,
@@ -319,7 +320,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 
     //printf("Pointer button '%d'(%d)\n", button, state);
     SWindowData *window_data = (SWindowData *) data;
-    kCall(mouse_btn_func, (MouseButton) (button - BTN_MOUSE + 1), (KeyMod) window_data->mod_keys, state == 1);
+    kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 }
 
 //  Scroll and other axis notifications.
@@ -352,10 +353,10 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
     SWindowData *window_data = (SWindowData *) data;
     if(axis == 0) {
-        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, -(value / 256.0f));
+        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -(value / 256.0f));
     }
     else if(axis == 1) {
-        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, -(value / 256.0f), 0.0f);
+        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -(value / 256.0f), 0.0f);
     }
 }
 
@@ -388,7 +389,8 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
     kUnused(discrete);
 }
 
-static const struct wl_pointer_listener pointer_listener = {
+static const struct 
+wl_pointer_listener pointer_listener = {
     .enter         = pointer_enter,
     .leave         = pointer_leave,
     .motion        = pointer_motion,
@@ -439,7 +441,8 @@ seat_name(void *data, struct wl_seat *seat, const char *name) {
     printf("Seat '%s'n", name);
 }
 
-static const struct wl_seat_listener seat_listener = {
+static const struct 
+wl_seat_listener seat_listener = {
     .capabilities = seat_capabilities, 
     .name         = 0x0,
 };
@@ -475,7 +478,8 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
     }
 }
 
-static const struct wl_shm_listener shm_listener = {
+static const struct 
+wl_shm_listener shm_listener = {
     .format = shm_format
 };
 
@@ -515,7 +519,8 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 }
 
-static const struct wl_registry_listener registry_listener = {
+static const struct 
+wl_registry_listener registry_listener = {
     .global        = registry_global, 
     .global_remove = 0x0,
 };
@@ -552,14 +557,14 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Window * 
+struct mfb_window * 
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     // TODO: Not yet
     kUnused(flags);
     return mfb_open(title, width, height);
 }
 
-struct Window * 
+struct mfb_window * 
 mfb_open(const char *title, unsigned width, unsigned height)
 {
     int fd = -1;
@@ -662,11 +667,11 @@ mfb_open(const char *title, unsigned width, unsigned height)
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     wl_surface_commit(window_data_way->surface);
 
-    mfb_set_keyboard_callback((struct Window *) window_data, keyboard_default);
+    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
     printf("Window created using Wayland API\n");
 
-    return (struct Window *) window_data;
+    return (struct mfb_window *) window_data;
 
 out:
     close(fd);
@@ -688,12 +693,13 @@ frame_done(void *data, struct wl_callback *callback, uint32_t cookie)
     *(uint32_t *)data = 1;
 }
 
-static const struct wl_callback_listener frame_listener = {
+static const struct 
+wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
-UpdateState 
-mfb_update(struct Window *window, void *buffer)
+mfb_update_state 
+mfb_update(struct mfb_window *window, void *buffer)
 {
     uint32_t done = 0;
 
@@ -739,8 +745,8 @@ mfb_update(struct Window *window, void *buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState 
-mfb_update_events(struct Window *window)
+mfb_update_state 
+mfb_update_events(struct mfb_window *window)
 {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -896,7 +902,7 @@ init_keycodes(void)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool 
-mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
 
     SWindowData *window_data = (SWindowData *) window;
 

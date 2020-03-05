@@ -20,7 +20,7 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Window *
+struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     int depth, i, formatCount, convDepth = -1;
     XPixmapFormatValues* formats;
@@ -185,14 +185,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, width, height, 32, width * 4);
 
-    mfb_set_keyboard_callback((struct Window *) window_data, keyboard_default);
+    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
     printf("Window created using X11 API\n");
 
-    return (struct Window *) window_data;
+    return (struct mfb_window *) window_data;
 }
 
-struct Window *
+struct mfb_window *
 mfb_open(const char *title, unsigned width, unsigned height) {
     return mfb_open_ex(title, width, height, 0);
 }
@@ -203,7 +203,8 @@ int translate_key(int scancode);
 int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
-static void processEvents(SWindowData *window_data) {
+static void 
+processEvents(SWindowData *window_data) {
     XEvent          event;
     SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
@@ -214,44 +215,44 @@ static void processEvents(SWindowData *window_data) {
             case KeyPress:
             case KeyRelease: 
             {
-                Key key_code    = (Key) translate_key(event.xkey.keycode);
-                int is_pressed = (event.type == KeyPress);
+                mfb_key key_code      = (mfb_key) translate_key(event.xkey.keycode);
+                int is_pressed        = (event.type == KeyPress);
                 window_data->mod_keys = translate_mod_ex(key_code, event.xkey.state, is_pressed);
 
                 window_data->key_status[key_code] = is_pressed;
-                kCall(keyboard_func, key_code, (KeyMod) window_data->mod_keys, is_pressed);
+                kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
             }
             break;
 
             case ButtonPress:
             case ButtonRelease:
             {
-                MouseButton button     = (MouseButton) event.xbutton.button;
+                mfb_mouse_button button = (mfb_mouse_button) event.xbutton.button;
                 int          is_pressed = (event.type == ButtonPress);
-                window_data->mod_keys = translate_mod(event.xkey.state);
+                window_data->mod_keys   = translate_mod(event.xkey.state);
                 switch (button) {
                     case Button1:
                     case Button2:
                     case Button3:
-                        kCall(mouse_btn_func, button, (KeyMod) window_data->mod_keys, is_pressed);
+                        kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
                         break;
 
                     case Button4:
-                        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, 1.0f);
+                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, 1.0f);
                         break;
                     case Button5:
-                        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 0.0f, -1.0f);
+                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -1.0f);
                         break;
 
                     case 6:
-                        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, 1.0f, 0.0f);
+                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 1.0f, 0.0f);
                         break;
                     case 7:
-                        kCall(mouse_wheel_func, (KeyMod) window_data->mod_keys, -1.0f, 0.0f);
+                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -1.0f, 0.0f);
                         break;
 
                     default:
-                        kCall(mouse_btn_func, (MouseButton) (button - 4), (KeyMod) window_data->mod_keys, is_pressed);
+                        kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
                         break;
                 }
             }
@@ -303,7 +304,8 @@ static void processEvents(SWindowData *window_data) {
 
 void destroy(SWindowData *window_data);
 
-UpdateState mfb_update(struct Window *window, void *buffer) {
+mfb_update_state 
+mfb_update(struct mfb_window *window, void *buffer) {
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -358,7 +360,8 @@ UpdateState mfb_update(struct Window *window, void *buffer) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update_events(struct Window *window) {
+mfb_update_state 
+mfb_update_events(struct mfb_window *window) {
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -378,7 +381,8 @@ UpdateState mfb_update_events(struct Window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void destroy(SWindowData *window_data)  {
+void 
+destroy(SWindowData *window_data)  {
     if (window_data != 0x0) {
         if (window_data->specific != 0x0) {
             SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
@@ -400,7 +404,8 @@ void destroy(SWindowData *window_data)  {
 
 extern short int g_keycodes[512];
 
-static int translateKeyCodeB(int keySym) {
+static int 
+translateKeyCodeB(int keySym) {
 
     switch (keySym)
     {
@@ -563,7 +568,8 @@ static int translateKeyCodeA(int keySym) {
     return KB_KEY_UNKNOWN;
 }
 
-void init_keycodes(SWindowData_X11 *window_data_x11) {
+void 
+init_keycodes(SWindowData_X11 *window_data_x11) {
     size_t  i;
     int     keySym;
 
@@ -585,7 +591,8 @@ void init_keycodes(SWindowData_X11 *window_data_x11) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_key(int scancode) {
+int 
+translate_key(int scancode) {
     if (scancode < 0 || scancode > 255)
         return KB_KEY_UNKNOWN;
 
@@ -594,7 +601,8 @@ int translate_key(int scancode) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_mod(int state) {
+int 
+translate_mod(int state) {
     int mod_keys = 0;
 
     if (state & ShiftMask)
@@ -615,7 +623,8 @@ int translate_mod(int state) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int translate_mod_ex(int key, int state, int is_pressed) {
+int 
+translate_mod_ex(int key, int state, int is_pressed) {
     int mod_keys = 0;
 
     mod_keys = translate_mod(state);
@@ -660,7 +669,8 @@ int translate_mod_ex(int key, int state, int is_pressed) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
+bool 
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
     SWindowData *window_data = (SWindowData *) window;
 
     if (offset_x + width > window_data->window_width) {

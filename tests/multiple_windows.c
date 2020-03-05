@@ -17,7 +17,8 @@ static unsigned int g_buffer_b[WIDTH_B * HEIGHT_B];
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void active(struct Window *window, bool isActive) {
+void 
+active(struct mfb_window *window, bool isActive) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
@@ -25,7 +26,8 @@ void active(struct Window *window, bool isActive) {
     fprintf(stdout, "%s > active: %d\n", window_title, isActive);
 }
 
-void resize(struct Window *window, int width, int height) {
+void 
+resize(struct mfb_window *window, int width, int height) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
@@ -34,18 +36,20 @@ void resize(struct Window *window, int width, int height) {
     fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
 }
 
-void keyboard(struct Window *window, Key key, KeyMod mod, bool isPressed) {
+void 
+keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [KeyMod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
+    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
         mfb_close(window);
     }    
 }
 
-void char_input(struct Window *window, unsigned int charCode) {
+void 
+char_input(struct mfb_window *window, unsigned int charCode) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
@@ -53,15 +57,17 @@ void char_input(struct Window *window, unsigned int charCode) {
     fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
 }
 
-void mouse_btn(struct Window *window, MouseButton button, KeyMod mod, bool isPressed) {
+void 
+mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [KeyMod: %x]\n", window_title, button, isPressed, mod);
+    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]\n", window_title, button, isPressed, mod);
 }
 
-void mouse_move(struct Window *window, int x, int y) {
+void 
+mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
@@ -72,21 +78,23 @@ void mouse_move(struct Window *window, int x, int y) {
     //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
 }
 
-void mouse_scroll(struct Window *window, KeyMod mod, float deltaX, float deltaY) {
+void 
+mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
     const char *window_title = "";
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [KeyMod: %x]\n", window_title, deltaX, deltaY, mod);
+    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, deltaX, deltaY, mod);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int main()
+int 
+main()
 {
     int noise, carry, seed = 0xbeef;
 
-    struct Window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, WF_RESIZABLE);
+    struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, WF_RESIZABLE);
     if (!window_a)
         return 0;
 
@@ -101,7 +109,7 @@ int main()
     mfb_set_user_data(window_a, (void *) "Window A");
 
     //--
-    struct Window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
+    struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
     if (!window_b)
         return 0;
 
@@ -134,10 +142,11 @@ int main()
     float   time = 0;
     for (;;)
     {
-        int         i, x, y;
-        float       dx, dy, time_x, time_y;
-        int         index;
-        UpdateState state_a, state_b;
+        int      i, x, y;
+        float    dx, dy, time_x, time_y;
+        int      index;
+        
+        mfb_update_state state_a, state_b;
 
         for (i = 0; i < WIDTH_A * HEIGHT_A; ++i)
         {
