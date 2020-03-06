@@ -8,18 +8,19 @@ static unsigned int g_buffer[WIDTH * HEIGHT];
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int main()
+int 
+main()
 {
     int noise, carry, seed = 0xbeef;
 
-    struct Window *window = mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE);
     if (!window)
         return 0;
 
     for (;;)
     {
         int         i;
-        UpdateState state;
+        mfb_update_state state;
 
         for (i = 0; i < WIDTH * HEIGHT; ++i)
         {

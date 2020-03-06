@@ -85,7 +85,8 @@ NSString* g_shadersSrc = @
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(USE_METAL_API)
-static bool create_shaders(SWindowData_OSX *window_data_osx) {
+static bool 
+create_shaders(SWindowData_OSX *window_data_osx) {
     // Error
     NSError* nsError = 0x0;
     NSError** nsErrorPtr = &nsError;
@@ -136,14 +137,16 @@ static bool create_shaders(SWindowData_OSX *window_data_osx) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Window *mfb_open(const char *title, unsigned width, unsigned height)
+struct mfb_window *
+mfb_open(const char *title, unsigned width, unsigned height)
 {
     return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
@@ -254,7 +257,7 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
     [NSApp finishLaunching];
 #endif
 
-    mfb_set_keyboard_callback((struct Window *) window_data, keyboard_default);
+    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
 #if defined(USE_METAL_API)
     NSLog(@"Window created using Metal API");
@@ -264,12 +267,13 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
 
     [pool drain];
 
-    return (struct Window *) window_data;
+    return (struct mfb_window *) window_data;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void destroy_window_data(SWindowData *window_data) 
+static void 
+destroy_window_data(SWindowData *window_data) 
 {
     if(window_data == 0x0)
         return;
@@ -293,7 +297,8 @@ static void destroy_window_data(SWindowData *window_data)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void update_events(SWindowData *window_data)
+static void 
+update_events(SWindowData *window_data)
 {
     NSEvent* event;
 
@@ -312,7 +317,8 @@ static void update_events(SWindowData *window_data)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update(struct Window *window, void *buffer)
+mfb_update_state 
+mfb_update(struct mfb_window *window, void *buffer)
 {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -345,7 +351,8 @@ UpdateState mfb_update(struct Window *window, void *buffer)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update_events(struct Window *window)
+mfb_update_state 
+mfb_update_events(struct mfb_window *window)
 {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -368,7 +375,8 @@ UpdateState mfb_update_events(struct Window *window)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
+bool 
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
 {
     SWindowData *window_data = (SWindowData *) window;
 
@@ -410,7 +418,8 @@ bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_
 
 extern short int g_keycodes[512];
 
-void init_keycodes() 
+void 
+init_keycodes() 
 {
     // Clear keys
     for (unsigned int i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 

@@ -12,10 +12,11 @@ long    s_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 uint32_t translate_mod();
-Key translate_key(unsigned int wParam, unsigned long lParam);
-void destroy_window_data(SWindowData *window_data);
+mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
+void     destroy_window_data(SWindowData *window_data);
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK 
+WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT res = 0;
 
     SWindowData     *window_data     = (SWindowData *) GetWindowLongPtr(hWnd, GWLP_USERDATA);
@@ -69,7 +70,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_SYSKEYUP:
         {
             if (window_data) {
-                Key key_code          = translate_key((unsigned int)wParam, (unsigned long)lParam);
+                mfb_key key_code      = translate_key((unsigned int)wParam, (unsigned long)lParam);
                 int is_pressed        = !((lParam >> 31) & 1);
                 window_data->mod_keys = translate_mod();
 
@@ -113,8 +114,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_XBUTTONDBLCLK:
         {
             if (window_data) {
-                MouseButton button = MOUSE_BTN_0;
-                window_data->mod_keys = translate_mod();
+                mfb_mouse_button button = MOUSE_BTN_0;
+                window_data->mod_keys   = translate_mod();
                 int          is_pressed = 0;
                 switch(message) {
                 case WM_LBUTTONDOWN:
@@ -219,7 +220,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
 
@@ -357,18 +359,20 @@ struct Window *mfb_open_ex(const char *title, unsigned width, unsigned height, u
 
     window_data_win->hdc = GetDC(window_data_win->window);
 
-    mfb_set_keyboard_callback((struct Window *) window_data, keyboard_default);
+    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
-    return (struct Window *) window_data;
+    return (struct mfb_window *) window_data;
 }
 
-struct Window *mfb_open(const char *title, unsigned width, unsigned height) {
+struct mfb_window *
+mfb_open(const char *title, unsigned width, unsigned height) {
     return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update(struct Window *window, void *buffer) {
+mfb_update_state 
+mfb_update(struct mfb_window *window, void *buffer) {
     MSG msg;
     
     if (window == 0x0) {
@@ -401,7 +405,8 @@ UpdateState mfb_update(struct Window *window, void *buffer) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UpdateState mfb_update_events(struct Window *window) {
+mfb_update_state 
+mfb_update_events(struct mfb_window *window) {
     MSG msg;
     
     if (window == 0x0) {
@@ -428,7 +433,8 @@ UpdateState mfb_update_events(struct Window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void destroy_window_data(SWindowData *window_data) {
+void 
+destroy_window_data(SWindowData *window_data) {
     if (window_data == 0x0)
         return;
 
@@ -452,7 +458,8 @@ void destroy_window_data(SWindowData *window_data) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-uint32_t translate_mod() {
+uint32_t 
+translate_mod() {
     uint32_t mods = 0;
 
     if (GetKeyState(VK_SHIFT) & 0x8000)
@@ -475,7 +482,8 @@ uint32_t translate_mod() {
 
 extern short int g_keycodes[512];
 
-void init_keycodes() {
+void 
+init_keycodes() {
 
     // Clear keys
     for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
@@ -606,7 +614,8 @@ void init_keycodes() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Key translate_key(unsigned int wParam, unsigned long lParam) {
+mfb_key 
+translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == VK_CONTROL) {
         MSG next;
         DWORD time;
@@ -626,12 +635,13 @@ Key translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == VK_PROCESSKEY)
         return KB_KEY_UNKNOWN;
 
-    return (Key) g_keycodes[HIWORD(lParam) & 0x1FF];
+    return (mfb_key) g_keycodes[HIWORD(lParam) & 0x1FF];
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool mfb_set_viewport(struct Window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+bool 
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
 
     if (offset_x + width > window_data->window_width) {
