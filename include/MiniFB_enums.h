@@ -172,6 +172,7 @@ typedef enum {
 
 // Opaque pointer
 struct mfb_window;
+struct mfb_timer;
 
 // Event callbacks
 typedef void(*mfb_active_func)(struct mfb_window *window, bool isActive);

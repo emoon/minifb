@@ -7,9 +7,10 @@
 
 
 typedef struct {
-    HWND        window;
-    WNDCLASS    wc;
-    HDC         hdc;
-    BITMAPINFO  *bitmapInfo;
-    bool        mouse_inside;
+    HWND                window;
+    WNDCLASS            wc;
+    HDC                 hdc;
+    BITMAPINFO          *bitmapInfo;
+    struct mfb_timer    *timer;
+    bool                mouse_inside;
 } SWindowData_Win;

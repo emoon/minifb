@@ -6,6 +6,13 @@
 #define kCall(func, ...)    if(window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
 #define kUnused(var)        (void) var;
 
+typedef struct mfb_timer {
+    int64_t     start_time;
+    int64_t     delta_counter;
+    uint64_t    time;
+} mfb_timer;
+
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

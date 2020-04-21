@@ -14,6 +14,7 @@ set(SrcLib
     src/MiniFB_cpp.cpp
     src/MiniFB_internal.c
     src/MiniFB_internal.h
+    src/MiniFB_timer.c
     src/WindowData.h
 )
 

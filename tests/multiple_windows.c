@@ -138,6 +138,8 @@ main()
         pallete[64*7 + c] = MFB_RGB(255-col, 0,       0);
     }
 
+    mfb_set_target_fps(10);
+
     //--
     float   time = 0;
     for (;;)
@@ -191,6 +193,12 @@ main()
         if(window_a == 0x0 && window_b == 0x0) {
             break;
         }
+
+        // Don't need to do this for both windows in the same thread
+        if(window_a != 0x0)
+            mfb_wait_sync(window_a);
+        else if(window_b != 0x0)
+            mfb_wait_sync(window_b);
     }
 
     return 0;
