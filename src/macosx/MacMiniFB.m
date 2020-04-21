@@ -419,8 +419,9 @@ mfb_wait_sync(struct mfb_window *window)
         else if(current >= g_time_for_frame * 0.8) {
             millis = 0;
         }
-
-        sched_yield();
+        
+        usleep(millis * 1000);
+        //sched_yield();
     }
 
     //[pool release];
@@ -624,6 +625,6 @@ mfb_timer_tick() {
 
 void 
 mfb_timer_init() {
-    g_timer_resolution = 1e+9;
-    g_timer_frequency  = 1.0 / g_timer_resolution;
+    g_timer_frequency  = 1e+9;
+    g_timer_resolution = 1.0 / g_timer_frequency;
 }
