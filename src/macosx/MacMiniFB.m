@@ -10,6 +10,8 @@
 #include <MetalKit/MetalKit.h>
 #endif
 #include <unistd.h>
+#include <sched.h>
+#include <mach/mach_time.h>
 
 void init_keycodes();
 
@@ -250,6 +252,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     [window_data_osx->window setAcceptsMouseMovedEvents:YES];
 
     [window_data_osx->window center];
+    window_data_osx->timer = mfb_timer_create();
 
     [NSApp activateIgnoringOtherApps:YES];
 
@@ -286,6 +289,8 @@ destroy_window_data(SWindowData *window_data)
         [window removeWindowData];
         [window performClose:nil];
 
+        mfb_timer_destroy(window_data_osx->timer);
+
         memset(window_data_osx, 0, sizeof(SWindowData_OSX));
         free(window_data_osx);
     }
@@ -303,14 +308,12 @@ update_events(SWindowData *window_data)
     NSEvent* event;
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    do
-    {
+    do {
         event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
         if (event) {
             [NSApp sendEvent:event];
         }
-    }
-    while ((window_data->close == false) && event);
+    } while ((window_data->close == false) && event);
 
     [pool release];
 }
@@ -371,6 +374,58 @@ mfb_update_events(struct mfb_window *window)
     }
 
     return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_time_for_frame;
+
+bool
+mfb_wait_sync(struct mfb_window *window) 
+{
+    NSEvent* event;
+
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    //NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+    double      current;
+    uint32_t    millis = 1;
+    while(1) {
+        event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+        if (event) {
+            [NSApp sendEvent:event];
+        }
+        
+        if(window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
+
+        current = mfb_timer_now(window_data_osx->timer);;
+        if (current >= g_time_for_frame) {
+            mfb_timer_reset(window_data_osx->timer);
+            return true;
+        }
+        else if(current >= g_time_for_frame * 0.8) {
+            millis = 0;
+        }
+
+        sched_yield();
+    }
+
+    //[pool release];
+
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -539,4 +594,36 @@ init_keycodes()
     g_keycodes[0x51] = KB_KEY_KP_EQUAL;
     g_keycodes[0x43] = KB_KEY_KP_MULTIPLY;
     g_keycodes[0x4E] = KB_KEY_KP_SUBTRACT;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_timer_frequency;
+extern double   g_timer_resolution;
+
+uint64_t 
+mfb_timer_tick() {
+    static mach_timebase_info_data_t    timebase = { 0 };
+
+    if (timebase.denom == 0) {
+        (void) mach_timebase_info(&timebase);
+    }
+    
+    uint64_t time = mach_absolute_time();
+
+    //return (time * s_timebase_info.numer) / s_timebase_info.denom;
+
+    // Perform the arithmetic at 128-bit precision to avoid the overflow!
+    uint64_t high    = (time >> 32) * timebase.numer;
+    uint64_t highRem = ((high % timebase.denom) << 32) / timebase.denom;
+    uint64_t low     = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
+    high /= timebase.denom;
+    
+    return (high << 32) + highRem + low;
+}
+
+void 
+mfb_timer_init() {
+    g_timer_resolution = 1e+9;
+    g_timer_frequency  = 1.0 / g_timer_resolution;
 }
