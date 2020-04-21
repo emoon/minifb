@@ -50,6 +50,9 @@ mfb_timer_destroy(struct mfb_timer *tmr) {
 //-------------------------------------
 void
 mfb_timer_reset(struct mfb_timer *tmr) {
+    if(tmr == 0x0) 
+        return;
+
     tmr->start_time    = mfb_timer_tick();
     tmr->delta_counter = tmr->start_time;
     tmr->time          = 0;
@@ -59,6 +62,9 @@ mfb_timer_reset(struct mfb_timer *tmr) {
 double
 mfb_timer_now(struct mfb_timer *tmr) {
     uint64_t    counter;
+
+    if(tmr == 0x0) 
+        return 0.0;
 
     counter         = mfb_timer_tick();
     tmr->time      += (counter - tmr->start_time);
@@ -73,6 +79,9 @@ mfb_timer_delta(struct mfb_timer *tmr) {
     int64_t     counter;
     uint64_t    delta;
 
+    if(tmr == 0x0) 
+        return 0.0;
+
     counter            = mfb_timer_tick();
     delta              = (counter - tmr->delta_counter);
     tmr->delta_counter = counter;
@@ -82,12 +91,12 @@ mfb_timer_delta(struct mfb_timer *tmr) {
 
 //-------------------------------------
 double
-mfb_timer_get_frequency(struct mfb_timer *tmr) {
+mfb_timer_get_frequency() {
     return g_timer_frequency;
 }
 
 //-------------------------------------
 double
-mfb_timer_get_resolution(struct mfb_timer *tmr) {
+mfb_timer_get_resolution() {
     return g_timer_resolution;
 }

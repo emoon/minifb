@@ -64,8 +64,8 @@ void                mfb_timer_destroy(struct mfb_timer *tmr);
 void                mfb_timer_reset(struct mfb_timer *tmr);
 double              mfb_timer_now(struct mfb_timer *tmr);
 double              mfb_timer_delta(struct mfb_timer *tmr);
-double              mfb_timer_get_frequency(struct mfb_timer *tmr);
-double              mfb_timer_get_resolution(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency();
+double              mfb_timer_get_resolution();
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

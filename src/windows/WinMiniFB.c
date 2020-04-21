@@ -433,7 +433,6 @@ mfb_update_events(struct mfb_window *window) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern double   g_time_for_frame;
-extern double   g_timer_resolution;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
@@ -458,8 +457,10 @@ mfb_wait_sync(struct mfb_window *window) {
             DispatchMessage(&msg);
         }
 
-        if(window_data->close)
+        if (window_data->close) {
+            destroy_window_data(window_data);
             return false;
+        }
 
         current = mfb_timer_now(window_data_win->timer);;
         if (current >= g_time_for_frame) {
