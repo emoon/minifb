@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
 #include "WindowData.h"
@@ -185,6 +187,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, width, height, 32, width * 4);
 
+    window_data_x11->timer = mfb_timer_create();
+
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
     printf("Window created using X11 API\n");
@@ -204,105 +208,110 @@ int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
 static void 
+processEvent(SWindowData *window_data, XEvent *event) {
+    switch (event->type) {
+        case KeyPress:
+        case KeyRelease: 
+        {
+            mfb_key key_code      = (mfb_key) translate_key(event->xkey.keycode);
+            int is_pressed        = (event->type == KeyPress);
+            window_data->mod_keys = translate_mod_ex(key_code, event->xkey.state, is_pressed);
+
+            window_data->key_status[key_code] = is_pressed;
+            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+        }
+        break;
+
+        case ButtonPress:
+        case ButtonRelease:
+        {
+            mfb_mouse_button button = (mfb_mouse_button) event->xbutton.button;
+            int          is_pressed = (event->type == ButtonPress);
+            window_data->mod_keys   = translate_mod(event->xkey.state);
+            switch (button) {
+                case Button1:
+                case Button2:
+                case Button3:
+                    kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
+                    break;
+
+                case Button4:
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, 1.0f);
+                    break;
+                case Button5:
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -1.0f);
+                    break;
+
+                case 6:
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 1.0f, 0.0f);
+                    break;
+                case 7:
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -1.0f, 0.0f);
+                    break;
+
+                default:
+                    kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
+                    break;
+            }
+        }
+        break;
+
+        case MotionNotify:
+            window_data->mouse_pos_x = event->xmotion.x;
+            window_data->mouse_pos_y = event->xmotion.y;
+            kCall(mouse_move_func, event->xmotion.x, event->xmotion.y);
+            break;
+
+        case ConfigureNotify: 
+        {
+            window_data->window_width  = event->xconfigure.width;
+            window_data->window_height = event->xconfigure.height;
+            window_data->dst_offset_x = 0;
+            window_data->dst_offset_y = 0;
+            window_data->dst_width    = window_data->window_width;
+            window_data->dst_height   = window_data->window_height;
+
+            SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+            XClearWindow(window_data_x11->display, window_data_x11->window);
+            kCall(resize_func, window_data->window_width, window_data->window_height);
+        }
+        break;
+
+        case EnterNotify:
+        case LeaveNotify:
+        break;
+
+        case FocusIn:
+            window_data->is_active = true;
+            kCall(active_func, true);
+            break;
+
+        case FocusOut:
+            window_data->is_active = false;
+            kCall(active_func, false);
+            break;
+
+        case DestroyNotify:
+            window_data->close = true;
+            return;
+            break;
+    }
+}
+
+static void 
 processEvents(SWindowData *window_data) {
     XEvent          event;
-    SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
     while ((window_data->close == false) && XPending(window_data_x11->display)) {
         XNextEvent(window_data_x11->display, &event);
-
-        switch (event.type) {
-            case KeyPress:
-            case KeyRelease: 
-            {
-                mfb_key key_code      = (mfb_key) translate_key(event.xkey.keycode);
-                int is_pressed        = (event.type == KeyPress);
-                window_data->mod_keys = translate_mod_ex(key_code, event.xkey.state, is_pressed);
-
-                window_data->key_status[key_code] = is_pressed;
-                kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
-            }
-            break;
-
-            case ButtonPress:
-            case ButtonRelease:
-            {
-                mfb_mouse_button button = (mfb_mouse_button) event.xbutton.button;
-                int          is_pressed = (event.type == ButtonPress);
-                window_data->mod_keys   = translate_mod(event.xkey.state);
-                switch (button) {
-                    case Button1:
-                    case Button2:
-                    case Button3:
-                        kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
-                        break;
-
-                    case Button4:
-                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, 1.0f);
-                        break;
-                    case Button5:
-                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -1.0f);
-                        break;
-
-                    case 6:
-                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 1.0f, 0.0f);
-                        break;
-                    case 7:
-                        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -1.0f, 0.0f);
-                        break;
-
-                    default:
-                        kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
-                        break;
-                }
-            }
-            break;
-
-            case MotionNotify:
-                window_data->mouse_pos_x = event.xmotion.x;
-                window_data->mouse_pos_y = event.xmotion.y;
-                kCall(mouse_move_func, event.xmotion.x, event.xmotion.y);
-                break;
-
-            case ConfigureNotify: 
-            {
-                window_data->window_width  = event.xconfigure.width;
-                window_data->window_height = event.xconfigure.height;
-                window_data->dst_offset_x = 0;
-                window_data->dst_offset_y = 0;
-                window_data->dst_width    = window_data->window_width;
-                window_data->dst_height   = window_data->window_height;
-
-                XClearWindow(window_data_x11->display, window_data_x11->window);
-                kCall(resize_func, window_data->window_width, window_data->window_height);
-            }
-            break;
-
-            case EnterNotify:
-            case LeaveNotify:
-            break;
-
-            case FocusIn:
-                window_data->is_active = true;
-                kCall(active_func, true);
-                break;
-
-            case FocusOut:
-                window_data->is_active = false;
-                kCall(active_func, false);
-                break;
-
-            case DestroyNotify:
-                window_data->close = true;
-                return;
-                break;
-        }
+        processEvent(window_data, &event);
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void destroy(SWindowData *window_data);
+void destroy_window_data(SWindowData *window_data);
 
 mfb_update_state 
 mfb_update(struct mfb_window *window, void *buffer) {
@@ -312,7 +321,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
-        destroy(window_data);
+        destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
@@ -368,7 +377,7 @@ mfb_update_events(struct mfb_window *window) {
 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
-        destroy(window_data);
+        destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
@@ -381,8 +390,61 @@ mfb_update_events(struct mfb_window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+extern double   g_time_for_frame;
+
+bool 
+mfb_wait_sync(struct mfb_window *window) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    XFlush(window_data_x11->display);
+    XEvent      event;
+    double      current;
+    uint32_t    millis = 1;
+    while(1) {
+        if(XEventsQueued(window_data_x11->display, QueuedAlready) > 0) {
+            XNextEvent(window_data_x11->display, &event);
+            processEvent(window_data, &event);
+        }
+        
+        if(window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
+
+        current = mfb_timer_now(window_data_x11->timer);
+        if (current >= g_time_for_frame) {
+            mfb_timer_reset(window_data_x11->timer);
+            return true;
+        }
+        else if(current >= g_time_for_frame * 0.8) {
+            millis = 0;
+        }
+
+        usleep(millis * 1000);
+        //sched_yield();
+    }
+
+    while ((window_data->close == false) && XPending(window_data_x11->display)) {
+        XNextEvent(window_data_x11->display, &event);
+        processEvent(window_data, &event);
+    }
+    
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void 
-destroy(SWindowData *window_data)  {
+destroy_window_data(SWindowData *window_data)  {
     if (window_data != 0x0) {
         if (window_data->specific != 0x0) {
             SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
@@ -392,6 +454,7 @@ destroy(SWindowData *window_data)  {
                 XDestroyWindow(window_data_x11->display, window_data_x11->window);
                 XCloseDisplay(window_data_x11->display);
             }
+            mfb_timer_destroy(window_data_x11->timer);
             memset(window_data_x11, 0, sizeof(SWindowData_X11));
             free(window_data_x11);
         }
@@ -686,4 +749,36 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_height   = height;
     
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_timer_frequency;
+extern double   g_timer_resolution;
+
+#define kClock      CLOCK_MONOTONIC
+//#define kClock      CLOCK_REALTIME
+
+uint64_t 
+mfb_timer_tick() {
+    struct timespec time;
+
+    if (clock_gettime(kClock, &time) != 0) {
+        return 0.0;
+    }
+
+    return time.tv_sec * 1e+9 + time.tv_nsec;
+}
+
+void 
+mfb_timer_init() {
+    struct timespec res;
+
+    if (clock_getres(kClock, &res) != 0) {
+        g_timer_frequency = 1e+9;
+    }
+    else {
+        g_timer_frequency = res.tv_sec + res.tv_nsec * 1e+9;
+    }
+    g_timer_resolution = 1.0 / g_timer_frequency;
 }

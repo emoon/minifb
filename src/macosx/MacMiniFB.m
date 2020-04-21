@@ -411,7 +411,7 @@ mfb_wait_sync(struct mfb_window *window)
             return false;
         }
 
-        current = mfb_timer_now(window_data_osx->timer);;
+        current = mfb_timer_now(window_data_osx->timer);
         if (current >= g_time_for_frame) {
             mfb_timer_reset(window_data_osx->timer);
             return true;
