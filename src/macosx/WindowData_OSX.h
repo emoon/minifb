@@ -10,7 +10,9 @@
 @class OSXWindow;
 
 typedef struct {
-    OSXWindow   *window;
+    OSXWindow           *window;
+    struct mfb_timer    *timer;
+    
 #if defined(USE_METAL_API)
         struct {
             id<MTLCommandQueue>         command_queue;

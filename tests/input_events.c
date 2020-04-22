@@ -114,8 +114,7 @@ main()
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 
-    for (;;)
-    {
+    do {
         int              i;
         mfb_update_state state;
 
@@ -143,7 +142,7 @@ main()
             window = 0x0;
             break;
         }
-    }
+    } while(mfb_wait_sync(window));
 
     return 0;
 }

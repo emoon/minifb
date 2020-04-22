@@ -110,13 +110,11 @@ main()
 
     mfb_set_user_data(window, (void *) "Input Events CPP Test");
 
-    for (;;)
-    {
+    do {
         int         i;
         mfb_update_state state;
 
-        for (i = 0; i < WIDTH * HEIGHT; ++i)
-        {
+        for (i = 0; i < WIDTH * HEIGHT; ++i) {
             noise = seed;
             noise >>= 3;
             noise ^= seed;
@@ -133,7 +131,7 @@ main()
             window = 0x0;
             break;
         }
-    }
+    } while(mfb_wait_sync(window));
 
     return 0;
 }

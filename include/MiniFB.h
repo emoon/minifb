@@ -56,6 +56,17 @@ float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // M
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
 
+void                mfb_set_target_fps(uint32_t fps);
+bool                mfb_wait_sync(struct mfb_window *window);
+
+struct mfb_timer *  mfb_timer_create();
+void                mfb_timer_destroy(struct mfb_timer *tmr);
+void                mfb_timer_reset(struct mfb_timer *tmr);
+double              mfb_timer_now(struct mfb_timer *tmr);
+double              mfb_timer_delta(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency();
+double              mfb_timer_get_resolution();
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus

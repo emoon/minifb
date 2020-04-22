@@ -48,10 +48,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
                 StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer, 
                               window_data_win->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
-
-                ValidateRect(hWnd, 0x0);
             }
-
+            ValidateRect(hWnd, 0x0);
             break;
         }
 
@@ -359,6 +357,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_win->hdc = GetDC(window_data_win->window);
 
+    window_data_win->timer = mfb_timer_create();
+
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
     return (struct mfb_window *) window_data;
@@ -421,14 +421,60 @@ mfb_update_events(struct mfb_window *window) {
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
     while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
-        if(msg.message == WM_PAINT)
-            return STATE_OK;
-
+        //if(msg.message == WM_PAINT)
+        //    return STATE_OK;
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
     return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_time_for_frame;
+
+bool
+mfb_wait_sync(struct mfb_window *window) {
+    MSG msg;
+    
+    if (window == 0x0) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *)window;
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+    double      current;
+    uint32_t    millis = 1;
+    while (1) {
+        if(PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        if (window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
+
+        current = mfb_timer_now(window_data_win->timer);;
+        if (current >= g_time_for_frame) {
+            mfb_timer_reset(window_data_win->timer);
+            return true;
+        }
+        else if(current >= g_time_for_frame * 0.8) {
+            millis = 0;
+        }
+
+        Sleep(millis);
+    }
+
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -453,6 +499,8 @@ destroy_window_data(SWindowData *window_data) {
     window_data_win->window = 0;
     window_data_win->hdc = 0;
     window_data_win->bitmapInfo = 0x0;
+    mfb_timer_destroy(window_data_win->timer);
+    window_data_win->timer = 0x0;
     window_data->close = true;
 }
 
@@ -658,4 +706,28 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_height = height;
 
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_timer_frequency;
+extern double   g_timer_resolution;
+
+uint64_t 
+mfb_timer_tick() {
+    int64_t     counter;
+
+    QueryPerformanceCounter((LARGE_INTEGER *) &counter);
+
+    return counter;
+}
+
+void 
+mfb_timer_init() {
+    uint64_t    frequency;
+
+    QueryPerformanceFrequency((LARGE_INTEGER *) &frequency);
+
+    g_timer_frequency  = (double) ((int64_t) frequency);
+    g_timer_resolution = 1.0 / g_timer_frequency;
 }

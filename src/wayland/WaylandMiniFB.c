@@ -27,6 +27,7 @@ destroy_window_data(SWindowData *window_data)
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if(window_data_way != 0x0) {
+        mfb_timer_destroy(window_data_way->timer);
         memset(window_data_way, 0, sizeof(SWindowData_Way));
         free(window_data_way);
     }
@@ -596,8 +597,8 @@ mfb_open(const char *title, unsigned width, unsigned height)
 
     init_keycodes();
 
-    if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1)
-    {
+    if (wl_display_dispatch(window_data_way->display) == -1 || 
+        wl_display_roundtrip(window_data_way->display) == -1) {
         return 0x0;
     }
 
@@ -666,6 +667,8 @@ mfb_open(const char *title, unsigned width, unsigned height)
     wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     wl_surface_commit(window_data_way->surface);
+
+    window_data_way->timer = mfb_timer_create();
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
@@ -762,11 +765,56 @@ mfb_update_events(struct mfb_window *window)
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
         return STATE_INTERNAL_ERROR;
 
-    if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
+    if (wl_display_dispatch_pending(window_data_way->display) == -1) {
         return STATE_INTERNAL_ERROR;
     }
 
     return STATE_OK;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+extern double   g_time_for_frame;
+
+bool 
+mfb_wait_sync(struct mfb_window *window) {
+    if(window == 0x0) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy(window_data);
+        return false;
+    }
+
+    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    double      current;
+    uint32_t    millis = 1;
+    while(1) {
+        if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+            return false;
+        }
+        
+        if(window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
+
+        current = mfb_timer_now(window_data_way->timer);
+        if (current >= g_time_for_frame) {
+            mfb_timer_reset(window_data_way->timer);
+            return true;
+        }
+        else if(current >= g_time_for_frame * 0.8) {
+            millis = 0;
+        }
+
+        usleep(millis * 1000);
+        //sched_yield();
+    }
+
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

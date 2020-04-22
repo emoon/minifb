@@ -53,5 +53,6 @@ typedef struct
     uint32_t                buffer_stride;
 
     uint32_t                mod_keys;
+    struct mfb_timer        *timer;
     bool                    close;
 } SWindowData_Way;
