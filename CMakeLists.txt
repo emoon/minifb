@@ -35,11 +35,13 @@ set(SrcMacOSX
 set(SrcWayland
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
+    src/MiniFB_linux.c
 )
 
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
+    src/MiniFB_linux.c
 )
 
 # Avoid RelWithDebInfo and MinSizeRel
@@ -52,6 +54,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
 endif(NOT CMAKE_BUILD_TYPE)
+
+# Set features
+#--------------------------------------
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set GCC/Clang flags
 #--------------------------------------
@@ -79,7 +87,6 @@ if (NOT MSVC)
     add_compile_options("$<$<CONFIG:Debug>:-g>")
     add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
-    set (CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11")
     set (CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
     set (CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
