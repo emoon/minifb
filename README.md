@@ -103,6 +103,47 @@ First the code creates window with the mfb_open call that is used to display the
 
 MiniFB has been tested on Windows, Mac OS X and Linux but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
 
+Extra: Timers and target FPS
+
+You can create timers for your own purposes.
+
+	struct mfb_timer *  mfb_timer_create();
+	void                mfb_timer_destroy(struct mfb_timer *tmr);
+	
+	void                mfb_timer_reset(struct mfb_timer *tmr);
+	double              mfb_timer_now(struct mfb_timer *tmr);
+	double              mfb_timer_delta(struct mfb_timer *tmr);
+
+	double              mfb_timer_get_frequency();
+	double              mfb_timer_get_resolution();
+
+Furthermore you can set a target fps for the application. The default is 60 frames per second. 
+
+	void                mfb_set_target_fps(uint32_t fps);
+
+This avoid the problem of update too fast the window collapsing the redrawing in fast processors.
+
+To use this you need to call the function:
+
+	bool                mfb_wait_sync(struct mfb_window *window);
+
+Example:
+
+    do {
+        int         i;
+        mfb_update_state state;
+
+		// TODO: add some awesome rendering to the buffer
+
+        state = mfb_update(window, g_buffer);
+        if (state != STATE_OK) {
+            window = 0x0;
+            break;
+        }
+    } while(mfb_wait_sync(window));
+
+Note that if you have several windows running on the same thread it makes no sense to wait them all...
+
 Build instructions
 ------------------
 
