@@ -115,20 +115,20 @@ elseif (APPLE)
         add_definitions(-DUSE_METAL_API)
     endif()
     
-    link_libraries("-framework Cocoa")
-    link_libraries("-framework QuartzCore")
-    link_libraries("-framework Metal")
-    link_libraries("-framework MetalKit")
+    #link_libraries("-framework Cocoa")
+    #link_libraries("-framework QuartzCore")
+    #link_libraries("-framework Metal")
+    #link_libraries("-framework MetalKit")
     
     list(APPEND SrcLib ${SrcMacOSX})
 elseif (UNIX)
     if(USE_WAYLAND_API)
-        link_libraries("-lwayland-client")
-        link_libraries("-lwayland-cursor")
+        #link_libraries("-lwayland-client")
+        #link_libraries("-lwayland-cursor")
 
         list(APPEND SrcLib ${SrcWayland})
     else()
-        link_libraries("-lX11")
+        #link_libraries("-lX11")
 
         list(APPEND SrcLib ${SrcX11})
     endif()
@@ -140,10 +140,26 @@ add_library(minifb STATIC
     ${SrcLib}
 )
 
+#--------------------------------------
+if (APPLE)
+    target_link_libraries(minifb "-framework Cocoa")
+    target_link_libraries(minifb "-framework QuartzCore")
+    target_link_libraries(minifb "-framework Metal")
+    target_link_libraries(minifb "-framework MetalKit")
+elseif (UNIX)
+    if(USE_WAYLAND_API)
+        target_link_libraries(minifb "-lwayland-client")
+        target_link_libraries(minifb "-lwayland-cursor")
+    else()
+        target_link_libraries(minifb "-lX11")
+    endif()
+endif()
+
 # For all projects
 #--------------------------------------
-target_include_directories(minifb PUBLIC  include)
+target_include_directories(minifb PUBLIC  ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(minifb PRIVATE src)
+
 link_libraries(minifb)
 
 # Examples
