@@ -5,6 +5,12 @@ project(${PROJECT_NAME})
 
 message("Processing " ${PROJECT_NAME})
 
+if(NOT DEFINED IOS)
+    if(TOLOWER CMAKE_SYSTEM_NAME STREQUAL "ios")
+        set(IOS true)
+    endif()
+endif()
+
 set(SrcLib
     include/MiniFB.h
     include/MiniFB_cpp.h
@@ -30,6 +36,16 @@ set(SrcMacOSX
     src/macosx/OSXWindowFrameView.h
     src/macosx/OSXWindowFrameView.m
     src/macosx/WindowData_OSX.h
+)
+
+set(SrcIOS
+    src/ios/WindowData_IOS.h
+    src/ios/iOSMiniFB.m
+    src/ios/iOSViewController.h
+    src/ios/iOSViewController.m
+    src/ios/iOSViewDelegate.h
+    src/ios/iOSViewDelegate.m
+    include/MiniFB_ios.h
 )
 
 set(SrcWayland
@@ -93,7 +109,7 @@ endif()
 
 # Set default cmake flags
 #--------------------------------------
-if (APPLE) 
+if (APPLE AND NOT IOS) 
     OPTION(USE_METAL_API "Build the project using metal API code" ON)
 elseif (UNIX)
     OPTION(USE_WAYLAND_API "Build the project using wayland API code" OFF)
@@ -110,6 +126,8 @@ elseif (MINGW)
     add_definitions(-D_WIN32_WINNT=0x0600)
 
     list(APPEND SrcLib ${SrcWindows})
+elseif (IOS)
+    list(APPEND SrcLib ${SrcIOS})
 elseif (APPLE)
     if(USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
@@ -142,10 +160,13 @@ add_library(minifb STATIC
 
 #--------------------------------------
 if (APPLE)
-    target_link_libraries(minifb "-framework Cocoa")
-    target_link_libraries(minifb "-framework QuartzCore")
-    target_link_libraries(minifb "-framework Metal")
-    target_link_libraries(minifb "-framework MetalKit")
+    if(IOS)
+    else()
+        target_link_libraries(minifb "-framework Cocoa")
+        target_link_libraries(minifb "-framework QuartzCore")
+        target_link_libraries(minifb "-framework Metal")
+        target_link_libraries(minifb "-framework MetalKit")
+    endif()
 elseif (UNIX)
     if(USE_WAYLAND_API)
         target_link_libraries(minifb "-lwayland-client")
@@ -164,20 +185,39 @@ link_libraries(minifb)
 
 # Examples
 #--------------------------------------
-add_executable(noise 
-    tests/noise.c
-)
+if(NOT IOS)
+    add_executable(noise 
+        tests/noise.c
+    )
 
-add_executable(input_events 
-    tests/input_events.c
-)
+    add_executable(input_events 
+        tests/input_events.c
+    )
 
-add_executable(input_events_cpp
-    tests/input_events_cpp.cpp
-)
+    add_executable(input_events_cpp
+        tests/input_events_cpp.cpp
+    )
 
-add_executable(multiple_windows
-    tests/multiple_windows.c
-)
+    add_executable(multiple_windows
+        tests/multiple_windows.c
+    )
+else()
+    add_executable(noise 
+        tests/ios/main.m
+        tests/ios/AppDelegate.h
+        tests/ios/AppDelegate.m
+    )
+
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
+
+    target_include_directories(minifb PRIVATE src)
+
+    add_definitions(-DTVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+
+    target_include_directories(noise PRIVATE src/ios)
+    
+    target_link_libraries(noise "-framework UIKit")
+    target_link_libraries(noise "-framework Metal")
+endif()
 
 message("Done " ${PROJECT_NAME})

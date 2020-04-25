@@ -1,0 +1,170 @@
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+#include <mach/mach_time.h>
+#include <MiniFB.h>
+#include "MiniFB_internal.h"
+#include "WindowData.h"
+#include "WindowData_IOS.h"
+
+//-------------------------------------
+struct mfb_window *
+mfb_open(const char *title, unsigned width, unsigned height) {
+    return mfb_open_ex(title, width, height, 0);
+}
+
+//-------------------------------------
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    kUnused(title);
+    kUnused(flags);
+    SWindowData *window_data;
+    
+    window_data = malloc(sizeof(SWindowData));
+    memset(window_data, 0, sizeof(SWindowData));
+
+    SWindowData_IOS *window_data_ios = malloc(sizeof(SWindowData_IOS));
+    memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
+    window_data->specific = window_data_ios;
+
+    window_data->window_width  = width;
+    window_data->window_height = height;
+
+    window_data->dst_width     = width;
+    window_data->dst_height    = height;
+
+    window_data->buffer_width  = width;
+    window_data->buffer_height = height;
+    window_data->buffer_stride = width * 4;
+
+    window_data->draw_buffer = malloc(width * height * 4);
+    if (!window_data->draw_buffer) {
+        NSLog(@"Unable to create draw buffer");
+    }
+
+    return (struct mfb_window *) window_data;
+}
+
+//-------------------------------------
+static void
+destroy_window_data(SWindowData *window_data) {
+    if(window_data == 0x0)
+        return;
+
+    @autoreleasepool {
+        SWindowData_IOS   *window_data_ios = (SWindowData_IOS *) window_data->specific;
+        if(window_data_ios != 0x0) {
+            memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
+            free(window_data_ios);
+        }
+        memset(window_data, 0, sizeof(SWindowData));
+        free(window_data);
+    }
+}
+
+//-------------------------------------
+mfb_update_state
+mfb_update(struct mfb_window *window, void *buffer) {
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if(window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
+    }
+
+    if(buffer == 0x0) {
+        return STATE_INVALID_BUFFER;
+    }
+
+    memcpy(window_data->draw_buffer, buffer, window_data->buffer_width * window_data->buffer_height * 4);
+
+    return STATE_OK;
+}
+
+//-------------------------------------
+mfb_update_state
+mfb_update_events(struct mfb_window *window) {
+    return STATE_OK;
+}
+
+//-------------------------------------
+extern double   g_time_for_frame;
+
+bool
+mfb_wait_sync(struct mfb_window *window) {
+    return true;
+}
+
+extern Vertex g_vertices[4];
+
+//-------------------------------------
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+    SWindowData *window_data = (SWindowData *) window;
+
+    if(offset_x + width > window_data->window_width) {
+        return false;
+    }
+    if(offset_y + height > window_data->window_height) {
+        return false;
+    }
+
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+
+    float x1 =  ((float) offset_x           / window_data->window_width)  * 2.0f - 1.0f;
+    float x2 = (((float) offset_x + width)  / window_data->window_width)  * 2.0f - 1.0f;
+    float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
+    float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
+
+    g_vertices[0].x = x1;
+    g_vertices[0].y = y1;
+
+    g_vertices[1].x = x1;
+    g_vertices[1].y = y2;
+
+    g_vertices[2].x = x2;
+    g_vertices[2].y = y1;
+
+    g_vertices[3].x = x2;
+    g_vertices[3].y = y2;
+
+    return true;
+}
+
+//-------------------------------------
+extern double   g_timer_frequency;
+extern double   g_timer_resolution;
+
+uint64_t
+mfb_timer_tick() {
+    static mach_timebase_info_data_t    timebase = { 0 };
+
+    if (timebase.denom == 0) {
+        (void) mach_timebase_info(&timebase);
+    }
+    
+    uint64_t time = mach_absolute_time();
+
+    //return (time * s_timebase_info.numer) / s_timebase_info.denom;
+
+    // Perform the arithmetic at 128-bit precision to avoid the overflow!
+    uint64_t high    = (time >> 32) * timebase.numer;
+    uint64_t highRem = ((high % timebase.denom) << 32) / timebase.denom;
+    uint64_t low     = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
+    high /= timebase.denom;
+    
+    return (high << 32) + highRem + low;
+}
+
+//-------------------------------------
+void
+mfb_timer_init() {
+    g_timer_frequency  = 1e+9;
+    g_timer_resolution = 1.0 / g_timer_frequency;
+}
+
