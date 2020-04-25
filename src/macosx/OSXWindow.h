@@ -1,6 +1,5 @@
 #import <Cocoa/Cocoa.h>
 #include <WindowData.h>
-// @class OSXWindowFrameView;
 
 @interface OSXWindow : NSWindow<NSWindowDelegate>
 {

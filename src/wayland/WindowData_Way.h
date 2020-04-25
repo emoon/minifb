@@ -40,19 +40,5 @@ typedef struct
     uint32_t                shm_format;
     uint32_t                *shm_ptr;
 
-    uint32_t                window_width;
-    uint32_t                window_height;
-    uint32_t                dst_offset_x;
-    uint32_t                dst_offset_y;
-    uint32_t                dst_width;
-    uint32_t                dst_height;
-
-    struct wl_buffer        *draw_buffer;
-    uint32_t                buffer_width;
-    uint32_t                buffer_height;
-    uint32_t                buffer_stride;
-
-    uint32_t                mod_keys;
     struct mfb_timer        *timer;
-    bool                    close;
 } SWindowData_Way;

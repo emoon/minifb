@@ -11,16 +11,14 @@ static unsigned int g_buffer[WIDTH * HEIGHT];
 int 
 main()
 {
-    int noise, carry, seed = 0xbeef;
+    int i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE);
     if (!window)
         return 0;
 
+    mfb_update_state state;
     do {
-        int         i;
-        mfb_update_state state;
-
         for (i = 0; i < WIDTH * HEIGHT; ++i) {
             noise = seed;
             noise >>= 3;

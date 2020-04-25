@@ -15,72 +15,61 @@
 
 void init_keycodes();
 
+//-------------------------------------
 #if defined(USE_METAL_API)
-id<MTLDevice>  g_metal_device;
-id<MTLLibrary> g_library;
 
-Vertex gVertices[4] = {
+id<MTLDevice>  g_metal_device = nil;
+id<MTLLibrary> g_library      = nil;
+
+Vertex g_vertices[4] = {
     {-1.0, -1.0, 0, 1},
     {-1.0,  1.0, 0, 1},
     { 1.0, -1.0, 0, 1},
     { 1.0,  1.0, 0, 1},
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//-------------------------------------
+#define kShader(inc, src)    @inc#src
 
-NSString* g_shadersSrc = @
-"	#include <metal_stdlib>\n"  
-    "using namespace metal;\n"
+NSString *g_shader_src = kShader(
+    "#include <metal_stdlib>\n",
+    using namespace metal;
 
-    "struct VertexOutput {\n"
-        "float4 pos [[position]];\n"
-        "float2 texcoord;\n"
-    "};\n"
+    //---------------------
+    struct VertexOutput {
+        float4 pos [[position]];
+        float2 texcoord;
+    };
 
-    "vertex VertexOutput vertFunc(unsigned int vID[[vertex_id]])\n"
-    "{\n"
-        "VertexOutput out;\n"
+    struct Vertex {
+        float4 position [[position]];
+    };
 
-        "out.pos.x = (float)(vID / 2) * 4.0 - 1.0;\n"
-        "out.pos.y = (float)(vID % 2) * 4.0 - 1.0;\n"
-        "out.pos.z = 0.0;\n"
-        "out.pos.w = 1.0;\n"
+    //---------------------
+    vertex VertexOutput
+    vertFunc(unsigned int vID[[vertex_id]], const device Vertex *pos [[ buffer(0) ]]) {
+        VertexOutput out;
 
-        "out.texcoord.x = (float)(vID / 2) * 2.0;\n"
-        "out.texcoord.y = 1.0 - (float)(vID % 2) * 2.0;\n"
+        out.pos = pos[vID].position;
 
-        "return out;\n"
-    "}\n"
+        out.texcoord.x = (float) (vID / 2);
+        out.texcoord.y = 1.0 - (float) (vID % 2);
 
-    "struct Vertex\n"
-    "{\n"
-        "float4 position [[position]];\n"
-    "};\n"
+        return out;
+    }
 
-    "vertex VertexOutput vertFunc2(unsigned int vID[[vertex_id]], const device Vertex *pos [[buffer(0)]])\n"
-    "{\n"
-        "VertexOutput out;\n"
-
-        "out.pos = pos[vID].position;\n"
-
-        "out.texcoord.x = (float)(vID / 2);\n"
-        "out.texcoord.y = 1.0 - (float)(vID % 2);\n"
-
-        "return out;\n"
-    "}\n"
-
-    "fragment float4 fragFunc(VertexOutput input [[stage_in]],\n"
-            "texture2d<half> colorTexture [[ texture(0) ]])\n"
-    "{\n"
-        "constexpr sampler textureSampler(mag_filter::nearest, min_filter::nearest);\n"
+    //---------------------
+    fragment float4
+    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
+        constexpr sampler textureSampler(mag_filter::nearest, min_filter::nearest);
 
         // Sample the texture to obtain a color
-        "const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);\n"
+        const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);
 
         // We return the color of the texture
-        "return float4(colorSample);\n"
-        //"return float4(input.texcoord.x, input.texcoord.y, 0.0, 1.0);\n"
-    "}\n";
+        return float4(colorSample);
+    };
+);
 
 #endif
 
@@ -89,47 +78,39 @@ NSString* g_shadersSrc = @
 #if defined(USE_METAL_API)
 static bool 
 create_shaders(SWindowData_OSX *window_data_osx) {
-    // Error
-    NSError* nsError = 0x0;
-    NSError** nsErrorPtr = &nsError;
+    NSError *error = 0x0;
 
-    id<MTLLibrary> library = [g_metal_device newLibraryWithSource:g_shadersSrc
-        options:[[MTLCompileOptions alloc] init]
-        error:nsErrorPtr];
-
-    // Error update
-    if (nsError || !library) {
-        NSLog(@"Unable to create shaders %@", nsError); 
+    id<MTLLibrary> g_library = [g_metal_device newLibraryWithSource:g_shader_src 
+                                                            options:[[MTLCompileOptions alloc] init]
+                                                              error:&error
+    ];
+    if (error || !g_library) {
+        NSLog(@"Unable to create shaders %@", error); 
         return false;
-    }                            
+    }
 
-    g_library = library;
-    NSLog(@"Names %@", [g_library functionNames]);
-
-    id<MTLFunction> vertex_shader_func = [g_library newFunctionWithName:@"vertFunc2"];
+    id<MTLFunction> vertex_shader_func   = [g_library newFunctionWithName:@"vertFunc"];
     id<MTLFunction> fragment_shader_func = [g_library newFunctionWithName:@"fragFunc"];
 
     if (!vertex_shader_func) {
-        printf("Unable to get vertFunc!\n");
+        NSLog(@"Unable to get vertFunc!\n");
         return false;
     }
 
     if (!fragment_shader_func) {
-        printf("Unable to get fragFunc!\n");
+        NSLog(@"Unable to get fragFunc!\n");
         return false;
     }
 
     // Create a reusable pipeline state
     MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.label = @"MyPipeline";
+    pipelineStateDescriptor.label = @"MiniFB_pipeline";
     pipelineStateDescriptor.vertexFunction = vertex_shader_func;
     pipelineStateDescriptor.fragmentFunction = fragment_shader_func;
     pipelineStateDescriptor.colorAttachments[0].pixelFormat = 80; //bgra8Unorm;
 
-    NSError *error = 0x0;
     window_data_osx->metal.pipeline_state = [g_metal_device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
-    if (!window_data_osx->metal.pipeline_state)
-    {
+    if (!window_data_osx->metal.pipeline_state) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
 
@@ -140,16 +121,14 @@ create_shaders(SWindowData_OSX *window_data_osx) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct mfb_window *
-mfb_open(const char *title, unsigned width, unsigned height)
-{
+mfb_open(const char *title, unsigned width, unsigned height) {
     return mfb_open_ex(title, width, height, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct mfb_window *
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
-{
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
     init_keycodes();
@@ -176,9 +155,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
 #if defined(USE_METAL_API)
     g_metal_device = MTLCreateSystemDefaultDevice();
-
     if (!g_metal_device) {
-        printf("Your device/OS doesn't support Metal.");
+        NSLog(@"Metal is not supported on this device");
         return 0x0;
     }
 
@@ -212,37 +190,27 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
     WindowViewController* viewController = [WindowViewController new];
 
-    MTLTextureDescriptor* textureDescriptor = [[MTLTextureDescriptor alloc] init];
-
     // Indicate that each pixel has a blue, green, red, and alpha channel, where each channel is
     // an 8-bit unsigned normalized value (i.e. 0 maps to 0.0 and 255 maps to 1.0)
-    textureDescriptor.pixelFormat = MTLPixelFormatBGRA8Unorm;
-
-    // Set the pixel dimensions of the texture
-    textureDescriptor.width = width;
-    textureDescriptor.height = height;
+    MTLTextureDescriptor    *td;
+    td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                            width:width
+                                                           height:height
+                                                        mipmapped:false];
 
     // Create the texture from the device by using the descriptor
-    
-    for (int i = 0; i < MaxBuffersInFlight; ++i) {
-        viewController->m_texture_buffers[i] = [g_metal_device newTextureWithDescriptor:textureDescriptor];
+    for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
+        viewController->texture_buffers[i] = [g_metal_device newTextureWithDescriptor:td];
     }
 
     // Used for syncing the CPU and GPU
-    viewController->m_semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
-    viewController->m_draw_buffer = window_data->draw_buffer;
-    viewController->m_width = width;
-    viewController->m_height = height;
+    viewController->semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
 
     MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
     view.device = g_metal_device; 
     view.delegate = viewController;
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window_data_osx->window.contentView addSubview:view];
-
-    //window_data->buffer_width  = width;
-    //window_data->buffer_height = height;
-    //window_data->buffer_stride = width * 4;
 
     //[window_data->window updateSize];
 #endif
@@ -277,8 +245,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void 
-destroy_window_data(SWindowData *window_data) 
-{
+destroy_window_data(SWindowData *window_data) {
     if(window_data == 0x0)
         return;
 
@@ -304,8 +271,7 @@ destroy_window_data(SWindowData *window_data)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void 
-update_events(SWindowData *window_data)
-{
+update_events(SWindowData *window_data) {
     NSEvent* event;
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
@@ -322,8 +288,7 @@ update_events(SWindowData *window_data)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mfb_update_state 
-mfb_update(struct mfb_window *window, void *buffer)
-{
+mfb_update(struct mfb_window *window, void *buffer) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -356,8 +321,7 @@ mfb_update(struct mfb_window *window, void *buffer)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mfb_update_state 
-mfb_update_events(struct mfb_window *window)
-{
+mfb_update_events(struct mfb_window *window) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -432,8 +396,7 @@ mfb_wait_sync(struct mfb_window *window) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool 
-mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) 
-{
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
 
     if(offset_x + width > window_data->window_width) {
@@ -454,17 +417,17 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
     float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
 
-    gVertices[0].x = x1;
-    gVertices[0].y = y1;
+    g_vertices[0].x = x1;
+    g_vertices[0].y = y1;
 
-    gVertices[1].x = x1;
-    gVertices[1].y = y2;
+    g_vertices[1].x = x1;
+    g_vertices[1].y = y2;
 
-    gVertices[2].x = x2;
-    gVertices[2].y = y1;
+    g_vertices[2].x = x2;
+    g_vertices[2].y = y1;
 
-    gVertices[3].x = x2;
-    gVertices[3].y = y2;
+    g_vertices[3].x = x2;
+    g_vertices[3].y = y2;
 #endif
 
     return true;
@@ -475,8 +438,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 extern short int g_keycodes[512];
 
 void 
-init_keycodes() 
-{
+init_keycodes() {
     // Clear keys
     for (unsigned int i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
         g_keycodes[i] = 0;

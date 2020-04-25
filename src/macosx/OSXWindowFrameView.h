@@ -16,13 +16,9 @@ enum { MaxBuffersInFlight = 3 };
 
 @interface WindowViewController : NSViewController<MTKViewDelegate> 
 {
-    @public id<MTLTexture> m_texture_buffers[MaxBuffersInFlight]; 
-    @public int m_current_buffer;
-    @public void* m_draw_buffer;
-    @public int m_width;
-    @public int m_height;
-    // Used for syncing with CPU/GPU
-    @public dispatch_semaphore_t m_semaphore;
+    @public id<MTLTexture>          texture_buffers[MaxBuffersInFlight]; 
+    @public int                     current_buffer;
+    @public dispatch_semaphore_t    semaphore;    // Used for syncing with CPU/GPU
 }
 
 @end
@@ -32,9 +28,9 @@ enum { MaxBuffersInFlight = 3 };
 
 @interface OSXWindowFrameView : NSView
 {
-    @public SWindowData *window_data;
+    @public SWindowData     *window_data;
 #if defined(USE_METAL_API)
-    @private NSTrackingArea* trackingArea;
+    @private NSTrackingArea *tracking_area;
 #endif
 }
 
