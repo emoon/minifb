@@ -9,19 +9,17 @@
 extern id<MTLDevice>  g_metal_device;
 extern id<MTLLibrary> g_library;
 
-extern Vertex gVertices[4];
+extern Vertex g_vertices[4];
 
 @implementation WindowViewController
 
-- (void)mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size
-{
+- (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
 	(void)view;
 	(void)size;
     // resize
 }
 
-- (void)drawInMTKView:(nonnull MTKView *)view
-{
+- (void) drawInMTKView:(nonnull MTKView *)view {
     OSXWindow   *window = (OSXWindow *) view.window;
     if(window->window_data == 0x0) {
         return;
@@ -39,8 +37,7 @@ extern Vertex gVertices[4];
     MTLRegion region = { { 0, 0, 0 }, { m_width, m_height, 1 } };
 
     // Copy the bytes from our data object into the texture
-    [m_texture_buffers[m_current_buffer] replaceRegion:region
-                mipmapLevel:0 withBytes:m_draw_buffer bytesPerRow:bytesPerRow];
+    [m_texture_buffers[m_current_buffer] replaceRegion:region mipmapLevel:0 withBytes:m_draw_buffer bytesPerRow:bytesPerRow];
 
     // Create a new command buffer for each render pass to the current drawable
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
@@ -60,14 +57,11 @@ extern Vertex gVertices[4];
     }];
 
     MTLRenderPassDescriptor* renderPassDescriptor = view.currentRenderPassDescriptor;
-
-    if (renderPassDescriptor != nil)
-    {
+    if (renderPassDescriptor != nil) {
 		renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 
         // Create a render command encoder so we can render into something
-        id<MTLRenderCommandEncoder> renderEncoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+        id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
@@ -75,19 +69,12 @@ extern Vertex gVertices[4];
         SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
         [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
-        [renderEncoder setVertexBytes:gVertices
-                       length:sizeof(gVertices)
-                      atIndex:0];
+        [renderEncoder setVertexBytes:g_vertices length:sizeof(g_vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:m_texture_buffers[m_current_buffer] atIndex:0];
 
         // Draw the vertices of our quads
-        // [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle
-        //                   vertexStart:0
-        //                   vertexCount:3];
-        [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
-                          vertexStart:0
-                          vertexCount:4];
+        [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
 
         // We're done encoding commands
         [renderEncoder endEncoding];
@@ -107,6 +94,7 @@ extern Vertex gVertices[4];
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if defined(USE_METAL_API)
+
 - (void)updateTrackingAreas
 {
     if(trackingArea != nil) {
@@ -121,6 +109,7 @@ extern Vertex gVertices[4];
                                             userInfo:nil];
     [self addTrackingArea:trackingArea];
 }
+
 #else 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +124,8 @@ extern Vertex gVertices[4];
 		NSMaxX(contentViewRect) + contentViewPadding,
 		NSMinY(contentViewRect) - resizeBoxSize - contentViewPadding,
 		resizeBoxSize,
-		resizeBoxSize);
+		resizeBoxSize
+    );
 	
 	return resizeRect;
 }

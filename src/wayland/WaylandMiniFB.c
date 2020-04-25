@@ -59,9 +59,9 @@ destroy(SWindowData *window_data)
     KILL(shell);
     KILL(surface);
     //KILL(buffer);
-    if(window_data_way->draw_buffer) {
-        wl_buffer_destroy(window_data_way->draw_buffer);
-        window_data_way->draw_buffer = 0x0;
+    if(window_data->draw_buffer) {
+        wl_buffer_destroy(window_data->draw_buffer);
+        window_data->draw_buffer = 0x0;
     }
     KILL(shm_pool);
     KILL(shm);

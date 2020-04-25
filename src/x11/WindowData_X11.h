@@ -17,5 +17,6 @@ typedef struct {
     XImage              *image_scaler;
     uint32_t            image_scaler_width;
     uint32_t            image_scaler_height;
+    
     struct mfb_timer   *timer;
 } SWindowData_X11;
