@@ -14,8 +14,18 @@
 //-------------------------------------
 @implementation iOSViewController
 {
-    MTKView         *_view;
-    iOSViewDelegate *_renderer;
+    MTKView         *metal_view;
+    iOSViewDelegate *view_delegate;
+    SWindowData     *window_data;
+}
+
+//-------------------------------------
+- (id) initWithWindowData:(SWindowData *) windowData {
+    self = [super init];
+    if (self) {
+        window_data = windowData;
+    }
+    return self;
 }
 
 //-------------------------------------
@@ -30,20 +40,20 @@
 {
     [super viewDidLoad];
 
-    _view = (MTKView *)self.view;
-    _view.device = MTLCreateSystemDefaultDevice();
-    _view.backgroundColor = UIColor.blackColor;
+    metal_view = (MTKView *)self.view;
+    metal_view.device = MTLCreateSystemDefaultDevice();
+    metal_view.backgroundColor = UIColor.blackColor;
 
-    if(!_view.device) {
+    if(!metal_view.device) {
         NSLog(@"Metal is not supported on this device");
         self.view = [[UIView alloc] initWithFrame:self.view.frame];
         return;
     }
 
-    _renderer = [[iOSViewDelegate alloc] initWithMetalKitView:_view];
-    [_renderer mtkView:_view drawableSizeWillChange:_view.bounds.size];
+    view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
+    [view_delegate mtkView:metal_view drawableSizeWillChange:metal_view.bounds.size];
 
-    _view.delegate = _renderer;
+    metal_view.delegate = view_delegate;
 }
 
 @end

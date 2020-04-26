@@ -5,6 +5,7 @@
 #include "MiniFB_internal.h"
 #include "WindowData.h"
 #include "WindowData_IOS.h"
+#include "iOSViewController.h"
 
 //-------------------------------------
 struct mfb_window *
@@ -17,6 +18,7 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     kUnused(title);
     kUnused(flags);
+    
     SWindowData *window_data;
     
     window_data = malloc(sizeof(SWindowData));
@@ -26,8 +28,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
     window_data->specific = window_data_ios;
 
-    window_data->window_width  = width;
-    window_data->window_height = height;
+    window_data->window_width  = [UIScreen mainScreen].bounds.size.width;
+    window_data->window_height = [UIScreen mainScreen].bounds.size.height;
 
     window_data->dst_width     = width;
     window_data->dst_height    = height;
@@ -39,7 +41,33 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->draw_buffer = malloc(width * height * 4);
     if (!window_data->draw_buffer) {
         NSLog(@"Unable to create draw buffer");
+        return 0x0;
     }
+
+    UIWindow    *window;
+    NSArray     *pWindows;
+    size_t      numWindows;
+
+    pWindows = [[UIApplication sharedApplication] windows];
+
+    numWindows   = [pWindows count];
+    //iOSViewController *controller = [[iOSViewController alloc] initWithFrame: [UIScreen mainScreen].bounds];
+    iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
+    if(numWindows > 0)
+    {
+        window = [pWindows objectAtIndex:0];
+    }
+    else
+    {
+        // Notice that you need to set "Launch Screen File" in:
+        // project > executable > general to get the real size
+        window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        NSLog(@"UIApplication has no window. We create one (%f, %f).", [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
+    }
+    [window setRootViewController:controller];
+    [controller release];
+    controller = (iOSViewController *) window.rootViewController;
+    [window makeKeyAndVisible];
 
     return (struct mfb_window *) window_data;
 }

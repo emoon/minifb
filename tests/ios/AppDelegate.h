@@ -14,7 +14,7 @@
 }
 @property (strong, nonatomic) UIWindow *window;
 
-- (void) on_update;
+- (void) onUpdate;
 
 @end
 

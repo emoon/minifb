@@ -14,10 +14,10 @@
 // update and drawable resize callbacks.
 @interface iOSViewDelegate : NSObject <MTKViewDelegate>
 {
-    @public SWindowData *m_window_data;
+    @public SWindowData *window_data;
 }
 
--(nonnull instancetype)initWithMetalKitView:(nonnull MTKView *)view;
+-(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData;
 
 @end
 

@@ -7,8 +7,10 @@
 //
 
 #import <UIKit/UIKit.h>
-#include "iOSViewDelegate.h"
+#include "WindowData.h"
 
 @interface iOSViewController : UIViewController
+
+- (id) initWithWindowData:(SWindowData *) windowData;
 
 @end

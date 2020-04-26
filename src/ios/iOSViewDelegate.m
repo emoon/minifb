@@ -84,26 +84,21 @@ NSString *g_shader_src = kShader(
 }
 
 //-------------------------------------
--(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view {
+-(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData {
     self = [super init];
     if (self) {
+        self->window_data = windowData;
+
         g_metal_device = view.device;
 
         view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
         view.sampleCount = 1;
-
-        uint32_t width  = view.bounds.size.width;
-        uint32_t height = view.bounds.size.height;
-
-        m_window_data = (SWindowData *) mfb_open_ex("", width, height, 0);
 
         m_semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
         m_command_queue = [g_metal_device newCommandQueue];
 
         [self _createShaders];
         [self _createAssets];
-        
-        user_implemented_init((struct mfb_window *) m_window_data);
     }
 
     return self;
@@ -154,8 +149,8 @@ NSString *g_shader_src = kShader(
 - (void) _createAssets {
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
-                                                            width:m_window_data->window_width
-                                                           height:m_window_data->window_height
+                                                            width:window_data->buffer_width
+                                                           height:window_data->buffer_height
                                                         mipmapped:false];
 
     m_texture_buffer = [g_metal_device newTextureWithDescriptor:td];
@@ -165,8 +160,6 @@ NSString *g_shader_src = kShader(
 - (void) drawInMTKView:(nonnull MTKView *) view
 {
     // Per frame updates here
-    user_implemented_update((struct mfb_window *) m_window_data);
-
     dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);
 
     m_current_buffer = (m_current_buffer + 1) % MaxBuffersInFlight;
@@ -176,12 +169,13 @@ NSString *g_shader_src = kShader(
 
     __block dispatch_semaphore_t block_sema = m_semaphore;
     [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-         dispatch_semaphore_signal(block_sema);
+        (void)buffer;
+        dispatch_semaphore_signal(block_sema);
     }];
 
     // Copy the bytes from our data object into the texture
-    MTLRegion region = { { 0, 0, 0 }, { m_window_data->window_width, m_window_data->window_height, 1 } };
-    [m_texture_buffer replaceRegion:region mipmapLevel:0 withBytes:m_window_data->draw_buffer bytesPerRow:m_window_data->buffer_stride];
+    MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
+    [m_texture_buffer replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
 
     // Delay getting the currentRenderPassDescriptor until absolutely needed. This avoids
     // holding onto the drawable and blocking the display pipeline any longer than necessary
