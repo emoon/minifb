@@ -191,6 +191,107 @@ cmake .. -DUSE_METAL_API=OFF
 ```
 
 
+### iOS (beta)
+
+It works with and without an UIWindow created. 
+If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
+
+**Issues:**
+
+- It seems that you have to manually set 'tvOS Deployment Target' to less than 13.
+- It seems that you have to manually set 'Launch Screen File' in project > executable > general to be able to get the real device height.
+- You need to manually set the 'Signing Team' and 'Bundle Identifier'. 
+- No multitouch is available yet.
+- As this version uses Metal API it cannot be run in the emulator.
+
+**Functions:**
+
+Some of the MiniFB functions don't make sense on mobile. 
+The available functions for iOS are:
+```c
+struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
+struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);	// flags ignored
+
+mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+
+void                mfb_close(struct mfb_window *window);
+
+void                mfb_set_user_data(struct mfb_window *window, void *user_data);
+void *              mfb_get_user_data(struct mfb_window *window);
+
+bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+
+void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
+void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+
+unsigned            mfb_get_window_width(struct mfb_window *window);
+unsigned            mfb_get_window_height(struct mfb_window *window);
+int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
+int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+```
+
+Timers are also available.
+```c
+struct mfb_timer *  mfb_timer_create(void);
+void                mfb_timer_destroy(struct mfb_timer *tmr);
+void                mfb_timer_reset(struct mfb_timer *tmr);
+double              mfb_timer_now(struct mfb_timer *tmr);
+double              mfb_timer_delta(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency(void);
+double              mfb_timer_get_resolution(void);
+```
+
+For now, no multitouch is available.
+
+**Example:**
+
+```objective-c
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    if(g_window == 0x0) {
+        g_width  = [UIScreen mainScreen].bounds.size.width;
+        g_height = [UIScreen mainScreen].bounds.size.height;
+        g_window = mfb_open("noise", g_width, g_height);
+        if(g_window != 0x0) {
+            g_buffer = malloc(g_width * g_height * 4);
+        }
+    }
+
+    return YES;
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application {    
+    mDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(OnUpdateFrame)];
+    [mDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+}
+
+- (void)applicationWillTerminate:(UIApplication *)application {
+    [mDisplayLink invalidate];
+    mfb_close(g_window);
+}
+
+- (void) OnUpdateFrame {
+    if(g_buffer != 0x0) {
+		// Do your wonderful rendering stuff
+    }
+    
+    mfb_update_state state = mfb_update(g_window, g_buffer);
+    if (state != STATE_OK) {
+        free(g_buffer);
+        g_buffer = 0x0;
+        g_width   = 0;
+        g_height  = 0;
+    }
+}
+```
+
+**CMake**
+```
+mkdir build
+cd build
+cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
+```
+
+
 ### Windows
 
 Visual Studio (ver 2012 express has been tested) tools needed (using the vcvars32.bat (for 32-bit) will set up the enviroment) to build run: tundra2 win32-msvc-debug and you should be able to run noise in t2-output/win32-msvc-debug-default/noise.exe
