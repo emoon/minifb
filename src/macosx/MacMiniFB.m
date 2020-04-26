@@ -200,14 +200,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     // Create the texture from the device by using the descriptor
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
-        viewController->m_texture_buffers[i] = [g_metal_device newTextureWithDescriptor:td];
+        viewController->texture_buffers[i] = [g_metal_device newTextureWithDescriptor:td];
     }
 
     // Used for syncing the CPU and GPU
-    viewController->m_semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
-    viewController->m_draw_buffer = window_data->draw_buffer;
-    viewController->m_width = width;
-    viewController->m_height = height;
+    viewController->semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
 
     MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
     view.device = g_metal_device; 
@@ -313,10 +310,13 @@ mfb_update(struct mfb_window *window, void *buffer) {
 #endif
 
     update_events(window_data);
-    if(window_data->close == false) {
-        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-        [[window_data_osx->window contentView] setNeedsDisplay:YES];
+    if(window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
     }
+
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+    [[window_data_osx->window contentView] setNeedsDisplay:YES];
 
     return STATE_OK;
 }
@@ -336,10 +336,13 @@ mfb_update_events(struct mfb_window *window) {
     }
 
     update_events(window_data);
-    if(window_data->close == false) {
-        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-        [[window_data_osx->window contentView] setNeedsDisplay:YES];
+    if(window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
     }
+
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+    [[window_data_osx->window contentView] setNeedsDisplay:YES];
 
     return STATE_OK;
 }
@@ -365,6 +368,10 @@ mfb_wait_sync(struct mfb_window *window) {
     //NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+    if(window_data_osx == 0x0) {
+        return false;
+    }
+
     double      current;
     uint32_t    millis = 1;
     while(1) {
@@ -400,6 +407,10 @@ mfb_wait_sync(struct mfb_window *window) {
 
 bool 
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+    if(window == 0x0) {
+        return false;
+    }
+
     SWindowData *window_data = (SWindowData *) window;
 
     if(offset_x + width > window_data->window_width) {

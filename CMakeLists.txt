@@ -6,8 +6,11 @@ project(${PROJECT_NAME})
 message("Processing " ${PROJECT_NAME})
 
 if(NOT DEFINED IOS)
-    if(TOLOWER CMAKE_SYSTEM_NAME STREQUAL "ios")
-        set(IOS true)
+    if(DEFINED CMAKE_SYSTEM_NAME)
+        string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
+        if(CMAKE_SYSTEM_NAME_LOWER STREQUAL "ios")
+            set(IOS true)
+        endif()
     endif()
 endif()
 
@@ -132,22 +135,12 @@ elseif (APPLE)
     if(USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
     endif()
-    
-    #link_libraries("-framework Cocoa")
-    #link_libraries("-framework QuartzCore")
-    #link_libraries("-framework Metal")
-    #link_libraries("-framework MetalKit")
-    
+        
     list(APPEND SrcLib ${SrcMacOSX})
 elseif (UNIX)
     if(USE_WAYLAND_API)
-        #link_libraries("-lwayland-client")
-        #link_libraries("-lwayland-cursor")
-
         list(APPEND SrcLib ${SrcWayland})
     else()
-        #link_libraries("-lX11")
-
         list(APPEND SrcLib ${SrcX11})
     endif()
 endif()
@@ -161,18 +154,30 @@ add_library(minifb STATIC
 #--------------------------------------
 if (APPLE)
     if(IOS)
+        target_link_libraries(minifb 
+            "-framework UIKit"
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+        )
     else()
-        target_link_libraries(minifb "-framework Cocoa")
-        target_link_libraries(minifb "-framework QuartzCore")
-        target_link_libraries(minifb "-framework Metal")
-        target_link_libraries(minifb "-framework MetalKit")
+        target_link_libraries(minifb
+            "-framework Cocoa"
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+        )
     endif()
 elseif (UNIX)
     if(USE_WAYLAND_API)
-        target_link_libraries(minifb "-lwayland-client")
-        target_link_libraries(minifb "-lwayland-cursor")
+        target_link_libraries(minifb 
+            "-lwayland-client"
+            "-lwayland-cursor"
+        )
     else()
-        target_link_libraries(minifb "-lX11")
+        target_link_libraries(minifb 
+            "-lX11"
+        )
     endif()
 endif()
 
@@ -186,6 +191,7 @@ link_libraries(minifb)
 # Examples
 #--------------------------------------
 if(NOT IOS)
+
     add_executable(noise 
         tests/noise.c
     )
@@ -201,7 +207,9 @@ if(NOT IOS)
     add_executable(multiple_windows
         tests/multiple_windows.c
     )
+    
 else()
+
     add_executable(noise 
         tests/ios/main.m
         tests/ios/AppDelegate.h
@@ -210,14 +218,11 @@ else()
 
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
-    target_include_directories(minifb PRIVATE src)
+    target_include_directories(noise PRIVATE src)
+    target_include_directories(noise PRIVATE src/ios)
 
     add_definitions(-DTVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
 
-    target_include_directories(noise PRIVATE src/ios)
-    
-    target_link_libraries(noise "-framework UIKit")
-    target_link_libraries(noise "-framework Metal")
 endif()
 
 message("Done " ${PROJECT_NAME})

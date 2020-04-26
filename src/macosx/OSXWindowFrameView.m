@@ -20,24 +20,24 @@ extern Vertex g_vertices[4];
 }
 
 - (void) drawInMTKView:(nonnull MTKView *)view {
-    OSXWindow   *window = (OSXWindow *) view.window;
-    if(window->window_data == 0x0) {
+    OSXWindow   *window      = (OSXWindow *) view.window;
+    SWindowData *window_data = window->window_data;
+    if(window_data == 0x0) {
         return;
     }
 
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     //   by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
-    dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 
     // Iterate through our Metal buffers, and cycle back to the first when we've written to MaxBuffersInFlight
-    m_current_buffer = (m_current_buffer + 1) % MaxBuffersInFlight;
+    current_buffer = (current_buffer + 1) % MaxBuffersInFlight;
 
     // Calculate the number of bytes per row of our image.
-    NSUInteger bytesPerRow = 4 * m_width;
-    MTLRegion region = { { 0, 0, 0 }, { m_width, m_height, 1 } };
+    MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
 
     // Copy the bytes from our data object into the texture
-    [m_texture_buffers[m_current_buffer] replaceRegion:region mipmapLevel:0 withBytes:m_draw_buffer bytesPerRow:bytesPerRow];
+    [texture_buffers[current_buffer] replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
 
     // Create a new command buffer for each render pass to the current drawable
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
@@ -49,7 +49,7 @@ extern Vertex g_vertices[4];
     //   dynamic buffers filled with our vertices, that we're writing to this frame, will no longer
     //   be needed by Metal and the GPU, meaning we can overwrite the buffer contents without
     //   corrupting the rendering.
-    __block dispatch_semaphore_t block_sema = m_semaphore;
+    __block dispatch_semaphore_t block_sema = semaphore;
     [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
     {
     	(void)buffer;
@@ -65,13 +65,13 @@ extern Vertex g_vertices[4];
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
-        OSXWindow     *window          = (OSXWindow *) view.window;
+        OSXWindow       *window          = (OSXWindow *) view.window;
         SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
         [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
         [renderEncoder setVertexBytes:g_vertices length:sizeof(g_vertices) atIndex:0];
 
-        [renderEncoder setFragmentTexture:m_texture_buffers[m_current_buffer] atIndex:0];
+        [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
 
         // Draw the vertices of our quads
         [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -97,17 +97,17 @@ extern Vertex g_vertices[4];
 
 - (void)updateTrackingAreas
 {
-    if(trackingArea != nil) {
-        [self removeTrackingArea:trackingArea];
-        [trackingArea release];
+    if(tracking_area != nil) {
+        [self removeTrackingArea:tracking_area];
+        [tracking_area release];
     }
 
     int opts = (NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways);
-    trackingArea = [ [NSTrackingArea alloc] initWithRect:[self bounds]
-                                            options:opts
-                                            owner:self
-                                            userInfo:nil];
-    [self addTrackingArea:trackingArea];
+    tracking_area = [[NSTrackingArea alloc] initWithRect:[self bounds]
+                                                 options:opts
+                                                   owner:self
+                                                userInfo:nil];
+    [self addTrackingArea:tracking_area];
 }
 
 #else 
@@ -136,7 +136,7 @@ extern Vertex g_vertices[4];
 {
 	(void)rect;
 
-    if(!window_data)
+    if(window_data == 0x0)
         return;
 
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;    
@@ -181,7 +181,9 @@ extern Vertex g_vertices[4];
 - (void)mouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,7 +191,9 @@ extern Vertex g_vertices[4];
 - (void)mouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,7 +201,9 @@ extern Vertex g_vertices[4];
 - (void)rightMouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +211,9 @@ extern Vertex g_vertices[4];
 - (void)rightMouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +221,9 @@ extern Vertex g_vertices[4];
 - (void)otherMouseDown:(NSEvent *)event
 {
     (void)event;
-    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,14 +231,18 @@ extern Vertex g_vertices[4];
 - (void)otherMouseUp:(NSEvent *)event
 {
     (void)event;
-    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)scrollWheel:(NSEvent *)event
 {
-    kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+    if(window_data != 0x0) {
+        kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,11 +264,13 @@ extern Vertex g_vertices[4];
 
 - (void)mouseMoved:(NSEvent *)event
 {
-    NSPoint point = [event locationInWindow];
-    //NSPoint localPoint = [self convertPoint:point fromView:nil];
-    window_data->mouse_pos_x = point.x;
-    window_data->mouse_pos_y = point.y;
-    kCall(mouse_move_func, point.x, point.y);
+    if(window_data != 0x0) {
+        NSPoint point = [event locationInWindow];
+        //NSPoint localPoint = [self convertPoint:point fromView:nil];
+        window_data->mouse_pos_x = point.x;
+        window_data->mouse_pos_y = point.y;
+        kCall(mouse_move_func, point.x, point.y);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
