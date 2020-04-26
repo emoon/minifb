@@ -133,9 +133,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     memset(window_data_osx, 0, sizeof(SWindowData_OSX));
     window_data->specific = window_data_osx;
 
-    window_data->window_width  = width;
-    window_data->window_height = height;
-
     window_data->dst_width     = width;
     window_data->dst_height    = height;
 
@@ -158,16 +155,43 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 #endif
 
-    NSWindowStyleMask styles =  NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
+    NSRect              rectangle, frameRect;
+    NSWindowStyleMask   styles = 0;
 
-    if (flags & WF_BORDERLESS)
+    if (flags & WF_BORDERLESS) {
         styles |= NSWindowStyleMaskBorderless;
+    }
+    else {
+        styles |= NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
+    }
 
     if (flags & WF_RESIZABLE)
         styles |= NSWindowStyleMaskResizable;
 
-    NSRect rectangle = NSMakeRect(0, 0, width, height);
-    NSRect frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
+    if (flags & WF_FULLSCREEN) {
+        styles = NSWindowStyleMaskFullScreen;
+        NSScreen *mainScreen = [NSScreen mainScreen];
+        NSRect screenRect = [mainScreen frame];
+        window_data->window_width  = screenRect.size.width;
+        window_data->window_height = screenRect.size.height;
+        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+        frameRect = rectangle;
+    }
+    else if (flags & WF_FULLSCREEN_DESKTOP) {
+        NSScreen *mainScreen = [NSScreen mainScreen];
+        NSRect screenRect = [mainScreen visibleFrame];
+        window_data->window_width  = screenRect.size.width;
+        window_data->window_height = screenRect.size.height;
+        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+        frameRect = rectangle;
+    }
+    else {
+        window_data->window_width  = width;
+        window_data->window_height = height;
+        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+        frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
+    }
+
     window_data_osx->window = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO windowData:window_data];
     if (!window_data_osx->window)
         return 0x0;
