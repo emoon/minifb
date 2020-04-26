@@ -565,6 +565,9 @@ mfb_get_key_name(mfb_key key) {
         case KB_KEY_MENU:
             return "Menu";
 
+        case KB_KEY_UNKNOWN:
+            return "Unknown";
     }
+    
     return "Unknown";
 }

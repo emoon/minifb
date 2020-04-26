@@ -72,6 +72,9 @@
 
 - (void)flagsChanged:(NSEvent *)event
 {
+    if(window_data == 0x0)
+        return;
+
     const uint32_t flags = [event modifierFlags];
     uint32_t	mod_keys = 0, mod_keys_aux = 0;
 
@@ -135,42 +138,48 @@
 
 - (void)keyDown:(NSEvent *)event
 {
-    short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-    window_data->key_status[key_code] = true;
-    kCall(keyboard_func, key_code, window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        short int key_code = g_keycodes[[event keyCode] & 0x1ff];
+        window_data->key_status[key_code] = true;
+        kCall(keyboard_func, key_code, window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)keyUp:(NSEvent *)event
 {
-    short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-    window_data->key_status[key_code] = false;
-    kCall(keyboard_func, key_code, window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        short int key_code = g_keycodes[[event keyCode] & 0x1ff];
+        window_data->key_status[key_code] = false;
+        kCall(keyboard_func, key_code, window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange
 {
-    NSString    *characters;
-    NSUInteger  length;
-    
     kUnused(replacementRange);
 
-    if ([string isKindOfClass:[NSAttributedString class]])
-        characters = [string string];
-    else
-        characters = (NSString*) string;
+    if(window_data != 0x0) {
+        NSString    *characters;
+        NSUInteger  length;    
 
-    length = [characters length];
-    for (NSUInteger i = 0;  i < length;  i++)
-    {
-        const unichar code = [characters characterAtIndex:i];
-        if ((code & 0xff00) == 0xf700)
-            continue;
+        if ([string isKindOfClass:[NSAttributedString class]])
+            characters = [string string];
+        else
+            characters = (NSString*) string;
 
-        kCall(char_input_func, code);
+        length = [characters length];
+        for (NSUInteger i = 0;  i < length;  i++)
+        {
+            const unichar code = [characters characterAtIndex:i];
+            if ((code & 0xff00) == 0xf700)
+                continue;
+
+            kCall(char_input_func, code);
+        }
     }
 }
 
@@ -180,9 +189,11 @@
 {
     kUnused(notification);
 
-    if(window_data->is_active == true) {
-        window_data->is_active = false;
-        kCall(active_func, false);
+    if(window_data != 0x0) {
+        if(window_data->is_active == true) {
+            window_data->is_active = false;
+            kCall(active_func, false);
+        }
     }
 }
 
@@ -190,10 +201,10 @@
 
 - (void)setContentView:(NSView *)aView
 {
-    if ([childContentView isEqualTo:aView])
-    {
+    if ([childContentView isEqualTo:aView]) {
         return;
     }
+
     NSRect bounds = [self frame];
     bounds.origin = NSZeroPoint;
 
@@ -232,15 +243,19 @@
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
     kUnused(notification);
-    window_data->is_active = true;
-    kCall(active_func, true);
+    if(window_data != 0x0) {
+        window_data->is_active = true;
+        kCall(active_func, true);
+    }
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
     kUnused(notification);
-    window_data->is_active = false;
-    kCall(active_func, false);
+    if(window_data) {
+        window_data->is_active = false;
+        kCall(active_func, false);
+    }
 }
 
 - (void)windowWillClose:(NSNotification *)notification {
@@ -277,19 +292,23 @@
 
 - (void)willClose
 {
-    window_data->close = true;
+    if(window_data != 0x0) {
+        window_data->close = true;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)windowDidResize:(NSNotification *)notification {
     kUnused(notification);
-    CGSize size = [self contentRectForFrameRect:[self frame]].size;
+    if(window_data != 0x0) {
+        CGSize size = [self contentRectForFrameRect:[self frame]].size;
 
-    window_data->window_width  = size.width;
-    window_data->window_height = size.height;
+        window_data->window_width  = size.width;
+        window_data->window_height = size.height;
 
-    kCall(resize_func, size.width, size.height);
+        kCall(resize_func, size.width, size.height);
+    }
 }
 
 @end

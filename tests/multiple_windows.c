@@ -107,6 +107,7 @@ main()
     mfb_set_mouse_scroll_callback(window_a, mouse_scroll);
 
     mfb_set_user_data(window_a, (void *) "Window A");
+    mfb_set_viewport(window_a, 25, 25, WIDTH_A-25, HEIGHT_A-25);
 
     //--
     struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
@@ -150,44 +151,48 @@ main()
         
         mfb_update_state state_a, state_b;
 
-        for (i = 0; i < WIDTH_A * HEIGHT_A; ++i)
-        {
-            noise = seed;
-            noise >>= 3;
-            noise ^= seed;
-            carry = noise & 1;
-            noise >>= 1;
-            seed >>= 1;
-            seed |= (carry << 30);
-            noise &= 0xFF;
-            g_buffer_a[i] = MFB_RGB(noise, noise, noise); 
-        }
+        if(window_a != 0x0) {
+            for (i = 0; i < WIDTH_A * HEIGHT_A; ++i)
+            {
+                noise = seed;
+                noise >>= 3;
+                noise ^= seed;
+                carry = noise & 1;
+                noise >>= 1;
+                seed >>= 1;
+                seed |= (carry << 30);
+                noise &= 0xFF;
+                g_buffer_a[i] = MFB_RGB(noise, noise, noise); 
+            }
 
-        //--
-        time_x = sinf(time * kPI / 180.0f);
-        time_y = cosf(time * kPI / 180.0f);
-        i = 0;
-        for(y=0; y<HEIGHT_B; ++y) {
-            dy = cosf((y * time_y) * kPI / 180.0f);                // [-1, 1]
-            for(x=0; x<WIDTH_B; ++x) {
-                dx = sinf((x * time_x) * kPI / 180.0f);            // [-1, 1]
-
-                index = (int) ((2.0f + dx + dy) * 0.25f * 511.0f);  // [0, 511]
-                g_buffer_b[i++] = pallete[index];
+            //--
+            state_a = mfb_update(window_a, g_buffer_a);
+            if (state_a != STATE_OK) {
+                window_a = 0x0;
             }
         }
-        time += 0.1f;
 
         //--
-        state_a = mfb_update(window_a, g_buffer_a);
-        if (state_a != STATE_OK) {
-            window_a = 0x0;
-        }
+        if(window_b != 0x0) {
+            time_x = sinf(time * kPI / 180.0f);
+            time_y = cosf(time * kPI / 180.0f);
+            i = 0;
+            for(y=0; y<HEIGHT_B; ++y) {
+                dy = cosf((y * time_y) * kPI / 180.0f);                // [-1, 1]
+                for(x=0; x<WIDTH_B; ++x) {
+                    dx = sinf((x * time_x) * kPI / 180.0f);            // [-1, 1]
 
-        //--
-        state_b = mfb_update(window_b, g_buffer_b);
-        if (state_b != STATE_OK) {
-            window_b = 0x0;
+                    index = (int) ((2.0f + dx + dy) * 0.25f * 511.0f);  // [0, 511]
+                    g_buffer_b[i++] = pallete[index];
+                }
+            }
+            time += 0.1f;
+
+            //--
+            state_b = mfb_update(window_b, g_buffer_b);
+            if (state_b != STATE_OK) {
+                window_b = 0x0;
+            }
         }
 
         if(window_a == 0x0 && window_b == 0x0) {
@@ -195,10 +200,16 @@ main()
         }
 
         // Don't need to do this for both windows in the same thread
-        if(window_a != 0x0)
-            mfb_wait_sync(window_a);
-        else if(window_b != 0x0)
-            mfb_wait_sync(window_b);
+        if(window_a != 0x0) {
+            if(mfb_wait_sync(window_a) == false) {
+                window_a = 0x0;
+            }
+        }
+        else if(window_b != 0x0) {
+            if(mfb_wait_sync(window_b) == false) {
+                window_b = 0x0;
+            }
+        }
     }
 
     return 0;

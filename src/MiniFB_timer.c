@@ -8,8 +8,8 @@ double      g_timer_resolution;
 double      g_time_for_frame = 1.0 / 60.0;
 
 //-------------------------------------
-extern uint64_t mfb_timer_tick();
-extern void mfb_timer_init();
+extern uint64_t mfb_timer_tick(void);
+extern void mfb_timer_init(void);
 
 //-------------------------------------
 void

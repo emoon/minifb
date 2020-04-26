@@ -1,3 +1,5 @@
+#if defined(__linux__)
+
 #include <time.h>
 #include <MiniFB.h>
 
@@ -30,3 +32,6 @@ mfb_timer_init() {
     }
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
+
+#endif
+

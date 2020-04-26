@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
     extern short int g_keycodes[512];
-    void init_keycodes();
+    void init_keycodes(void);
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed);
 
 #if defined(__cplusplus)
