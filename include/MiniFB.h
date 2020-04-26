@@ -59,13 +59,13 @@ const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // O
 void                mfb_set_target_fps(uint32_t fps);
 bool                mfb_wait_sync(struct mfb_window *window);
 
-struct mfb_timer *  mfb_timer_create();
+struct mfb_timer *  mfb_timer_create(void);
 void                mfb_timer_destroy(struct mfb_timer *tmr);
 void                mfb_timer_reset(struct mfb_timer *tmr);
 double              mfb_timer_now(struct mfb_timer *tmr);
 double              mfb_timer_delta(struct mfb_timer *tmr);
-double              mfb_timer_get_frequency();
-double              mfb_timer_get_resolution();
+double              mfb_timer_get_frequency(void);
+double              mfb_timer_get_resolution(void);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
