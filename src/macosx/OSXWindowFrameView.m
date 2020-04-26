@@ -65,7 +65,7 @@ extern Vertex g_vertices[4];
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
-        OSXWindow     *window            = (OSXWindow *) view.window;
+        OSXWindow       *window          = (OSXWindow *) view.window;
         SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
         [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
@@ -136,7 +136,7 @@ extern Vertex g_vertices[4];
 {
 	(void)rect;
 
-    if(!window_data)
+    if(window_data == 0x0)
         return;
 
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;    
@@ -181,7 +181,9 @@ extern Vertex g_vertices[4];
 - (void)mouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,7 +191,9 @@ extern Vertex g_vertices[4];
 - (void)mouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,7 +201,9 @@ extern Vertex g_vertices[4];
 - (void)rightMouseDown:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +211,9 @@ extern Vertex g_vertices[4];
 - (void)rightMouseUp:(NSEvent*)event
 {
     (void)event;
-    kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +221,9 @@ extern Vertex g_vertices[4];
 - (void)otherMouseDown:(NSEvent *)event
 {
     (void)event;
-    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,14 +231,18 @@ extern Vertex g_vertices[4];
 - (void)otherMouseUp:(NSEvent *)event
 {
     (void)event;
-    kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+    if(window_data != 0x0) {
+        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)scrollWheel:(NSEvent *)event
 {
-    kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+    if(window_data != 0x0) {
+        kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,11 +264,13 @@ extern Vertex g_vertices[4];
 
 - (void)mouseMoved:(NSEvent *)event
 {
-    NSPoint point = [event locationInWindow];
-    //NSPoint localPoint = [self convertPoint:point fromView:nil];
-    window_data->mouse_pos_x = point.x;
-    window_data->mouse_pos_y = point.y;
-    kCall(mouse_move_func, point.x, point.y);
+    if(window_data != 0x0) {
+        NSPoint point = [event locationInWindow];
+        //NSPoint localPoint = [self convertPoint:point fromView:nil];
+        window_data->mouse_pos_x = point.x;
+        window_data->mouse_pos_y = point.y;
+        kCall(mouse_move_func, point.x, point.y);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
