@@ -9,8 +9,6 @@
 extern id<MTLDevice>  g_metal_device;
 extern id<MTLLibrary> g_library;
 
-extern Vertex g_vertices[4];
-
 @implementation WindowViewController
 
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
@@ -69,7 +67,7 @@ extern Vertex g_vertices[4];
         SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window->window_data->specific;
         [renderEncoder setRenderPipelineState:window_data_osx->metal.pipeline_state];
 
-        [renderEncoder setVertexBytes:g_vertices length:sizeof(g_vertices) atIndex:0];
+        [renderEncoder setVertexBytes:window_data_osx->metal.vertices length:sizeof(window_data_osx->metal.vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
 

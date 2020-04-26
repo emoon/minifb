@@ -107,7 +107,7 @@ main()
     mfb_set_mouse_scroll_callback(window_a, mouse_scroll);
 
     mfb_set_user_data(window_a, (void *) "Window A");
-    mfb_set_viewport(window_a, 25, 25, WIDTH_A-25, HEIGHT_A-25);
+    mfb_set_viewport(window_a, 25, 25, WIDTH_A-50, HEIGHT_A-50);
 
     //--
     struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);

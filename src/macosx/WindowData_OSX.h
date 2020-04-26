@@ -9,6 +9,10 @@
 
 @class OSXWindow;
 
+typedef struct Vertex {
+    float x, y, z, w;
+} Vertex;
+
 typedef struct {
     OSXWindow           *window;
     struct mfb_timer    *timer;
@@ -17,6 +21,7 @@ typedef struct {
     struct {
         id<MTLCommandQueue>         command_queue;
         id<MTLRenderPipelineState>  pipeline_state; 
+        Vertex                      vertices[4];
     } metal;
 #endif        
 } SWindowData_OSX;

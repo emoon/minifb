@@ -21,13 +21,6 @@ void init_keycodes();
 id<MTLDevice>  g_metal_device = nil;
 id<MTLLibrary> g_library      = nil;
 
-Vertex g_vertices[4] = {
-    {-1.0, -1.0, 0, 1},
-    {-1.0,  1.0, 0, 1},
-    { 1.0, -1.0, 0, 1},
-    { 1.0,  1.0, 0, 1},
-};
-
 //-------------------------------------
 #define kShader(inc, src)    @inc#src
 
@@ -184,6 +177,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     if (!window_data->draw_buffer)
         return 0x0;
+
+    static Vertex s_vertices[4] = {
+        {-1.0, -1.0, 0, 1},
+        {-1.0,  1.0, 0, 1},
+        { 1.0, -1.0, 0, 1},
+        { 1.0,  1.0, 0, 1},
+    };
+    memcpy(window_data_osx->metal.vertices, s_vertices, sizeof(s_vertices));
 
     // Setup command queue
     window_data_osx->metal.command_queue = [g_metal_device newCommandQueue];
@@ -431,17 +432,19 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
     float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
 
-    g_vertices[0].x = x1;
-    g_vertices[0].y = y1;
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
 
-    g_vertices[1].x = x1;
-    g_vertices[1].y = y2;
+    window_data_osx->metal.vertices[0].x = x1;
+    window_data_osx->metal.vertices[0].y = y1;
 
-    g_vertices[2].x = x2;
-    g_vertices[2].y = y1;
+    window_data_osx->metal.vertices[1].x = x1;
+    window_data_osx->metal.vertices[1].y = y2;
 
-    g_vertices[3].x = x2;
-    g_vertices[3].y = y2;
+    window_data_osx->metal.vertices[2].x = x2;
+    window_data_osx->metal.vertices[2].y = y1;
+
+    window_data_osx->metal.vertices[3].x = x2;
+    window_data_osx->metal.vertices[3].y = y2;
 #endif
 
     return true;
