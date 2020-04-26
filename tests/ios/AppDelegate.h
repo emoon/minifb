@@ -12,9 +12,10 @@
 {
     CADisplayLink   *mDisplayLink;
 }
+
 @property (strong, nonatomic) UIWindow *window;
 
-- (void) onUpdate;
+- (void) OnUpdateFrame;
 
 @end
 

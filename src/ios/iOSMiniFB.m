@@ -8,17 +8,8 @@
 #include "iOSViewController.h"
 
 //-------------------------------------
-struct mfb_window *
-mfb_open(const char *title, unsigned width, unsigned height) {
-    return mfb_open_ex(title, width, height, 0);
-}
-
-//-------------------------------------
-struct mfb_window *
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    kUnused(title);
-    kUnused(flags);
-    
+SWindowData *
+create_window_data(unsigned width, unsigned height) {
     SWindowData *window_data;
     
     window_data = malloc(sizeof(SWindowData));
@@ -43,30 +34,55 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         NSLog(@"Unable to create draw buffer");
         return 0x0;
     }
+    
+    return window_data;
+}
+
+//-------------------------------------
+struct mfb_window *
+mfb_open(const char *title, unsigned width, unsigned height) {
+    return mfb_open_ex(title, width, height, 0);
+}
+
+//-------------------------------------
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    kUnused(title);
+    kUnused(flags);
+    
+    SWindowData *window_data = create_window_data(width, height);
+    if (window_data == 0x0) {
+        return 0x0;
+    }
 
     UIWindow    *window;
-    NSArray     *pWindows;
+    NSArray     *windows;
     size_t      numWindows;
 
-    pWindows = [[UIApplication sharedApplication] windows];
-
-    numWindows   = [pWindows count];
-    //iOSViewController *controller = [[iOSViewController alloc] initWithFrame: [UIScreen mainScreen].bounds];
-    iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
-    if(numWindows > 0)
-    {
-        window = [pWindows objectAtIndex:0];
+    windows = [[UIApplication sharedApplication] windows];
+    numWindows = [windows count];
+    if(numWindows > 0) {
+        window = [windows objectAtIndex:0];
     }
-    else
-    {
+    else {
         // Notice that you need to set "Launch Screen File" in:
-        // project > executable > general to get the real size
+        // project > executable > general
+        // to get the real size with [UIScreen mainScreen].bounds].
         window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
         NSLog(@"UIApplication has no window. We create one (%f, %f).", [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
     }
-    [window setRootViewController:controller];
-    [controller release];
-    controller = (iOSViewController *) window.rootViewController;
+    
+    if([window.rootViewController isKindOfClass:[iOSViewController class]] == false) {
+        iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
+        [window setRootViewController:controller];
+#if !__has_feature(objc_arc)
+        [controller release];
+#endif
+        controller = (iOSViewController *) window.rootViewController;
+    }
+    else {
+        ((iOSViewController *) window.rootViewController)->window_data = window_data;
+    }
     [window makeKeyAndVisible];
 
     return (struct mfb_window *) window_data;
@@ -125,9 +141,9 @@ mfb_wait_sync(struct mfb_window *window) {
     return true;
 }
 
+//-------------------------------------
 extern Vertex g_vertices[4];
 
-//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;

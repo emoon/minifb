@@ -2,7 +2,6 @@
 
 #include <MiniFB_enums.h>
 #include <WindowData.h>
-
 #include <MetalKit/MetalKit.h>
 
 typedef struct Vertex {

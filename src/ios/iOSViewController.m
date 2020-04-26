@@ -6,17 +6,18 @@
 //  Copyright © 2020 Carlos Aragones. All rights reserved.
 //
 
-#import "iOSViewController.h"
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
+#import "iOSViewController.h"
 #import "iOSViewDelegate.h"
+#import "iOSView.h"
+#include "WindowData_IOS.h"
 
 //-------------------------------------
 @implementation iOSViewController
 {
-    MTKView         *metal_view;
+    iOSView         *metal_view;
     iOSViewDelegate *view_delegate;
-    SWindowData     *window_data;
 }
 
 //-------------------------------------
@@ -30,9 +31,18 @@
 
 //-------------------------------------
 - (void) loadView {
-    UIView *view = [[MTKView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    iOSView *view = [[iOSView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    // Probably the window was created automatically by an storyboard or similar
+    if(window_data == 0x0) {
+        NSLog(@"WindowData is null!");
+    }
+    view->window_data = window_data;
+    view.userInteractionEnabled = true;
+
     [self setView:view];
+#if !__has_feature(objc_arc)
     [view release];
+#endif
 }
 
 //-------------------------------------
@@ -40,7 +50,7 @@
 {
     [super viewDidLoad];
 
-    metal_view = (MTKView *)self.view;
+    metal_view = (iOSView *) self.view;
     metal_view.device = MTLCreateSystemDefaultDevice();
     metal_view.backgroundColor = UIColor.blackColor;
 

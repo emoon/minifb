@@ -10,6 +10,9 @@
 #include "WindowData.h"
 
 @interface iOSViewController : UIViewController
+{
+    @public SWindowData *window_data;
+}
 
 - (id) initWithWindowData:(SWindowData *) windowData;
 
