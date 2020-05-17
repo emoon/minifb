@@ -38,8 +38,8 @@ set(SrcMacOSX
     src/macosx/OSXWindow.m
     src/macosx/OSXView.h
     src/macosx/OSXView.m
-    src/macosx/OSXViewController.h
-    src/macosx/OSXViewController.m
+    src/macosx/OSXViewDelegate.h
+    src/macosx/OSXViewDelegate.m
     src/macosx/WindowData_OSX.h
 )
 

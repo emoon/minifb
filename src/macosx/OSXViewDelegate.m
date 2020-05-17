@@ -1,4 +1,4 @@
-#include "OSXViewController.h"
+#include "OSXViewDelegate.h"
 
 #if defined(USE_METAL_API)
 
@@ -49,7 +49,7 @@ NSString *g_shader_src = kShader(
 );
 
 //-------------------------------------
-@implementation OSXViewController
+@implementation OSXViewDelegate
 
 //-------------------------------------
 - (id) initWithWindowData:(SWindowData *) windowData {

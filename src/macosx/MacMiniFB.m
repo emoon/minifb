@@ -1,6 +1,6 @@
 #include "OSXWindow.h"
 #include "OSXView.h"
-#include "OSXViewController.h"
+#include "OSXViewDelegate.h"
 #include "WindowData_OSX.h"
 #include <MiniFB.h>
 #include <MiniFB_enums.h>
@@ -129,7 +129,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
 #if defined(USE_METAL_API)
-    OSXViewController *viewController = [[OSXViewController alloc] initWithWindowData:window_data];
+    OSXViewDelegate *viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
 
     MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
     view.device = viewController->metal_device;
