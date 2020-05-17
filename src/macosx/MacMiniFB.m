@@ -188,11 +188,13 @@ destroy_window_data(SWindowData *window_data) {
         free(window_data_osx);
     }
 
+#if defined(USE_METAL_API)
     if(window_data->draw_buffer != 0x0) {
         free(window_data->draw_buffer);
         window_data->draw_buffer = 0x0;
     }
-
+#endif
+    
     memset(window_data, 0, sizeof(SWindowData));
     free(window_data);
 
