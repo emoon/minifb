@@ -1,11 +1,12 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #include <mach/mach_time.h>
-#include <MiniFB.h>
-#include "MiniFB_internal.h"
-#include "WindowData.h"
-#include "WindowData_IOS.h"
+
 #include "iOSViewController.h"
+#include "WindowData_IOS.h"
+#include <MiniFB.h>
+#include <MiniFB_internal.h>
+#include <WindowData.h>
 
 //-------------------------------------
 SWindowData *
@@ -27,9 +28,9 @@ create_window_data(unsigned width, unsigned height) {
     }
     memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
 
-    float scale = [UIScreen mainScreen].scale;
+    window_data->specific = window_data_ios;
 
-    window_data->specific      = window_data_ios;
+    float scale = [UIScreen mainScreen].scale;
 
     window_data->window_width  = [UIScreen mainScreen].bounds.size.width  * scale;
     window_data->window_height = [UIScreen mainScreen].bounds.size.height * scale;
@@ -43,8 +44,8 @@ create_window_data(unsigned width, unsigned height) {
 
     window_data->draw_buffer   = malloc(width * height * 4);
     if (!window_data->draw_buffer) {
-        free(window_data);
         free(window_data_ios);
+        free(window_data);
         NSLog(@"Unable to create draw buffer");
         return 0x0;
     }
@@ -68,38 +69,40 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     kUnused(title);
     kUnused(flags);
 
-    SWindowData *window_data = create_window_data(width, height);
-    if (window_data == 0x0) {
-        return 0x0;
-    }
+    @autoreleasepool {
+        SWindowData *window_data = create_window_data(width, height);
+        if (window_data == 0x0) {
+            return 0x0;
+        }
 
-    windows = [[UIApplication sharedApplication] windows];
-    numWindows = [windows count];
-    if(numWindows > 0) {
-        window = [windows objectAtIndex:0];
-    }
-    else {
-        // Notice that you need to set "Launch Screen File" in:
-        // project > executable > general
-        // to get the real size with [UIScreen mainScreen].bounds].
-        window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        NSLog(@"UIApplication has no window. We create one (%f, %f).", [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
-    }
+        windows = [[UIApplication sharedApplication] windows];
+        numWindows = [windows count];
+        if(numWindows > 0) {
+            window = [windows objectAtIndex:0];
+        }
+        else {
+            // Notice that you need to set "Launch Screen File" in:
+            // project > executable > general
+            // to get the real size with [UIScreen mainScreen].bounds].
+            window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+            NSLog(@"UIApplication has no window. We create one (%f, %f).", [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
+        }
 
-    if([window.rootViewController isKindOfClass:[iOSViewController class]] == false) {
-        iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
-        [window setRootViewController:controller];
-#if !__has_feature(objc_arc)
-        [controller release];
-#endif
-        controller = (iOSViewController *) window.rootViewController;
-    }
-    else {
-        ((iOSViewController *) window.rootViewController)->window_data = window_data;
-    }
-    [window makeKeyAndVisible];
+        if([window.rootViewController isKindOfClass:[iOSViewController class]] == false) {
+            iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
+            [window setRootViewController:controller];
+    #if !__has_feature(objc_arc)
+            [controller release];
+    #endif
+            controller = (iOSViewController *) window.rootViewController;
+        }
+        else {
+            ((iOSViewController *) window.rootViewController)->window_data = window_data;
+        }
+        [window makeKeyAndVisible];
 
-    return (struct mfb_window *) window_data;
+        return (struct mfb_window *) window_data;
+    }
 }
 
 //-------------------------------------
@@ -144,7 +147,10 @@ mfb_update(struct mfb_window *window, void *buffer) {
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    kUnused(window);
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
     return STATE_OK;
 }
 
@@ -153,13 +159,20 @@ extern double   g_time_for_frame;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    kUnused(window);
+    if(window == 0x0) {
+        return false;
+    }
+
     return true;
 }
 
 //-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+    if(window == 0x0) {
+        return false;
+    }
+
     SWindowData *window_data = (SWindowData *) window;
 
     if(offset_x + width > window_data->window_width) {

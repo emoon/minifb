@@ -1,10 +1,3 @@
-#include "OSXWindow.h"
-#include "OSXView.h"
-#include "OSXViewDelegate.h"
-#include "WindowData_OSX.h"
-#include <MiniFB.h>
-#include <MiniFB_enums.h>
-#include <MiniFB_internal.h>
 #include <Cocoa/Cocoa.h>
 #if defined(USE_METAL_API)
 #include <Carbon/Carbon.h>
@@ -14,20 +7,22 @@
 #include <sched.h>
 #include <mach/mach_time.h>
 
+#include "OSXWindow.h"
+#include "OSXView.h"
+#include "OSXViewDelegate.h"
+#include "WindowData_OSX.h"
+#include <MiniFB.h>
+#include <MiniFB_internal.h>
+#include <MiniFB_enums.h>
+
 void init_keycodes();
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct mfb_window *
-mfb_open(const char *title, unsigned width, unsigned height) {
-    return mfb_open_ex(title, width, height, 0);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 SWindowData *
 create_window_data(unsigned width, unsigned height) {
-    SWindowData *window_data = malloc(sizeof(SWindowData));
+    SWindowData *window_data;
+
+    window_data = malloc(sizeof(SWindowData));
     if(window_data == 0x0) {
         NSLog(@"Cannot allocate window data");
         return 0x0;
@@ -42,7 +37,7 @@ create_window_data(unsigned width, unsigned height) {
     }
     memset(window_data_osx, 0, sizeof(SWindowData_OSX));
 
-    window_data->specific      = window_data_osx;
+    window_data->specific = window_data_osx;
 
     window_data->dst_width     = width;
     window_data->dst_height    = height;
@@ -64,162 +59,161 @@ create_window_data(unsigned width, unsigned height) {
     return window_data;
 }
 
+//-------------------------------------
 struct mfb_window *
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-
-    SWindowData *window_data = create_window_data(width, height);
-    if (window_data == 0x0) {
-        return 0x0;
-    }
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-
-    init_keycodes();
-
-    [NSApplication sharedApplication];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-
-    NSRect              rectangle, frameRect;
-    NSWindowStyleMask   styles = 0;
-
-    if (flags & WF_BORDERLESS) {
-        styles |= NSWindowStyleMaskBorderless;
-    }
-    else {
-        styles |= NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
-    }
-
-    if (flags & WF_RESIZABLE)
-        styles |= NSWindowStyleMaskResizable;
-
-    if (flags & WF_FULLSCREEN) {
-        styles = NSWindowStyleMaskFullScreen;
-        NSScreen *mainScreen = [NSScreen mainScreen];
-        NSRect screenRect = [mainScreen frame];
-        window_data->window_width  = screenRect.size.width;
-        window_data->window_height = screenRect.size.height;
-        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
-        frameRect = rectangle;
-    }
-    else if (flags & WF_FULLSCREEN_DESKTOP) {
-        NSScreen *mainScreen = [NSScreen mainScreen];
-        NSRect screenRect = [mainScreen visibleFrame];
-        window_data->window_width  = screenRect.size.width;
-        window_data->window_height = screenRect.size.height;
-        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
-        frameRect = rectangle;
-    }
-    else {
-        window_data->window_width  = width;
-        window_data->window_height = height;
-        rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
-        frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
-    }
-
-    window_data_osx->window = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO windowData:window_data];
-    if (!window_data_osx->window) {
-        NSLog(@"Cannot create window");
-        if(window_data->draw_buffer != 0x0) {
-            free(window_data->draw_buffer);
-            window_data->draw_buffer = 0x0;
-        }
-        free(window_data_osx);
-        free(window_data);
-        return 0x0;
-    }
-
-#if defined(USE_METAL_API)
-    OSXViewDelegate *viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
-
-    MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
-    view.device = viewController->metal_device;
-    view.delegate = viewController;
-    view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [window_data_osx->window.contentView addSubview:view];
-
-    //[window_data->window updateSize];
-#endif
-
-    [window_data_osx->window setTitle:[NSString stringWithUTF8String:title]];
-    [window_data_osx->window setReleasedWhenClosed:NO];
-    [window_data_osx->window performSelectorOnMainThread:@selector(makeKeyAndOrderFront:) withObject:nil waitUntilDone:YES];
-    [window_data_osx->window setAcceptsMouseMovedEvents:YES];
-
-    [window_data_osx->window center];
-    window_data_osx->timer = mfb_timer_create();
-
-    [NSApp activateIgnoringOtherApps:YES];
-
-#if defined(USE_METAL_API)
-    [NSApp finishLaunching];
-#endif
-
-    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
-
-#if defined(USE_METAL_API)
-    NSLog(@"Window created using Metal API");
-#else
-    NSLog(@"Window created using Cocoa API");
-#endif
-
-    [pool drain];
-
-    return (struct mfb_window *) window_data;
+mfb_open(const char *title, unsigned width, unsigned height) {
+    return mfb_open_ex(title, width, height, 0);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//-------------------------------------
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    @autoreleasepool {
+        SWindowData *window_data = create_window_data(width, height);
+        if (window_data == 0x0) {
+            return 0x0;
+        }
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
 
+        init_keycodes();
+
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+        NSRect              rectangle, frameRect;
+        NSWindowStyleMask   styles = 0;
+
+        if (flags & WF_BORDERLESS) {
+            styles |= NSWindowStyleMaskBorderless;
+        }
+        else {
+            styles |= NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
+        }
+
+        if (flags & WF_RESIZABLE)
+            styles |= NSWindowStyleMaskResizable;
+
+        if (flags & WF_FULLSCREEN) {
+            styles = NSWindowStyleMaskFullScreen;
+            NSScreen *mainScreen = [NSScreen mainScreen];
+            NSRect screenRect = [mainScreen frame];
+            window_data->window_width  = screenRect.size.width;
+            window_data->window_height = screenRect.size.height;
+            rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+            frameRect = rectangle;
+        }
+        else if (flags & WF_FULLSCREEN_DESKTOP) {
+            NSScreen *mainScreen = [NSScreen mainScreen];
+            NSRect screenRect = [mainScreen visibleFrame];
+            window_data->window_width  = screenRect.size.width;
+            window_data->window_height = screenRect.size.height;
+            rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+            frameRect = rectangle;
+        }
+        else {
+            window_data->window_width  = width;
+            window_data->window_height = height;
+            rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
+            frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
+        }
+
+        window_data_osx->window = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO windowData:window_data];
+        if (!window_data_osx->window) {
+            NSLog(@"Cannot create window");
+            if(window_data->draw_buffer != 0x0) {
+                free(window_data->draw_buffer);
+                window_data->draw_buffer = 0x0;
+            }
+            free(window_data_osx);
+            free(window_data);
+            return 0x0;
+        }
+
+    #if defined(USE_METAL_API)
+        OSXViewDelegate *viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
+
+        MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
+        view.device = viewController->metal_device;
+        view.delegate = viewController;
+        view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        [window_data_osx->window.contentView addSubview:view];
+
+        //[window_data->window updateSize];
+    #endif
+
+        [window_data_osx->window setTitle:[NSString stringWithUTF8String:title]];
+        [window_data_osx->window setReleasedWhenClosed:NO];
+        [window_data_osx->window performSelectorOnMainThread:@selector(makeKeyAndOrderFront:) withObject:nil waitUntilDone:YES];
+        [window_data_osx->window setAcceptsMouseMovedEvents:YES];
+
+        [window_data_osx->window center];
+        window_data_osx->timer = mfb_timer_create();
+
+        [NSApp activateIgnoringOtherApps:YES];
+
+    #if defined(USE_METAL_API)
+        [NSApp finishLaunching];
+    #endif
+
+        mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
+
+    #if defined(USE_METAL_API)
+        NSLog(@"Window created using Metal API");
+    #else
+        NSLog(@"Window created using Cocoa API");
+    #endif
+
+        return (struct mfb_window *) window_data;
+    }
+}
+
+//-------------------------------------
 static void
 destroy_window_data(SWindowData *window_data) {
     if(window_data == 0x0)
         return;
 
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    @autoreleasepool {
+        SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
+        if(window_data_osx != 0x0) {
+            OSXWindow   *window = window_data_osx->window;
+            [window removeWindowData];
+            [window performClose:nil];
 
-    SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
-    if(window_data_osx != 0x0) {
-        OSXWindow   *window = window_data_osx->window;
-        [window removeWindowData];
-        [window performClose:nil];
+            mfb_timer_destroy(window_data_osx->timer);
 
-        mfb_timer_destroy(window_data_osx->timer);
-
-        memset(window_data_osx, 0, sizeof(SWindowData_OSX));
-        free(window_data_osx);
-    }
+            memset(window_data_osx, 0, sizeof(SWindowData_OSX));
+            free(window_data_osx);
+        }
 
 #if defined(USE_METAL_API)
-    if(window_data->draw_buffer != 0x0) {
-        free(window_data->draw_buffer);
-        window_data->draw_buffer = 0x0;
-    }
+        if(window_data->draw_buffer != 0x0) {
+            free(window_data->draw_buffer);
+            window_data->draw_buffer = 0x0;
+        }
 #endif
-    
-    memset(window_data, 0, sizeof(SWindowData));
-    free(window_data);
-
-    [pool drain];
+        
+        memset(window_data, 0, sizeof(SWindowData));
+        free(window_data);
+    }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static void
 update_events(SWindowData *window_data) {
     NSEvent* event;
 
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    do {
-        event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-        if (event) {
-            [NSApp sendEvent:event];
-        }
-    } while ((window_data->close == false) && event);
-
-    [pool release];
+    @autoreleasepool {
+        do {
+            event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+            if (event) {
+                [NSApp sendEvent:event];
+            }
+        } while ((window_data->close == false) && event);
+    }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 mfb_update_state
 mfb_update(struct mfb_window *window, void *buffer) {
     if(window == 0x0) {
@@ -254,8 +248,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     if(window == 0x0) {
@@ -280,8 +273,7 @@ mfb_update_events(struct mfb_window *window) {
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern double   g_time_for_frame;
 
 bool
@@ -289,7 +281,7 @@ mfb_wait_sync(struct mfb_window *window) {
     NSEvent* event;
 
     if(window == 0x0) {
-        return STATE_INVALID_WINDOW;
+        return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
@@ -298,46 +290,43 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    //NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-    if(window_data_osx == 0x0) {
-        return false;
-    }
-
-    double      current;
-    uint32_t    millis = 1;
-    while(1) {
-        event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-        if (event) {
-            [NSApp sendEvent:event];
-        }
-
-        if(window_data->close) {
-            destroy_window_data(window_data);
+    @autoreleasepool {
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+        if(window_data_osx == 0x0) {
             return false;
         }
 
-        current = mfb_timer_now(window_data_osx->timer);
-        if (current >= g_time_for_frame) {
-            mfb_timer_reset(window_data_osx->timer);
-            return true;
-        }
-        else if(current >= g_time_for_frame * 0.8) {
-            millis = 0;
-        }
+        double      current;
+        uint32_t    millis = 1;
+        while(1) {
+            event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+            if (event) {
+                [NSApp sendEvent:event];
+            }
 
-        usleep(millis * 1000);
-        //sched_yield();
+            if(window_data->close) {
+                destroy_window_data(window_data);
+                return false;
+            }
+
+            current = mfb_timer_now(window_data_osx->timer);
+            if (current >= g_time_for_frame) {
+                mfb_timer_reset(window_data_osx->timer);
+                return true;
+            }
+            else if(current >= g_time_for_frame * 0.8) {
+                millis = 0;
+            }
+
+            usleep(millis * 1000);
+            //sched_yield();
+        }
     }
-
-    //[pool release];
 
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     if(window == 0x0) {
@@ -382,8 +371,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern short int g_keycodes[512];
 
 void
@@ -508,8 +496,7 @@ init_keycodes() {
     g_keycodes[0x4E] = KB_KEY_KP_SUBTRACT;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
@@ -534,8 +521,10 @@ mfb_timer_tick() {
     return (high << 32) + highRem + low;
 }
 
+//-------------------------------------
 void
 mfb_timer_init() {
     g_timer_frequency  = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
+
