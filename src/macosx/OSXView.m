@@ -1,9 +1,9 @@
-#import "OSXWindowFrameView.h"
+#import "OSXView.h"
 #import "OSXWindow.h"
 #include <MiniFB_internal.h>
 
 //-------------------------------------
-@implementation OSXWindowFrameView
+@implementation OSXView
 
 #if defined(USE_METAL_API)
 

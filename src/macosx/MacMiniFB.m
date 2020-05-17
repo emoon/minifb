@@ -1,5 +1,5 @@
 #include "OSXWindow.h"
-#include "OSXWindowFrameView.h"
+#include "OSXView.h"
 #include "OSXViewController.h"
 #include "WindowData_OSX.h"
 #include <MiniFB.h>

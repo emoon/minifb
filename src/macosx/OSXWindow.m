@@ -1,5 +1,5 @@
 #import "OSXWindow.h"
-#import "OSXWindowFrameView.h"
+#import "OSXView.h"
 #include "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
@@ -28,7 +28,7 @@
         self.delegate = self;
         
         self->window_data = windowData;
-        OSXWindowFrameView *view = (OSXWindowFrameView *) self->childContentView.superview;
+        OSXView *view = (OSXView *) self->childContentView.superview;
         view->window_data = windowData;
     }
     return self;
@@ -38,7 +38,7 @@
 
 - (void) removeWindowData {
     self->window_data = 0x0;
-    OSXWindowFrameView *view = (OSXWindowFrameView *) self->childContentView.superview;
+    OSXView *view = (OSXView *) self->childContentView.superview;
     view->window_data = 0x0;
 }
 
@@ -60,7 +60,7 @@
     sizeDelta.width -= childBoundsSize.width;
     sizeDelta.height -= childBoundsSize.height;
     
-    OSXWindowFrameView *frameView = [super contentView];
+    OSXView *frameView = [super contentView];
     NSSize newFrameSize = [frameView bounds].size;
     newFrameSize.width += sizeDelta.width;
     newFrameSize.height += sizeDelta.height;
@@ -208,10 +208,10 @@
     NSRect bounds = [self frame];
     bounds.origin = NSZeroPoint;
 
-    OSXWindowFrameView *frameView = [super contentView];
+    OSXView *frameView = [super contentView];
     if (!frameView)
     {
-        frameView = [[[OSXWindowFrameView alloc] initWithFrame:bounds] autorelease];
+        frameView = [[[OSXView alloc] initWithFrame:bounds] autorelease];
         
         [super setContentView:frameView];
     }

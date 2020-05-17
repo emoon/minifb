@@ -2,7 +2,7 @@
 
 #include "WindowData.h"
 
-@interface OSXWindowFrameView : NSView
+@interface OSXView : NSView
 {
     @public SWindowData     *window_data;
 #if defined(USE_METAL_API)

@@ -36,8 +36,8 @@ set(SrcMacOSX
     src/macosx/MacMiniFB.m
     src/macosx/OSXWindow.h
     src/macosx/OSXWindow.m
-    src/macosx/OSXWindowFrameView.h
-    src/macosx/OSXWindowFrameView.m
+    src/macosx/OSXView.h
+    src/macosx/OSXView.m
     src/macosx/OSXViewController.h
     src/macosx/OSXViewController.m
     src/macosx/WindowData_OSX.h
