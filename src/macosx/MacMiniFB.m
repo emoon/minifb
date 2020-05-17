@@ -1,5 +1,6 @@
 #include "OSXWindow.h"
 #include "OSXWindowFrameView.h"
+#include "OSXViewController.h"
 #include "WindowData_OSX.h"
 #include <MiniFB.h>
 #include <MiniFB_enums.h>
@@ -14,102 +15,6 @@
 #include <mach/mach_time.h>
 
 void init_keycodes();
-
-//-------------------------------------
-#if defined(USE_METAL_API)
-
-id<MTLDevice>  g_metal_device = nil;
-id<MTLLibrary> g_library      = nil;
-
-//-------------------------------------
-#define kShader(inc, src)    @inc#src
-
-NSString *g_shader_src = kShader(
-    "#include <metal_stdlib>\n",
-    using namespace metal;
-
-    //---------------------
-    struct VertexOutput {
-        float4 pos [[position]];
-        float2 texcoord;
-    };
-
-    struct Vertex {
-        float4 position [[position]];
-    };
-
-    //---------------------
-    vertex VertexOutput
-    vertFunc(unsigned int vID[[vertex_id]], const device Vertex *pos [[ buffer(0) ]]) {
-        VertexOutput out;
-
-        out.pos = pos[vID].position;
-
-        out.texcoord.x = (float) (vID / 2);
-        out.texcoord.y = 1.0 - (float) (vID % 2);
-
-        return out;
-    }
-
-    //---------------------
-    fragment float4
-    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
-        constexpr sampler textureSampler(mag_filter::nearest, min_filter::nearest);
-
-        // Sample the texture to obtain a color
-        const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);
-
-        // We return the color of the texture
-        return float4(colorSample);
-    };
-);
-
-#endif
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#if defined(USE_METAL_API)
-static bool 
-create_shaders(SWindowData_OSX *window_data_osx) {
-    NSError *error = 0x0;
-
-    id<MTLLibrary> g_library = [g_metal_device newLibraryWithSource:g_shader_src 
-                                                            options:[[MTLCompileOptions alloc] init]
-                                                              error:&error
-    ];
-    if (error || !g_library) {
-        NSLog(@"Unable to create shaders %@", error); 
-        return false;
-    }
-
-    id<MTLFunction> vertex_shader_func   = [g_library newFunctionWithName:@"vertFunc"];
-    id<MTLFunction> fragment_shader_func = [g_library newFunctionWithName:@"fragFunc"];
-
-    if (!vertex_shader_func) {
-        NSLog(@"Unable to get vertFunc!\n");
-        return false;
-    }
-
-    if (!fragment_shader_func) {
-        NSLog(@"Unable to get fragFunc!\n");
-        return false;
-    }
-
-    // Create a reusable pipeline state
-    MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.label = @"MiniFB_pipeline";
-    pipelineStateDescriptor.vertexFunction = vertex_shader_func;
-    pipelineStateDescriptor.fragmentFunction = fragment_shader_func;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = 80; //bgra8Unorm;
-
-    window_data_osx->metal.pipeline_state = [g_metal_device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
-    if (!window_data_osx->metal.pipeline_state) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
-    }
-
-    return true;
-}
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -200,47 +105,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
 #if defined(USE_METAL_API)
-    g_metal_device = MTLCreateSystemDefaultDevice();
-    if (!g_metal_device) {
-        NSLog(@"Metal is not supported on this device");
-        return 0x0;
-    }
-
-    if (!create_shaders((SWindowData_OSX *) window_data->specific)) {
-        return 0x0;
-    }
-
-    static Vertex s_vertices[4] = {
-        {-1.0, -1.0, 0, 1},
-        {-1.0,  1.0, 0, 1},
-        { 1.0, -1.0, 0, 1},
-        { 1.0,  1.0, 0, 1},
-    };
-    memcpy(window_data_osx->metal.vertices, s_vertices, sizeof(s_vertices));
-
-    // Setup command queue
-    window_data_osx->metal.command_queue = [g_metal_device newCommandQueue];
-
-    WindowViewController* viewController = [WindowViewController new];
-
-    // Indicate that each pixel has a blue, green, red, and alpha channel, where each channel is
-    // an 8-bit unsigned normalized value (i.e. 0 maps to 0.0 and 255 maps to 1.0)
-    MTLTextureDescriptor    *td;
-    td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
-                                                            width:width
-                                                           height:height
-                                                        mipmapped:false];
-
-    // Create the texture from the device by using the descriptor
-    for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
-        viewController->texture_buffers[i] = [g_metal_device newTextureWithDescriptor:td];
-    }
-
-    // Used for syncing the CPU and GPU
-    viewController->semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
+    OSXViewController *viewController = [[OSXViewController alloc] initWithWindowData:window_data];
 
     MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
-    view.device = g_metal_device; 
+    view.device = viewController->metal_device; 
     view.delegate = viewController;
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window_data_osx->window.contentView addSubview:view];
