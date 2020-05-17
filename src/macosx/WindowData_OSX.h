@@ -16,12 +16,10 @@ typedef struct Vertex {
 typedef struct {
     OSXWindow           *window;
     struct mfb_timer    *timer;
-    
+
 #if defined(USE_METAL_API)
     struct {
-        id<MTLCommandQueue>         command_queue;
-        id<MTLRenderPipelineState>  pipeline_state; 
         Vertex                      vertices[4];
     } metal;
-#endif        
+#endif
 } SWindowData_OSX;

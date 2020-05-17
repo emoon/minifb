@@ -1,5 +1,6 @@
 #import "OSXView.h"
 #import "OSXWindow.h"
+#import "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 
 //-------------------------------------
@@ -22,13 +23,13 @@
     [self addTrackingArea:tracking_area];
 }
 
-#else 
+#else
 
 //-------------------------------------
 - (NSRect)resizeRect {
 	const CGFloat resizeBoxSize = 16.0;
 	const CGFloat contentViewPadding = 5.5;
-	
+
 	NSRect contentViewRect = [[self window] contentRectForFrameRect:[[self window] frame]];
 	NSRect resizeRect = NSMakeRect(
 		NSMaxX(contentViewRect) + contentViewPadding,
@@ -36,7 +37,7 @@
 		resizeBoxSize,
 		resizeBoxSize
     );
-	
+
 	return resizeRect;
 }
 
@@ -47,16 +48,16 @@
     if(window_data == 0x0)
         return;
 
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;    
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
 	if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
 		return;
 
 	CGContextRef context = [[NSGraphicsContext currentContext] graphicsPort];
 
 	CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-	CGDataProviderRef provider = CGDataProviderCreateWithData(0x0, window_data->draw_buffer, window_data->buffer_width * window_data->buffer_height * 4, 0x0); 
+	CGDataProviderRef provider = CGDataProviderCreateWithData(0x0, window_data->draw_buffer, window_data->buffer_width * window_data->buffer_height * 4, 0x0);
 
-	CGImageRef img = CGImageCreate(window_data->buffer_width, window_data->buffer_height, 8, 32, window_data->buffer_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little, 
+	CGImageRef img = CGImageCreate(window_data->buffer_width, window_data->buffer_height, 8, 32, window_data->buffer_width * 4, space, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little,
 								   provider, 0x0, false, kCGRenderingIntentDefault);
 
     const CGFloat components[] = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -69,7 +70,7 @@
         CGContextSetFillColorWithColor(context, black);
         CGContextFillRect(context, CGRectMake(0, 0, window_data->window_width, window_data->window_height));
     }
-    
+
 	CGContextDrawImage(context, CGRectMake(window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height), img);
 
 	CGImageRelease(img);

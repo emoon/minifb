@@ -11,7 +11,7 @@
 SWindowData *
 create_window_data(unsigned width, unsigned height) {
     SWindowData *window_data;
-    
+
     window_data = malloc(sizeof(SWindowData));
     if(window_data == 0x0) {
         NSLog(@"Cannot allocate window data");
@@ -48,7 +48,7 @@ create_window_data(unsigned width, unsigned height) {
         NSLog(@"Unable to create draw buffer");
         return 0x0;
     }
-    
+
     return window_data;
 }
 
@@ -67,20 +67,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     kUnused(title);
     kUnused(flags);
-    
+
     SWindowData *window_data = create_window_data(width, height);
     if (window_data == 0x0) {
         return 0x0;
     }
-    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
-    
-    static Vertex s_vertices[4] = {
-        {-1.0, -1.0, 0, 1},
-        {-1.0,  1.0, 0, 1},
-        { 1.0, -1.0, 0, 1},
-        { 1.0,  1.0, 0, 1},
-    };
-    memcpy(window_data_ios->vertices, s_vertices, sizeof(s_vertices));
 
     windows = [[UIApplication sharedApplication] windows];
     numWindows = [windows count];
@@ -94,7 +85,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
         NSLog(@"UIApplication has no window. We create one (%f, %f).", [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
     }
-    
+
     if([window.rootViewController isKindOfClass:[iOSViewController class]] == false) {
         iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
         [window setRootViewController:controller];
@@ -216,7 +207,7 @@ mfb_timer_tick() {
     if (timebase.denom == 0) {
         (void) mach_timebase_info(&timebase);
     }
-    
+
     uint64_t time = mach_absolute_time();
 
     //return (time * s_timebase_info.numer) / s_timebase_info.denom;
@@ -226,7 +217,7 @@ mfb_timer_tick() {
     uint64_t highRem = ((high % timebase.denom) << 32) / timebase.denom;
     uint64_t low     = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
     high /= timebase.denom;
-    
+
     return (high << 32) + highRem + low;
 }
 

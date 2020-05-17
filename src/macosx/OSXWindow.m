@@ -24,9 +24,9 @@
     {
         [self setOpaque:YES];
         [self setBackgroundColor:[NSColor clearColor]];
-        
+
         self.delegate = self;
-        
+
         self->window_data = windowData;
         OSXView *view = (OSXView *) self->childContentView.superview;
         view->window_data = windowData;
@@ -59,12 +59,12 @@
     NSSize childBoundsSize = [childContentView bounds].size;
     sizeDelta.width -= childBoundsSize.width;
     sizeDelta.height -= childBoundsSize.height;
-    
+
     OSXView *frameView = [super contentView];
     NSSize newFrameSize = [frameView bounds].size;
     newFrameSize.width += sizeDelta.width;
     newFrameSize.height += sizeDelta.height;
-    
+
     [super setContentSize:newFrameSize];
 }
 
@@ -164,7 +164,7 @@
 
     if(window_data != 0x0) {
         NSString    *characters;
-        NSUInteger  length;    
+        NSUInteger  length;
 
         if ([string isKindOfClass:[NSAttributedString class]])
             characters = [string string];
@@ -212,10 +212,10 @@
     if (!frameView)
     {
         frameView = [[[OSXView alloc] initWithFrame:bounds] autorelease];
-        
+
         [super setContentView:frameView];
     }
-    
+
     if (childContentView)
     {
         [childContentView removeFromSuperview];

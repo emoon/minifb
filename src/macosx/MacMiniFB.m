@@ -132,7 +132,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     OSXViewController *viewController = [[OSXViewController alloc] initWithWindowData:window_data];
 
     MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
-    view.device = viewController->metal_device; 
+    view.device = viewController->metal_device;
     view.delegate = viewController;
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window_data_osx->window.contentView addSubview:view];
@@ -169,13 +169,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void 
+static void
 destroy_window_data(SWindowData *window_data) {
     if(window_data == 0x0)
         return;
 
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    
+
     SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
     if(window_data_osx != 0x0) {
         OSXWindow   *window = window_data_osx->window;
@@ -201,7 +201,7 @@ destroy_window_data(SWindowData *window_data) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void 
+static void
 update_events(SWindowData *window_data) {
     NSEvent* event;
 
@@ -218,7 +218,7 @@ update_events(SWindowData *window_data) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_update_state 
+mfb_update_state
 mfb_update(struct mfb_window *window, void *buffer) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -254,7 +254,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_update_state 
+mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -310,7 +310,7 @@ mfb_wait_sync(struct mfb_window *window) {
         if (event) {
             [NSApp sendEvent:event];
         }
-        
+
         if(window_data->close) {
             destroy_window_data(window_data);
             return false;
@@ -324,7 +324,7 @@ mfb_wait_sync(struct mfb_window *window) {
         else if(current >= g_time_for_frame * 0.8) {
             millis = 0;
         }
-        
+
         usleep(millis * 1000);
         //sched_yield();
     }
@@ -336,7 +336,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool 
+bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     if(window == 0x0) {
         return false;
@@ -384,10 +384,10 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
 extern short int g_keycodes[512];
 
-void 
+void
 init_keycodes() {
     // Clear keys
-    for (unsigned int i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
+    for (unsigned int i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
         g_keycodes[i] = 0;
 
     g_keycodes[0x1D] = KB_KEY_0;
@@ -426,7 +426,7 @@ init_keycodes() {
     g_keycodes[0x07] = KB_KEY_X;
     g_keycodes[0x10] = KB_KEY_Y;
     g_keycodes[0x06] = KB_KEY_Z;
-    
+
     g_keycodes[0x27] = KB_KEY_APOSTROPHE;
     g_keycodes[0x2A] = KB_KEY_BACKSLASH;
     g_keycodes[0x2B] = KB_KEY_COMMA;
@@ -439,7 +439,7 @@ init_keycodes() {
     g_keycodes[0x29] = KB_KEY_SEMICOLON;
     g_keycodes[0x2C] = KB_KEY_SLASH;
     g_keycodes[0x0A] = KB_KEY_WORLD_1;
-    
+
     g_keycodes[0x33] = KB_KEY_BACKSPACE;
     g_keycodes[0x39] = KB_KEY_CAPS_LOCK;
     g_keycodes[0x75] = KB_KEY_DELETE;
@@ -486,7 +486,7 @@ init_keycodes() {
     g_keycodes[0x31] = KB_KEY_SPACE;
     g_keycodes[0x30] = KB_KEY_TAB;
     g_keycodes[0x7E] = KB_KEY_UP;
-    
+
     g_keycodes[0x52] = KB_KEY_KP_0;
     g_keycodes[0x53] = KB_KEY_KP_1;
     g_keycodes[0x54] = KB_KEY_KP_2;
@@ -511,14 +511,14 @@ init_keycodes() {
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
-uint64_t 
+uint64_t
 mfb_timer_tick() {
     static mach_timebase_info_data_t    timebase = { 0 };
 
     if (timebase.denom == 0) {
         (void) mach_timebase_info(&timebase);
     }
-    
+
     uint64_t time = mach_absolute_time();
 
     //return (time * s_timebase_info.numer) / s_timebase_info.denom;
@@ -528,11 +528,11 @@ mfb_timer_tick() {
     uint64_t highRem = ((high % timebase.denom) << 32) / timebase.denom;
     uint64_t low     = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
     high /= timebase.denom;
-    
+
     return (high << 32) + highRem + low;
 }
 
-void 
+void
 mfb_timer_init() {
     g_timer_frequency  = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
