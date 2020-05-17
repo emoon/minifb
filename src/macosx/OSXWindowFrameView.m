@@ -6,16 +6,7 @@
 #if defined(USE_METAL_API)
 #import <MetalKit/MetalKit.h>
 
-extern id<MTLDevice>  g_metal_device;
-extern id<MTLLibrary> g_library;
-
 @implementation WindowViewController
-
-- (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
-	(void)view;
-	(void)size;
-    // resize
-}
 
 - (void) drawInMTKView:(nonnull MTKView *)view {
     OSXWindow   *window      = (OSXWindow *) view.window;
@@ -84,6 +75,13 @@ extern id<MTLLibrary> g_library;
     // Finalize rendering here & push the command buffer to the GPU
     [commandBuffer commit];
 }
+
+- (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
+	(void)view;
+	(void)size;
+    // resize
+}
+
 @end
 #endif
 

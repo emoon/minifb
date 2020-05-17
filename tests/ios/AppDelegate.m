@@ -17,6 +17,7 @@ struct mfb_window   *g_window = 0x0;
 uint32_t            *g_buffer = 0x0;
 uint32_t            g_width   = 0;
 uint32_t            g_height  = 0;
+float               g_scale   = 1;
 
 //-------------------------------------
 @interface AppDelegate ()
@@ -37,6 +38,14 @@ mouse_move(struct mfb_window *window, int x, int y) {
     NSLog(@"Touch moved %d, %d", x, y);
 }
 
+void
+resize(struct mfb_window *window, int width, int height) {
+    kUnused(window);
+    g_width  = width;
+    g_height = height;
+    NSLog(@"Resize %d, %d", width, height);
+}
+
 //-------------------------------------
 @implementation AppDelegate
 
@@ -44,18 +53,24 @@ mouse_move(struct mfb_window *window, int x, int y) {
 - (void) OnUpdateFrame {
     static int seed = 0xbeef;
     int noise, carry;
+    int dis = 0;
 
     if(g_buffer != 0x0) {
-        for (uint32_t i = 0; i < g_width * g_height; ++i) {
-            noise = seed;
-            noise >>= 3;
-            noise ^= seed;
-            carry = noise & 1;
-            noise >>= 1;
-            seed >>= 1;
-            seed |= (carry << 30);
-            noise &= 0xFF;
-            g_buffer[i] = MFB_RGB(noise, noise, noise);
+        uint32_t i = 0;
+        for (uint32_t y = 0; y < g_height; ++y) {
+            for (uint32_t x = 0; x < g_width; ++x) {
+                noise = seed;
+                noise >>= 3;
+                noise ^= seed;
+                carry = noise & 1;
+                noise >>= 1;
+                seed >>= 1;
+                seed |= (carry << 30);
+                noise &= 0xFF >> dis;
+                g_buffer[i++] = MFB_RGB(noise, noise, noise);
+            }
+            if((y & 0x07) == 0x07)
+                dis ^= 0x01;
         }
     }
     
@@ -75,13 +90,15 @@ mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(launchOptions);
     
     if(g_window == 0x0) {
-        g_width  = [UIScreen mainScreen].bounds.size.width;
-        g_height = [UIScreen mainScreen].bounds.size.height;
+        g_scale  = [UIScreen mainScreen].scale;
+        g_width  = [UIScreen mainScreen].bounds.size.width  * g_scale;
+        g_height = [UIScreen mainScreen].bounds.size.height * g_scale;
         g_window = mfb_open("noise", g_width, g_height);
         if(g_window != 0x0) {
             g_buffer = malloc(g_width * g_height * 4);
             mfb_set_mouse_move_callback(g_window, mouse_move);
             mfb_set_mouse_button_callback(g_window, mouse_btn);
+            mfb_set_resize_callback(g_window, resize);
         }
     }
 

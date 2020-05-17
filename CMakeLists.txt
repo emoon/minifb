@@ -44,6 +44,8 @@ set(SrcMacOSX
 set(SrcIOS
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
+    src/ios/iOSView.h
+    src/ios/iOSView.m
     src/ios/iOSViewController.h
     src/ios/iOSViewController.m
     src/ios/iOSViewDelegate.h

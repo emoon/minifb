@@ -120,18 +120,24 @@ mfb_open(const char *title, unsigned width, unsigned height) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct mfb_window *
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-
-    init_keycodes();
-
+SWindowData *
+create_window_data(unsigned width, unsigned height) {
     SWindowData *window_data = malloc(sizeof(SWindowData));
+    if(window_data == 0x0) {
+        NSLog(@"Cannot allocate window data");
+        return 0x0;
+    }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_OSX *window_data_osx = malloc(sizeof(SWindowData_OSX));
+    if(window_data_osx == 0x0) {
+        free(window_data);
+        NSLog(@"Cannot allocate osx window data");
+        return 0x0;
+    }
     memset(window_data_osx, 0, sizeof(SWindowData_OSX));
-    window_data->specific = window_data_osx;
+
+    window_data->specific      = window_data_osx;
 
     window_data->window_width  = width;
     window_data->window_height = height;
@@ -143,20 +149,33 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
 
-    [NSApplication sharedApplication];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-
 #if defined(USE_METAL_API)
-    g_metal_device = MTLCreateSystemDefaultDevice();
-    if (!g_metal_device) {
-        NSLog(@"Metal is not supported on this device");
-        return 0x0;
-    }
-
-    if (!create_shaders((SWindowData_OSX *) window_data->specific)) {
+    window_data->draw_buffer = malloc(width * height * 4);
+    if (!window_data->draw_buffer) {
+        free(window_data_osx);
+        free(window_data);
+        NSLog(@"Unable to create draw buffer");
         return 0x0;
     }
 #endif
+
+    return window_data;
+}
+
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+
+    SWindowData *window_data = create_window_data(width, height);
+    if (window_data == 0x0) {
+        return 0x0;
+    }
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+
+    init_keycodes();
+
+    [NSApplication sharedApplication];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
     NSWindowStyleMask styles =  NSWindowStyleMaskClosable | NSWindowStyleMaskTitled;
 
@@ -169,14 +188,27 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     NSRect rectangle = NSMakeRect(0, 0, width, height);
     NSRect frameRect = [NSWindow frameRectForContentRect:rectangle styleMask:styles];
     window_data_osx->window = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO windowData:window_data];
-    if (!window_data_osx->window)
+    if (!window_data_osx->window) {
+        NSLog(@"Cannot create window");
+        if(window_data->draw_buffer != 0x0) {
+            free(window_data->draw_buffer);
+            window_data->draw_buffer = 0x0;
+        }
+        free(window_data_osx);
+        free(window_data);
         return 0x0;
+    }
 
 #if defined(USE_METAL_API)
-    window_data->draw_buffer = malloc(width * height * 4);
-
-    if (!window_data->draw_buffer)
+    g_metal_device = MTLCreateSystemDefaultDevice();
+    if (!g_metal_device) {
+        NSLog(@"Metal is not supported on this device");
         return 0x0;
+    }
+
+    if (!create_shaders((SWindowData_OSX *) window_data->specific)) {
+        return 0x0;
+    }
 
     static Vertex s_vertices[4] = {
         {-1.0, -1.0, 0, 1},
@@ -263,6 +295,12 @@ destroy_window_data(SWindowData *window_data) {
         memset(window_data_osx, 0, sizeof(SWindowData_OSX));
         free(window_data_osx);
     }
+
+    if(window_data->draw_buffer != 0x0) {
+        free(window_data->draw_buffer);
+        window_data->draw_buffer = 0x0;
+    }
+
     memset(window_data, 0, sizeof(SWindowData));
     free(window_data);
 

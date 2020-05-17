@@ -223,6 +223,7 @@ bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_
 
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
 
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);

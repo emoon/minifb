@@ -13,14 +13,26 @@ create_window_data(unsigned width, unsigned height) {
     SWindowData *window_data;
     
     window_data = malloc(sizeof(SWindowData));
+    if(window_data == 0x0) {
+        NSLog(@"Cannot allocate window data");
+        return 0x0;
+    }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_IOS *window_data_ios = malloc(sizeof(SWindowData_IOS));
+    if(window_data_ios == 0x0) {
+        free(window_data);
+        NSLog(@"Cannot allocate ios window data");
+        return 0x0;
+    }
     memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
-    window_data->specific = window_data_ios;
 
-    window_data->window_width  = [UIScreen mainScreen].bounds.size.width;
-    window_data->window_height = [UIScreen mainScreen].bounds.size.height;
+    float scale = [UIScreen mainScreen].scale;
+
+    window_data->specific      = window_data_ios;
+
+    window_data->window_width  = [UIScreen mainScreen].bounds.size.width  * scale;
+    window_data->window_height = [UIScreen mainScreen].bounds.size.height * scale;
 
     window_data->dst_width     = width;
     window_data->dst_height    = height;
@@ -29,8 +41,10 @@ create_window_data(unsigned width, unsigned height) {
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
 
-    window_data->draw_buffer = malloc(width * height * 4);
+    window_data->draw_buffer   = malloc(width * height * 4);
     if (!window_data->draw_buffer) {
+        free(window_data);
+        free(window_data_ios);
         NSLog(@"Unable to create draw buffer");
         return 0x0;
     }
@@ -47,6 +61,10 @@ mfb_open(const char *title, unsigned width, unsigned height) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    UIWindow    *window;
+    NSArray     *windows;
+    size_t      numWindows;
+
     kUnused(title);
     kUnused(flags);
     
@@ -54,10 +72,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (window_data == 0x0) {
         return 0x0;
     }
-
-    UIWindow    *window;
-    NSArray     *windows;
-    size_t      numWindows;
+    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
+    
+    static Vertex s_vertices[4] = {
+        {-1.0, -1.0, 0, 1},
+        {-1.0,  1.0, 0, 1},
+        { 1.0, -1.0, 0, 1},
+        { 1.0,  1.0, 0, 1},
+    };
+    memcpy(window_data_ios->vertices, s_vertices, sizeof(s_vertices));
 
     windows = [[UIApplication sharedApplication] windows];
     numWindows = [windows count];
@@ -130,6 +153,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
+    kUnused(window);
     return STATE_OK;
 }
 
@@ -138,12 +162,11 @@ extern double   g_time_for_frame;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
+    kUnused(window);
     return true;
 }
 
 //-------------------------------------
-extern Vertex g_vertices[4];
-
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
@@ -165,17 +188,19 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
     float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
 
-    g_vertices[0].x = x1;
-    g_vertices[0].y = y1;
+    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
 
-    g_vertices[1].x = x1;
-    g_vertices[1].y = y2;
+    window_data_ios->vertices[0].x = x1;
+    window_data_ios->vertices[0].y = y1;
 
-    g_vertices[2].x = x2;
-    g_vertices[2].y = y1;
+    window_data_ios->vertices[1].x = x1;
+    window_data_ios->vertices[1].y = y2;
 
-    g_vertices[3].x = x2;
-    g_vertices[3].y = y2;
+    window_data_ios->vertices[2].x = x2;
+    window_data_ios->vertices[2].y = y1;
+
+    window_data_ios->vertices[3].x = x2;
+    window_data_ios->vertices[3].y = y2;
 
     return true;
 }

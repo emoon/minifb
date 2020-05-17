@@ -9,6 +9,5 @@ typedef struct Vertex {
 } Vertex;
 
 typedef struct {
-    id<MTLCommandQueue>         command_queue;
-    id<MTLRenderPipelineState>  pipeline_state;
+    Vertex                      vertices[4];
 } SWindowData_IOS;

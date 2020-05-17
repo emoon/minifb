@@ -13,6 +13,7 @@
 #include "WindowData_IOS.h"
 #include <MiniFB.h>
 #include <MiniFB_ios.h>
+#include <MiniFB_internal.h>
 
 //-------------------------------------
 #define kShader(inc, src)    @inc#src
@@ -22,14 +23,6 @@ enum { MaxBuffersInFlight = 3 };    // Number of textures in flight (tripple buf
 
 id<MTLDevice>  g_metal_device = nil;
 id<MTLLibrary> g_library      = nil;
-
-//--
-Vertex g_vertices[4] = {
-    {-1.0, -1.0, 0, 1},
-    {-1.0,  1.0, 0, 1},
-    { 1.0, -1.0, 0, 1},
-    { 1.0,  1.0, 0, 1},
-};
 
 //--
 NSString *g_shader_src = kShader(
@@ -87,14 +80,15 @@ NSString *g_shader_src = kShader(
 -(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData {
     self = [super init];
     if (self) {
-        self->window_data = windowData;
-
-        g_metal_device = view.device;
+        self->window_data     = windowData;
+        self->window_data_ios = (SWindowData_IOS *) windowData->specific;
 
         view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
-        view.sampleCount = 1;
+        view.sampleCount      = 1;
 
-        m_semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
+        g_metal_device        = view.device;
+
+        m_semaphore     = dispatch_semaphore_create(MaxBuffersInFlight);
         m_command_queue = [g_metal_device newCommandQueue];
 
         [self _createShaders];
@@ -157,8 +151,7 @@ NSString *g_shader_src = kShader(
 }
 
 //-------------------------------------
-- (void) drawInMTKView:(nonnull MTKView *) view
-{
+- (void) drawInMTKView:(nonnull MTKView *) view {
     // Per frame updates here
     dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);
 
@@ -189,7 +182,7 @@ NSString *g_shader_src = kShader(
 
         // Set render command encoder state
         [renderEncoder setRenderPipelineState:m_pipeline_state];
-        [renderEncoder setVertexBytes:g_vertices length:sizeof(g_vertices) atIndex:0];
+        [renderEncoder setVertexBytes:window_data_ios->vertices length:sizeof(window_data_ios->vertices) atIndex:0];
 
         //[renderEncoder setFragmentTexture:m_texture_buffers[m_current_buffer] atIndex:0];
         [renderEncoder setFragmentTexture:m_texture_buffer atIndex:0];
@@ -211,6 +204,10 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
     // Respond to drawable size or orientation changes here
+    window_data->window_width  = size.width;
+    window_data->window_height = size.height;
+
+    kCall(resize_func, size.width, size.height);
 }
 
 @end
