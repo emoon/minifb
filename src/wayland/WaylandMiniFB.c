@@ -19,6 +19,8 @@
 
 #include <sys/mman.h>
 
+void init_keycodes();
+
 static void 
 destroy_window_data(SWindowData *window_data) 
 {

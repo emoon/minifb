@@ -15,6 +15,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void init_keycodes(SWindowData_X11 *window_data_x11);
+
 extern void 
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
               uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);

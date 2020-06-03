@@ -11,6 +11,8 @@ long    s_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void init_keycodes();
+
 uint32_t translate_mod();
 mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
 void     destroy_window_data(SWindowData *window_data);

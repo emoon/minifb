@@ -15,6 +15,7 @@
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
 
+//-------------------------------------
 void init_keycodes();
 
 //-------------------------------------
