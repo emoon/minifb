@@ -273,6 +273,14 @@ processEvent(SWindowData *window_data, XEvent *event) {
             window_data->dst_height   = window_data->window_height;
 
             SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+            if(window_data_x11->image_scaler != 0x0) {
+                window_data_x11->image_scaler->data = 0x0;
+                XDestroyImage(window_data_x11->image_scaler);
+                window_data_x11->image_scaler        = 0x0;
+                window_data_x11->image_scaler_width  = 0;
+                window_data_x11->image_scaler_height = 0;
+            }
+                
             XClearWindow(window_data_x11->display, window_data_x11->window);
             kCall(resize_func, window_data->window_width, window_data->window_height);
         }
@@ -354,7 +362,8 @@ mfb_update(struct mfb_window *window, void *buffer) {
     }
 
     if (window_data_x11->image_scaler != 0x0) {
-        stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
+        stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width, 
+                      (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
         window_data_x11->image_scaler->data = (char *) window_data_x11->image_buffer;
         XPutImage(window_data_x11->display, window_data_x11->window, window_data_x11->gc, window_data_x11->image_scaler, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     }
