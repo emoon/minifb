@@ -265,12 +265,10 @@ processEvent(SWindowData *window_data, XEvent *event) {
 
         case ConfigureNotify: 
         {
-            window_data->window_width  = event->xconfigure.width;
-            window_data->window_height = event->xconfigure.height;
             window_data->dst_offset_x = 0;
             window_data->dst_offset_y = 0;
-            window_data->dst_width    = window_data->window_width;
-            window_data->dst_height   = window_data->window_height;
+            window_data->dst_width    = event->xconfigure.width;
+            window_data->dst_height   = event->xconfigure.height;
 
             SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
             if(window_data_x11->image_scaler != 0x0) {
@@ -750,8 +748,6 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     window_data->dst_offset_x = offset_x;
     window_data->dst_offset_y = offset_y;
-    window_data->dst_width    = width;
-    window_data->dst_height   = height;
     
     return true;
 }
