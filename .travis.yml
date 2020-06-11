@@ -1,0 +1,72 @@
+language: cpp
+
+jobs:
+  include:
+    - os: linux
+      dist: bionic
+      name: "Linux X11"
+      addons:
+          apt:
+              packages:
+                  - libx11-dev
+
+    - os: linux
+      dist: bionic
+      name: "Linux Wayland"
+      addons:
+          apt:
+              packages:
+                  - libwayland-dev
+      env:
+        - USE_WAYLAND=ON
+
+    - os: osx
+      name: "MacOS X Cocoa"
+
+    - os: osx
+      name: "MacOS X Metal"
+      env:
+        - USE_METAL_API=ON
+
+    - os: osx
+      name: "MacOS iOS"
+      env:
+        - USE_IOS=ON
+
+    - os: windows
+      name: "Windows Visual Studio"
+      env:
+        - USE_WINDOWS=ON
+
+script:
+  - mkdir build
+  - cd build
+  - echo off
+  - echo "---------"
+  - echo "Config..."
+  - echo "---------"
+  - if [ $TRAVIS_OS_NAME = 'osx' ]; then
+      if test -n "${USE_IOS}"; then
+        cmake .. -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ;
+      elif test -n "${USE_METAL_API}"; then
+        cmake .. -USE_METAL_API=ON;
+      else
+        cmake ..;
+      fi
+    elif [ $TRAVIS_OS_NAME = 'linux' ]; then
+      if test -n "${USE_WAYLAND}"; then
+        cmake .. -DUSE_WAYLAND=ON;
+      else
+        cmake ..;
+      fi
+    else
+      cmake ..;
+    fi
+  - echo "--------"
+  - echo "Build..."
+  - echo "--------"
+  - if test -n "${USE_IOS}"; then
+      cmake --build . --target minifb ;
+    else
+      cmake --build . ;
+    fi
