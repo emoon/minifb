@@ -84,6 +84,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Code generation options
+#--------------------------------------
+option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
+
 # Set GCC/Clang flags
 #--------------------------------------
 if (NOT MSVC)
@@ -194,38 +198,41 @@ link_libraries(minifb)
 
 # Examples
 #--------------------------------------
-if(NOT IOS)
+if (MINIFB_BUILD_EXAMPLES)
+    if(NOT IOS)
 
-    add_executable(noise 
-        tests/noise.c
-    )
+        add_executable(noise
+            tests/noise.c
+        )
 
-    add_executable(input_events 
-        tests/input_events.c
-    )
+        add_executable(input_events
+            tests/input_events.c
+        )
 
-    add_executable(input_events_cpp
-        tests/input_events_cpp.cpp
-    )
+        add_executable(input_events_cpp
+            tests/input_events_cpp.cpp
+        )
 
-    add_executable(multiple_windows
-        tests/multiple_windows.c
-    )
-    
-else()
+        add_executable(multiple_windows
+            tests/multiple_windows.c
+        )
 
-    add_executable(noise 
-        tests/ios/main.m
-        tests/ios/AppDelegate.h
-        tests/ios/AppDelegate.m
-    )
+    else()
 
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
+        add_executable(noise
+            tests/ios/main.m
+            tests/ios/AppDelegate.h
+            tests/ios/AppDelegate.m
+        )
 
-    target_include_directories(noise PRIVATE src)
-    target_include_directories(noise PRIVATE src/ios)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
-    add_definitions(-DTVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+        target_include_directories(noise PRIVATE src)
+        target_include_directories(noise PRIVATE src/ios)
+
+        add_definitions(-DTVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+
+    endif()
 
 endif()
 
