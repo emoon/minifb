@@ -178,8 +178,17 @@ destroy_window_data(SWindowData *window_data) {
         SWindowData_OSX   *window_data_osx = (SWindowData_OSX *) window_data->specific;
         if(window_data_osx != 0x0) {
             OSXWindow   *window = window_data_osx->window;
-            [window removeWindowData];
             [window performClose:nil];
+            
+            // Flush events!
+            NSEvent* event;
+            do {
+                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+                }
+            } while (event);
+            [window removeWindowData];
 
             mfb_timer_destroy(window_data_osx->timer);
 
