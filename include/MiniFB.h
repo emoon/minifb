@@ -23,6 +23,8 @@ struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned heig
 // Also updates the window events
 mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
 
+mfb_update_state    mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height);
+
 // Only updates the window events
 mfb_update_state    mfb_update_events(struct mfb_window *window);
 

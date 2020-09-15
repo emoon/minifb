@@ -375,13 +375,26 @@ mfb_open(const char *title, unsigned width, unsigned height) {
 
 mfb_update_state 
 mfb_update(struct mfb_window *window, void *buffer) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+
+    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+mfb_update_state
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     MSG msg;
     
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
 
-    SWindowData *window_data = (SWindowData *)window;
+    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -391,9 +404,13 @@ mfb_update(struct mfb_window *window, void *buffer) {
         return STATE_INVALID_BUFFER;
     }
 
-    window_data->draw_buffer = buffer;
+    window_data->draw_buffer   = buffer;
+    window_data->buffer_width  = width;
+    window_data->buffer_height = height;
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+    window_data_win->bitmapInfo->bmiHeader.biWidth = window_data->buffer_width;
+    window_data_win->bitmapInfo->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
     InvalidateRect(window_data_win->window, 0x0, TRUE);
     SendMessage(window_data_win->window, WM_PAINT, 0, 0);
 
@@ -692,7 +709,7 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 
 bool 
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-    SWindowData     *window_data     = (SWindowData *) window;
+    SWindowData *window_data = (SWindowData *) window;
 
     if (offset_x + width > window_data->window_width) {
         return false;

@@ -1,25 +1,38 @@
 #include <MiniFB.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 
-#define WIDTH      800
-#define HEIGHT     600
-static unsigned int g_buffer[WIDTH * HEIGHT];
+static uint32_t  g_width  = 800;
+static uint32_t  g_height = 600;
+static uint32_t *g_buffer = 0x0;
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void 
+resize(struct mfb_window *window, int width, int height) {
+    g_width  = width;
+    g_height = height;
+    g_buffer = realloc(g_buffer, g_width * g_height * 4);
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int 
 main()
 {
-    int i, noise, carry, seed = 0xbeef;
+    uint32_t    i, noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("Noise Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, WF_RESIZABLE);
     if (!window)
         return 0;
 
+    g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
+    mfb_set_resize_callback(window, resize);
+
     mfb_update_state state;
     do {
-        for (i = 0; i < WIDTH * HEIGHT; ++i) {
+        for (i = 0; i < g_width * g_height; ++i) {
             noise = seed;
             noise >>= 3;
             noise ^= seed;
@@ -31,7 +44,7 @@ main()
             g_buffer[i] = MFB_RGB(noise, noise, noise); 
         }
 
-        state = mfb_update(window, g_buffer);
+        state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != STATE_OK) {
             window = 0x0;
             break;
