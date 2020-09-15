@@ -131,11 +131,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
 
     #if defined(USE_METAL_API)
-        OSXViewDelegate *viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
+        window_data_osx->viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
 
         MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
-        view.device = viewController->metal_device;
-        view.delegate = viewController;
+        view.device   = window_data_osx->viewController->metal_device;
+        view.delegate = window_data_osx->viewController;
         view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         [window_data_osx->window.contentView addSubview:view];
 
@@ -229,6 +229,16 @@ mfb_update(struct mfb_window *window, void *buffer) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
+    SWindowData *window_data = (SWindowData *) window;
+    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+}
+
+//-------------------------------------
+mfb_update_state
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+    if(window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
@@ -240,8 +250,19 @@ mfb_update(struct mfb_window *window, void *buffer) {
         return STATE_INVALID_BUFFER;
     }
 
+    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+
 #if defined(USE_METAL_API)
-    memcpy(window_data->draw_buffer, buffer, window_data->buffer_width * window_data->buffer_height * 4);
+    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+        window_data->buffer_width  = width;
+        window_data->buffer_stride = width * 4;
+        window_data->buffer_height = height;
+        window_data->draw_buffer   = realloc(window_data->draw_buffer, window_data->buffer_stride * window_data->buffer_height);
+
+        [window_data_osx->viewController resizeTextures];
+    }
+    
+    memcpy(window_data->draw_buffer, buffer, window_data->buffer_stride * window_data->buffer_height);
 #else
     window_data->draw_buffer = buffer;
 #endif
@@ -252,7 +273,6 @@ mfb_update(struct mfb_window *window, void *buffer) {
         return STATE_EXIT;
     }
 
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
     [[window_data_osx->window contentView] setNeedsDisplay:YES];
 
     return STATE_OK;

@@ -28,6 +28,7 @@ enum { MaxBuffersInFlight = 3 };
 }
 
 - (id) initWithWindowData:(SWindowData *) windowData;
+- (void) resizeTextures;
 
 @end
 

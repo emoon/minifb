@@ -8,6 +8,7 @@
 #endif
 
 @class OSXWindow;
+@class OSXViewDelegate;
 
 typedef struct Vertex {
     float x, y, z, w;
@@ -15,6 +16,7 @@ typedef struct Vertex {
 
 typedef struct {
     OSXWindow           *window;
+    OSXViewDelegate     *viewController;
     struct mfb_timer    *timer;
 
 #if defined(USE_METAL_API)
