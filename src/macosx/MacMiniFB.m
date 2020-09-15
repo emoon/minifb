@@ -264,6 +264,20 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     
     memcpy(window_data->draw_buffer, buffer, window_data->buffer_stride * window_data->buffer_height);
 #else
+    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+        float deltaX = (float) width  / (float) window_data->buffer_width;
+        float deltaY = (float) height / (float) window_data->buffer_height;
+        
+        window_data->dst_offset_x *= deltaX;
+        window_data->dst_offset_y *= deltaY;
+        window_data->dst_width    *= deltaX;
+        window_data->dst_height   *= deltaY;
+
+        window_data->buffer_width  = width;
+        window_data->buffer_stride = width * 4;
+        window_data->buffer_height = height;
+    }
+    
     window_data->draw_buffer = buffer;
 #endif
 
