@@ -329,6 +329,18 @@ mfb_update(struct mfb_window *window, void *buffer) {
     }
 
     SWindowData *window_data = (SWindowData *) window;
+    mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+mfb_update_state 
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -339,6 +351,20 @@ mfb_update(struct mfb_window *window, void *buffer) {
     }
 
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+
+    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+        float deltaX = (float) width  / (float) window_data->buffer_width;
+        float deltaY = (float) height / (float) window_data->buffer_height;
+        
+        window_data->dst_offset_x *= deltaX;
+        window_data->dst_offset_y *= deltaY;
+        window_data->dst_width    *= deltaX;
+        window_data->dst_height   *= deltaY;
+
+        window_data->buffer_width  = width;
+        window_data->buffer_stride = width * 4;
+        window_data->buffer_height = height;
+    }
 
     if (window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
         if (window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
