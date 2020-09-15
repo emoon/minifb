@@ -406,6 +406,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     window_data->draw_buffer   = buffer;
     window_data->buffer_width  = width;
+    window_data->buffer_stride = width * 4;
     window_data->buffer_height = height;
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
