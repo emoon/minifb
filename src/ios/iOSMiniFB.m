@@ -130,7 +130,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
 }
 
 //-------------------------------------
