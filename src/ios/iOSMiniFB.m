@@ -123,8 +123,19 @@ destroy_window_data(SWindowData *window_data) {
 }
 
 //-------------------------------------
-mfb_update_state
+mfb_update_state 
 mfb_update(struct mfb_window *window, void *buffer) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+}
+
+//-------------------------------------
+mfb_update_state
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     if(window == 0x0) {
         return STATE_INVALID_WINDOW;
     }

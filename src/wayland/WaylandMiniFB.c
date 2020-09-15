@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <linux/limits.h>
 #include <linux/input.h>
 #include <linux/input-event-codes.h>
 
@@ -703,8 +704,22 @@ wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 mfb_update_state 
-mfb_update(struct mfb_window *window, void *buffer)
+mfb_update(struct mfb_window *window, void *buffer) {
+    if (window == 0x0) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+mfb_update_state 
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height)
 {
     uint32_t done = 0;
 
@@ -726,6 +741,9 @@ mfb_update(struct mfb_window *window, void *buffer)
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
         return STATE_INTERNAL_ERROR;
 
+    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+    }
+    
     // update shm buffer
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
