@@ -76,6 +76,7 @@ destroy(SWindowData *window_data)
     wl_display_disconnect(window_data_way->display);
 
     destroy_window_data(window_data);
+    close(window_data_way->fd);
 }
 
 // This event provides a file descriptor to the client which can be memory-mapped 
@@ -562,17 +563,13 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct mfb_window * 
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    // TODO: Not yet
-    kUnused(flags);
-    return mfb_open(title, width, height);
+mfb_open(const char *title, unsigned width, unsigned height) {
+    return mfb_open_ex(title, width, height, 0);
 }
 
 struct mfb_window * 
-mfb_open(const char *title, unsigned width, unsigned height)
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
-    int fd = -1;
-
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     if(window_data == 0x0) {
         return 0x0;
@@ -617,17 +614,17 @@ mfb_open(const char *title, unsigned width, unsigned height)
     if (ret >= sizeof(shmfile))
         goto out;
 
-    fd = mkstemp(shmfile);
-    if (fd == -1)
+    window_data_way->fd = mkstemp(shmfile);
+    if (window_data_way->fd == -1)
         goto out;
     unlink(shmfile);
 
     uint32_t length = sizeof(uint32_t) * width * height;
 
-    if (ftruncate(fd, length) == -1)
+    if (ftruncate(window_data_way->fd, length) == -1)
         goto out;
 
-    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, fd, 0);
+    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
     if (window_data_way->shm_ptr == MAP_FAILED)
         goto out;
 
@@ -641,13 +638,10 @@ mfb_open(const char *title, unsigned width, unsigned height)
     window_data->dst_width     = width;
     window_data->dst_height    = height;
 
-    window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, fd, length);
+    window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
-
-    close(fd);
-    fd = -1;
 
     window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
     if (!window_data_way->surface)
@@ -680,7 +674,7 @@ mfb_open(const char *title, unsigned width, unsigned height)
     return (struct mfb_window *) window_data;
 
 out:
-    close(fd);
+    close(window_data_way->fd);
     destroy(window_data);
     return 0x0;
 }
@@ -742,6 +736,38 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_INTERNAL_ERROR;
 
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
+        uint32_t oldLength = sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height;
+        uint32_t length    = sizeof(uint32_t) * width * height;
+
+        // For some reason it crash when you make it smaller
+        if(oldLength < length) {
+            if (ftruncate(window_data_way->fd, length) == -1)
+                return STATE_INTERNAL_ERROR;
+
+            //munmap(window_data_way->shm_ptr, sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height);
+            window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+            if (window_data_way->shm_ptr == MAP_FAILED)
+                return STATE_INTERNAL_ERROR;
+
+            wl_shm_pool_resize(window_data_way->shm_pool, length);
+        }
+
+        window_data->buffer_width  = width;
+        window_data->buffer_height = height;
+        window_data->buffer_stride = width * sizeof(uint32_t);
+
+        float deltaX = (float) width  / (float) window_data->buffer_width;
+        float deltaY = (float) height / (float) window_data->buffer_height;
+        
+        window_data->dst_offset_x *= deltaX;
+        window_data->dst_offset_y *= deltaY;
+        window_data->dst_width    *= deltaX;
+        window_data->dst_height   *= deltaY;
+
+        wl_buffer_destroy(window_data->draw_buffer);
+        window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
+                                        window_data->buffer_width, window_data->buffer_height,
+                                        window_data->buffer_stride, window_data_way->shm_format);
     }
     
     // update shm buffer

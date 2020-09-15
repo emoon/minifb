@@ -40,5 +40,7 @@ typedef struct
     uint32_t                shm_format;
     uint32_t                *shm_ptr;
 
+    int                     fd;
+    
     struct mfb_timer        *timer;
 } SWindowData_Way;
