@@ -17,7 +17,7 @@
 @implementation iOSViewController
 {
     iOSView         *metal_view;
-    iOSViewDelegate *view_delegate;
+    //iOSViewDelegate *view_delegate;
 }
 
 //-------------------------------------
@@ -60,10 +60,11 @@
         return;
     }
 
-    view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
-    [view_delegate mtkView:metal_view drawableSizeWillChange:metal_view.bounds.size];
+    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
+    window_data_ios->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
+    [window_data_ios->view_delegate mtkView:metal_view drawableSizeWillChange:metal_view.bounds.size];
 
-    metal_view.delegate = view_delegate;
+    metal_view.delegate = window_data_ios->view_delegate;
 }
 
 @end

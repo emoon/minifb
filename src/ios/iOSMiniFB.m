@@ -150,6 +150,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_INVALID_BUFFER;
     }
 
+    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
+
+    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+        window_data->buffer_width  = width;
+        window_data->buffer_stride = width * 4;
+        window_data->buffer_height = height;
+        window_data->draw_buffer   = realloc(window_data->draw_buffer, window_data->buffer_stride * window_data->buffer_height);
+
+        [window_data_ios->view_delegate resizeTextures];
+    }
+
     memcpy(window_data->draw_buffer, buffer, window_data->buffer_width * window_data->buffer_height * 4);
 
     return STATE_OK;

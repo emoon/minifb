@@ -17,6 +17,7 @@
 }
 
 -(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData;
+- (void) resizeTextures;
 
 @end
 

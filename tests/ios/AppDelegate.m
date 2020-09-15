@@ -74,7 +74,7 @@ resize(struct mfb_window *window, int width, int height) {
         }
     }
     
-    mfb_update_state state = mfb_update(g_window, g_buffer);
+    mfb_update_state state = mfb_update_ex(g_window, g_buffer, g_width, g_height);
     if (state != STATE_OK) {
         free(g_buffer);
         g_buffer = 0x0;

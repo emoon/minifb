@@ -4,10 +4,13 @@
 #include <WindowData.h>
 #include <MetalKit/MetalKit.h>
 
+@class iOSViewDelegate;
+
 typedef struct Vertex {
     float x, y, z, w;
 } Vertex;
 
 typedef struct {
-    Vertex                      vertices[4];
+    iOSViewDelegate     *view_delegate;
+    Vertex              vertices[4];
 } SWindowData_IOS;

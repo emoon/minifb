@@ -168,6 +168,19 @@ NSString *g_shader_src = kShader(
 }
 
 //-------------------------------------
+- (void) resizeTextures {
+    MTLTextureDescriptor    *td;
+    td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                            width:window_data->buffer_width
+                                                           height:window_data->buffer_height
+                                                        mipmapped:false];
+
+    // Create the texture from the device by using the descriptor
+    [texture_buffer release];
+    texture_buffer = [metal_device newTextureWithDescriptor:td];
+}
+
+//-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     // by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
