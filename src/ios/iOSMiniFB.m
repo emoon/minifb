@@ -3,6 +3,7 @@
 #include <mach/mach_time.h>
 
 #include "iOSViewController.h"
+#include "iOSViewDelegate.h"
 #include "WindowData_IOS.h"
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
@@ -35,8 +36,7 @@ create_window_data(unsigned width, unsigned height) {
     window_data->window_width  = [UIScreen mainScreen].bounds.size.width  * scale;
     window_data->window_height = [UIScreen mainScreen].bounds.size.height * scale;
 
-    window_data->dst_width     = width;
-    window_data->dst_height    = height;
+    calc_dst_factor(window_data, width, height);
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
@@ -191,6 +191,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_offset_y = offset_y;
     window_data->dst_width    = width;
     window_data->dst_height   = height;
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
     float x1 =  ((float) offset_x           / window_data->window_width)  * 2.0f - 1.0f;
     float x2 = (((float) offset_x + width)  / window_data->window_width)  * 2.0f - 1.0f;

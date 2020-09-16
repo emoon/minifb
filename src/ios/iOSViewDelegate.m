@@ -240,9 +240,12 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
+    (void) view;
     // Respond to drawable size or orientation changes here
-    window_data->window_width  = size.width;
-    window_data->window_height = size.height;
+    float scale = [UIScreen mainScreen].scale;
+
+    window_data->window_width  = size.width  * scale;
+    window_data->window_height = size.height * scale;
     resize_dst(window_data, size.width, size.height);
 
     kCall(resize_func, size.width, size.height);

@@ -43,6 +43,7 @@ resize(struct mfb_window *window, int width, int height) {
     kUnused(window);
     g_width  = width;
     g_height = height;
+    g_buffer = realloc(g_buffer, g_width * g_height * 4);
     NSLog(@"Resize %d, %d", width, height);
 }
 
@@ -95,6 +96,9 @@ resize(struct mfb_window *window, int width, int height) {
         g_height = [UIScreen mainScreen].bounds.size.height * g_scale;
         g_window = mfb_open("noise", g_width, g_height);
         if(g_window != 0x0) {
+            g_width  -= 100;
+            g_height -= 100;
+            mfb_set_viewport(g_window, 50, 50, g_width, g_height);
             g_buffer = malloc(g_width * g_height * 4);
             mfb_set_mouse_move_callback(g_window, mouse_move);
             mfb_set_mouse_button_callback(g_window, mouse_btn);
