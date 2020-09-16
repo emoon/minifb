@@ -184,12 +184,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_SIZE:
             if (window_data) {
-                window_data->dst_offset_x = 0;
-                window_data->dst_offset_y = 0;
-                window_data->dst_width = LOWORD(lParam);
-                window_data->dst_height = HIWORD(lParam);
-                window_data->window_width = window_data->dst_width;
-                window_data->window_height = window_data->dst_height;
+                window_data->window_width  = LOWORD(lParam);
+                window_data->window_height = HIWORD(lParam);
+                resize_dst(window_data, LOWORD(lParam), HIWORD(lParam));
                 BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
                 kCall(resize_func, window_data->dst_width, window_data->dst_height);
             }
@@ -311,12 +308,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_win->wc.lpszClassName = title;
     RegisterClass(&window_data_win->wc);
 
-    if (window_data->dst_width == 0)
-        window_data->dst_width = width;
-
-    if (window_data->dst_height == 0)
-        window_data->dst_height = height;
-
+    calc_dst_factor(window_data, width, height);
+    
     window_data->window_width  = rect.right;
     window_data->window_height = rect.bottom;
 
@@ -692,7 +685,12 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 
 bool 
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-    SWindowData *window_data = (SWindowData *) window;
+    SWindowData     *window_data     = (SWindowData *) window;
+    SWindowData_Win *window_data_win = 0x0;
+
+    if(window_data == 0x0) {
+        return false;
+    }
 
     if (offset_x + width > window_data->window_width) {
         return false;
@@ -704,8 +702,13 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_offset_x = offset_x;
     window_data->dst_offset_y = offset_y;
 
-    window_data->dst_width = width;
-    window_data->dst_height = height;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
+
+    window_data_win = (SWindowData_Win *) window_data->specific;
+    BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 
     return true;
 }

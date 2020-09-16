@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <MiniFB_enums.h>
 
+//-------------------------------------
 typedef struct {
     void                    *specific;
     void                    *user_data;
@@ -23,6 +24,10 @@ typedef struct {
     uint32_t                dst_offset_y;
     uint32_t                dst_width;
     uint32_t                dst_height;
+    float                   factor_x;
+    float                   factor_y;
+    float                   factor_width;
+    float                   factor_height;
 
     void                    *draw_buffer;
     uint32_t                buffer_width;

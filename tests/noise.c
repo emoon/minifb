@@ -30,6 +30,9 @@ main()
     g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
     mfb_set_resize_callback(window, resize);
 
+    mfb_set_viewport(window, 50, 50, g_width - 50 - 50, g_height - 50 - 50);
+    resize(window, g_width - 100, g_height - 100);  // to resize buffer
+
     mfb_update_state state;
     do {
         for (i = 0; i < g_width * g_height; ++i) {

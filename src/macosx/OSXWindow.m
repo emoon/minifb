@@ -306,6 +306,7 @@
 
         window_data->window_width  = size.width;
         window_data->window_height = size.height;
+        resize_dst(window_data, size.width, size.height);
 
         kCall(resize_func, size.width, size.height);
     }

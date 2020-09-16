@@ -4,6 +4,7 @@
 //#define kUseBilinearInterpolation
 
 #if defined(kUseBilinearInterpolation)
+//-------------------------------------
 static uint32_t 
 interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uint32_t srcOffsetY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch) {
     uint32_t incX = x + 1 < srcWidth ? 1 : 0;
@@ -39,6 +40,7 @@ interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uin
 #endif
 
 // Only for 32 bits images
+//-------------------------------------
 void 
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
               uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch) {
@@ -74,4 +76,29 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
         }
         dstImage += dstPitch;
     }
+}
+
+//-------------------------------------
+void 
+calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height) {
+    if (window_data->dst_width == 0) {
+        window_data->dst_width = width;
+    }
+    window_data->factor_x     = (float) window_data->dst_offset_x / (float) width;
+    window_data->factor_width = (float) window_data->dst_width    / (float) width;
+
+    if (window_data->dst_height == 0) {
+        window_data->dst_height = height;
+    }
+    window_data->factor_y      = (float) window_data->dst_offset_y / (float) height;
+    window_data->factor_height = (float) window_data->dst_height   / (float) height;
+}
+
+//-------------------------------------
+void 
+resize_dst(SWindowData *window_data, uint32_t width, uint32_t height) {
+    window_data->dst_offset_x = width  * window_data->factor_x;
+    window_data->dst_offset_y = height * window_data->factor_y;
+    window_data->dst_width    = width  * window_data->factor_width;
+    window_data->dst_height   = height * window_data->factor_height;
 }

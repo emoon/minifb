@@ -739,16 +739,18 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_height = height;
         window_data->buffer_stride = width * sizeof(uint32_t);
 
-        float deltaX = (float) width  / (float) window_data->buffer_width;
-        float deltaY = (float) height / (float) window_data->buffer_height;
+        // This must be in the resize event but we don't have it for Wayland :(
+        resize_dst(window_data, width, height);
+        // float deltaX = (float) width  / (float) window_data->buffer_width;
+        // float deltaY = (float) height / (float) window_data->buffer_height;
         
-        window_data->dst_offset_x *= deltaX;
-        window_data->dst_offset_y *= deltaY;
-        window_data->dst_width    *= deltaX;
-        window_data->dst_height   *= deltaY;
+        // window_data->dst_offset_x *= deltaX;
+        // window_data->dst_offset_y *= deltaY;
+        // window_data->dst_width    *= deltaX;
+        // window_data->dst_height   *= deltaY;
 
         wl_buffer_destroy(window_data->draw_buffer);
-        window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
+        window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
                                         window_data->buffer_width, window_data->buffer_height,
                                         window_data->buffer_stride, window_data_way->shm_format);
     }
