@@ -628,10 +628,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
     window_data->buffer_stride = width * sizeof(uint32_t);
-    window_data->dst_offset_x  = 0;
-    window_data->dst_offset_y  = 0;
-    window_data->dst_width     = width;
-    window_data->dst_height    = height;
+    calc_dst_factor(window_data, width, height);
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
@@ -741,13 +738,6 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
         // This must be in the resize event but we don't have it for Wayland :(
         resize_dst(window_data, width, height);
-        // float deltaX = (float) width  / (float) window_data->buffer_width;
-        // float deltaY = (float) height / (float) window_data->buffer_height;
-        
-        // window_data->dst_offset_x *= deltaX;
-        // window_data->dst_offset_y *= deltaY;
-        // window_data->dst_width    *= deltaX;
-        // window_data->dst_height   *= deltaY;
 
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
@@ -993,10 +983,11 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     }
 
     // TODO: Not yet
-    // window_data->dst_offset_x = offset_x;
-    // window_data->dst_offset_y = offset_y;
-    // window_data->dst_width    = width;
-    // window_data->dst_height   = height;
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+    resize_dst(window_data, width, height);
 
     return false;
 }

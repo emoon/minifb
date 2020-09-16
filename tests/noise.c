@@ -11,6 +11,7 @@ static uint32_t *g_buffer = 0x0;
 
 void 
 resize(struct mfb_window *window, int width, int height) {
+    (void) window;
     g_width  = width;
     g_height = height;
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
