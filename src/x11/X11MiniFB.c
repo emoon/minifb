@@ -95,10 +95,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
-    window_data->dst_offset_x  = 0;
-    window_data->dst_offset_y  = 0;
-    window_data->dst_width     = width;
-    window_data->dst_height    = height;
+    calc_dst_factor(window_data, width, height);
 
     if (flags & WF_FULLSCREEN_DESKTOP) {
         posX         = 0;
@@ -261,7 +258,7 @@ processEvent(SWindowData *window_data, XEvent *event) {
         case ConfigureNotify: 
         {
             window_data->window_width  = event->xconfigure.width;
-            window_data->window_height = event->xconfigure.height;
+            window_data->window_height = event->xconfigure.height;            
             resize_dst(window_data, event->xconfigure.width, event->xconfigure.height);
 
             SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
@@ -331,14 +328,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    bool different_size = false;
 
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
         window_data->buffer_width  = width;
         window_data->buffer_stride = width * 4;
         window_data->buffer_height = height;
+        different_size = true;
     }
 
-    if (window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
+    if (different_size || window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
         if (window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
             if (window_data_x11->image_scaler != 0x0) {
                 window_data_x11->image_scaler->data = 0x0;
@@ -750,6 +749,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_offset_y = offset_y;
     window_data->dst_width    = width;
     window_data->dst_height   = height;
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
     
     return true;
 }
