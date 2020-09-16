@@ -62,12 +62,6 @@ create_window_data(unsigned width, unsigned height) {
 
 //-------------------------------------
 struct mfb_window *
-mfb_open(const char *title, unsigned width, unsigned height) {
-    return mfb_open_ex(title, width, height, 0);
-}
-
-//-------------------------------------
-struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     @autoreleasepool {
         SWindowData *window_data = create_window_data(width, height);
@@ -221,16 +215,6 @@ update_events(SWindowData *window_data) {
             }
         } while ((window_data->close == false) && event);
     }
-}
-
-//-------------------------------------
-mfb_update_state
-mfb_update(struct mfb_window *window, void *buffer) {
-    if(window == 0x0) {
-        return STATE_INVALID_WINDOW;
-    }
-    SWindowData *window_data = (SWindowData *) window;
-    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
 }
 
 //-------------------------------------

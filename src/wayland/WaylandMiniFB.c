@@ -563,11 +563,6 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct mfb_window * 
-mfb_open(const char *title, unsigned width, unsigned height) {
-    return mfb_open_ex(title, width, height, 0);
-}
-
-struct mfb_window * 
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
@@ -697,18 +692,6 @@ static const struct
 wl_callback_listener frame_listener = {
     .done = frame_done,
 };
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mfb_update_state 
-mfb_update(struct mfb_window *window, void *buffer) {
-    if (window == 0x0) {
-        return STATE_INVALID_WINDOW;
-    }
-
-    SWindowData *window_data = (SWindowData *) window;
-    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

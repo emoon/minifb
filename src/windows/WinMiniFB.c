@@ -366,24 +366,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     return (struct mfb_window *) window_data;
 }
 
-struct mfb_window *
-mfb_open(const char *title, unsigned width, unsigned height) {
-    return mfb_open_ex(title, width, height, 0);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mfb_update_state 
-mfb_update(struct mfb_window *window, void *buffer) {
-    if (window == 0x0) {
-        return STATE_INVALID_WINDOW;
-    }
-
-    SWindowData *window_data = (SWindowData *) window;
-
-    return mfb_update_ex(window, buffer, window_data->buffer_width, window_data->buffer_height);
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mfb_update_state
