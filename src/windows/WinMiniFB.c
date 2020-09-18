@@ -508,11 +508,7 @@ destroy_window_data(SWindowData *window_data) {
         window_data_win->bitmapInfo = 0x0;
     }
 #else
-    if (window_data_win->hGLRC) {
-        wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(window_data_win->hGLRC);
-        window_data_win->hGLRC = 0;
-    }
+    destroy_GL_context(window_data);
 #endif
 
     if (window_data_win->window != 0 && window_data_win->hdc != 0) {

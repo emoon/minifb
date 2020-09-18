@@ -106,6 +106,9 @@ if(APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
 elseif(UNIX)
     option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
+    if(NOT USE_WAYLAND_API)
+        option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    endif()
 elseif(WIN32)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
 endif()
@@ -174,6 +177,11 @@ elseif(UNIX)
     if(USE_WAYLAND_API)
         list(APPEND SrcLib ${SrcWayland})
     else()
+        if(USE_OPENGL_API)
+            list(APPEND SrcLib ${SrcGL})
+
+            add_definitions(-DUSE_OPENGL_API)
+        endif()
         list(APPEND SrcLib ${SrcX11})
     endif()
 
@@ -216,6 +224,11 @@ elseif(UNIX)
         target_link_libraries(minifb
             "-lX11"
         )
+        if(USE_OPENGL_API)
+        target_link_libraries(minifb
+            "-lGL"
+        )
+        endif()
     endif()
 
 elseif(WIN32)
