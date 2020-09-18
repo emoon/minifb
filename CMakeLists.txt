@@ -138,9 +138,16 @@ if(NOT MSVC)
     #--------------------------------------
     add_compile_options("$<$<CONFIG:Debug>:-g>")
     add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
+
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
     set(CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
     set(CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-D_DEBUG)
+    add_definitions(-DDEBUG)
 endif()
 
 # Set compiler/platform specific flags and dependencies

@@ -5,6 +5,9 @@
 #if defined(USE_OPENGL_API)
     #include "gl/MiniFB_GL.h"
 #endif
+#if defined(_DEBUG) || defined(DEBUG)
+    #include <stdio.h>
+#endif
 #include <stdlib.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

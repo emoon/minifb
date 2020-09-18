@@ -145,12 +145,15 @@ destroy_GL_context(SWindowData *window_data) {
 }
 
 //-------------------------------------
+#if defined(RGB)
+    #undef RGB
+#endif
+
 #define TEXTURE0    0x84C0  // [ Core in gl 1.3, gles1 1.0, gles2 2.0, glsc2 2.0, Provided by GL_ARB_multitexture (gl) ]
 #define RGB         0x1907  // [ Core in gl 1.0, gles1 1.0, gles2 2.0, glsc2 2.0 ]    
 #define RGBA        0x1908  // [ Core in gl 1.0, gles1 1.0, gles2 2.0, glsc2 2.0 ]
 #define BGR         0x80E0  // [ Core in gl 1.2 ]
 #define BGRA        0x80E1  // [ Core in gl 1.2, Provided by GL_ARB_vertex_array_bgra (gl|glcore) ]
-
 
 //-------------------------------------
 void 

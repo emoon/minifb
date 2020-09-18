@@ -2,8 +2,7 @@
 
 #if defined(USE_OPENGL_API)
 
-    #include "WindowData.h"
-    #include <stdbool.h>
+    #include <WindowData.h>
 
     bool create_GL_context(SWindowData *window_data);
     void destroy_GL_context(SWindowData *window_data);
