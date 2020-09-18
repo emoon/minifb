@@ -185,7 +185,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #else
                 resize_GL(window_data);
 #endif
-                kCall(resize_func, window_data->dst_width, window_data->dst_height);
+                kCall(resize_func, window_data->window_width, window_data->window_height);
             }
             break;
 
