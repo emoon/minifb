@@ -216,12 +216,12 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 #if defined(_WIN32) || defined(WIN32)
 
     SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
-    GLenum format = GL_RGBA;
+    GLenum format = BGRA;
 
 #elif defined(linux)
 
     SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
-    GLenum format = GL_BGRA; // for some reason the colors are inverted on X11
+    GLenum format = BGRA;
 
 #endif
 
