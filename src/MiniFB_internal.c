@@ -97,8 +97,8 @@ calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height) {
 //-------------------------------------
 void 
 resize_dst(SWindowData *window_data, uint32_t width, uint32_t height) {
-    window_data->dst_offset_x = width  * window_data->factor_x;
-    window_data->dst_offset_y = height * window_data->factor_y;
-    window_data->dst_width    = width  * window_data->factor_width;
-    window_data->dst_height   = height * window_data->factor_height;
+    window_data->dst_offset_x = (uint32_t) (width  * window_data->factor_x);
+    window_data->dst_offset_y = (uint32_t) (height * window_data->factor_y);
+    window_data->dst_width    = (uint32_t) (width  * window_data->factor_width);
+    window_data->dst_height   = (uint32_t) (height * window_data->factor_height);
 }

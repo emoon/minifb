@@ -95,6 +95,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
         [window makeKeyAndVisible];
 
+        window_data->is_initialized = true;
         return (struct mfb_window *) window_data;
     }
 }

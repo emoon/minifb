@@ -2,7 +2,9 @@
 #include <MiniFB_internal.h>
 #include <WindowData.h>
 #include "WindowData_Win.h"
-
+#if defined(USE_OPENGL_API)
+    #include "gl/MiniFB_GL.h"
+#endif
 #include <stdlib.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,31 +31,18 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
     switch (message)
     {
+#if !defined(USE_OPENGL_API)
         case WM_PAINT:
         {
             if (window_data && window_data->draw_buffer && window_data_win)
             {
-                //if (window_data->dst_offset_x > 0) {
-                //    BitBlt(window_data_win->hdc, 0, window_data->dst_offset_y, window_data->dst_offset_x, window_data->dst_height, 0, 0, 0, BLACKNESS);
-                //}
-                //if (window_data->dst_offset_y > 0) {
-                //    BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->dst_offset_y, 0, 0, 0, BLACKNESS);
-                //}
-                //uint32_t offsetY = window_data->dst_offset_y + window_data->dst_height;
-                //if (offsetY < window_data->window_height) {
-                //    BitBlt(window_data_win->hdc, 0, offsetY, window_data->window_width, window_data->window_height - offsetY, 0, 0, 0, BLACKNESS);
-                //}
-                //uint32_t offsetX = window_data->dst_offset_x + window_data->dst_width;
-                //if (offsetX < window_data->window_width) {
-                //    BitBlt(window_data_win->hdc, offsetX, window_data->dst_offset_y, window_data->window_width - offsetX, window_data->dst_height, 0, 0, 0, BLACKNESS);
-                //}
-
                 StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer, 
                               window_data_win->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
             }
             ValidateRect(hWnd, 0x0);
             break;
         }
+#endif
 
         case WM_DESTROY:
         case WM_CLOSE:
@@ -187,7 +176,12 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, LOWORD(lParam), HIWORD(lParam));
+
+#if !defined(USE_OPENGL_API)
                 BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+#else
+                resize_GL(window_data);
+#endif
                 kCall(resize_func, window_data->dst_width, window_data->dst_height);
             }
             break;
@@ -334,12 +328,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     ShowWindow(window_data_win->window, SW_NORMAL);
 
+    window_data_win->hdc = GetDC(window_data_win->window);
+
+#if !defined(USE_OPENGL_API)
+
     window_data_win->bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
     if(window_data_win->bitmapInfo == 0x0) {
         free(window_data);
         free(window_data_win);
         return 0x0;
     }
+
     window_data_win->bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
     window_data_win->bitmapInfo->bmiHeader.biPlanes      = 1;
     window_data_win->bitmapInfo->bmiHeader.biBitCount    = 32;
@@ -350,12 +349,25 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_win->bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
     window_data_win->bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
 
-    window_data_win->hdc = GetDC(window_data_win->window);
+#else
+
+    create_GL_context(window_data);
+
+#endif
 
     window_data_win->timer = mfb_timer_create();
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+#if defined(_DEBUG) || defined(DEBUG)
+    #if defined(USE_OPENGL_API)
+        printf("Window created using OpenGL API\n");
+    #else
+        printf("Window created using GDI API\n");
+    #endif
+#endif
+
+    window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
 }
 
@@ -385,10 +397,19 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     window_data->buffer_height = height;
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+
+#if !defined(USE_OPENGL_API)
+
     window_data_win->bitmapInfo->bmiHeader.biWidth = window_data->buffer_width;
     window_data_win->bitmapInfo->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
     InvalidateRect(window_data_win->window, 0x0, TRUE);
     SendMessage(window_data_win->window, WM_PAINT, 0, 0);
+
+#else
+
+    redraw_GL(window_data, buffer);
+
+#endif
 
     while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
@@ -481,10 +502,18 @@ destroy_window_data(SWindowData *window_data) {
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
 
-    window_data->draw_buffer = 0x0;
+#if !defined(USE_OPENGL_API)
     if (window_data_win->bitmapInfo != 0x0) {
         free(window_data_win->bitmapInfo);
+        window_data_win->bitmapInfo = 0x0;
     }
+#else
+    if (window_data_win->hGLRC) {
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(window_data_win->hGLRC);
+        window_data_win->hGLRC = 0;
+    }
+#endif
 
     if (window_data_win->window != 0 && window_data_win->hdc != 0) {
         ReleaseDC(window_data_win->window, window_data_win->hdc);
@@ -492,11 +521,13 @@ destroy_window_data(SWindowData *window_data) {
     }
 
     window_data_win->window = 0;
-    window_data_win->hdc = 0;
-    window_data_win->bitmapInfo = 0x0;
+    window_data_win->hdc    = 0;
+
     mfb_timer_destroy(window_data_win->timer);
     window_data_win->timer = 0x0;
-    window_data->close = true;
+
+    window_data->draw_buffer = 0x0;
+    window_data->close       = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -686,7 +717,6 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 bool 
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
-    SWindowData_Win *window_data_win = 0x0;
 
     if(window_data == 0x0) {
         return false;
@@ -707,8 +737,12 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
+#if !defined(USE_OPENGL_API)
+    SWindowData_Win *window_data_win = 0x0;
+
     window_data_win = (SWindowData_Win *) window_data->specific;
     BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+#endif
 
     return true;
 }

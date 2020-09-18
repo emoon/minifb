@@ -5,6 +5,8 @@ project(${PROJECT_NAME})
 
 message("Processing " ${PROJECT_NAME})
 
+# Detect iOS
+#--------------------------------------
 if(NOT DEFINED IOS)
     if(DEFINED CMAKE_SYSTEM_NAME)
         string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
@@ -14,6 +16,8 @@ if(NOT DEFINED IOS)
     endif()
 endif()
 
+# Sources
+#--------------------------------------
 set(SrcLib
     include/MiniFB.h
     include/MiniFB_cpp.h
@@ -27,11 +31,13 @@ set(SrcLib
     src/WindowData.h
 )
 
+#--
 set(SrcWindows
     src/windows/WinMiniFB.c
     src/windows/WindowData_Win.h
 )
 
+#--
 set(SrcMacOSX
     src/macosx/MacMiniFB.m
     src/macosx/OSXWindow.h
@@ -43,6 +49,7 @@ set(SrcMacOSX
     src/macosx/WindowData_OSX.h
 )
 
+#--
 set(SrcIOS
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
@@ -55,16 +62,23 @@ set(SrcIOS
     include/MiniFB_ios.h
 )
 
+#--
 set(SrcWayland
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
 )
 
+#--
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
     src/MiniFB_linux.c
+)
+
+set(SrcGL
+    src/gl/MiniFB_GL.h
+    src/gl/MiniFB_GL.c
 )
 
 # Avoid RelWithDebInfo and MinSizeRel
@@ -88,9 +102,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 
+if(APPLE AND NOT IOS)
+    option(USE_METAL_API "Build the project using metal API code" ON)
+elseif(UNIX)
+    option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
+elseif(WIN32)
+    option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+endif()
+
 # Set GCC/Clang flags
 #--------------------------------------
-if (NOT MSVC)
+if(NOT MSVC)
     # Avoid default flag values
     #--------------------------------------
     set(CMAKE_C_FLAGS "" CACHE STRING "" FORCE)
@@ -113,56 +135,62 @@ if (NOT MSVC)
     #--------------------------------------
     add_compile_options("$<$<CONFIG:Debug>:-g>")
     add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
-    set (CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
-    set (CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")
-endif()
-
-# Set default cmake flags
-#--------------------------------------
-if (APPLE AND NOT IOS) 
-    OPTION(USE_METAL_API "Build the project using metal API code" ON)
-elseif (UNIX)
-    OPTION(USE_WAYLAND_API "Build the project using wayland API code" OFF)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
+    set(CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
+    set(CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
 # Set compiler/platform specific flags and dependencies
 #--------------------------------------
-if (MSVC)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    add_definitions(-D_WIN32_WINNT=0x0600)
+if(WIN32)
 
-    list (APPEND SrcLib ${SrcWindows})
-elseif (MINGW)
-    add_definitions(-D_WIN32_WINNT=0x0600)
+    if(MSVC)
+        add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    endif()
+    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 (we are in 2020)
+
+    if(USE_OPENGL_API)
+        list(APPEND SrcLib ${SrcGL})
+
+        add_definitions(-DUSE_OPENGL_API)
+    endif()
 
     list(APPEND SrcLib ${SrcWindows})
-elseif (IOS)
+
+elseif(IOS)
+
     list(APPEND SrcLib ${SrcIOS})
-elseif (APPLE)
+
+elseif(APPLE)
+
     if(USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
     endif()
-        
+
     list(APPEND SrcLib ${SrcMacOSX})
-elseif (UNIX)
+
+elseif(UNIX)
+
     if(USE_WAYLAND_API)
         list(APPEND SrcLib ${SrcWayland})
     else()
         list(APPEND SrcLib ${SrcX11})
     endif()
+
 endif()
 
 # Library
 #--------------------------------------
-add_library(minifb STATIC 
+add_library(minifb STATIC
     ${SrcLib}
 )
 
+# Link
 #--------------------------------------
-if (APPLE)
+if(APPLE)
+
     if(IOS)
-        target_link_libraries(minifb 
+        target_link_libraries(minifb
             "-framework UIKit"
             "-framework QuartzCore"
             "-framework Metal"
@@ -176,17 +204,28 @@ if (APPLE)
             "-framework MetalKit"
         )
     endif()
-elseif (UNIX)
+
+elseif(UNIX)
+
     if(USE_WAYLAND_API)
-        target_link_libraries(minifb 
+        target_link_libraries(minifb
             "-lwayland-client"
             "-lwayland-cursor"
         )
     else()
-        target_link_libraries(minifb 
+        target_link_libraries(minifb
             "-lX11"
         )
     endif()
+
+elseif(WIN32)
+
+    if(USE_OPENGL_API)
+        target_link_libraries(minifb
+            "Opengl32.lib"
+        )
+    endif()
+
 endif()
 
 # For all projects
@@ -198,7 +237,7 @@ link_libraries(minifb)
 
 # Examples
 #--------------------------------------
-if (MINIFB_BUILD_EXAMPLES)
+if(MINIFB_BUILD_EXAMPLES)
     if(NOT IOS)
 
         add_executable(noise

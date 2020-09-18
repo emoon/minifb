@@ -661,13 +661,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+#if defined(_DEBUG) || defined(DEBUG)
     printf("Window created using Wayland API\n");
+#endif
 
+    window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
 
 out:
     close(window_data_way->fd);
     destroy(window_data);
+
     return 0x0;
 }
 

@@ -151,14 +151,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+#if defined(_DEBUG) || defined(DEBUG)
     #if defined(USE_METAL_API)
         NSLog(@"Window created using Metal API");
     #else
         NSLog(@"Window created using Cocoa API");
     #endif
+#endif
 
+        window_data->is_initialized = true;
         return (struct mfb_window *) window_data;
-    }
+    }    
 }
 
 //-------------------------------------

@@ -189,8 +189,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+#if defined(_DEBUG) || defined(DEBUG)
     printf("Window created using X11 API\n");
+#endif
 
+    window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
 }
 

@@ -43,6 +43,7 @@ typedef struct {
     uint32_t                mod_keys;
 
     bool                    is_active;
+    bool                    is_initialized;
 
     bool                    close;
 } SWindowData;
