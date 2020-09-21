@@ -276,6 +276,10 @@ if(MINIFB_BUILD_EXAMPLES)
             tests/multiple_windows.c
         )
 
+        add_executable(hidpi
+            tests/hidpi.c
+        )
+
     else()
 
         add_executable(noise
