@@ -85,28 +85,28 @@ dpi_aware() {
 //--
 void 
 get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
-    UINT    xdpi, ydpi;
+    UINT    x, y;
 
     if(mfb_GetDpiForMonitor != 0x0) {
         HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-        mfb_GetDpiForMonitor(monitor, mfb_MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
+        mfb_GetDpiForMonitor(monitor, mfb_MDT_EFFECTIVE_DPI, &x, &y);
     }
     else {
         const HDC dc = GetDC(hWnd);
-        xdpi = GetDeviceCaps(dc, LOGPIXELSX);
-        ydpi = GetDeviceCaps(dc, LOGPIXELSY);
+        x = GetDeviceCaps(dc, LOGPIXELSX);
+        y = GetDeviceCaps(dc, LOGPIXELSY);
         ReleaseDC(NULL, dc);
     }
 
     if (dpi_x) {
-        *dpi_x = xdpi / (float) USER_DEFAULT_SCREEN_DPI;
+        *dpi_x = x / (float) USER_DEFAULT_SCREEN_DPI;
         if(*dpi_x == 0) {
             *dpi_x = 1;
         }
     }
 
     if (dpi_y) {
-        *dpi_y = ydpi / (float) USER_DEFAULT_SCREEN_DPI;
+        *dpi_y = y / (float) USER_DEFAULT_SCREEN_DPI;
         if (*dpi_y == 0) {
             *dpi_y = 1;
         }

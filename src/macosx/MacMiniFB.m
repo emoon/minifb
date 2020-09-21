@@ -551,3 +551,34 @@ mfb_timer_init() {
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
 
+//-------------------------------------
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    float scale = 1.0f;
+
+    if(window != 0x0) {
+        SWindowData     *window_data     = (SWindowData *) window;
+        SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+
+        scale = [window_data_osx->window backingScaleFactor];
+    }
+    else {
+        scale = [[NSScreen mainScreen] backingScaleFactor];
+    }
+    
+    if (dpi_x) {
+        *dpi_x = scale;
+        if(*dpi_x == 0) {
+            *dpi_x = 1;
+        }
+    }
+
+    if (dpi_y) {
+        *dpi_y = scale;
+        if (*dpi_y == 0) {
+            *dpi_y = 1;
+        }
+    }
+
+}
+
