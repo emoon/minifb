@@ -230,6 +230,7 @@ elseif(UNIX)
     else()
         target_link_libraries(minifb
             "-lX11"
+            #"-lXrandr" DPI NOT WORKING
         )
         if(USE_OPENGL_API)
         target_link_libraries(minifb

@@ -579,6 +579,5 @@ mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
             *dpi_y = 1;
         }
     }
-
 }
 

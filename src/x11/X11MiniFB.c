@@ -4,6 +4,11 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+
+// I cannot find a way to get dpi under VirtualBox
+//#include <X11/Xresource.h>
+//#include <X11/extensions/Xrandr.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -788,4 +793,36 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
     
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    float x = 96.0, y = 96.0;
+
+    if(window != 0x0) {
+        //SWindowData     *window_data     = (SWindowData *) window;
+        //SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+
+        // I cannot find a way to get dpi under VirtualBox
+        // XrmGetResource "Xft.dpi", "Xft.Dpi"
+        // XRRGetOutputInfo
+        // DisplayWidthMM, DisplayHeightMM
+        // All returning invalid values or 0
+    }
+
+    if (dpi_x) {
+        *dpi_x = x / 96.0f;
+        if(*dpi_x == 0) {
+            *dpi_x = 1.0f;
+        }
+    }
+
+    if (dpi_y) {
+        *dpi_y = y / 96.0f;
+        if (*dpi_y == 0) {
+            *dpi_y = 1.0f;
+        }
+    }
 }

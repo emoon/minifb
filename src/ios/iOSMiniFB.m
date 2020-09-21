@@ -248,3 +248,25 @@ mfb_timer_init() {
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
 
+//-------------------------------------
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    (void) window;
+    float scale = 1.0f;
+
+    scale = [[UIScreen mainScreen] scale];
+    
+    if (dpi_x) {
+        *dpi_x = scale;
+        if(*dpi_x == 0) {
+            *dpi_x = 1;
+        }
+    }
+
+    if (dpi_y) {
+        *dpi_y = scale;
+        if (*dpi_y == 0) {
+            *dpi_y = 1;
+        }
+    }
+}

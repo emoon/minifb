@@ -91,7 +91,8 @@ resize(struct mfb_window *window, int width, int height) {
     kUnused(launchOptions);
     
     if(g_window == 0x0) {
-        g_scale  = [UIScreen mainScreen].scale;
+        mfb_get_monitor_dpi(0x0, &g_scale, 0x0);
+        //g_scale  = [UIScreen mainScreen].scale;
         g_width  = [UIScreen mainScreen].bounds.size.width  * g_scale;
         g_height = [UIScreen mainScreen].bounds.size.height * g_scale;
         g_window = mfb_open("noise", g_width, g_height);

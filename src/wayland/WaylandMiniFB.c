@@ -996,3 +996,30 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     return false;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    float x = 96.0, y = 96.0;
+
+    if(window != 0x0) {
+        //SWindowData     *window_data     = (SWindowData *) window;
+        //SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+
+        // I cannot find a way to get dpi under VirtualBox
+    }
+
+    if (dpi_x) {
+        *dpi_x = x / 96.0f;
+        if(*dpi_x == 0) {
+            *dpi_x = 1.0f;
+        }
+    }
+
+    if (dpi_y) {
+        *dpi_y = y / 96.0f;
+        if (*dpi_y == 0) {
+            *dpi_y = 1.0f;
+        }
+    }
+}
