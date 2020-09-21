@@ -203,6 +203,18 @@ init_GL(SWindowData *window_data) {
 void 
 resize_GL(SWindowData *window_data) {
     if(window_data->is_initialized) {
+    #if defined(_WIN32) || defined(WIN32)
+
+        SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
+        wglMakeCurrent(window_data_ex->hdc, window_data_ex->hGLRC);
+
+    #elif defined(linux)
+
+        SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
+        glXMakeCurrent(window_data_ex->display, window_data_ex->window, window_data_ex->context);
+
+    #endif
+
         glViewport(0, 0, window_data->window_width, window_data->window_height);
 
         glMatrixMode(GL_PROJECTION);
@@ -221,10 +233,14 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
     GLenum format = BGRA;
 
+    wglMakeCurrent(window_data_ex->hdc, window_data_ex->hGLRC);
+
 #elif defined(linux)
 
     SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
     GLenum format = BGRA;
+
+    glXMakeCurrent(window_data_ex->display, window_data_ex->window, window_data_ex->context);
 
 #endif
 
