@@ -12,6 +12,123 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
+typedef enum mfb_PROCESS_DPI_AWARENESS {
+    mfb_PROCESS_DPI_UNAWARE           = 0,
+    mfb_PROCESS_SYSTEM_DPI_AWARE      = 1,
+    mfb_PROCESS_PER_MONITOR_DPI_AWARE = 2
+} mfb_PROCESS_DPI_AWARENESS;
+
+typedef enum mfb_MONITOR_DPI_TYPE {
+    mfb_MDT_EFFECTIVE_DPI             = 0,
+    mfb_MDT_ANGULAR_DPI               = 1,
+    mfb_MDT_RAW_DPI                   = 2,
+    mfb_MDT_DEFAULT                   = mfb_MDT_EFFECTIVE_DPI
+} mfb_MONITOR_DPI_TYPE;
+
+#define mfb_DPI_AWARENESS_CONTEXT_UNAWARE               ((HANDLE) -1)
+#define mfb_DPI_AWARENESS_CONTEXT_SYSTEM_AWARE          ((HANDLE) -2)
+#define mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE     ((HANDLE) -3)
+#define mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2  ((HANDLE) -4)
+#define mfb_DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((HANDLE) -5)
+
+// user32.dll
+typedef BOOL(WINAPI *PFN_SetProcessDPIAware)(void);
+typedef BOOL(WINAPI *PFN_SetProcessDpiAwarenessContext)(HANDLE);
+
+HMODULE                           mfb_user32_dll                    = 0x0;
+PFN_SetProcessDPIAware            mfb_SetProcessDPIAware            = 0x0;
+PFN_SetProcessDpiAwarenessContext mfb_SetProcessDpiAwarenessContext = 0x0;
+
+// shcore.dll
+typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(mfb_PROCESS_DPI_AWARENESS);
+typedef HRESULT(WINAPI *PFN_GetDpiForMonitor)(HMONITOR, mfb_MONITOR_DPI_TYPE, UINT *, UINT *);
+
+HMODULE                           mfb_shcore_dll                    = 0x0;
+PFN_SetProcessDpiAwareness        mfb_SetProcessDpiAwareness        = 0x0;
+PFN_GetDpiForMonitor              mfb_GetDpiForMonitor              = 0x0;
+
+//--
+void
+load_functions() {
+    if(mfb_user32_dll == 0x0) {
+        mfb_user32_dll = LoadLibraryA("user32.dll");
+        if (mfb_user32_dll != 0x0) {
+            mfb_SetProcessDPIAware = (PFN_SetProcessDPIAware) GetProcAddress(mfb_user32_dll, "SetProcessDPIAware");
+            mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
+        }
+    }
+
+    if(mfb_shcore_dll == 0x0) {
+        mfb_shcore_dll = LoadLibraryA("shcore.dll");
+        if (mfb_shcore_dll != 0x0) {
+            mfb_SetProcessDpiAwareness = (PFN_SetProcessDpiAwareness) GetProcAddress(mfb_shcore_dll, "SetProcessDpiAwareness");
+            mfb_GetDpiForMonitor = (PFN_GetDpiForMonitor) GetProcAddress(mfb_shcore_dll, "GetDpiForMonitor");
+        }
+    }
+}
+
+//--
+void
+dpi_aware() {
+    if (mfb_SetProcessDpiAwarenessContext != 0x0) {
+        mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+    else if (mfb_SetProcessDpiAwareness != 0x0) {
+        mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE);
+    }
+    else if (mfb_SetProcessDPIAware != 0x0) {
+        mfb_SetProcessDPIAware();
+    }
+}
+
+//--
+void 
+get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
+    UINT    xdpi, ydpi;
+
+    if(mfb_GetDpiForMonitor != 0x0) {
+        HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+        mfb_GetDpiForMonitor(monitor, mfb_MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
+    }
+    else {
+        const HDC dc = GetDC(hWnd);
+        xdpi = GetDeviceCaps(dc, LOGPIXELSX);
+        ydpi = GetDeviceCaps(dc, LOGPIXELSY);
+        ReleaseDC(NULL, dc);
+    }
+
+    if (dpi_x) {
+        *dpi_x = xdpi / (float) USER_DEFAULT_SCREEN_DPI;
+        if(*dpi_x == 0) {
+            *dpi_x = 1;
+        }
+    }
+
+    if (dpi_y) {
+        *dpi_y = ydpi / (float) USER_DEFAULT_SCREEN_DPI;
+        if (*dpi_y == 0) {
+            *dpi_y = 1;
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    HWND hWnd = 0x0;
+
+    if(window != 0x0) {
+        SWindowData     *window_data     = (SWindowData *) window;
+        SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+        hWnd = window_data_win->window;
+    }
+    get_monitor_dpi(hWnd, dpi_x, dpi_y);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 long    s_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,8 +154,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
         {
-            if (window_data && window_data->draw_buffer && window_data_win)
-            {
+            if (window_data && window_data->draw_buffer && window_data_win) {
                 StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer, 
                               window_data_win->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
             }
@@ -176,16 +292,28 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_SIZE:
             if (window_data) {
+                float       scaleX, scaleY;
+                uint32_t    width, height;
+
+                if(wParam == SIZE_MINIMIZED) {
+                    return res;
+                }
+
+                get_monitor_dpi(hWnd, &scaleX, &scaleY);
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
-                resize_dst(window_data, LOWORD(lParam), HIWORD(lParam));
+                resize_dst(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
                 BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 #else
                 resize_GL(window_data);
 #endif
-                kCall(resize_func, window_data->window_width, window_data->window_height);
+                if(window_data->window_width != 0 && window_data->window_height != 0) {
+                    width  = (uint32_t) (window_data->window_width  / scaleX);
+                    height = (uint32_t) (window_data->window_height / scaleY);
+                    kCall(resize_func, width, height);
+                }
             }
             break;
 
@@ -219,6 +347,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     RECT rect = { 0 };
     int  x = 0, y = 0;
 
+    load_functions();
+    dpi_aware();
     init_keycodes();
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
@@ -287,8 +417,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
     else if (!(flags & WF_FULLSCREEN)) {
-        rect.right  = width;
-        rect.bottom = height;
+        float dpi_x, dpi_y;
+        get_monitor_dpi(0, &dpi_x, &dpi_y);
+
+        rect.right  = (LONG) (width  * dpi_x);
+        rect.bottom = (LONG) (height * dpi_y);
 
         AdjustWindowRect(&rect, s_window_style, 0);
 
@@ -557,132 +690,129 @@ extern short int g_keycodes[512];
 
 void 
 init_keycodes() {
+    if(g_keycodes[0x00B] != KB_KEY_0) {
+        g_keycodes[0x00B] = KB_KEY_0;
+        g_keycodes[0x002] = KB_KEY_1;
+        g_keycodes[0x003] = KB_KEY_2;
+        g_keycodes[0x004] = KB_KEY_3;
+        g_keycodes[0x005] = KB_KEY_4;
+        g_keycodes[0x006] = KB_KEY_5;
+        g_keycodes[0x007] = KB_KEY_6;
+        g_keycodes[0x008] = KB_KEY_7;
+        g_keycodes[0x009] = KB_KEY_8;
+        g_keycodes[0x00A] = KB_KEY_9;
+        g_keycodes[0x01E] = KB_KEY_A;
+        g_keycodes[0x030] = KB_KEY_B;
+        g_keycodes[0x02E] = KB_KEY_C;
+        g_keycodes[0x020] = KB_KEY_D;
+        g_keycodes[0x012] = KB_KEY_E;
+        g_keycodes[0x021] = KB_KEY_F;
+        g_keycodes[0x022] = KB_KEY_G;
+        g_keycodes[0x023] = KB_KEY_H;
+        g_keycodes[0x017] = KB_KEY_I;
+        g_keycodes[0x024] = KB_KEY_J;
+        g_keycodes[0x025] = KB_KEY_K;
+        g_keycodes[0x026] = KB_KEY_L;
+        g_keycodes[0x032] = KB_KEY_M;
+        g_keycodes[0x031] = KB_KEY_N;
+        g_keycodes[0x018] = KB_KEY_O;
+        g_keycodes[0x019] = KB_KEY_P;
+        g_keycodes[0x010] = KB_KEY_Q;
+        g_keycodes[0x013] = KB_KEY_R;
+        g_keycodes[0x01F] = KB_KEY_S;
+        g_keycodes[0x014] = KB_KEY_T;
+        g_keycodes[0x016] = KB_KEY_U;
+        g_keycodes[0x02F] = KB_KEY_V;
+        g_keycodes[0x011] = KB_KEY_W;
+        g_keycodes[0x02D] = KB_KEY_X;
+        g_keycodes[0x015] = KB_KEY_Y;
+        g_keycodes[0x02C] = KB_KEY_Z;
 
-    // Clear keys
-    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
-        g_keycodes[i] = 0;
+        g_keycodes[0x028] = KB_KEY_APOSTROPHE;
+        g_keycodes[0x02B] = KB_KEY_BACKSLASH;
+        g_keycodes[0x033] = KB_KEY_COMMA;
+        g_keycodes[0x00D] = KB_KEY_EQUAL;
+        g_keycodes[0x029] = KB_KEY_GRAVE_ACCENT;
+        g_keycodes[0x01A] = KB_KEY_LEFT_BRACKET;
+        g_keycodes[0x00C] = KB_KEY_MINUS;
+        g_keycodes[0x034] = KB_KEY_PERIOD;
+        g_keycodes[0x01B] = KB_KEY_RIGHT_BRACKET;
+        g_keycodes[0x027] = KB_KEY_SEMICOLON;
+        g_keycodes[0x035] = KB_KEY_SLASH;
+        g_keycodes[0x056] = KB_KEY_WORLD_2;
 
-    g_keycodes[0x00B] = KB_KEY_0;
-    g_keycodes[0x002] = KB_KEY_1;
-    g_keycodes[0x003] = KB_KEY_2;
-    g_keycodes[0x004] = KB_KEY_3;
-    g_keycodes[0x005] = KB_KEY_4;
-    g_keycodes[0x006] = KB_KEY_5;
-    g_keycodes[0x007] = KB_KEY_6;
-    g_keycodes[0x008] = KB_KEY_7;
-    g_keycodes[0x009] = KB_KEY_8;
-    g_keycodes[0x00A] = KB_KEY_9;
-    g_keycodes[0x01E] = KB_KEY_A;
-    g_keycodes[0x030] = KB_KEY_B;
-    g_keycodes[0x02E] = KB_KEY_C;
-    g_keycodes[0x020] = KB_KEY_D;
-    g_keycodes[0x012] = KB_KEY_E;
-    g_keycodes[0x021] = KB_KEY_F;
-    g_keycodes[0x022] = KB_KEY_G;
-    g_keycodes[0x023] = KB_KEY_H;
-    g_keycodes[0x017] = KB_KEY_I;
-    g_keycodes[0x024] = KB_KEY_J;
-    g_keycodes[0x025] = KB_KEY_K;
-    g_keycodes[0x026] = KB_KEY_L;
-    g_keycodes[0x032] = KB_KEY_M;
-    g_keycodes[0x031] = KB_KEY_N;
-    g_keycodes[0x018] = KB_KEY_O;
-    g_keycodes[0x019] = KB_KEY_P;
-    g_keycodes[0x010] = KB_KEY_Q;
-    g_keycodes[0x013] = KB_KEY_R;
-    g_keycodes[0x01F] = KB_KEY_S;
-    g_keycodes[0x014] = KB_KEY_T;
-    g_keycodes[0x016] = KB_KEY_U;
-    g_keycodes[0x02F] = KB_KEY_V;
-    g_keycodes[0x011] = KB_KEY_W;
-    g_keycodes[0x02D] = KB_KEY_X;
-    g_keycodes[0x015] = KB_KEY_Y;
-    g_keycodes[0x02C] = KB_KEY_Z;
+        g_keycodes[0x00E] = KB_KEY_BACKSPACE;
+        g_keycodes[0x153] = KB_KEY_DELETE;
+        g_keycodes[0x14F] = KB_KEY_END;
+        g_keycodes[0x01C] = KB_KEY_ENTER;
+        g_keycodes[0x001] = KB_KEY_ESCAPE;
+        g_keycodes[0x147] = KB_KEY_HOME;
+        g_keycodes[0x152] = KB_KEY_INSERT;
+        g_keycodes[0x15D] = KB_KEY_MENU;
+        g_keycodes[0x151] = KB_KEY_PAGE_DOWN;
+        g_keycodes[0x149] = KB_KEY_PAGE_UP;
+        g_keycodes[0x045] = KB_KEY_PAUSE;
+        g_keycodes[0x146] = KB_KEY_PAUSE;
+        g_keycodes[0x039] = KB_KEY_SPACE;
+        g_keycodes[0x00F] = KB_KEY_TAB;
+        g_keycodes[0x03A] = KB_KEY_CAPS_LOCK;
+        g_keycodes[0x145] = KB_KEY_NUM_LOCK;
+        g_keycodes[0x046] = KB_KEY_SCROLL_LOCK;
+        g_keycodes[0x03B] = KB_KEY_F1;
+        g_keycodes[0x03C] = KB_KEY_F2;
+        g_keycodes[0x03D] = KB_KEY_F3;
+        g_keycodes[0x03E] = KB_KEY_F4;
+        g_keycodes[0x03F] = KB_KEY_F5;
+        g_keycodes[0x040] = KB_KEY_F6;
+        g_keycodes[0x041] = KB_KEY_F7;
+        g_keycodes[0x042] = KB_KEY_F8;
+        g_keycodes[0x043] = KB_KEY_F9;
+        g_keycodes[0x044] = KB_KEY_F10;
+        g_keycodes[0x057] = KB_KEY_F11;
+        g_keycodes[0x058] = KB_KEY_F12;
+        g_keycodes[0x064] = KB_KEY_F13;
+        g_keycodes[0x065] = KB_KEY_F14;
+        g_keycodes[0x066] = KB_KEY_F15;
+        g_keycodes[0x067] = KB_KEY_F16;
+        g_keycodes[0x068] = KB_KEY_F17;
+        g_keycodes[0x069] = KB_KEY_F18;
+        g_keycodes[0x06A] = KB_KEY_F19;
+        g_keycodes[0x06B] = KB_KEY_F20;
+        g_keycodes[0x06C] = KB_KEY_F21;
+        g_keycodes[0x06D] = KB_KEY_F22;
+        g_keycodes[0x06E] = KB_KEY_F23;
+        g_keycodes[0x076] = KB_KEY_F24;
+        g_keycodes[0x038] = KB_KEY_LEFT_ALT;
+        g_keycodes[0x01D] = KB_KEY_LEFT_CONTROL;
+        g_keycodes[0x02A] = KB_KEY_LEFT_SHIFT;
+        g_keycodes[0x15B] = KB_KEY_LEFT_SUPER;
+        g_keycodes[0x137] = KB_KEY_PRINT_SCREEN;
+        g_keycodes[0x138] = KB_KEY_RIGHT_ALT;
+        g_keycodes[0x11D] = KB_KEY_RIGHT_CONTROL;
+        g_keycodes[0x036] = KB_KEY_RIGHT_SHIFT;
+        g_keycodes[0x15C] = KB_KEY_RIGHT_SUPER;
+        g_keycodes[0x150] = KB_KEY_DOWN;
+        g_keycodes[0x14B] = KB_KEY_LEFT;
+        g_keycodes[0x14D] = KB_KEY_RIGHT;
+        g_keycodes[0x148] = KB_KEY_UP;
 
-    g_keycodes[0x028] = KB_KEY_APOSTROPHE;
-    g_keycodes[0x02B] = KB_KEY_BACKSLASH;
-    g_keycodes[0x033] = KB_KEY_COMMA;
-    g_keycodes[0x00D] = KB_KEY_EQUAL;
-    g_keycodes[0x029] = KB_KEY_GRAVE_ACCENT;
-    g_keycodes[0x01A] = KB_KEY_LEFT_BRACKET;
-    g_keycodes[0x00C] = KB_KEY_MINUS;
-    g_keycodes[0x034] = KB_KEY_PERIOD;
-    g_keycodes[0x01B] = KB_KEY_RIGHT_BRACKET;
-    g_keycodes[0x027] = KB_KEY_SEMICOLON;
-    g_keycodes[0x035] = KB_KEY_SLASH;
-    g_keycodes[0x056] = KB_KEY_WORLD_2;
-
-    g_keycodes[0x00E] = KB_KEY_BACKSPACE;
-    g_keycodes[0x153] = KB_KEY_DELETE;
-    g_keycodes[0x14F] = KB_KEY_END;
-    g_keycodes[0x01C] = KB_KEY_ENTER;
-    g_keycodes[0x001] = KB_KEY_ESCAPE;
-    g_keycodes[0x147] = KB_KEY_HOME;
-    g_keycodes[0x152] = KB_KEY_INSERT;
-    g_keycodes[0x15D] = KB_KEY_MENU;
-    g_keycodes[0x151] = KB_KEY_PAGE_DOWN;
-    g_keycodes[0x149] = KB_KEY_PAGE_UP;
-    g_keycodes[0x045] = KB_KEY_PAUSE;
-    g_keycodes[0x146] = KB_KEY_PAUSE;
-    g_keycodes[0x039] = KB_KEY_SPACE;
-    g_keycodes[0x00F] = KB_KEY_TAB;
-    g_keycodes[0x03A] = KB_KEY_CAPS_LOCK;
-    g_keycodes[0x145] = KB_KEY_NUM_LOCK;
-    g_keycodes[0x046] = KB_KEY_SCROLL_LOCK;
-    g_keycodes[0x03B] = KB_KEY_F1;
-    g_keycodes[0x03C] = KB_KEY_F2;
-    g_keycodes[0x03D] = KB_KEY_F3;
-    g_keycodes[0x03E] = KB_KEY_F4;
-    g_keycodes[0x03F] = KB_KEY_F5;
-    g_keycodes[0x040] = KB_KEY_F6;
-    g_keycodes[0x041] = KB_KEY_F7;
-    g_keycodes[0x042] = KB_KEY_F8;
-    g_keycodes[0x043] = KB_KEY_F9;
-    g_keycodes[0x044] = KB_KEY_F10;
-    g_keycodes[0x057] = KB_KEY_F11;
-    g_keycodes[0x058] = KB_KEY_F12;
-    g_keycodes[0x064] = KB_KEY_F13;
-    g_keycodes[0x065] = KB_KEY_F14;
-    g_keycodes[0x066] = KB_KEY_F15;
-    g_keycodes[0x067] = KB_KEY_F16;
-    g_keycodes[0x068] = KB_KEY_F17;
-    g_keycodes[0x069] = KB_KEY_F18;
-    g_keycodes[0x06A] = KB_KEY_F19;
-    g_keycodes[0x06B] = KB_KEY_F20;
-    g_keycodes[0x06C] = KB_KEY_F21;
-    g_keycodes[0x06D] = KB_KEY_F22;
-    g_keycodes[0x06E] = KB_KEY_F23;
-    g_keycodes[0x076] = KB_KEY_F24;
-    g_keycodes[0x038] = KB_KEY_LEFT_ALT;
-    g_keycodes[0x01D] = KB_KEY_LEFT_CONTROL;
-    g_keycodes[0x02A] = KB_KEY_LEFT_SHIFT;
-    g_keycodes[0x15B] = KB_KEY_LEFT_SUPER;
-    g_keycodes[0x137] = KB_KEY_PRINT_SCREEN;
-    g_keycodes[0x138] = KB_KEY_RIGHT_ALT;
-    g_keycodes[0x11D] = KB_KEY_RIGHT_CONTROL;
-    g_keycodes[0x036] = KB_KEY_RIGHT_SHIFT;
-    g_keycodes[0x15C] = KB_KEY_RIGHT_SUPER;
-    g_keycodes[0x150] = KB_KEY_DOWN;
-    g_keycodes[0x14B] = KB_KEY_LEFT;
-    g_keycodes[0x14D] = KB_KEY_RIGHT;
-    g_keycodes[0x148] = KB_KEY_UP;
-
-    g_keycodes[0x052] = KB_KEY_KP_0;
-    g_keycodes[0x04F] = KB_KEY_KP_1;
-    g_keycodes[0x050] = KB_KEY_KP_2;
-    g_keycodes[0x051] = KB_KEY_KP_3;
-    g_keycodes[0x04B] = KB_KEY_KP_4;
-    g_keycodes[0x04C] = KB_KEY_KP_5;
-    g_keycodes[0x04D] = KB_KEY_KP_6;
-    g_keycodes[0x047] = KB_KEY_KP_7;
-    g_keycodes[0x048] = KB_KEY_KP_8;
-    g_keycodes[0x049] = KB_KEY_KP_9;
-    g_keycodes[0x04E] = KB_KEY_KP_ADD;
-    g_keycodes[0x053] = KB_KEY_KP_DECIMAL;
-    g_keycodes[0x135] = KB_KEY_KP_DIVIDE;
-    g_keycodes[0x11C] = KB_KEY_KP_ENTER;
-    g_keycodes[0x037] = KB_KEY_KP_MULTIPLY;
-    g_keycodes[0x04A] = KB_KEY_KP_SUBTRACT;
+        g_keycodes[0x052] = KB_KEY_KP_0;
+        g_keycodes[0x04F] = KB_KEY_KP_1;
+        g_keycodes[0x050] = KB_KEY_KP_2;
+        g_keycodes[0x051] = KB_KEY_KP_3;
+        g_keycodes[0x04B] = KB_KEY_KP_4;
+        g_keycodes[0x04C] = KB_KEY_KP_5;
+        g_keycodes[0x04D] = KB_KEY_KP_6;
+        g_keycodes[0x047] = KB_KEY_KP_7;
+        g_keycodes[0x048] = KB_KEY_KP_8;
+        g_keycodes[0x049] = KB_KEY_KP_9;
+        g_keycodes[0x04E] = KB_KEY_KP_ADD;
+        g_keycodes[0x053] = KB_KEY_KP_DECIMAL;
+        g_keycodes[0x135] = KB_KEY_KP_DIVIDE;
+        g_keycodes[0x11C] = KB_KEY_KP_ENTER;
+        g_keycodes[0x037] = KB_KEY_KP_MULTIPLY;
+        g_keycodes[0x04A] = KB_KEY_KP_SUBTRACT;
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -716,6 +846,8 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 bool 
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
+    SWindowData_Win *window_data_win = 0x0;
+    float           scaleX, scaleY;
 
     if(window_data == 0x0) {
         return false;
@@ -728,11 +860,14 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    window_data->dst_offset_x = offset_x;
-    window_data->dst_offset_y = offset_y;
+    window_data_win = (SWindowData_Win *) window_data->specific;
 
-    window_data->dst_width    = width;
-    window_data->dst_height   = height;
+    get_monitor_dpi(window_data_win->window, &scaleX, &scaleY);
+    window_data->dst_offset_x = (uint32_t) (offset_x * scaleX);
+    window_data->dst_offset_y = (uint32_t) (offset_y * scaleY);
+
+    window_data->dst_width    = (uint32_t) (width  * scaleX);
+    window_data->dst_height   = (uint32_t) (height * scaleY);
 
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 

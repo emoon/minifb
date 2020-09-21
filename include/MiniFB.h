@@ -38,6 +38,10 @@ void *              mfb_get_user_data(struct mfb_window *window);
 // Set viewport (useful when resize)
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 
+// DPI
+void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
+
+// Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
 void                mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback);
@@ -46,6 +50,7 @@ void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback);
 
+// Getters
 const char *        mfb_get_key_name(mfb_key key);
 
 bool                mfb_is_window_active(struct mfb_window *window);
@@ -58,9 +63,11 @@ float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // M
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
 
+// FPS
 void                mfb_set_target_fps(uint32_t fps);
 bool                mfb_wait_sync(struct mfb_window *window);
 
+// Timer
 struct mfb_timer *  mfb_timer_create(void);
 void                mfb_timer_destroy(struct mfb_timer *tmr);
 void                mfb_timer_reset(struct mfb_timer *tmr);
