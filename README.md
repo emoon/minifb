@@ -186,7 +186,7 @@ cmake .. -DUSE_METAL_API=OFF
 if you use **tundra**:
 
 ```
-tundra2 macosx-clang-debug 
+tundra2 macosx-clang-debug
 ```
 
 and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
@@ -230,6 +230,9 @@ unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+
+// Not working on Linux (X11 nor Wayland)
+void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y)
 ```
 
 Timers are also available.
@@ -306,7 +309,7 @@ if you use **tundra**:
 Visual Studio (ver 2012 express has been tested) tools needed (using the vcvars32.bat (for 32-bit) will set up the enviroment) to build run:
 
 ```
-tundra2 win32-msvc-debug 
+tundra2 win32-msvc-debug
 ```
 
 and you should be able to run noise in t2-output/win32-msvc-debug-default/noise.exe
