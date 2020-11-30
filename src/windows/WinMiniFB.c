@@ -872,9 +872,6 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
-    SWindowData_Win *window_data_win = 0x0;
-
-    window_data_win = (SWindowData_Win *) window_data->specific;
     BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 #endif
 
