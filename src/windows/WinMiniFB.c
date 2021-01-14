@@ -83,7 +83,7 @@ dpi_aware() {
 }
 
 //--
-void 
+void
 get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
     UINT    x, y;
 
@@ -139,7 +139,7 @@ uint32_t translate_mod();
 mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
 void     destroy_window_data(SWindowData *window_data);
 
-LRESULT CALLBACK 
+LRESULT CALLBACK
 WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT res = 0;
 
@@ -155,7 +155,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT:
         {
             if (window_data && window_data->draw_buffer && window_data_win) {
-                StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer, 
+                StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
                               window_data_win->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
             }
             ValidateRect(hWnd, 0x0);
@@ -193,7 +193,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_CHAR:
         case WM_SYSCHAR:
-        case WM_UNICHAR: 
+        case WM_UNICHAR:
         {
 
             if (window_data) {
@@ -439,7 +439,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     RegisterClass(&window_data_win->wc);
 
     calc_dst_factor(window_data, width, height);
-    
+
     window_data->window_width  = rect.right;
     window_data->window_height = rect.bottom;
 
@@ -512,7 +512,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     MSG msg;
-    
+
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -557,10 +557,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_update_state 
+mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     MSG msg;
-    
+
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
     }
@@ -589,7 +589,7 @@ extern double   g_time_for_frame;
 bool
 mfb_wait_sync(struct mfb_window *window) {
     MSG msg;
-    
+
     if (window == 0x0) {
         return false;
     }
@@ -631,7 +631,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void 
+void
 destroy_window_data(SWindowData *window_data) {
     if (window_data == 0x0)
         return;
@@ -664,7 +664,7 @@ destroy_window_data(SWindowData *window_data) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-uint32_t 
+uint32_t
 translate_mod() {
     uint32_t mods = 0;
 
@@ -688,7 +688,7 @@ translate_mod() {
 
 extern short int g_keycodes[512];
 
-void 
+void
 init_keycodes() {
     if(g_keycodes[0x00B] != KB_KEY_0) {
         g_keycodes[0x00B] = KB_KEY_0;
@@ -817,7 +817,7 @@ init_keycodes() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_key 
+mfb_key
 translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == VK_CONTROL) {
         MSG next;
@@ -843,7 +843,7 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool 
+bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
     SWindowData_Win *window_data_win = 0x0;
@@ -872,8 +872,6 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
-    SWindowData_Win *window_data_win = 0x0;
-
     window_data_win = (SWindowData_Win *) window_data->specific;
     BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 #endif
@@ -886,7 +884,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
-uint64_t 
+uint64_t
 mfb_timer_tick() {
     int64_t     counter;
 
@@ -895,7 +893,7 @@ mfb_timer_tick() {
     return counter;
 }
 
-void 
+void
 mfb_timer_init() {
     uint64_t    frequency;
 
