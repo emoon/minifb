@@ -43,6 +43,8 @@ typedef struct {
     uint32_t                mod_keys;
 
     uint32_t                flags;
+    float                   scale_x;
+    float                   scale_y;
 
     bool                    is_active;
     bool                    is_initialized;

@@ -34,12 +34,15 @@ typedef BOOL(WINAPI *PFN_SetProcessDPIAware)(void);
 typedef BOOL(WINAPI *PFN_SetProcessDpiAwarenessContext)(HANDLE);
 typedef UINT(WINAPI *PFN_GetDpiForWindow)(HWND);
 typedef BOOL(WINAPI *PFN_EnableNonClientDpiScaling)(HWND);
+typedef BOOL(WINAPI *PFN_AdjustWindowRectExForDpi)(LPRECT lpRect, DWORD dwStyle, BOOL bMenu, DWORD dwExStyle, UINT dpi);
+
 
 HMODULE                           mfb_user32_dll                    = 0x0;
 PFN_SetProcessDPIAware            mfb_SetProcessDPIAware            = 0x0;
 PFN_SetProcessDpiAwarenessContext mfb_SetProcessDpiAwarenessContext = 0x0;
 PFN_GetDpiForWindow               mfb_GetDpiForWindow               = 0x0;
 PFN_EnableNonClientDpiScaling     mfb_EnableNonClientDpiScaling     = 0x0;
+PFN_AdjustWindowRectExForDpi      mfb_AdjustWindowRectExForDpi      = 0x0;
 
 // shcore.dll
 typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(mfb_PROCESS_DPI_AWARENESS);
@@ -59,6 +62,7 @@ load_functions() {
             mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
             mfb_GetDpiForWindow = (PFN_GetDpiForWindow) GetProcAddress(mfb_user32_dll, "GetDpiForWindow");
             mfb_EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling) GetProcAddress(mfb_user32_dll, "EnableNonClientDpiScaling");
+            mfb_AdjustWindowRectExForDpi = (PFN_AdjustWindowRectExForDpi) GetProcAddress(mfb_user32_dll, "AdjustWindowRectExForDpi");
         }
     }
 
@@ -195,22 +199,48 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             return DefWindowProc(hWnd, message, wParam, lParam);;
         }
 
-        // TODO
-        //case 0x02E4://WM_GETDPISCALEDSIZE:
-        //{
-        //    SIZE* size = (SIZE*) lParam;
-        //    WORD dpi = LOWORD(wParam);
-        //    return true;
-        //    break;
-        //}
+        case 0x02E4://WM_GETDPISCALEDSIZE:
+        {
+            // It seems that some OpenGL drivers slide the corner of the viewport a little bit on DPI scale changes
+            if(window_data != 0x0) {
+                SIZE    *size    = (SIZE *) lParam;
+                RECT    new_rect = { 0 };
 
-        // TODO
-        //case WM_DPICHANGED:
-        //{
-        //    const float xscale = HIWORD(wParam);
-        //    const float yscale = LOWORD(wParam);
-        //    break;
-        //}
+                if ((window_data->flags & (WF_DO_NOT_DPI_SCALE | WF_FULLSCREEN_DESKTOP)) != 0) {
+                    size->cx = window_data->window_width;
+                    size->cy = window_data->window_height;
+                }
+                else {
+                    float   new_scale = LOWORD(wParam) / (float) USER_DEFAULT_SCREEN_DPI;
+                    float   width  = (window_data->window_width  / window_data->scale_x) * new_scale;
+                    float   height = (window_data->window_height / window_data->scale_y) * new_scale;
+
+                    window_data->scale_x = new_scale;
+                    window_data->scale_y = new_scale;
+
+                    size->cx = (LONG) width;
+                    size->cy = (LONG) height;
+                }
+                // if this event comes Windows version is more modern than AdjustWindowRectExForDpi
+                mfb_AdjustWindowRectExForDpi(&new_rect, s_window_style, FALSE, 0, LOWORD(wParam));
+                size->cx += (new_rect.right - new_rect.left);
+                size->cy += (new_rect.bottom - new_rect.top);
+            }
+            return TRUE;
+        }
+
+        case WM_DPICHANGED:
+        {
+            RECT    *rect = (RECT *) lParam;
+            SetWindowPos(hWnd,
+                         HWND_TOP,
+                         rect->left,
+                         rect->top,
+                         rect->right  - rect->left,
+                         rect->bottom - rect->top,
+                         SWP_NOACTIVATE | SWP_NOZORDER);
+            break;
+        }
 
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
@@ -339,8 +369,15 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
                 }
-                window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
-                window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
+
+                float       scale_x = 1.0f;
+                float       scale_y = 1.0f;
+
+                if((window_data->flags & WF_DO_NOT_DPI_SCALE) == 0)
+                    get_monitor_scale(hWnd, &scale_x, &scale_y);
+
+                window_data->mouse_pos_x = (int32_t) (LOWORD(lParam) / scale_x);
+                window_data->mouse_pos_y = (int32_t) (HIWORD(lParam) / scale_y);
                 kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
             }
             break;
@@ -363,6 +400,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
                 if((window_data->flags & WF_DO_NOT_DPI_SCALE) == 0)
                     get_monitor_scale(hWnd, &scale_x, &scale_y);
+
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
@@ -409,6 +447,8 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
+    float scale_x = 1.0f;
+    float scale_y = 1.0f;
 
     load_functions();
     dpi_aware();
@@ -428,6 +468,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     memset(window_data_win, 0, sizeof(SWindowData_Win));
     window_data->specific = window_data_win;
 
+    if ((flags & WF_DO_NOT_DPI_SCALE) == 0)
+        get_monitor_scale(0, &scale_x, &scale_y);
+
+    window_data->scale_x       = scale_x;
+    window_data->scale_y       = scale_y;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
@@ -480,15 +525,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
     else if ((flags & WF_FULLSCREEN) == 0) {
-        float scale_x = 1.0f;
-        float scale_y = 1.0f;
-
-        if((flags & WF_DO_NOT_DPI_SCALE) == 0)
-            get_monitor_scale(0, &scale_x, &scale_y);
-
-        rect.right  = (LONG) (width  * scale_x);
-        rect.bottom = (LONG) (height * scale_y);
-        printf("WS: %d, %d\n", rect.right, rect.bottom);
+        rect.right  = (LONG) (width  * window_data->scale_x);
+        rect.bottom = (LONG) (height * window_data->scale_x);
 
         AdjustWindowRect(&rect, s_window_style, 0);
 
@@ -499,8 +537,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom + rect.top) / 2;
     }
 
-    window_data->flags = flags;
-
     window_data_win->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_win->wc.lpfnWndProc   = WndProc;
     window_data_win->wc.hCursor       = LoadCursor(0, IDC_ARROW);
@@ -509,6 +545,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     calc_dst_factor(window_data, width, height);
 
+    window_data->flags         = flags;
     window_data->window_width  = rect.right;
     window_data->window_height = rect.bottom;
 
@@ -934,6 +971,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     if((window_data->flags & WF_DO_NOT_DPI_SCALE) == 0)
         get_monitor_scale(window_data_win->window, &scale_x, &scale_y);
+
     window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);
     window_data->dst_offset_y = (uint32_t) (offset_y * scale_y);
 
