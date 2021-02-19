@@ -168,6 +168,7 @@ typedef enum {
     WF_FULLSCREEN_DESKTOP = 0x04,
     WF_BORDERLESS         = 0x08,
     WF_ALWAYS_ON_TOP      = 0x10,
+    WF_DO_NOT_DPI_SCALE   = 0x20,
 } mfb_window_flags;
 
 // Opaque pointer
@@ -182,4 +183,3 @@ typedef void(*mfb_char_input_func)(struct mfb_window *window, unsigned int code)
 typedef void(*mfb_mouse_button_func)(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed);
 typedef void(*mfb_mouse_move_func)(struct mfb_window *window, int x, int y);
 typedef void(*mfb_mouse_scroll_func)(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY);
-

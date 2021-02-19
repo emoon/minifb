@@ -353,14 +353,16 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_SIZE:
             if (window_data) {
-                float       scale_x, scale_y;
+                float       scale_x = 1.0f;
+                float       scale_y = 1.0f;
                 uint32_t    width, height;
 
                 if(wParam == SIZE_MINIMIZED) {
                     return res;
                 }
 
-                get_monitor_scale(hWnd, &scale_x, &scale_y);
+                if((window_data->flags & WF_DO_NOT_DPI_SCALE) == 0)
+                    get_monitor_scale(hWnd, &scale_x, &scale_y);
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
@@ -477,13 +479,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             rect.top = 0;
         }
     }
-    else if (!(flags & WF_FULLSCREEN)) {
-        float scale_x, scale_y;
+    else if ((flags & WF_FULLSCREEN) == 0) {
+        float scale_x = 1.0f;
+        float scale_y = 1.0f;
 
-        get_monitor_scale(0, &scale_x, &scale_y);
+        if((flags & WF_DO_NOT_DPI_SCALE) == 0)
+            get_monitor_scale(0, &scale_x, &scale_y);
 
         rect.right  = (LONG) (width  * scale_x);
         rect.bottom = (LONG) (height * scale_y);
+        printf("WS: %d, %d\n", rect.right, rect.bottom);
 
         AdjustWindowRect(&rect, s_window_style, 0);
 
@@ -493,6 +498,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         x = (GetSystemMetrics(SM_CXSCREEN) - rect.right) / 2;
         y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom + rect.top) / 2;
     }
+
+    window_data->flags = flags;
 
     window_data_win->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_win->wc.lpfnWndProc   = WndProc;
@@ -909,7 +916,8 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
     SWindowData_Win *window_data_win = 0x0;
-    float           scale_x, scale_y;
+    float           scale_x = 1.0f;
+    float           scale_y = 1.0f;
 
     if(window_data == 0x0) {
         return false;
@@ -924,7 +932,8 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     window_data_win = (SWindowData_Win *) window_data->specific;
 
-    get_monitor_scale(window_data_win->window, &scale_x, &scale_y);
+    if((window_data->flags & WF_DO_NOT_DPI_SCALE) == 0)
+        get_monitor_scale(window_data_win->window, &scale_x, &scale_y);
     window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);
     window_data->dst_offset_y = (uint32_t) (offset_y * scale_y);
 

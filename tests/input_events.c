@@ -65,8 +65,9 @@ char_input(struct mfb_window *window, unsigned int charCode) {
 
 void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
-    const char *window_title = "";
-    int x, y;
+    const char  *window_title = "";
+    int         x, y;
+
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
@@ -103,7 +104,7 @@ main()
 {
     int noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, WF_RESIZABLE | WF_DO_NOT_DPI_SCALE);
     if (!window)
         return 0;
 
