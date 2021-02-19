@@ -48,7 +48,7 @@ public:
         fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
         if(key == KB_KEY_ESCAPE) {
             mfb_close(window);
-        }    
+        }
     }
 
     void char_input(struct mfb_window *window, unsigned int charCode) {
@@ -60,11 +60,15 @@ public:
     }
 
     void mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
-        const char *window_title = "";
+        const char  *window_title = "";
+        int         x, y;
+
         if(window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]\n", window_title, button, isPressed, mod);
+        x = mfb_get_mouse_x(window);
+        y = mfb_get_mouse_y(window);
+        fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
     }
 
     void mouse_move(struct mfb_window *window, int x, int y) {
@@ -89,7 +93,7 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int 
+int
 main()
 {
     int noise, carry, seed = 0xbeef;
@@ -123,7 +127,7 @@ main()
             seed >>= 1;
             seed |= (carry << 30);
             noise &= 0xFF;
-            g_buffer[i] = MFB_RGB(noise, noise, noise); 
+            g_buffer[i] = MFB_RGB(noise, noise, noise);
         }
 
         state = mfb_update(window, g_buffer);

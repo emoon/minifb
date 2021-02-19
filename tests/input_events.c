@@ -11,7 +11,7 @@ static bool         g_active = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void 
+void
 active(struct mfb_window *window, bool isActive) {
     const char *window_title = "";
     if(window) {
@@ -21,7 +21,7 @@ active(struct mfb_window *window, bool isActive) {
     g_active = isActive;
 }
 
-void 
+void
 resize(struct mfb_window *window, int width, int height) {
     uint32_t x = 0;
     uint32_t y = 0;
@@ -42,7 +42,7 @@ resize(struct mfb_window *window, int width, int height) {
     mfb_set_viewport(window, x, y, width, height);
 }
 
-void 
+void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
     if(window) {
@@ -51,10 +51,10 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed
     fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
     if(key == KB_KEY_ESCAPE) {
         mfb_close(window);
-    }    
+    }
 }
 
-void 
+void
 char_input(struct mfb_window *window, unsigned int charCode) {
     const char *window_title = "";
     if(window) {
@@ -63,16 +63,19 @@ char_input(struct mfb_window *window, unsigned int charCode) {
     fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
 }
 
-void 
+void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
+    int x, y;
     if(window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]\n", window_title, button, isPressed, mod);
+    x = mfb_get_mouse_x(window);
+    y = mfb_get_mouse_y(window);
+    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
 }
 
-void 
+void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
@@ -84,7 +87,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
     //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
 }
 
-void 
+void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
     const char *window_title = "";
     if(window) {
@@ -95,7 +98,7 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float del
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int 
+int
 main()
 {
     int noise, carry, seed = 0xbeef;
@@ -118,7 +121,7 @@ main()
         int              i;
         mfb_update_state state;
 
-        if(g_active) 
+        if(g_active)
         {
             for (i = 0; i < WIDTH * HEIGHT; ++i)
             {
@@ -130,7 +133,7 @@ main()
                 seed >>= 1;
                 seed |= (carry << 30);
                 noise &= 0xFF;
-                g_buffer[i] = MFB_RGB(noise, noise, noise); 
+                g_buffer[i] = MFB_RGB(noise, noise, noise);
             }
 
             state = mfb_update(window, g_buffer);
