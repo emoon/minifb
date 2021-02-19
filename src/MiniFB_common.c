@@ -13,7 +13,7 @@ mfb_open(const char *title, unsigned width, unsigned height) {
 }
 
 //-------------------------------------
-mfb_update_state 
+mfb_update_state
 mfb_update(struct mfb_window *window, void *buffer) {
     if (window == 0x0) {
         return STATE_INVALID_WINDOW;
@@ -25,7 +25,7 @@ mfb_update(struct mfb_window *window, void *buffer) {
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -34,7 +34,7 @@ mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback) {
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -43,7 +43,7 @@ mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback) {
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -52,7 +52,7 @@ mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback)
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_char_input_callback(struct mfb_window *window, mfb_char_input_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -61,7 +61,7 @@ mfb_set_char_input_callback(struct mfb_window *window, mfb_char_input_func callb
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -70,7 +70,7 @@ mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func c
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -79,7 +79,7 @@ mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callb
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -88,7 +88,7 @@ mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func c
 }
 
 //-------------------------------------
-void 
+void
 mfb_set_user_data(struct mfb_window *window, void *user_data) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -107,8 +107,15 @@ mfb_get_user_data(struct mfb_window *window) {
     return 0x0;
 }
 
+// [Deprecated]
 //-------------------------------------
-void 
+void
+mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+    mfb_get_monitor_scale(window, dpi_x, dpi_y);
+}
+
+//-------------------------------------
+void
 mfb_close(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -117,7 +124,7 @@ mfb_close(struct mfb_window *window) {
 }
 
 //-------------------------------------
-void 
+void
 keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     kUnused(mod);
     kUnused(isPressed);
@@ -128,7 +135,7 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
 }
 
 //-------------------------------------
-bool 
+bool
 mfb_is_window_active(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -138,7 +145,7 @@ mfb_is_window_active(struct mfb_window *window) {
 }
 
 //-------------------------------------
-unsigned 
+unsigned
 mfb_get_window_width(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -148,7 +155,7 @@ mfb_get_window_width(struct mfb_window *window) {
 }
 
 //-------------------------------------
-unsigned 
+unsigned
 mfb_get_window_height(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -158,7 +165,7 @@ mfb_get_window_height(struct mfb_window *window) {
 }
 
 //-------------------------------------
-int 
+int
 mfb_get_mouse_x(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -168,7 +175,7 @@ mfb_get_mouse_x(struct mfb_window *window) {
 }
 
 //-------------------------------------
-int 
+int
 mfb_get_mouse_y(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -178,7 +185,7 @@ mfb_get_mouse_y(struct mfb_window *window) {
 }
 
 //-------------------------------------
-float 
+float
 mfb_get_mouse_scroll_x(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -188,7 +195,7 @@ mfb_get_mouse_scroll_x(struct mfb_window *window) {
 }
 
 //-------------------------------------
-float 
+float
 mfb_get_mouse_scroll_y(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -198,7 +205,7 @@ mfb_get_mouse_scroll_y(struct mfb_window *window) {
 }
 
 //-------------------------------------
-const uint8_t * 
+const uint8_t *
 mfb_get_mouse_button_buffer(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -208,7 +215,7 @@ mfb_get_mouse_button_buffer(struct mfb_window *window) {
 }
 
 //-------------------------------------
-const uint8_t * 
+const uint8_t *
 mfb_get_key_buffer(struct mfb_window *window)  {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -218,7 +225,7 @@ mfb_get_key_buffer(struct mfb_window *window)  {
 }
 
 //-------------------------------------
-const char * 
+const char *
 mfb_get_key_name(mfb_key key) {
 
     switch (key)
@@ -586,6 +593,6 @@ mfb_get_key_name(mfb_key key) {
         case KB_KEY_UNKNOWN:
             return "Unknown";
     }
-    
+
     return "Unknown";
 }

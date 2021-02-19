@@ -232,6 +232,8 @@ int                 mfb_get_mouse_x(struct mfb_window *window);             // L
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
 
 // Not working on Linux (X11 nor Wayland)
+void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
+// [Deprecated] Use mfb_get_monitor_scale instead
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y)
 ```
 

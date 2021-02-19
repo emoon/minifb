@@ -250,23 +250,23 @@ mfb_timer_init() {
 
 //-------------------------------------
 void
-mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     (void) window;
     float scale = 1.0f;
 
     scale = [[UIScreen mainScreen] scale];
-    
-    if (dpi_x) {
-        *dpi_x = scale;
-        if(*dpi_x == 0) {
-            *dpi_x = 1;
+
+    if (scale_x) {
+        *scale_x = scale;
+        if(*scale_x == 0) {
+            *scale_x = 1;
         }
     }
 
-    if (dpi_y) {
-        *dpi_y = scale;
-        if (*dpi_y == 0) {
-            *dpi_y = 1;
+    if (scale_y) {
+        *scale_y = scale;
+        if (*scale_y == 0) {
+            *scale_y = 1;
         }
     }
 }

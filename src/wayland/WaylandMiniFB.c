@@ -22,8 +22,8 @@
 
 void init_keycodes();
 
-static void 
-destroy_window_data(SWindowData *window_data) 
+static void
+destroy_window_data(SWindowData *window_data)
 {
     if(window_data == 0x0)
         return;
@@ -38,12 +38,12 @@ destroy_window_data(SWindowData *window_data)
     free(window_data);
 }
 
-static void 
+static void
 destroy(SWindowData *window_data)
 {
     if(window_data == 0x0)
         return;
-    
+
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == 0x0 || window_data_way->display == 0x0) {
         destroy_window_data(window_data);
@@ -79,7 +79,7 @@ destroy(SWindowData *window_data)
     close(window_data_way->fd);
 }
 
-// This event provides a file descriptor to the client which can be memory-mapped 
+// This event provides a file descriptor to the client which can be memory-mapped
 // to provide a keyboard mapping description.
 // format: keymap format
 // fd:     keymap file descriptor
@@ -98,7 +98,7 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
 // serial:  serial number of the enter event
 // surface: surface gaining keyboard focus
 // keys:    the currently pressed keys
-static void 
+static void
 keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys)
 {
     kUnused(keyboard);
@@ -114,7 +114,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
 // The leave notification is sent before the enter notification for the new focus.
 // serial:  serial number of the leave event
 // surface: surface that lost keyboard focus
-static void 
+static void
 keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface)
 {
     kUnused(keyboard);
@@ -126,13 +126,13 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kCall(active_func, false);
 }
 
-// A key was pressed or released. The time argument is a timestamp with 
+// A key was pressed or released. The time argument is a timestamp with
 // millisecond granularity, with an undefined base.
 // serial: serial number of the key event
 // time:   timestamp with millisecond granularity
 // key:    key that produced the event
 // state:  physical state of the key
-static void 
+static void
 keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
 {
     kUnused(keyboard);
@@ -183,14 +183,14 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     }
 }
 
-// Notifies clients that the modifier and/or group state has changed, 
+// Notifies clients that the modifier and/or group state has changed,
 // and it should update its local state.
 // serial:         serial number of the modifiers event
 // mods_depressed: depressed modifiers
 // mods_latched:   latched modifiers
 // mods_locked:    locked modifiers
 // group:          keyboard layout
-static void 
+static void
 keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
 {
     kUnused(data);
@@ -206,7 +206,7 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
 // Informs the client about the keyboard's repeat rate and delay.
 // rate:  the rate of repeating keys in characters per second
 // delay: delay in milliseconds since key down until repeating starts
-static void 
+static void
 keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay)
 {
     kUnused(data);
@@ -215,7 +215,7 @@ keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int
     kUnused(delay);
 }
 
-static const struct 
+static const struct
 wl_keyboard_listener keyboard_listener = {
     .keymap      = keyboard_keymap,
     .enter       = keyboard_enter,
@@ -278,7 +278,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     //fprintf(stderr, "Pointer left surface %p\n", surface);
 }
 
-// Notification of pointer location change. 
+// Notification of pointer location change.
 //
 // The arguments sx and sy are the location relative to the focused surface.
 //
@@ -329,19 +329,19 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 }
 
 //  Scroll and other axis notifications.
-// 
+//
 //  For scroll events (vertical and horizontal scroll axes), the
 //  value parameter is the length of a vector along the specified
 //  axis in a coordinate space identical to those of motion events,
 //  representing a relative movement along the specified axis.
-// 
+//
 //  For devices that support movements non-parallel to axes multiple
 //  axis events will be emitted.
-// 
+//
 //  When applicable, for example for touch pads, the server can
 //  choose to emit scroll events where the motion vector is
 //  equivalent to a motion event vector.
-// 
+//
 //  When applicable, a client can transform its content relative to
 //  the scroll distance.
 //
@@ -365,20 +365,20 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     }
 }
 
-static void 
+static void
 frame(void *data, struct wl_pointer *pointer) {
     kUnused(data);
     kUnused(pointer);
 }
 
-static void 
+static void
 axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
     kUnused(data);
     kUnused(pointer);
     kUnused(axis_source);
 }
 
-static void 
+static void
 axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) {
     kUnused(data);
     kUnused(pointer);
@@ -386,7 +386,7 @@ axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) 
     kUnused(axis);
 }
 
-static void 
+static void
 axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
     kUnused(data);
     kUnused(pointer);
@@ -394,7 +394,7 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
     kUnused(discrete);
 }
 
-static const struct 
+static const struct
 wl_pointer_listener pointer_listener = {
     .enter         = pointer_enter,
     .leave         = pointer_leave,
@@ -409,7 +409,7 @@ wl_pointer_listener pointer_listener = {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void 
+static void
 seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps)
 {
     kUnused(data);
@@ -427,28 +427,28 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         window_data_way->keyboard = 0x0;
     }
 
-    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer) 
+    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer)
     {
         window_data_way->pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(window_data_way->pointer, &pointer_listener, window_data);
-    } 
-    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer) 
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer)
     {
         wl_pointer_destroy(window_data_way->pointer);
         window_data_way->pointer = 0x0;
     }
 }
 
-static void 
+static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
     kUnused(data);
     kUnused(seat);
     printf("Seat '%s'n", name);
 }
 
-static const struct 
+static const struct
 wl_seat_listener seat_listener = {
-    .capabilities = seat_capabilities, 
+    .capabilities = seat_capabilities,
     .name         = 0x0,
 };
 
@@ -460,7 +460,7 @@ wl_seat_listener seat_listener = {
 // for buffers. Known formats include argb8888 and xrgb8888.
 //
 // format: buffer pixel format
-static void 
+static void
 shm_format(void *data, struct wl_shm *shm, uint32_t format)
 {
     kUnused(shm);
@@ -472,7 +472,7 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
         switch (format)
         {
             // We could do RGBA, but that would not be what is expected from minifb...
-            // case WL_SHM_FORMAT_ARGB8888: 
+            // case WL_SHM_FORMAT_ARGB8888:
             case WL_SHM_FORMAT_XRGB8888:
                 window_data_way->shm_format = format;
             break;
@@ -483,14 +483,14 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
     }
 }
 
-static const struct 
+static const struct
 wl_shm_listener shm_listener = {
     .format = shm_format
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void 
+static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
 {
     kUnused(version);
@@ -524,9 +524,9 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 }
 
-static const struct 
+static const struct
 wl_registry_listener registry_listener = {
-    .global        = registry_global, 
+    .global        = registry_global,
     .global_remove = 0x0,
 };
 
@@ -562,7 +562,7 @@ static const struct wl_shell_surface_listener shell_surface_listener = {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct mfb_window * 
+struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
@@ -592,7 +592,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
     init_keycodes();
 
-    if (wl_display_dispatch(window_data_way->display) == -1 || 
+    if (wl_display_dispatch(window_data_way->display) == -1 ||
         wl_display_roundtrip(window_data_way->display) == -1) {
         return 0x0;
     }
@@ -631,7 +631,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     calc_dst_factor(window_data, width, height);
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
-    window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
+    window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
 
@@ -680,7 +680,7 @@ out:
 // Notify the client when the related request is done.
 //
 // callback_data: request-specific data for the callback
-static void 
+static void
 frame_done(void *data, struct wl_callback *callback, uint32_t cookie)
 {
     kUnused(cookie);
@@ -689,14 +689,14 @@ frame_done(void *data, struct wl_callback *callback, uint32_t cookie)
     *(uint32_t *)data = 1;
 }
 
-static const struct 
+static const struct
 wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_update_state 
+mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height)
 {
     uint32_t done = 0;
@@ -744,11 +744,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         resize_dst(window_data, width, height);
 
         wl_buffer_destroy(window_data->draw_buffer);
-        window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0, 
+        window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                         window_data->buffer_width, window_data->buffer_height,
                                         window_data->buffer_stride, window_data_way->shm_format);
     }
-    
+
     // update shm buffer
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
@@ -773,7 +773,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mfb_update_state 
+mfb_update_state
 mfb_update_events(struct mfb_window *window)
 {
     if(window == 0x0) {
@@ -801,7 +801,7 @@ mfb_update_events(struct mfb_window *window)
 
 extern double   g_time_for_frame;
 
-bool 
+bool
 mfb_wait_sync(struct mfb_window *window) {
     if(window == 0x0) {
         return false;
@@ -820,7 +820,7 @@ mfb_wait_sync(struct mfb_window *window) {
         if (wl_display_dispatch_pending(window_data_way->display) == -1) {
             return false;
         }
-        
+
         if(window_data->close) {
             destroy_window_data(window_data);
             return false;
@@ -846,11 +846,11 @@ mfb_wait_sync(struct mfb_window *window) {
 
 extern short int g_keycodes[512];
 
-void 
+void
 init_keycodes(void)
 {
     // Clear keys
-    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) 
+    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
         g_keycodes[i] = 0;
 
     g_keycodes[KEY_GRAVE]      = KB_KEY_GRAVE_ACCENT;
@@ -974,7 +974,7 @@ init_keycodes(void)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool 
+bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
 
     SWindowData *window_data = (SWindowData *) window;
@@ -999,7 +999,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void
-mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 96.0, y = 96.0;
 
     if(window != 0x0) {
@@ -1009,17 +1009,17 @@ mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
         // I cannot find a way to get dpi under VirtualBox
     }
 
-    if (dpi_x) {
-        *dpi_x = x / 96.0f;
-        if(*dpi_x == 0) {
-            *dpi_x = 1.0f;
+    if (scale_x) {
+        *scale_x = x / 96.0f;
+        if(*scale_x == 0) {
+            *scale_x = 1.0f;
         }
     }
 
-    if (dpi_y) {
-        *dpi_y = y / 96.0f;
-        if (*dpi_y == 0) {
-            *dpi_y = 1.0f;
+    if (scale_y) {
+        *scale_y = y / 96.0f;
+        if (*scale_y == 0) {
+            *scale_y = 1.0f;
         }
     }
 }

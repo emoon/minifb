@@ -161,7 +161,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         window_data->is_initialized = true;
         return (struct mfb_window *) window_data;
-    }    
+    }
 }
 
 //-------------------------------------
@@ -175,7 +175,7 @@ destroy_window_data(SWindowData *window_data) {
         if(window_data_osx != 0x0) {
             OSXWindow   *window = window_data_osx->window;
             [window performClose:nil];
-            
+
             // Flush events!
             NSEvent* event;
             do {
@@ -198,7 +198,7 @@ destroy_window_data(SWindowData *window_data) {
             window_data->draw_buffer = 0x0;
         }
 #endif
-        
+
         memset(window_data, 0, sizeof(SWindowData));
         free(window_data);
     }
@@ -247,7 +247,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
         [window_data_osx->viewController resizeTextures];
     }
-    
+
     memcpy(window_data->draw_buffer, buffer, window_data->buffer_stride * window_data->buffer_height);
 #else
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
@@ -255,7 +255,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = width * 4;
         window_data->buffer_height = height;
     }
-    
+
     window_data->draw_buffer = buffer;
 #endif
 
@@ -553,7 +553,7 @@ mfb_timer_init() {
 
 //-------------------------------------
 void
-mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float scale = 1.0f;
 
     if(window != 0x0) {
@@ -565,19 +565,18 @@ mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
     else {
         scale = [[NSScreen mainScreen] backingScaleFactor];
     }
-    
-    if (dpi_x) {
-        *dpi_x = scale;
-        if(*dpi_x == 0) {
-            *dpi_x = 1;
+
+    if (scale_x) {
+        *scale_x = scale;
+        if(*scale_x == 0) {
+            *scale_x = 1;
         }
     }
 
-    if (dpi_y) {
-        *dpi_y = scale;
-        if (*dpi_y == 0) {
-            *dpi_y = 1;
+    if (scale_y) {
+        *scale_y = scale;
+        if (*scale_y == 0) {
+            *scale_y = 1;
         }
     }
 }
-

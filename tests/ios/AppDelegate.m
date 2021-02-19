@@ -74,7 +74,7 @@ resize(struct mfb_window *window, int width, int height) {
                 dis ^= 0x01;
         }
     }
-    
+
     mfb_update_state state = mfb_update_ex(g_window, g_buffer, g_width, g_height);
     if (state != STATE_OK) {
         free(g_buffer);
@@ -89,9 +89,9 @@ resize(struct mfb_window *window, int width, int height) {
     // Override point for customization after application launch.
     kUnused(application);
     kUnused(launchOptions);
-    
+
     if(g_window == 0x0) {
-        mfb_get_monitor_dpi(0x0, &g_scale, 0x0);
+        mfb_get_monitor_scale(0x0, &g_scale, 0x0);
         //g_scale  = [UIScreen mainScreen].scale;
         g_width  = [UIScreen mainScreen].bounds.size.width  * g_scale;
         g_height = [UIScreen mainScreen].bounds.size.height * g_scale;
@@ -135,7 +135,7 @@ resize(struct mfb_window *window, int width, int height) {
 - (void)applicationDidBecomeActive:(UIApplication *)application {
     // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
     kUnused(application);
-    
+
     mDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(OnUpdateFrame)];
     [mDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
 }
@@ -144,7 +144,7 @@ resize(struct mfb_window *window, int width, int height) {
 - (void)applicationWillTerminate:(UIApplication *)application {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     kUnused(application);
-    
+
     [mDisplayLink invalidate];
     mfb_close(g_window);
 }

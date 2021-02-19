@@ -39,7 +39,10 @@ void *              mfb_get_user_data(struct mfb_window *window);
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 
 // DPI
+// [Deprecated]: Probably a better name will be mfb_get_monitor_scale
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
+// Use this instead
+void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
 
 // Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);

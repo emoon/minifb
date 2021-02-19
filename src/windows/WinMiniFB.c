@@ -5,11 +5,8 @@
 #if defined(USE_OPENGL_API)
     #include "gl/MiniFB_GL.h"
 #endif
-#if defined(_DEBUG) || defined(DEBUG)
-    #include <stdio.h>
-#endif
+#include <stdio.h>
 #include <stdlib.h>
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
@@ -35,10 +32,14 @@ typedef enum mfb_MONITOR_DPI_TYPE {
 // user32.dll
 typedef BOOL(WINAPI *PFN_SetProcessDPIAware)(void);
 typedef BOOL(WINAPI *PFN_SetProcessDpiAwarenessContext)(HANDLE);
+typedef UINT(WINAPI *PFN_GetDpiForWindow)(HWND);
+typedef BOOL(WINAPI *PFN_EnableNonClientDpiScaling)(HWND);
 
 HMODULE                           mfb_user32_dll                    = 0x0;
 PFN_SetProcessDPIAware            mfb_SetProcessDPIAware            = 0x0;
 PFN_SetProcessDpiAwarenessContext mfb_SetProcessDpiAwarenessContext = 0x0;
+PFN_GetDpiForWindow               mfb_GetDpiForWindow               = 0x0;
+PFN_EnableNonClientDpiScaling     mfb_EnableNonClientDpiScaling     = 0x0;
 
 // shcore.dll
 typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(mfb_PROCESS_DPI_AWARENESS);
@@ -56,6 +57,8 @@ load_functions() {
         if (mfb_user32_dll != 0x0) {
             mfb_SetProcessDPIAware = (PFN_SetProcessDPIAware) GetProcAddress(mfb_user32_dll, "SetProcessDPIAware");
             mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
+            mfb_GetDpiForWindow = (PFN_GetDpiForWindow) GetProcAddress(mfb_user32_dll, "GetDpiForWindow");
+            mfb_EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling) GetProcAddress(mfb_user32_dll, "EnableNonClientDpiScaling");
         }
     }
 
@@ -69,22 +72,55 @@ load_functions() {
 }
 
 //--
+// NOT Thread safe. Just convenient (Don't do this at home guys)
+char *
+GetErrorMessage() {
+    static char buffer[256];
+
+    buffer[0] = 0;
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,  // Not used with FORMAT_MESSAGE_FROM_SYSTEM
+                  GetLastError(),
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  buffer,
+                  sizeof(buffer),
+                  NULL);
+
+    return buffer;
+}
+
+//--
 void
 dpi_aware() {
     if (mfb_SetProcessDpiAwarenessContext != 0x0) {
-        mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if(mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
+            uint32_t error = GetLastError();
+            if(error == ERROR_INVALID_PARAMETER) {
+                error = NO_ERROR;
+                if(mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE) == false) {
+                    error = GetLastError();
+                }
+            }
+            if(error != NO_ERROR) {
+                fprintf(stderr, "Error (SetProcessDpiAwarenessContext): %s\n", GetErrorMessage());
+            }
+        }
     }
     else if (mfb_SetProcessDpiAwareness != 0x0) {
-        mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE);
+        if(mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE) != S_OK) {
+            fprintf(stderr, "Error (SetProcessDpiAwareness): %s\n", GetErrorMessage());
+        }
     }
     else if (mfb_SetProcessDPIAware != 0x0) {
-        mfb_SetProcessDPIAware();
+        if(mfb_SetProcessDPIAware() == false) {
+            fprintf(stderr, "Error (SetProcessDPIAware): %s\n", GetErrorMessage());
+        }
     }
 }
 
 //--
 void
-get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
+get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
     UINT    x, y;
 
     if(mfb_GetDpiForMonitor != 0x0) {
@@ -98,17 +134,17 @@ get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
         ReleaseDC(NULL, dc);
     }
 
-    if (dpi_x) {
-        *dpi_x = x / (float) USER_DEFAULT_SCREEN_DPI;
-        if(*dpi_x == 0) {
-            *dpi_x = 1;
+    if (scale_x) {
+        *scale_x = x / (float) USER_DEFAULT_SCREEN_DPI;
+        if(*scale_x == 0) {
+            *scale_x = 1;
         }
     }
 
-    if (dpi_y) {
-        *dpi_y = y / (float) USER_DEFAULT_SCREEN_DPI;
-        if (*dpi_y == 0) {
-            *dpi_y = 1;
+    if (scale_y) {
+        *scale_y = y / (float) USER_DEFAULT_SCREEN_DPI;
+        if (*scale_y == 0) {
+            *scale_y = 1;
         }
     }
 }
@@ -116,7 +152,7 @@ get_monitor_dpi(HWND hWnd, float *dpi_x, float *dpi_y) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void
-mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     HWND hWnd = 0x0;
 
     if(window != 0x0) {
@@ -124,7 +160,7 @@ mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y) {
         SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
         hWnd = window_data_win->window;
     }
-    get_monitor_dpi(hWnd, dpi_x, dpi_y);
+    get_monitor_scale(hWnd, scale_x, scale_y);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,6 +187,31 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
     switch (message)
     {
+        case WM_NCCREATE:
+        {
+            if(mfb_EnableNonClientDpiScaling)
+                mfb_EnableNonClientDpiScaling(hWnd);
+
+            return DefWindowProc(hWnd, message, wParam, lParam);;
+        }
+
+        // TODO
+        //case 0x02E4://WM_GETDPISCALEDSIZE:
+        //{
+        //    SIZE* size = (SIZE*) lParam;
+        //    WORD dpi = LOWORD(wParam);
+        //    return true;
+        //    break;
+        //}
+
+        // TODO
+        //case WM_DPICHANGED:
+        //{
+        //    const float xscale = HIWORD(wParam);
+        //    const float yscale = LOWORD(wParam);
+        //    break;
+        //}
+
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
         {
@@ -292,14 +353,14 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_SIZE:
             if (window_data) {
-                float       scaleX, scaleY;
+                float       scale_x, scale_y;
                 uint32_t    width, height;
 
                 if(wParam == SIZE_MINIMIZED) {
                     return res;
                 }
 
-                get_monitor_dpi(hWnd, &scaleX, &scaleY);
+                get_monitor_scale(hWnd, &scale_x, &scale_y);
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
@@ -310,8 +371,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 resize_GL(window_data);
 #endif
                 if(window_data->window_width != 0 && window_data->window_height != 0) {
-                    width  = (uint32_t) (window_data->window_width  / scaleX);
-                    height = (uint32_t) (window_data->window_height / scaleY);
+                    width  = (uint32_t) (window_data->window_width  / scale_x);
+                    height = (uint32_t) (window_data->window_height / scale_y);
                     kCall(resize_func, width, height);
                 }
             }
@@ -417,11 +478,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
     else if (!(flags & WF_FULLSCREEN)) {
-        float dpi_x, dpi_y;
-        get_monitor_dpi(0, &dpi_x, &dpi_y);
+        float scale_x, scale_y;
 
-        rect.right  = (LONG) (width  * dpi_x);
-        rect.bottom = (LONG) (height * dpi_y);
+        get_monitor_scale(0, &scale_x, &scale_y);
+
+        rect.right  = (LONG) (width  * scale_x);
+        rect.bottom = (LONG) (height * scale_y);
 
         AdjustWindowRect(&rect, s_window_style, 0);
 
@@ -847,7 +909,7 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
     SWindowData_Win *window_data_win = 0x0;
-    float           scaleX, scaleY;
+    float           scale_x, scale_y;
 
     if(window_data == 0x0) {
         return false;
@@ -862,12 +924,12 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     window_data_win = (SWindowData_Win *) window_data->specific;
 
-    get_monitor_dpi(window_data_win->window, &scaleX, &scaleY);
-    window_data->dst_offset_x = (uint32_t) (offset_x * scaleX);
-    window_data->dst_offset_y = (uint32_t) (offset_y * scaleY);
+    get_monitor_scale(window_data_win->window, &scale_x, &scale_y);
+    window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);
+    window_data->dst_offset_y = (uint32_t) (offset_y * scale_y);
 
-    window_data->dst_width    = (uint32_t) (width  * scaleX);
-    window_data->dst_height   = (uint32_t) (height * scaleY);
+    window_data->dst_width    = (uint32_t) (width  * scale_x);
+    window_data->dst_height   = (uint32_t) (height * scale_y);
 
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
