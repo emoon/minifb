@@ -80,10 +80,13 @@ NSString *g_shader_src = kShader(
 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
-        id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
-        if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
-            g_use_hardware_sync  = true;
-        }
+
+        // MacOS Mojave is ignoring view.preferredFramesPerSecond
+        // MacOS Big Sur is ignoring commandBuffer:presentDrawable:afterMinimumDuration:
+        //id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
+        //if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
+        //    g_use_hardware_sync  = true;
+        //}
 
         [self _createShaders];
         [self _createAssets];
@@ -173,10 +176,10 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
     if (g_target_fps_changed) {
-        // MacOS is ignoring this :()
+        // MacOS is ignoring this :(
         if (g_time_for_frame == 0) {
-            // Contrary to what is stated in the documentation, 
-            // 0 means that it does not update.
+            // Contrary to what is stated in the documentation,
+            // 0 means that it does not update. Like pause.
             view.preferredFramesPerSecond = 9999;
         }
         else {
@@ -233,12 +236,13 @@ NSString *g_shader_src = kShader(
         [renderEncoder endEncoding];
 
         // Schedule a present once the framebuffer is complete using the current drawable
-        if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
-            [commandBuffer presentDrawable:view.currentDrawable afterMinimumDuration:g_time_for_frame];
-        }
-        else {
+        //if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
+        //    // MacOS Big Sur is ignoring this
+        //    [commandBuffer presentDrawable:view.currentDrawable afterMinimumDuration:g_time_for_frame];
+        //}
+        //else {
             [commandBuffer presentDrawable:view.currentDrawable];
-        }
+        //}
     }
 
     // Finalize rendering here & push the command buffer to the GPU
