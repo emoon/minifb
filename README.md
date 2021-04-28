@@ -145,6 +145,8 @@ unsigned            mfb_get_target_fps();
 
 This avoid the problem of update too fast the window collapsing the redrawing in fast processors.
 
+Note: OpenGL and iOS have hardware support for syncing. Other systems will use software syncing. Including MacOS Metal.
+
 To use this you need to call the function:
 
 ```c
