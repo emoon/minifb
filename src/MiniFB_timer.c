@@ -25,6 +25,17 @@ mfb_set_target_fps(uint32_t fps) {
 }
 
 //-------------------------------------
+unsigned
+mfb_get_target_fps() {
+    if (g_time_for_frame == 0) {
+        return 0;
+    }
+    else {
+        return 1.0 / g_time_for_frame;
+    }
+}
+
+//-------------------------------------
 struct mfb_timer *
 mfb_timer_create() {
     static int  once = 1;
