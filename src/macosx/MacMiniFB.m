@@ -321,18 +321,8 @@ mfb_wait_sync(struct mfb_window *window) {
         double      current;
         uint32_t    millis = 1;
         while(1) {
-            event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-            if (event) {
-                [NSApp sendEvent:event];
-            }
-
-            if(window_data->close) {
-                destroy_window_data(window_data);
-                return false;
-            }
-
             current = mfb_timer_now(window_data_osx->timer);
-            if (current >= g_time_for_frame) {
+            if (current >= g_time_for_frame * 0.96) {
                 mfb_timer_reset(window_data_osx->timer);
                 return true;
             }
@@ -342,6 +332,18 @@ mfb_wait_sync(struct mfb_window *window) {
 
             usleep(millis * 1000);
             //sched_yield();
+
+            if(millis == 1) {
+                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+
+                    if(window_data->close) {
+                        destroy_window_data(window_data);
+                        return false;
+                    }
+                }
+            }
         }
     }
 
