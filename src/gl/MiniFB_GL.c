@@ -1,6 +1,7 @@
 #if defined(USE_OPENGL_API)
 
 #include "MiniFB_GL.h"
+#include "MiniFB_internal.h"
 #if defined(_WIN32) || defined(WIN32)
     #include <windows/WindowData_Win.h>
     #include <gl/gl.h>
@@ -18,6 +19,10 @@
 #else
     #define UseCleanUp(x)
 #endif
+
+extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
+
 
 //-------------------------------------
 #if defined(_WIN32) || defined(WIN32)
@@ -59,19 +64,62 @@ setup_pixel_format(HDC hDC) {
 
     return true;
 }
+
+typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC)(int);
+typedef int (WINAPI * PFNWGLGETSWAPINTERVALEXTPROC)(void);
+PFNWGLSWAPINTERVALEXTPROC       SwapIntervalEXT    = 0x0;
+PFNWGLGETSWAPINTERVALEXTPROC    GetSwapIntervalEXT = 0x0;
+
+#elif defined(linux)
+
+bool
+setup_pixel_format(SWindowData_X11 *window_data_x11) {
+    GLint glxAttribs[] = {
+        GLX_RGBA,
+        GLX_DOUBLEBUFFER,
+        GLX_DEPTH_SIZE,     24,
+        GLX_STENCIL_SIZE,   8,
+        GLX_RED_SIZE,       8,
+        GLX_GREEN_SIZE,     8,
+        GLX_BLUE_SIZE,      8,
+        GLX_DEPTH_SIZE,     24,
+        GLX_STENCIL_SIZE,   8,
+        GLX_SAMPLE_BUFFERS, 0,
+        GLX_SAMPLES,        0,
+        None
+    };
+
+    XVisualInfo* visualInfo = glXChooseVisual(window_data_x11->display, window_data_x11->screen, glxAttribs);
+    if (visualInfo == 0) {
+        fprintf(stderr, "Could not create correct visual window.\n");
+        XCloseDisplay(window_data_x11->display);
+        return false;
+    }
+
+    return true;
+}
+
+typedef void (*PFNGLXSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);
+PFNGLXSWAPINTERVALEXTPROC   SwapIntervalEXT = 0x0;
+
 #endif
 
 //-------------------------------------
-bool 
+bool
 create_GL_context(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
 
-    if(setup_pixel_format(window_data_win->hdc) == false)
+    if (setup_pixel_format(window_data_win->hdc) == false)
         return false;
+
     window_data_win->hGLRC = wglCreateContext(window_data_win->hdc);
     wglMakeCurrent(window_data_win->hdc, window_data_win->hGLRC);
     init_GL(window_data);
+
+    SwapIntervalEXT    = (PFNWGLSWAPINTERVALEXTPROC)    wglGetProcAddress("wglSwapIntervalEXT");
+    GetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC) wglGetProcAddress("wglGetSwapIntervalEXT");
+    set_target_fps_aux();
 
     return true;
 
@@ -89,26 +137,8 @@ create_GL_context(SWindowData *window_data) {
         //fprintf(stdout, "GLX version: %d.%d\n", majorGLX, minorGLX);
     }
 
-    GLint glxAttribs[] = {
-        GLX_RGBA,
-        GLX_DOUBLEBUFFER,
-        GLX_DEPTH_SIZE,     24,
-        GLX_STENCIL_SIZE,   8,
-        GLX_RED_SIZE,       8,
-        GLX_GREEN_SIZE,     8,
-        GLX_BLUE_SIZE,      8,
-        GLX_DEPTH_SIZE,     24,
-        GLX_STENCIL_SIZE,   8,
-        GLX_SAMPLE_BUFFERS, 0,
-        GLX_SAMPLES,        0,
-        None
-    };
-    XVisualInfo* visualInfo = glXChooseVisual(window_data_x11->display, window_data_x11->screen, glxAttribs);
-    if (visualInfo == 0) {
-        fprintf(stderr, "Could not create correct visual window.\n");
-        XCloseDisplay(window_data_x11->display);
+    if (setup_pixel_format(window_data_x11) == false)
         return false;
-    }
 
     window_data_x11->context = glXCreateContext(window_data_x11->display, visualInfo, NULL, GL_TRUE);
     glXMakeCurrent(window_data_x11->display, window_data_x11->window, window_data_x11->context);
@@ -120,12 +150,15 @@ create_GL_context(SWindowData *window_data) {
 
     init_GL(window_data);
 
+    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) getProcAddressGLX("glXSwapIntervalEXT");
+    set_target_fps_aux();
+
     return true;
 #endif
 }
 
 //-------------------------------------
-void 
+void
 destroy_GL_context(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
 
@@ -150,13 +183,13 @@ destroy_GL_context(SWindowData *window_data) {
 #endif
 
 #define TEXTURE0    0x84C0  // [ Core in gl 1.3, gles1 1.0, gles2 2.0, glsc2 2.0, Provided by GL_ARB_multitexture (gl) ]
-#define RGB         0x1907  // [ Core in gl 1.0, gles1 1.0, gles2 2.0, glsc2 2.0 ]    
+#define RGB         0x1907  // [ Core in gl 1.0, gles1 1.0, gles2 2.0, glsc2 2.0 ]
 #define RGBA        0x1908  // [ Core in gl 1.0, gles1 1.0, gles2 2.0, glsc2 2.0 ]
 #define BGR         0x80E0  // [ Core in gl 1.2 ]
 #define BGRA        0x80E1  // [ Core in gl 1.2, Provided by GL_ARB_vertex_array_bgra (gl|glcore) ]
 
 //-------------------------------------
-void 
+void
 init_GL(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
 
@@ -200,9 +233,9 @@ init_GL(SWindowData *window_data) {
 }
 
 //-------------------------------------
-void 
+void
 resize_GL(SWindowData *window_data) {
-    if(window_data->is_initialized) {
+    if (window_data->is_initialized) {
     #if defined(_WIN32) || defined(WIN32)
 
         SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
@@ -226,7 +259,7 @@ resize_GL(SWindowData *window_data) {
 }
 
 //-------------------------------------
-void 
+void
 redraw_GL(SWindowData *window_data, const void *pixels) {
 #if defined(_WIN32) || defined(WIN32)
 
@@ -253,11 +286,11 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 
     float vertices[] = {
         x, y,
-        0, 0, 
+        0, 0,
 
         w, y,
         1, 0,
-        
+
         x, h,
         0, 1,
 
@@ -286,6 +319,49 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     SwapBuffers(window_data_ex->hdc);
 #elif defined(linux)
     glXSwapBuffers(window_data_ex->display, window_data_ex->window);
+#endif
+}
+
+//-------------------------------------
+void
+set_target_fps_aux() {
+    // Assuming the monitor refresh rate is 60 hz
+    int interval = (int) ((60.0 * g_time_for_frame) + 0.5);
+
+#if defined(_WIN32) || defined(WIN32)
+
+    if (SwapIntervalEXT != 0x0) {
+        bool success = SwapIntervalEXT(interval);
+        if (GetSwapIntervalEXT != 0x0) {
+            int currentInterval = GetSwapIntervalEXT();
+            if (interval != currentInterval) {
+                fprintf(stderr, "Cannot set target swap interval. Current swap interval is %d\n", currentInterval);
+            }
+        }
+        else if (success == false) {
+            fprintf(stderr, "Cannot set target swap interval.\n");
+        }
+        g_use_hardware_sync = true;
+    }
+
+#elif defined(linux)
+    #define kGLX_SWAP_INTERVAL_EXT               0x20F1
+    #define kGLX_MAX_SWAP_INTERVAL_EXT           0x20F2
+
+    if (SwapIntervalEXT != 0x0) {
+        Display         *dpy     = glXGetCurrentDisplay();
+        GLXDrawable     drawable = glXGetCurrentDrawable();
+        unsigned int    currentInterval, maxInterval;
+
+        SwapIntervalEXT(dpy, drawable, interval);
+        glXQueryDrawable(dpy, drawable, kGLX_SWAP_INTERVAL_EXT, &currentInterval);
+        if (interval != currentInterval) {
+            glXQueryDrawable(dpy, drawable, kGLX_MAX_SWAP_INTERVAL_EXT, &maxInterval);
+            fprintf(stderr, "Cannot set target swap interval. Current swap interval is %d (max: %d)\n", currentInterval, maxInterval);
+        }
+        g_use_hardware_sync = true;
+    }
+
 #endif
 }
 

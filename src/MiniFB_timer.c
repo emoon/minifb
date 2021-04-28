@@ -6,6 +6,7 @@
 double      g_timer_frequency;
 double      g_timer_resolution;
 double      g_time_for_frame = 1.0 / 60.0;
+bool        g_use_hardware_sync = false;
 
 //-------------------------------------
 extern uint64_t mfb_timer_tick(void);
@@ -20,6 +21,7 @@ mfb_set_target_fps(uint32_t fps) {
     else {
         g_time_for_frame = 1.0 / fps;
     }
+    set_target_fps_aux();
 }
 
 //-------------------------------------
@@ -50,7 +52,7 @@ mfb_timer_destroy(struct mfb_timer *tmr) {
 //-------------------------------------
 void
 mfb_timer_reset(struct mfb_timer *tmr) {
-    if(tmr == 0x0) 
+    if(tmr == 0x0)
         return;
 
     tmr->start_time    = mfb_timer_tick();
@@ -63,7 +65,7 @@ double
 mfb_timer_now(struct mfb_timer *tmr) {
     uint64_t    counter;
 
-    if(tmr == 0x0) 
+    if(tmr == 0x0)
         return 0.0;
 
     counter         = mfb_timer_tick();
@@ -79,7 +81,7 @@ mfb_timer_delta(struct mfb_timer *tmr) {
     int64_t     counter;
     uint64_t    delta;
 
-    if(tmr == 0x0) 
+    if(tmr == 0x0)
         return 0.0;
 
     counter            = mfb_timer_tick();

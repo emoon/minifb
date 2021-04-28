@@ -192,7 +192,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             if(mfb_EnableNonClientDpiScaling)
                 mfb_EnableNonClientDpiScaling(hWnd);
 
-            return DefWindowProc(hWnd, message, wParam, lParam);;
+            return DefWindowProc(hWnd, message, wParam, lParam);
         }
 
         // TODO
@@ -647,11 +647,10 @@ mfb_update_events(struct mfb_window *window) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    MSG msg;
-
     if (window == 0x0) {
         return false;
     }
@@ -662,9 +661,14 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
+    if(g_use_hardware_sync) {
+        return true;
+    }
+
+    MSG             msg;
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    double      current;
-    uint32_t    millis = 1;
+    double          current;
+    uint32_t        millis = 1;
     while (1) {
         current = mfb_timer_now(window_data_win->timer);
         if (current >= g_time_for_frame * 0.96) {
