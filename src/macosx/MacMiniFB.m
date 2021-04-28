@@ -297,6 +297,7 @@ mfb_update_events(struct mfb_window *window) {
 
 //-------------------------------------
 extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
@@ -310,6 +311,10 @@ mfb_wait_sync(struct mfb_window *window) {
     if(window_data->close) {
         destroy_window_data(window_data);
         return false;
+    }
+
+    if(g_use_hardware_sync) {
+        return true;
     }
 
     @autoreleasepool {

@@ -80,6 +80,10 @@ NSString *g_shader_src = kShader(
 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
+        id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
+        if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
+            g_use_hardware_sync  = true;
+        }
 
         [self _createShaders];
         [self _createAssets];
@@ -169,9 +173,16 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
     if (g_target_fps_changed) {
-        view.preferredFramesPerSecond = (int) (1.0 / g_time_for_frame);
+        // MacOS is ignoring this :()
+        if (g_time_for_frame == 0) {
+            // Contrary to what is stated in the documentation, 
+            // 0 means that it does not update.
+            view.preferredFramesPerSecond = 9999;
+        }
+        else {
+            view.preferredFramesPerSecond = (int) (1.0 / g_time_for_frame);
+        }
         g_target_fps_changed = false;
-        g_use_hardware_sync  = true;
     }
 
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed

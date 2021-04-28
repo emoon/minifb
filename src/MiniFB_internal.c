@@ -103,7 +103,7 @@ resize_dst(SWindowData *window_data, uint32_t width, uint32_t height) {
     window_data->dst_height   = (uint32_t) (height * window_data->factor_height);
 }
 
-#if !defined(USE_OPENGL_API)
+#if !defined(USE_OPENGL_API) && !defined(USE_METAL_API)
 
 //-------------------------------------
 void
