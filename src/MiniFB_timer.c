@@ -36,6 +36,12 @@ mfb_get_target_fps() {
 }
 
 //-------------------------------------
+void
+mfb_disable_hw_sync() {
+    g_use_hardware_sync = false;
+}
+
+//-------------------------------------
 struct mfb_timer *
 mfb_timer_create() {
     static int  once = 1;

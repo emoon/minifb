@@ -70,6 +70,8 @@ const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // O
 void                mfb_set_target_fps(uint32_t fps);
 unsigned            mfb_get_target_fps();
 bool                mfb_wait_sync(struct mfb_window *window);
+// TODO: mfb_disable_hw_sync
+void                mfb_disable_hw_sync();  // Valid only for OpenGL (Windows, X11). Must be called after mfb_open
 
 // Timer
 struct mfb_timer *  mfb_timer_create(void);
