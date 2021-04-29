@@ -4,6 +4,17 @@
 
 #import <MetalKit/MetalKit.h>
 
+extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
+//--
+bool    g_target_fps_changed = true;
+
+//-------------------------------------
+void
+set_target_fps_aux() {
+    g_target_fps_changed = true;
+}
+
 //-------------------------------------
 #define kShader(inc, src)    @inc#src
 
@@ -69,6 +80,13 @@ NSString *g_shader_src = kShader(
 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
+
+        // MacOS Mojave is ignoring view.preferredFramesPerSecond
+        // MacOS Big Sur is ignoring commandBuffer:presentDrawable:afterMinimumDuration:
+        //id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
+        //if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
+        //    g_use_hardware_sync  = true;
+        //}
 
         [self _createShaders];
         [self _createAssets];
@@ -157,6 +175,19 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
+    if (g_target_fps_changed) {
+        // MacOS is ignoring this :(
+        if (g_time_for_frame == 0) {
+            // Contrary to what is stated in the documentation,
+            // 0 means that it does not update. Like pause.
+            view.preferredFramesPerSecond = 9999;
+        }
+        else {
+            view.preferredFramesPerSecond = (int) (1.0 / g_time_for_frame);
+        }
+        g_target_fps_changed = false;
+    }
+
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     // by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
     dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
@@ -205,7 +236,13 @@ NSString *g_shader_src = kShader(
         [renderEncoder endEncoding];
 
         // Schedule a present once the framebuffer is complete using the current drawable
-        [commandBuffer presentDrawable:view.currentDrawable];
+        //if ([commandBuffer respondsToSelector:@selector(presentDrawable:afterMinimumDuration:)]) {
+        //    // MacOS Big Sur is ignoring this
+        //    [commandBuffer presentDrawable:view.currentDrawable afterMinimumDuration:g_time_for_frame];
+        //}
+        //else {
+            [commandBuffer presentDrawable:view.currentDrawable];
+        //}
     }
 
     // Finalize rendering here & push the command buffer to the GPU

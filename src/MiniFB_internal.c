@@ -5,7 +5,7 @@
 
 #if defined(kUseBilinearInterpolation)
 //-------------------------------------
-static uint32_t 
+static uint32_t
 interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uint32_t srcOffsetY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch) {
     uint32_t incX = x + 1 < srcWidth ? 1 : 0;
     uint32_t incY = y + 1 < srcHeight ? srcPitch : 0;
@@ -41,7 +41,7 @@ interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uin
 
 // Only for 32 bits images
 //-------------------------------------
-void 
+void
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
               uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch) {
 
@@ -79,7 +79,7 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
 }
 
 //-------------------------------------
-void 
+void
 calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height) {
     if (window_data->dst_width == 0) {
         window_data->dst_width = width;
@@ -95,10 +95,19 @@ calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height) {
 }
 
 //-------------------------------------
-void 
+void
 resize_dst(SWindowData *window_data, uint32_t width, uint32_t height) {
     window_data->dst_offset_x = (uint32_t) (width  * window_data->factor_x);
     window_data->dst_offset_y = (uint32_t) (height * window_data->factor_y);
     window_data->dst_width    = (uint32_t) (width  * window_data->factor_width);
     window_data->dst_height   = (uint32_t) (height * window_data->factor_height);
 }
+
+#if !defined(USE_OPENGL_API) && !defined(USE_METAL_API)
+
+//-------------------------------------
+void
+set_target_fps_aux() {
+}
+
+#endif

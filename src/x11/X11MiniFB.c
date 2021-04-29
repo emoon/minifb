@@ -433,6 +433,7 @@ mfb_update_events(struct mfb_window *window) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
@@ -446,24 +447,18 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
+    if(g_use_hardware_sync) {
+        return true;
+    }
+
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
     XFlush(window_data_x11->display);
     XEvent      event;
     double      current;
     uint32_t    millis = 1;
     while(1) {
-        if(XEventsQueued(window_data_x11->display, QueuedAlready) > 0) {
-            XNextEvent(window_data_x11->display, &event);
-            processEvent(window_data, &event);
-        }
-
-        if(window_data->close) {
-            destroy_window_data(window_data);
-            return false;
-        }
-
         current = mfb_timer_now(window_data_x11->timer);
-        if (current >= g_time_for_frame) {
+        if (current >= g_time_for_frame * 0.96) {
             mfb_timer_reset(window_data_x11->timer);
             return true;
         }
@@ -473,6 +468,16 @@ mfb_wait_sync(struct mfb_window *window) {
 
         usleep(millis * 1000);
         //sched_yield();
+
+        if(millis == 1 && XEventsQueued(window_data_x11->display, QueuedAlready) > 0) {
+            XNextEvent(window_data_x11->display, &event);
+            processEvent(window_data, &event);
+
+            if(window_data->close) {
+                destroy_window_data(window_data);
+                return false;
+            }
+        }
     }
 
     return true;

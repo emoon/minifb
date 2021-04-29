@@ -136,13 +136,16 @@ double              mfb_timer_get_frequency();
 double              mfb_timer_get_resolution();
 ```
 
-Furthermore you can set a target fps for the application. The default is 60 frames per second.
+Furthermore you can set (and get) a target fps for the application. The default is 60 frames per second.
 
 ```c
 void                mfb_set_target_fps(uint32_t fps);
+unsigned            mfb_get_target_fps();
 ```
 
 This avoid the problem of update too fast the window collapsing the redrawing in fast processors.
+
+Note: OpenGL and iOS have hardware support for syncing. Other systems will use software syncing. Including MacOS Metal.
 
 To use this you need to call the function:
 

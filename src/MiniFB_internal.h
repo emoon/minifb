@@ -20,6 +20,7 @@ extern "C" {
 
     void calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height);
     void resize_dst(SWindowData *window_data, uint32_t width, uint32_t height);
+    void set_target_fps_aux();
 
 #if defined(__cplusplus)
 }

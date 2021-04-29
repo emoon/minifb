@@ -297,6 +297,7 @@ mfb_update_events(struct mfb_window *window) {
 
 //-------------------------------------
 extern double   g_time_for_frame;
+extern bool     g_use_hardware_sync;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
@@ -312,6 +313,10 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
+    if(g_use_hardware_sync) {
+        return true;
+    }
+
     @autoreleasepool {
         SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
         if(window_data_osx == 0x0) {
@@ -321,18 +326,8 @@ mfb_wait_sync(struct mfb_window *window) {
         double      current;
         uint32_t    millis = 1;
         while(1) {
-            event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-            if (event) {
-                [NSApp sendEvent:event];
-            }
-
-            if(window_data->close) {
-                destroy_window_data(window_data);
-                return false;
-            }
-
             current = mfb_timer_now(window_data_osx->timer);
-            if (current >= g_time_for_frame) {
+            if (current >= g_time_for_frame * 0.96) {
                 mfb_timer_reset(window_data_osx->timer);
                 return true;
             }
@@ -342,6 +337,18 @@ mfb_wait_sync(struct mfb_window *window) {
 
             usleep(millis * 1000);
             //sched_yield();
+
+            if(millis == 1) {
+                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+
+                    if(window_data->close) {
+                        destroy_window_data(window_data);
+                        return false;
+                    }
+                }
+            }
         }
     }
 
