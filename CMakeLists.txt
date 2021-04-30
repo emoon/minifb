@@ -118,21 +118,21 @@ endif()
 if(NOT MSVC)
     # Avoid default flag values
     #--------------------------------------
-    set(CMAKE_C_FLAGS "" CACHE STRING "" FORCE)
-    set(CMAKE_C_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-    set(CMAKE_C_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+    set(CMAKE_C_FLAGS "")
+    set(CMAKE_C_FLAGS_DEBUG "" )
+    set(CMAKE_C_FLAGS_RELEASE "")
 
-    set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
-    set(CMAKE_CXX_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-    set(CMAKE_CXX_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS "")
+    set(CMAKE_CXX_FLAGS_DEBUG "")
+    set(CMAKE_CXX_FLAGS_RELEASE "")
 
-    set(CMAKE_OBJC_FLAGS "" CACHE STRING "" FORCE)
-    set(CMAKE_OBJC_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-    set(CMAKE_OBJC_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+    set(CMAKE_OBJC_FLAGS "")
+    set(CMAKE_OBJC_FLAGS_DEBUG "")
+    set(CMAKE_OBJC_FLAGS_RELEASE "")
 
-    set(CMAKE_OBJCXX_FLAGS "" CACHE STRING "" FORCE)
-    set(CMAKE_OBJCXX_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-    set(CMAKE_OBJCXX_FLAGS_RELEASE "" CACHE STRING "" FORCE)
+    set(CMAKE_OBJCXX_FLAGS "")
+    set(CMAKE_OBJCXX_FLAGS_DEBUG "")
+    set(CMAKE_OBJCXX_FLAGS_RELEASE "")
 
     # Set our flags
     #--------------------------------------
