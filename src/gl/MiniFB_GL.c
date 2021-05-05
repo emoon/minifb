@@ -95,6 +95,7 @@ setup_pixel_format(SWindowData_X11 *window_data_x11) {
         XCloseDisplay(window_data_x11->display);
         return false;
     }
+    window_data_x11->context = glXCreateContext(window_data_x11->display, visualInfo, NULL, GL_TRUE);
 
     return true;
 }
@@ -140,7 +141,6 @@ create_GL_context(SWindowData *window_data) {
     if (setup_pixel_format(window_data_x11) == false)
         return false;
 
-    window_data_x11->context = glXCreateContext(window_data_x11->display, visualInfo, NULL, GL_TRUE);
     glXMakeCurrent(window_data_x11->display, window_data_x11->window, window_data_x11->context);
 
     //fprintf(stdout, "GL Vendor: %s\n", glGetString(GL_VENDOR));
@@ -150,7 +150,7 @@ create_GL_context(SWindowData *window_data) {
 
     init_GL(window_data);
 
-    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) getProcAddressGLX("glXSwapIntervalEXT");
+    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress("glXSwapIntervalEXT");
     set_target_fps_aux();
 
     return true;
