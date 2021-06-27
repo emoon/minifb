@@ -11,6 +11,7 @@
 
 #ifndef USER_DEFAULT_SCREEN_DPI
 #  define USER_DEFAULT_SCREEN_DPI 96.0
+#  define TODO_DPI_STUFF // TODO DPI awareness is not working...
 #endif
 
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
@@ -189,17 +190,25 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
     }
 
     if (scale_x) {
+#ifdef TODO_DPI_STUFF
+        *scale_x = 1;
+#else
         *scale_x = x / (float) USER_DEFAULT_SCREEN_DPI;
         if(*scale_x == 0) {
             *scale_x = 1;
         }
+#endif
     }
 
     if (scale_y) {
+#ifdef TODO_DPI_STUFF
+        *scale_y = 1;
+#else
         *scale_y = y / (float) USER_DEFAULT_SCREEN_DPI;
         if (*scale_y == 0) {
             *scale_y = 1;
         }
+#endif
     }
 }
 
