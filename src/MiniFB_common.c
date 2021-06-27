@@ -1,6 +1,7 @@
 #include "MiniFB.h"
 #include "WindowData.h"
 #include <MiniFB_internal.h>
+#include <string.h>
 
 //-------------------------------------
 short int g_keycodes[512] = { 0 };
@@ -84,6 +85,22 @@ mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func c
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
         window_data->mouse_wheel_func = callback;
+    }
+}
+
+//-------------------------------------
+void mfb_set_file_drag_callback(struct mfb_window *window, mfb_file_drag_func callback) {
+    if(window != 0x0) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->file_drag_func = callback;
+    }
+}
+
+//-------------------------------------
+void mfb_set_file_drop_callback(struct mfb_window *window, mfb_file_drop_func callback) {
+    if(window != 0x0) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->file_drop_func = callback;
     }
 }
 
@@ -222,6 +239,24 @@ mfb_get_key_buffer(struct mfb_window *window)  {
         return window_data->key_status;
     }
     return 0;
+}
+
+//-------------------------------------
+/* get next filename in file list (returns 0 when there are none) */
+char *mfb_get_dropped_file(char *file_list)
+{
+    const char *delim = "\n\r";
+    
+    if (!file_list)
+        return 0;
+    
+    /* a new file list has been provided: tokenize it and return first token */
+    if (strchr(file_list, '\n'))
+        return strtok(file_list, delim);
+    
+    /* return next token from previous file list */
+    else
+        return strtok(0, delim);
 }
 
 //-------------------------------------

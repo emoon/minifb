@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <unistd.h>
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
@@ -204,6 +205,28 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_x11->timer = mfb_timer_create();
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
+    
+    // Find or create drag and drop atoms
+    // Atoms for Xdnd
+    window_data_x11->root = defaultRootWindow;
+    window_data_x11->XdndAware = XInternAtom(window_data_x11->display, "XdndAware", True);
+    window_data_x11->XdndEnter = XInternAtom(window_data_x11->display, "XdndEnter", True);
+    window_data_x11->XdndPosition = XInternAtom(window_data_x11->display, "XdndPosition", True);
+    window_data_x11->XdndStatus = XInternAtom(window_data_x11->display, "XdndStatus", True);
+    window_data_x11->XdndActionCopy = XInternAtom(window_data_x11->display, "XdndActionCopy", True);
+    window_data_x11->XdndDrop = XInternAtom(window_data_x11->display, "XdndDrop", True);
+    window_data_x11->XdndLeave = XInternAtom(window_data_x11->display, "XdndLeave", True);
+    window_data_x11->XdndFinished = XInternAtom(window_data_x11->display, "XdndFinished", True);
+    window_data_x11->XdndSelection = XInternAtom(window_data_x11->display, "XdndSelection", True);
+    window_data_x11->UTF8_STRING = XInternAtom(window_data_x11->display, "UTF8_STRING", False);
+    
+    // Enable Xdnd
+    if(window_data_x11->XdndAware!=None)
+    {
+        //Announce XDND support
+        Atom version=5;
+        XChangeProperty(window_data_x11->display, window_data_x11->window, window_data_x11->XdndAware, XA_ATOM, 32, PropModeReplace, (unsigned char*)&version, 1);
+    }
 
 #if defined(_DEBUG) || defined(DEBUG)
     printf("Window created using X11 API\n");
@@ -219,8 +242,41 @@ int translate_key(int scancode);
 int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
+// Retrieve a single window property of the specified type
+// Inspired by fghGetWindowProperty from freeglut
+//
+static unsigned long mfbGetWindowProperty(Display *display,
+                                          Window window,
+                                          Atom property,
+                                          Atom type,
+                                          unsigned char** value)
+{
+    Atom actualType;
+    int actualFormat;
+    unsigned long itemCount, bytesAfter;
+
+    XGetWindowProperty(display,
+                       window,
+                       property,
+                       0,
+                       LONG_MAX,
+                       False,
+                       type,
+                       &actualType,
+                       &actualFormat,
+                       &itemCount,
+                       &bytesAfter,
+                       value);
+
+    if (actualType != type)
+        return 0;
+
+    return itemCount;
+}
+
 static void
 processEvent(SWindowData *window_data, XEvent *event) {
+    SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
     switch (event->type) {
         case KeyPress:
         case KeyRelease:
@@ -291,11 +347,147 @@ processEvent(SWindowData *window_data, XEvent *event) {
                 window_data_x11->image_scaler_width  = 0;
                 window_data_x11->image_scaler_height = 0;
             }
-            XClearWindow(window_data_x11->display, window_data_x11->window);
+            // XXX I commented this so there is no tearing/flicker as the window is moved
+            //XClearWindow(window_data_x11->display, window_data_x11->window);
 #endif
             kCall(resize_func, window_data->window_width, window_data->window_height);
         }
         break;
+        
+        case ClientMessage:
+        {
+            if(event->xclient.message_type == window_data_x11->XdndEnter)
+            {
+                // Xdnd Enter: the drag&drop event has started in the window,
+                // we could be getting the type and possible conversions here
+                // but since we use always string conversion we don't need
+                // it
+            }
+            else if(event->xclient.message_type == window_data_x11->XdndDrop)
+            {
+                // Xdnd Drop: The drag&drop event has finished dropping on
+                // the window, ask to convert the selection
+                window_data_x11->xdnd.sourceWindow = event->xclient.data.l[0];
+                XConvertSelection(window_data_x11->display,        /* display */
+                                  window_data_x11->XdndSelection,  /* selection */
+                                  window_data_x11->UTF8_STRING,    /* target */
+                                  window_data_x11->XdndSelection,  /* property */
+                                  window_data_x11->window,         /* requestor */
+                                  CurrentTime);                    /* time */
+            }
+            else if(event->xclient.message_type == window_data_x11->XdndLeave)
+            {
+                int x = -1;
+                int y = -1;
+                window_data_x11->drop_x = x;
+                window_data_x11->drop_y = y;
+                kCall(file_drag_func, x, y);
+            }
+            else if(event->xclient.message_type == window_data_x11->XdndPosition)
+            {
+                // Xdnd Position: get coordinates of the mouse inside the window
+                // and update the mouse position
+                int absX = (event->xclient.data.l[2]>>16) & 0xFFFF;
+                int absY = (event->xclient.data.l[2]) & 0xFFFF;
+
+                Window child;
+                int x, y;
+
+                XTranslateCoordinates(window_data_x11->display,
+                                      window_data_x11->root,
+                                      window_data_x11->window,
+                                      absX, absY, &x, &y, &child);
+
+                /* mouse move event */
+                window_data_x11->drop_x = x;
+                window_data_x11->drop_y = y;
+                kCall(file_drag_func, x, y);
+
+                // Xdnd: reply with an XDND status message
+                XClientMessageEvent m;
+                memset(&m, 0, sizeof(m));
+                m.type = ClientMessage;
+                m.display = event->xclient.display;
+                m.window = event->xclient.data.l[0];
+                m.message_type = window_data_x11->XdndStatus;
+                m.format=32;
+                m.data.l[0] = window_data_x11->window;
+                m.data.l[1] = 1; // Always accept the dnd with no rectangle
+                m.data.l[2] = 0; // Specify an empty rectangle
+                m.data.l[3] = 0;
+                m.data.l[4] = window_data_x11->XdndActionCopy; // We only accept copying
+
+                XSendEvent(window_data_x11->display, event->xclient.data.l[0], False, NoEventMask, (XEvent*)&m);
+                XFlush(window_data_x11->display);
+            }
+        }
+        break;
+        
+        case SelectionNotify:
+        {
+            if(event->xselection.property != None)
+            {
+                    // Xdnd: got a selection notification from the conversion
+                    // we asked for, get the data and finish the d&d event
+                    char *data;
+                    free(window_data_x11->xdnd.string);
+                    window_data_x11->xdnd.string = NULL;
+                    int result = mfbGetWindowProperty(window_data_x11->display,
+                                                      event->xselection.requestor,
+                                                      event->xselection.property,
+                                                      event->xselection.target,
+                                                      (unsigned char**) &data);
+                    
+                    if (result)
+                    {
+                        window_data_x11->xdnd.string = strdup(data);
+                        
+                        /* strip "file://" prefixes */
+                        const char *prefix = "file://";
+                        char *str = window_data_x11->xdnd.string;
+                        char *ss;
+                        while ((ss = strstr(str, prefix)))
+                        {
+                            memmove(ss, ss + strlen(prefix), strlen(ss + strlen(prefix))+1);
+                        }
+                        
+                        /* clean up strings that use percent notation */
+                        for (ss = strchr(str, '%'); ss; ss = strchr(ss+1, '%'))
+                        {
+                            int p;
+                            sscanf(ss+1, "%2X", &p);
+                            *ss = p;
+                            memmove(ss+1, ss + 3, strlen(ss + 3)+1);
+                        }
+                    }
+
+                    XClientMessageEvent m;
+                    memset(&m, 0, sizeof(m));
+                    m.type = ClientMessage;
+                    m.display = window_data_x11->display;
+                    m.window = window_data_x11->xdnd.sourceWindow;
+                    m.message_type = window_data_x11->XdndFinished;
+                    m.format=32;
+                    m.data.l[0] = window_data_x11->window;
+                    m.data.l[1] = result;
+                    m.data.l[2] = window_data_x11->XdndActionCopy; //We only ever copy.
+
+                    // Reply that all is well.
+                    XSendEvent(window_data_x11->display, window_data_x11->xdnd.sourceWindow, False, NoEventMask, (XEvent*)&m);
+
+                    XSync(window_data_x11->display, False);
+
+                    XFree(data);
+
+                    if (result)
+                    {
+                        /* callback */
+                        kCall(file_drop_func, window_data_x11->xdnd.string, window_data_x11->drop_x, window_data_x11->drop_y);
+                    }
+                    kCall(file_drag_func, -1, -1);
+            }
+            break;
+        }
 
         case EnterNotify:
         case LeaveNotify:

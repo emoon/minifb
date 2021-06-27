@@ -9,6 +9,10 @@
 #include <stdlib.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef USER_DEFAULT_SCREEN_DPI
+#  define USER_DEFAULT_SCREEN_DPI 96.0
+#endif
+
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
 typedef enum mfb_PROCESS_DPI_AWARENESS {
     mfb_PROCESS_DPI_UNAWARE           = 0,
@@ -49,6 +53,56 @@ HMODULE                           mfb_shcore_dll                    = 0x0;
 PFN_SetProcessDpiAwareness        mfb_SetProcessDpiAwareness        = 0x0;
 PFN_GetDpiForMonitor              mfb_GetDpiForMonitor              = 0x0;
 
+// private
+static void *toWchar(const char *src)
+{
+	if(!src)
+		return 0;
+
+#ifndef _UNICODE
+	return strdup(src);
+#else
+	wchar_t *out = 0;
+	size_t src_length;
+	int length;
+	
+	src_length = strlen(src);
+	length = MultiByteToWideChar(CP_UTF8, 0, src, src_length, 0, 0);
+	out = malloc((length+1) * sizeof(*out));
+	if (out) {
+		MultiByteToWideChar(CP_UTF8, 0, src, src_length, out, length);
+		out[length] = L'\0';
+	}
+	return out;
+#endif
+}
+
+// private
+static char *toUtf8(const void* src)
+{
+	if (!src)
+		return 0;
+
+#ifndef _UNICODE
+	return strdup(src);
+#else
+	char *out = 0;
+	size_t src_length = 0;
+	int length;
+	
+	src_length = wcslen(src);
+	length = WideCharToMultiByte(CP_UTF8, 0, src, src_length,
+			0, 0, NULL, NULL);
+	out = malloc((length+1) * sizeof(char));
+	if (out) {
+		WideCharToMultiByte(CP_UTF8, 0, src, src_length,
+				out, length, NULL, NULL);
+		out[length] = '\0';
+	}
+	return out;
+#endif
+}
+
 //--
 void
 load_functions() {
@@ -75,7 +129,7 @@ load_functions() {
 // NOT Thread safe. Just convenient (Don't do this at home guys)
 char *
 GetErrorMessage() {
-    static char buffer[256];
+    TCHAR buffer[256];
 
     buffer[0] = 0;
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -86,7 +140,7 @@ GetErrorMessage() {
                   sizeof(buffer),
                   NULL);
 
-    return buffer;
+    return toUtf8(buffer);
 }
 
 //--
@@ -319,7 +373,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             }
             break;
-
+#if 0 /* XXX only for Windows Vista and later */
         case WM_MOUSEHWHEEL:
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
@@ -327,7 +381,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
             }
             break;
-
+#endif
         case WM_MOUSEMOVE:
             if (window_data) {
                 if (window_data_win->mouse_inside == false) {
@@ -348,6 +402,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_MOUSELEAVE:
             if (window_data) {
                 window_data_win->mouse_inside = false;
+                kCall(file_drag_func, -1, -1);
             }
             break;
 
@@ -391,10 +446,64 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(active_func, false);
             }
             break;
+        
+        case WM_DROPFILES:
+        {
+            TCHAR szName[MAX_PATH];
+            HDROP hDrop = (HDROP)wParam;
+            POINT pt;
+            int numFiles = DragQueryFile(hDrop, 0xFFFFFFFF, szName, MAX_PATH);
+            int currentSize = 1;
+            int i;
+            DragQueryPoint(hDrop, &pt);
+
+            memset(window_data_win->dropString, 0, window_data_win->dropStringSize);
+            for (i = 0; i < numFiles; i++)
+            {
+                char *utf8str;
+                DragQueryFile(hDrop, i, szName, MAX_PATH);
+                utf8str = toUtf8(szName);
+                currentSize += strlen(utf8str) + 8;
+                if (window_data_win->dropStringSize < currentSize)
+                {
+                    int Osz = window_data_win->dropStringSize;
+                    
+                    if (!window_data_win->dropString)
+                        window_data_win->dropStringSize = currentSize * 2;
+                    
+                    if (window_data_win->dropStringSize < MAX_PATH)
+                        window_data_win->dropStringSize = MAX_PATH;
+                    
+                    window_data_win->dropStringSize *= 2;
+                    window_data_win->dropString = realloc(window_data_win->dropString, window_data_win->dropStringSize);
+                    
+                    memset(window_data_win->dropString + Osz, 0, window_data_win->dropStringSize - Osz);
+                }
+                strcat(window_data_win->dropString, utf8str);
+                strcat(window_data_win->dropString, "\n");
+                free(utf8str);
+            }
+
+            kCall(file_drop_func, window_data_win->dropString, pt.x, pt.y);
+            kCall(file_drag_func, -1, -1);
+            DragFinish(hDrop);
+            break;
+        }
 
         default:
         {
             res = DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    
+    /* hacky method of testing if file is being dragged in from outside window */
+    /* if the mouse is in the window, no WM_MOUSEMOVE events are being sent, and the left mouse button is down, something outside the window is being dragged */
+    if (window_data_win && window_data_win->mouse_inside == false && GetKeyState(VK_LBUTTON) < 0)
+    {
+        POINT p;
+        if (GetCursorPos(&p) && ScreenToClient(hWnd, &p))
+        {
+            kCall(file_drag_func, p.x, p.y);
         }
     }
 
@@ -407,10 +516,13 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
+    void *Wtitle = 0;
 
     load_functions();
     dpi_aware();
     init_keycodes();
+    
+    Wtitle = toWchar(title);
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
     if (window_data == 0x0) {
@@ -497,7 +609,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_win->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_win->wc.lpfnWndProc   = WndProc;
     window_data_win->wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    window_data_win->wc.lpszClassName = title;
+    window_data_win->wc.lpszClassName = Wtitle;
     RegisterClass(&window_data_win->wc);
 
     calc_dst_factor(window_data, width, height);
@@ -507,7 +619,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_win->window = CreateWindowEx(
         0,
-        title, title,
+        Wtitle, Wtitle,
         s_window_style,
         x, y,
         window_data->window_width, window_data->window_height,
@@ -525,6 +637,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         SetWindowPos(window_data_win->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
     ShowWindow(window_data_win->window, SW_NORMAL);
+    DragAcceptFiles(window_data_win->window, TRUE);
 
     window_data_win->hdc = GetDC(window_data_win->window);
 

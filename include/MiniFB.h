@@ -52,6 +52,8 @@ void                mfb_set_char_input_callback(struct mfb_window *window, mfb_c
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback);
+void                mfb_set_file_drag_callback(struct mfb_window *window, mfb_file_drag_func callback);
+void                mfb_set_file_drop_callback(struct mfb_window *window, mfb_file_drop_func callback);
 
 // Getters
 const char *        mfb_get_key_name(mfb_key key);
