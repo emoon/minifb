@@ -373,7 +373,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             }
             break;
-#if 0 /* XXX only for Windows Vista and later */
+#if (WINVER >= _WIN32_WINNT_VISTA) /* only for Windows Vista and later */
         case WM_MOUSEHWHEEL:
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
