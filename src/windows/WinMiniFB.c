@@ -9,9 +9,13 @@
 #include <stdlib.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#define WANT_DPI_AWARENESS 1
+#ifdef MINIFB_NO_DPI_AWARENESS
+	#undef WANT_DPI_AWARENESS
+#endif
+
 #ifndef USER_DEFAULT_SCREEN_DPI
 #  define USER_DEFAULT_SCREEN_DPI 96.0
-#  define TODO_DPI_STUFF // TODO DPI awareness is not working...
 #endif
 
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
@@ -107,6 +111,7 @@ static char *toUtf8(const void* src)
 //--
 void
 load_functions() {
+#ifdef WANT_DPI_AWARENESS
     if(mfb_user32_dll == 0x0) {
         mfb_user32_dll = LoadLibraryA("user32.dll");
         if (mfb_user32_dll != 0x0) {
@@ -124,6 +129,7 @@ load_functions() {
             mfb_GetDpiForMonitor = (PFN_GetDpiForMonitor) GetProcAddress(mfb_shcore_dll, "GetDpiForMonitor");
         }
     }
+#endif
 }
 
 //--
@@ -147,6 +153,7 @@ GetErrorMessage() {
 //--
 void
 dpi_aware() {
+#ifdef WANT_DPI_AWARENESS
     if (mfb_SetProcessDpiAwarenessContext != 0x0) {
         if(mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
             uint32_t error = GetLastError();
@@ -171,11 +178,13 @@ dpi_aware() {
             fprintf(stderr, "Error (SetProcessDPIAware): %s\n", GetErrorMessage());
         }
     }
+#endif
 }
 
 //--
 void
 get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
+#ifdef WANT_DPI_AWARENESS
     UINT    x, y;
 
     if(mfb_GetDpiForMonitor != 0x0) {
@@ -190,26 +199,24 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
     }
 
     if (scale_x) {
-#ifdef TODO_DPI_STUFF
-        *scale_x = 1;
-#else
         *scale_x = x / (float) USER_DEFAULT_SCREEN_DPI;
         if(*scale_x == 0) {
             *scale_x = 1;
         }
-#endif
     }
 
     if (scale_y) {
-#ifdef TODO_DPI_STUFF
-        *scale_y = 1;
-#else
         *scale_y = y / (float) USER_DEFAULT_SCREEN_DPI;
         if (*scale_y == 0) {
             *scale_y = 1;
         }
-#endif
     }
+#else
+	if (scale_x)
+		*scale_x = 1;
+	if (scale_y)
+		*scale_y = 1;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -393,6 +400,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #endif
         case WM_MOUSEMOVE:
             if (window_data) {
+                float scale_x, scale_y;
+                get_monitor_scale(hWnd, &scale_x, &scale_y);
                 if (window_data_win->mouse_inside == false) {
                     window_data_win->mouse_inside = true;
                     TRACKMOUSEEVENT tme;
@@ -402,8 +411,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
                 }
-                window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
-                window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
+                window_data->mouse_pos_x = (int)(short) LOWORD(lParam) * scale_x;
+                window_data->mouse_pos_y = (int)(short) HIWORD(lParam) * scale_y;
                 kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
             }
             break;
@@ -458,6 +467,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         
         case WM_DROPFILES:
         {
+            float scale_x, scale_y;
             TCHAR szName[MAX_PATH];
             HDROP hDrop = (HDROP)wParam;
             POINT pt;
@@ -465,6 +475,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             int currentSize = 1;
             int i;
             DragQueryPoint(hDrop, &pt);
+            get_monitor_scale(hWnd, &scale_x, &scale_y);
 
             memset(window_data_win->dropString, 0, window_data_win->dropStringSize);
             for (i = 0; i < numFiles; i++)
@@ -493,7 +504,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 free(utf8str);
             }
 
-            kCall(file_drop_func, window_data_win->dropString, pt.x, pt.y);
+            kCall(file_drop_func, window_data_win->dropString, pt.x * scale_x, pt.y * scale_y);
             kCall(file_drag_func, -1, -1);
             DragFinish(hDrop);
             break;
