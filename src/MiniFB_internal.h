@@ -1,6 +1,6 @@
 #pragma once
 
-#include <MiniFB.h>
+#include "../include/MiniFB.h"
 #include "WindowData.h"
 
 #define kCall(func, ...)    if(window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);

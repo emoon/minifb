@@ -1,6 +1,6 @@
-#include "MiniFB.h"
+#include "../include/MiniFB.h"
 #include "WindowData.h"
-#include <MiniFB_internal.h>
+#include "MiniFB_internal.h"
 #include <string.h>
 
 //-------------------------------------

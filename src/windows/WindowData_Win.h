@@ -1,6 +1,6 @@
 #pragma once
 
-#include <MiniFB_enums.h>
+#include "../../include/MiniFB_enums.h"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h> /* FIXME some toolchains may require uppercase ShlObj.h */

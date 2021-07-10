@@ -1,6 +1,5 @@
-#include <MiniFB.h>
-#include <MiniFB_internal.h>
-#include <WindowData.h>
+#include "../MiniFB_internal.h"
+#include "../WindowData.h"
 #include "WindowData_Win.h"
 #if defined(USE_OPENGL_API)
     #include "gl/MiniFB_GL.h"
@@ -1084,7 +1083,7 @@ extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
 uint64_t
-mfb_timer_tick() {
+mfb_timer_tick(void) {
     int64_t     counter;
 
     QueryPerformanceCounter((LARGE_INTEGER *) &counter);
@@ -1093,7 +1092,7 @@ mfb_timer_tick() {
 }
 
 void
-mfb_timer_init() {
+mfb_timer_init(void) {
     uint64_t    frequency;
 
     QueryPerformanceFrequency((LARGE_INTEGER *) &frequency);
