@@ -1,6 +1,5 @@
-#include <MiniFB.h>
-#include <MiniFB_internal.h>
-#include <WindowData.h>
+#include "../MiniFB_internal.h"
+#include "../WindowData.h"
 #include "WindowData_Win.h"
 #if defined(USE_OPENGL_API)
     #include "gl/MiniFB_GL.h"
@@ -8,6 +7,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define WANT_DPI_AWARENESS 1
+#ifdef MINIFB_NO_DPI_AWARENESS
+	#undef WANT_DPI_AWARENESS
+#endif
+
+#ifndef USER_DEFAULT_SCREEN_DPI
+#  define USER_DEFAULT_SCREEN_DPI 96.0
+#endif
 
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
 typedef enum mfb_PROCESS_DPI_AWARENESS {
@@ -49,9 +57,60 @@ HMODULE                           mfb_shcore_dll                    = 0x0;
 PFN_SetProcessDpiAwareness        mfb_SetProcessDpiAwareness        = 0x0;
 PFN_GetDpiForMonitor              mfb_GetDpiForMonitor              = 0x0;
 
+// private
+static void *toWchar(const char *src)
+{
+	if(!src)
+		return 0;
+
+#ifndef _UNICODE
+	return strdup(src);
+#else
+	wchar_t *out = 0;
+	size_t src_length;
+	int length;
+	
+	src_length = strlen(src);
+	length = MultiByteToWideChar(CP_UTF8, 0, src, src_length, 0, 0);
+	out = malloc((length+1) * sizeof(*out));
+	if (out) {
+		MultiByteToWideChar(CP_UTF8, 0, src, src_length, out, length);
+		out[length] = L'\0';
+	}
+	return out;
+#endif
+}
+
+// private
+static char *toUtf8(const void* src)
+{
+	if (!src)
+		return 0;
+
+#ifndef _UNICODE
+	return strdup(src);
+#else
+	char *out = 0;
+	size_t src_length = 0;
+	int length;
+	
+	src_length = wcslen(src);
+	length = WideCharToMultiByte(CP_UTF8, 0, src, src_length,
+			0, 0, NULL, NULL);
+	out = malloc((length+1) * sizeof(char));
+	if (out) {
+		WideCharToMultiByte(CP_UTF8, 0, src, src_length,
+				out, length, NULL, NULL);
+		out[length] = '\0';
+	}
+	return out;
+#endif
+}
+
 //--
 void
 load_functions() {
+#ifdef WANT_DPI_AWARENESS
     if(mfb_user32_dll == 0x0) {
         mfb_user32_dll = LoadLibraryA("user32.dll");
         if (mfb_user32_dll != 0x0) {
@@ -69,13 +128,14 @@ load_functions() {
             mfb_GetDpiForMonitor = (PFN_GetDpiForMonitor) GetProcAddress(mfb_shcore_dll, "GetDpiForMonitor");
         }
     }
+#endif
 }
 
 //--
 // NOT Thread safe. Just convenient (Don't do this at home guys)
 char *
 GetErrorMessage() {
-    static char buffer[256];
+    TCHAR buffer[256];
 
     buffer[0] = 0;
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -86,12 +146,13 @@ GetErrorMessage() {
                   sizeof(buffer),
                   NULL);
 
-    return buffer;
+    return toUtf8(buffer);
 }
 
 //--
 void
 dpi_aware() {
+#ifdef WANT_DPI_AWARENESS
     if (mfb_SetProcessDpiAwarenessContext != 0x0) {
         if(mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
             uint32_t error = GetLastError();
@@ -116,11 +177,13 @@ dpi_aware() {
             fprintf(stderr, "Error (SetProcessDPIAware): %s\n", GetErrorMessage());
         }
     }
+#endif
 }
 
 //--
 void
 get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
+#ifdef WANT_DPI_AWARENESS
     UINT    x, y;
 
     if(mfb_GetDpiForMonitor != 0x0) {
@@ -147,6 +210,12 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
             *scale_y = 1;
         }
     }
+#else
+	if (scale_x)
+		*scale_x = 1;
+	if (scale_y)
+		*scale_y = 1;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -319,7 +388,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
             }
             break;
-
+#if (WINVER >= _WIN32_WINNT_VISTA) /* only for Windows Vista and later */
         case WM_MOUSEHWHEEL:
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
@@ -327,9 +396,11 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
             }
             break;
-
+#endif
         case WM_MOUSEMOVE:
             if (window_data) {
+                float scale_x, scale_y;
+                get_monitor_scale(hWnd, &scale_x, &scale_y);
                 if (window_data_win->mouse_inside == false) {
                     window_data_win->mouse_inside = true;
                     TRACKMOUSEEVENT tme;
@@ -339,8 +410,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
                 }
-                window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
-                window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
+                window_data->mouse_pos_x = (int)(short) LOWORD(lParam) * scale_x;
+                window_data->mouse_pos_y = (int)(short) HIWORD(lParam) * scale_y;
                 kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
             }
             break;
@@ -348,6 +419,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_MOUSELEAVE:
             if (window_data) {
                 window_data_win->mouse_inside = false;
+                kCall(file_drag_func, -1, -1);
             }
             break;
 
@@ -391,10 +463,66 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 kCall(active_func, false);
             }
             break;
+        
+        case WM_DROPFILES:
+        {
+            float scale_x, scale_y;
+            TCHAR szName[MAX_PATH];
+            HDROP hDrop = (HDROP)wParam;
+            POINT pt;
+            int numFiles = DragQueryFile(hDrop, 0xFFFFFFFF, szName, MAX_PATH);
+            int currentSize = 1;
+            int i;
+            DragQueryPoint(hDrop, &pt);
+            get_monitor_scale(hWnd, &scale_x, &scale_y);
+
+            memset(window_data_win->dropString, 0, window_data_win->dropStringSize);
+            for (i = 0; i < numFiles; i++)
+            {
+                char *utf8str;
+                DragQueryFile(hDrop, i, szName, MAX_PATH);
+                utf8str = toUtf8(szName);
+                currentSize += strlen(utf8str) + 8;
+                if (window_data_win->dropStringSize < currentSize)
+                {
+                    int Osz = window_data_win->dropStringSize;
+                    
+                    if (!window_data_win->dropString)
+                        window_data_win->dropStringSize = currentSize * 2;
+                    
+                    if (window_data_win->dropStringSize < MAX_PATH)
+                        window_data_win->dropStringSize = MAX_PATH;
+                    
+                    window_data_win->dropStringSize *= 2;
+                    window_data_win->dropString = realloc(window_data_win->dropString, window_data_win->dropStringSize);
+                    
+                    memset(window_data_win->dropString + Osz, 0, window_data_win->dropStringSize - Osz);
+                }
+                strcat(window_data_win->dropString, utf8str);
+                strcat(window_data_win->dropString, "\n");
+                free(utf8str);
+            }
+
+            kCall(file_drop_func, window_data_win->dropString, pt.x * scale_x, pt.y * scale_y);
+            kCall(file_drag_func, -1, -1);
+            DragFinish(hDrop);
+            break;
+        }
 
         default:
         {
             res = DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    
+    /* hacky method of testing if file is being dragged in from outside window */
+    /* if the mouse is in the window, no WM_MOUSEMOVE events are being sent, and the left mouse button is down, something outside the window is being dragged */
+    if (window_data_win && window_data_win->mouse_inside == false && GetKeyState(VK_LBUTTON) < 0)
+    {
+        POINT p;
+        if (GetCursorPos(&p) && ScreenToClient(hWnd, &p))
+        {
+            kCall(file_drag_func, p.x, p.y);
         }
     }
 
@@ -407,10 +535,13 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
+    void *Wtitle = 0;
 
     load_functions();
     dpi_aware();
     init_keycodes();
+    
+    Wtitle = toWchar(title);
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
     if (window_data == 0x0) {
@@ -497,7 +628,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_win->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_win->wc.lpfnWndProc   = WndProc;
     window_data_win->wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    window_data_win->wc.lpszClassName = title;
+    window_data_win->wc.lpszClassName = Wtitle;
     RegisterClass(&window_data_win->wc);
 
     calc_dst_factor(window_data, width, height);
@@ -507,7 +638,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_win->window = CreateWindowEx(
         0,
-        title, title,
+        Wtitle, Wtitle,
         s_window_style,
         x, y,
         window_data->window_width, window_data->window_height,
@@ -525,6 +656,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         SetWindowPos(window_data_win->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
     ShowWindow(window_data_win->window, SW_NORMAL);
+    DragAcceptFiles(window_data_win->window, TRUE);
 
     window_data_win->hdc = GetDC(window_data_win->window);
 
@@ -951,7 +1083,7 @@ extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
 uint64_t
-mfb_timer_tick() {
+mfb_timer_tick(void) {
     int64_t     counter;
 
     QueryPerformanceCounter((LARGE_INTEGER *) &counter);
@@ -960,7 +1092,7 @@ mfb_timer_tick() {
 }
 
 void
-mfb_timer_init() {
+mfb_timer_init(void) {
     uint64_t    frequency;
 
     QueryPerformanceFrequency((LARGE_INTEGER *) &frequency);

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <MiniFB_enums.h>
+#include "../include/MiniFB_enums.h"
 
 //-------------------------------------
 typedef struct {
@@ -16,6 +16,8 @@ typedef struct {
     mfb_mouse_button_func   mouse_btn_func;
     mfb_mouse_move_func     mouse_move_func;
     mfb_mouse_scroll_func   mouse_wheel_func;
+    mfb_file_drag_func      file_drag_func;
+    mfb_file_drop_func      file_drop_func;
 
     uint32_t                window_width;
     uint32_t                window_height;

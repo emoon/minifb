@@ -1,7 +1,7 @@
 #if defined(__linux__)
 
 #include <time.h>
-#include <MiniFB.h>
+#include "../include/MiniFB.h"
 
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
@@ -10,7 +10,7 @@ extern double   g_timer_resolution;
 //#define kClock      CLOCK_REALTIME
 
 uint64_t 
-mfb_timer_tick() {
+mfb_timer_tick(void) {
     struct timespec time;
 
     if (clock_gettime(kClock, &time) != 0) {
@@ -21,7 +21,7 @@ mfb_timer_tick() {
 }
 
 void 
-mfb_timer_init() {
+mfb_timer_init(void) {
     struct timespec res;
 
     if (clock_getres(kClock, &res) != 0) {
