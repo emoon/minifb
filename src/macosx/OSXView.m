@@ -106,6 +106,7 @@
 - (void)mouseDown:(NSEvent*)event {
     (void)event;
     if(window_data != 0x0) {
+        window_data->mouse_button_status[MOUSE_BTN_1] = true;
         kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
     }
 }
@@ -114,6 +115,7 @@
 - (void)mouseUp:(NSEvent*)event {
     (void)event;
     if(window_data != 0x0) {
+        window_data->mouse_button_status[MOUSE_BTN_1] = false;
         kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
     }
 }
@@ -122,6 +124,7 @@
 - (void)rightMouseDown:(NSEvent*)event {
     (void)event;
     if(window_data != 0x0) {
+        window_data->mouse_button_status[MOUSE_BTN_2] = true;
         kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
     }
 }
@@ -130,7 +133,8 @@
 - (void)rightMouseUp:(NSEvent*)event {
     (void)event;
     if(window_data != 0x0) {
-        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+        window_data->mouse_button_status[MOUSE_BTN_2] = false;
+        kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, false);
     }
 }
 
@@ -138,6 +142,7 @@
 - (void)otherMouseDown:(NSEvent *)event {
     (void)event;
     if(window_data != 0x0) {
+        window_data->mouse_button_status[[event buttonNumber] & 0x07] = true;
         kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
     }
 }
@@ -146,6 +151,7 @@
 - (void)otherMouseUp:(NSEvent *)event {
     (void)event;
     if(window_data != 0x0) {
+        window_data->mouse_button_status[[event buttonNumber] & 0x07] = false;
         kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
     }
 }
@@ -153,7 +159,9 @@
 //-------------------------------------
 - (void)scrollWheel:(NSEvent *)event {
     if(window_data != 0x0) {
-        kCall(mouse_wheel_func, window_data->mod_keys, [event deltaX], [event deltaY]);
+        window_data->mouse_wheel_x = [event deltaX];
+        window_data->mouse_wheel_y = [event deltaY];
+        kCall(mouse_wheel_func, window_data->mod_keys, window_data->mouse_wheel_x, window_data->mouse_wheel_y);
     }
 }
 
@@ -226,4 +234,3 @@
 }
 
 @end
-

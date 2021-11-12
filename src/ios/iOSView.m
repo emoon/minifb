@@ -20,6 +20,7 @@
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
             window_data->mouse_pos_y = point.y;
+            window_data->mouse_button_status[buttonNumber & 0x07] = true;
             kCall(mouse_btn_func, buttonNumber, 0, true);
             ++buttonNumber;
         }
@@ -37,6 +38,7 @@
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
             window_data->mouse_pos_y = point.y;
+            window_data->mouse_button_status[buttonNumber & 0x07] = true;
             kCall(mouse_move_func, point.x, point.y);
             ++buttonNumber;
         }
@@ -54,6 +56,7 @@
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
             window_data->mouse_pos_y = point.y;
+            window_data->mouse_button_status[buttonNumber & 0x07] = false;
             kCall(mouse_btn_func, buttonNumber, 0, false);
             ++buttonNumber;
         }
@@ -71,6 +74,7 @@
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
             window_data->mouse_pos_y = point.y;
+            window_data->mouse_button_status[buttonNumber & 0x07] = false;
             kCall(mouse_btn_func, buttonNumber, 0, false);
             ++buttonNumber;
         }

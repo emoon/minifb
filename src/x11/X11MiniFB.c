@@ -244,24 +244,30 @@ processEvent(SWindowData *window_data, XEvent *event) {
                 case Button1:
                 case Button2:
                 case Button3:
+                    window_data->mouse_button_status[button & 0x07] = is_pressed;
                     kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
 
                 case Button4:
-                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, 1.0f);
+                    window_data->mouse_wheel_y = 1.0f;
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
                     break;
                 case Button5:
-                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -1.0f);
+                    window_data->mouse_wheel_y = -1.0f;
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
                     break;
 
                 case 6:
-                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 1.0f, 0.0f);
+                    window_data->mouse_wheel_x = 1.0f;
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
                     break;
                 case 7:
-                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -1.0f, 0.0f);
+                    window_data->mouse_wheel_x = -1.0f;
+                    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
                     break;
 
                 default:
+                    window_data->mouse_button_status[(button - 4) & 0x07] = is_pressed;
                     kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
             }

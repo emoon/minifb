@@ -325,6 +325,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 
     //printf("Pointer button '%d'(%d)\n", button, state);
     SWindowData *window_data = (SWindowData *) data;
+    window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 }
 
@@ -358,10 +359,12 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
     SWindowData *window_data = (SWindowData *) data;
     if(axis == 0) {
-        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, -(value / 256.0f));
+        window_data->mouse_wheel_y = -(value / 256.0f);
+        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
     }
     else if(axis == 1) {
-        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, -(value / 256.0f), 0.0f);
+        window_data->mouse_wheel_x = -(value / 256.0f);
+        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
     }
 }
 

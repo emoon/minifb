@@ -309,6 +309,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                         is_pressed = 1;
                     }
                 }
+                window_data->mouse_button_status[button & 0x07] = is_pressed;
                 kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
             }
             break;
@@ -316,7 +317,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSEWHEEL:
             if (window_data) {
-                kCall(mouse_wheel_func, translate_mod(), 0.0f, (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
+                window_data->mouse_wheel_y = (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA;
+                kCall(mouse_wheel_func, translate_mod(), 0.0f, window_data->mouse_wheel_y);
             }
             break;
 
@@ -324,7 +326,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
             if (window_data) {
-                kCall(mouse_wheel_func, translate_mod(), -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA), 0.0f);
+                window_data->mouse_wheel_x = -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
+                kCall(mouse_wheel_func, translate_mod(), window_data->mouse_wheel_x, 0.0f);
             }
             break;
 
