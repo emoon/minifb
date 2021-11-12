@@ -233,8 +233,8 @@ unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
 
-// Not working on Linux (X11 nor Wayland)
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 // [Deprecated] Use mfb_get_monitor_scale instead
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y)
@@ -288,7 +288,7 @@ For now, no multitouch is available.
     mfb_update_state state = mfb_update(g_window, g_buffer);
     if (state != STATE_OK) {
         free(g_buffer);
-        g_buffer = 0x0;
+        g_buffer  = 0x0;
         g_width   = 0;
         g_height  = 0;
     }
@@ -301,6 +301,53 @@ For now, no multitouch is available.
 mkdir build
 cd build
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
+```
+
+### Android (beta)
+
+Take a look at the example in tests/android. You need **Android Studio** to build and run it.
+
+**Functions:**
+
+Some of the MiniFB functions don't make sense on mobile.
+The available functions for Android are:
+
+```c
+struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
+struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
+
+mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+
+void                mfb_close(struct mfb_window *window);
+
+void                mfb_set_user_data(struct mfb_window *window, void *user_data);
+void *              mfb_get_user_data(struct mfb_window *window);
+
+bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+
+void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
+void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
+void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+
+bool                mfb_is_window_active(struct mfb_window *window);
+unsigned            mfb_get_window_width(struct mfb_window *window);
+unsigned            mfb_get_window_height(struct mfb_window *window);
+int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
+int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+```
+
+Timers are also available.
+
+```c
+struct mfb_timer *  mfb_timer_create(void);
+void                mfb_timer_destroy(struct mfb_timer *tmr);
+void                mfb_timer_reset(struct mfb_timer *tmr);
+double              mfb_timer_now(struct mfb_timer *tmr);
+double              mfb_timer_delta(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency(void);
+double              mfb_timer_get_resolution(void);
 ```
 
 ### Windows

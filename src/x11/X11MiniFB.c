@@ -438,7 +438,7 @@ extern bool     g_use_hardware_sync;
 bool
 mfb_wait_sync(struct mfb_window *window) {
     if (window == 0x0) {
-        return STATE_INVALID_WINDOW;
+        return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;

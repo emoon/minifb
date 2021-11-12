@@ -1,0 +1,26 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 30
+    ndkVersion '22.1.7171670'
+
+    defaultConfig {
+        applicationId 'com.example.noise'
+        minSdkVersion 14
+        targetSdkVersion 29
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            version '3.18.1'
+            path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+}

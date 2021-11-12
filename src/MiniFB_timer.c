@@ -1,4 +1,4 @@
-#include "MiniFB.h"
+#include <MiniFB.h>
 #include "MiniFB_internal.h"
 #include <stdlib.h>
 

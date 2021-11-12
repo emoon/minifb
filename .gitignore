@@ -7,3 +7,8 @@ t2-output
 /build
 /.history
 /xcode
+.gradle
+.idea
+.cxx
+build
+kk
