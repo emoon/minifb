@@ -22,6 +22,8 @@
     #include <gl/MiniFB_GL.h>
 #endif
 
+static Atom s_delete_window_atom;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void init_keycodes(SWindowData_X11 *window_data_x11);
@@ -185,6 +187,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         sizeHints.max_height = height;
     }
 
+    s_delete_window_atom = XInternAtom(window_data_x11->display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(window_data_x11->display, window_data_x11->window, &s_delete_window_atom, 1);
+
 #if defined(USE_OPENGL_API)
     if(create_GL_context(window_data) == false) {
         return 0x0;
@@ -315,6 +320,15 @@ processEvent(SWindowData *window_data, XEvent *event) {
             window_data->close = true;
             return;
             break;
+
+        case ClientMessage:
+        {
+            if ((Atom)event->xclient.data.l[0] == s_delete_window_atom) {
+                window_data->close = true;
+                return;
+            }
+        }
+        break;
     }
 }
 
