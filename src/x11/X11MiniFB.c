@@ -240,6 +240,18 @@ processEvent(SWindowData *window_data, XEvent *event) {
             mfb_mouse_button button = (mfb_mouse_button) event->xbutton.button;
             int          is_pressed = (event->type == ButtonPress);
             window_data->mod_keys   = translate_mod(event->xkey.state);
+
+            // Swap mouse right and middle for parity with other platforms:
+            // https://github.com/emoon/minifb/issues/65
+            switch (button) {
+                case Button2:
+                    button = Button3;
+                    break;
+                case Button3:
+                    button = Button2;
+                    break;
+            }
+
             switch (button) {
                 case Button1:
                 case Button2:
