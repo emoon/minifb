@@ -186,6 +186,20 @@ cd build
 cmake .. -DUSE_METAL_API=OFF
 ```
 
+#### Coordinate system
+
+On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
+
+In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
+
+```
+mkdir build
+cd build
+cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
+```
+
+_Note: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y_
+
 if you use **tundra**:
 
 ```

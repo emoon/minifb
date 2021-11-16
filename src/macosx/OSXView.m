@@ -186,8 +186,12 @@
         NSPoint point = [event locationInWindow];
         //NSPoint localPoint = [self convertPoint:point fromView:nil];
         window_data->mouse_pos_x = point.x;
+#if defined(USE_INVERTED_Y_ON_MACOS)
         window_data->mouse_pos_y = point.y;
-        kCall(mouse_move_func, point.x, point.y);
+#else
+        window_data->mouse_pos_y = window_data->window_height - point.y;
+#endif
+        kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
     }
 }
 

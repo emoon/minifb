@@ -104,6 +104,7 @@ option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 
 if(APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
+    option(USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
 elseif(UNIX)
     option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
     if(NOT USE_WAYLAND_API)
@@ -178,6 +179,10 @@ elseif(APPLE)
 
     if(USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
+    endif()
+
+    if(USE_INVERTED_Y_ON_MACOS)
+        add_definitions(-DUSE_INVERTED_Y_ON_MACOS)
     endif()
 
     list(APPEND SrcLib ${SrcMacOSX})
