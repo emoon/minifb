@@ -236,6 +236,15 @@ processEvent(SWindowData *window_data, XEvent *event) {
 
             window_data->key_status[key_code] = is_pressed;
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+
+            if (event->type == KeyRelease) {
+                char c;
+                KeySym ks;
+                XComposeStatus s;
+                if (XLookupString(event, &c, 1, &ks, &s) > 0) {
+                    kCall(char_input_func, c);
+                }
+            }
         }
         break;
 
