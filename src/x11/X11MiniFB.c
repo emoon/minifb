@@ -241,7 +241,7 @@ processEvent(SWindowData *window_data, XEvent *event) {
                 char c;
                 KeySym ks;
                 XComposeStatus s;
-                if (XLookupString(event, &c, 1, &ks, &s) > 0) {
+                if (XLookupString(&event->xkey, &c, 1, &ks, &s) > 0) {
                     kCall(char_input_func, c);
                 }
             }
