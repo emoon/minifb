@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.7)
 
 set(PROJECT_NAME MiniFB)
 project(${PROJECT_NAME})
@@ -98,6 +98,9 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+#--------------------------------------
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 # Code generation options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
@@ -139,14 +142,41 @@ if(NOT MSVC)
     #--------------------------------------
     add_compile_options("$<$<CONFIG:Debug>:-g>")
     add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
-    if(APPLE)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough")
-    else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -Wno-switch -Wno-unused-function -Wno-implicit-fallthrough -Wno-cast-function-type")
+    add_compile_options(-Wall -Wextra)
+    add_compile_options(-Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough)
+
+    if(NOT APPLE)
+        add_compile_options(-Wno-cast-function-type)
     endif()
-    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
-    set(CMAKE_OBJC_FLAGS "${CMAKE_C_FLAGS}")
-    set(CMAKE_OBJCXX_FLAGS "${CMAKE_CXX_FLAGS}")
+else()
+    # Security check
+    add_compile_options(/GS)
+    # Function level linking
+    add_compile_options(/Gy)
+    # Exceptions
+    add_compile_options(/EHsc)    
+    if(MSVC_VERSION GREATER_EQUAL 1900)
+        # SDL checks 2015+
+        add_compile_options(/sdl)
+    endif()
+    if(MSVC_VERSION LESS_EQUAL 1920)
+        # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
+        add_compile_options(/Gm)
+    endif()
+    add_compile_options(/fp:fast)
+    # Runtime library
+    add_compile_options("$<IF:$<CONFIG:Debug>,/MDd,/MD>")
+    # Program database for edit and continue
+    add_compile_options("$<IF:$<CONFIG:Debug>,/ZI,/Zi>")
+    # Optimizations
+    add_compile_options("$<IF:$<CONFIG:Debug>,/Od,/O2>")
+    # Inline function expansion
+    add_compile_options("$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>")
+    # Basic runtime checks
+    add_compile_options("$<$<CONFIG:Debug>:/RTC1>")
+    # Force Visual Studio to actualize __cplusplus version macro
+    add_compile_options(/Zc:__cplusplus)
+
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -288,6 +318,19 @@ if(MINIFB_BUILD_EXAMPLES)
         add_executable(hidpi
             tests/hidpi.c
         )
+
+        add_executable(text
+            tests/text.cpp
+            external/stb/stb_truetype.h
+            external/SkylineBinPack.h
+            external/SkylineBinPack.cpp
+            external/FontSTB.h
+            external/FontSTB.cpp
+        )
+
+        target_include_directories(text PRIVATE external)
+
+        configure_file("tests/resources/Cartoon_Regular.ttf" "${CMAKE_CURRENT_BINARY_DIR}/font.ttf" COPYONLY)
 
     else()
 
