@@ -237,4 +237,126 @@
     [super dealloc];
 }
 
+#pragma mark NSTextInputClient
+
+//-------------------------------------
+// [Binding Keystrokes]
+//-------------------------------------
+
+// Invokes the action specified by the given selector.
+//-------------------------------------
+- (void)doCommandBySelector:(nonnull SEL)selector {
+    kUnused(selector);
+}
+
+//-------------------------------------
+// [Storing Text]
+//-------------------------------------
+
+// Returns an attributed string derived from the given range in the receiver's text storage.
+//-------------------------------------
+- (nullable NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
+    kUnused(range);
+    kUnused(actualRange);
+    return nil;
+}
+
+// Inserts the given string into the receiver, replacing the specified content.
+//-------------------------------------
+- (void)insertText:(nonnull id)string replacementRange:(NSRange)replacementRange {
+    kUnused(replacementRange);
+
+    if(window_data != 0x0) {
+        NSString    *characters;
+        NSUInteger  codepoint;
+
+        if ([string isKindOfClass:[NSAttributedString class]])
+            characters = [string string];
+        else
+            characters = (NSString*) string;
+
+        NSRange range = NSMakeRange(0, [characters length]);
+        while (range.length) {
+            codepoint = 0;
+            if ([characters getBytes:&codepoint
+                       maxLength:sizeof(codepoint)
+                      usedLength:NULL
+                        encoding:NSUTF32StringEncoding // NSUTF8StringEncoding
+                         options:0
+                           range:range
+                  remainingRange:&range]) {
+
+                if ((codepoint & 0xff00) == 0xf700)
+                    continue;
+
+                kCall(char_input_func, codepoint);
+            }
+        }
+    }
+}
+
+//-------------------------------------
+// [Getting Character Coordinates]
+//-------------------------------------
+
+// Returns the index of the character whose bounding rectangle includes the given point.
+//-------------------------------------
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+    kUnused(point);
+    return 0;
+}
+
+// Returns the first logical boundary rectangle for characters in the given range.
+//-------------------------------------
+- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
+    kUnused(range);
+    kUnused(actualRange);
+    return NSMakeRect(0.0, 0.0, 0.0, 0.0);
+}
+
+//-------------------------------------
+// [Handling Marked Text]
+//-------------------------------------
+
+//-------------------------------------
+static const NSRange kEmptyRange = { NSNotFound, 0 };
+
+// Returns a Boolean value indicating whether the receiver has marked text.
+//-------------------------------------
+- (BOOL)hasMarkedText {
+    return false;
+}
+
+// Returns the range of the marked text.
+//-------------------------------------
+- (NSRange)markedRange {
+    return kEmptyRange;
+}
+
+// Returns the range of selected text.
+//-------------------------------------
+- (NSRange)selectedRange {
+    return kEmptyRange;
+}
+
+// Replaces a specified range in the receiver’s text storage with the given string and sets the selection.
+//-------------------------------------
+- (void)setMarkedText:(nonnull id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
+    kUnused(string);
+    kUnused(selectedRange);
+    kUnused(replacementRange);
+}
+
+// Unmarks the marked text.
+//-------------------------------------
+- (void)unmarkText {
+}
+
+// Returns an array of attribute names recognized by the receiver.
+//-------------------------------------
+- (nonnull NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {
+    return [NSArray array];
+}
+//----
+
 @end
