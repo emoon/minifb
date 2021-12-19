@@ -154,7 +154,7 @@ else()
     # Function level linking
     add_compile_options(/Gy)
     # Exceptions
-    add_compile_options(/EHsc)    
+    add_compile_options(/EHsc)
     if(MSVC_VERSION GREATER_EQUAL 1900)
         # SDL checks 2015+
         add_compile_options(/sdl)
@@ -319,19 +319,6 @@ if(MINIFB_BUILD_EXAMPLES)
         add_executable(hidpi
             tests/hidpi.c
         )
-
-        add_executable(text
-            tests/text.cpp
-            external/stb/stb_truetype.h
-            external/SkylineBinPack.h
-            external/SkylineBinPack.cpp
-            external/FontSTB.h
-            external/FontSTB.cpp
-        )
-
-        target_include_directories(text PRIVATE external)
-
-        configure_file("tests/resources/Cartoon_Regular.ttf" "${CMAKE_CURRENT_BINARY_DIR}/font.ttf" COPYONLY)
 
     else()
 
