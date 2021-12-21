@@ -51,6 +51,12 @@ void resize(struct mfb_window *window, int width, int height) {
     mfb_set_viewport(window, x, y, width, height);
 }
 
+void close(struct mfb_window *window) {
+    ...
+    return true;    // true => confirm close
+                    // false => don't close 
+}
+
 void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     ...
     // Remember to close the window in some way
@@ -86,6 +92,7 @@ if (!window)
 
 mfb_set_active_callback(window, active);
 mfb_set_resize_callback(window, resize);
+mfb_set_close_callback(window, close);
 mfb_set_keyboard_callback(window, keyboard);
 mfb_set_char_input_callback(window, char_input);
 mfb_set_mouse_button_callback(window, mouse_btn);
@@ -242,6 +249,7 @@ bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
 
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
@@ -343,6 +351,7 @@ void                mfb_set_active_callback(struct mfb_window *window, mfb_activ
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
 
 bool                mfb_is_window_active(struct mfb_window *window);
 unsigned            mfb_get_window_width(struct mfb_window *window);

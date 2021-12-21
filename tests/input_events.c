@@ -49,7 +49,8 @@ close(struct mfb_window *window) {
         window_title = (const char*)mfb_get_user_data(window);
     }
 	fprintf(stdout, "%s > close\n", window_title);
-    return true; // true => confirm close
+    return true;    // true => confirm close
+                    // false => don't close 
 }
 
 static void

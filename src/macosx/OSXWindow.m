@@ -237,6 +237,21 @@
     }
 }
 
+- (BOOL)windowShouldClose:(NSWindow *) window 
+{
+    bool destroy = false;
+    if (!window_data) {
+        destroy = true;
+    } else {
+        // Obtain a confirmation of close
+        if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+            destroy = true;
+        }
+    }
+
+    return destroy;
+}
+
 - (void)windowWillClose:(NSNotification *)notification {
     kUnused(notification);
     if(window_data) {
