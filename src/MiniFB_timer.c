@@ -31,7 +31,7 @@ mfb_get_target_fps() {
         return 0;
     }
     else {
-        return 1.0 / g_time_for_frame;
+        return (unsigned) (1.0 / g_time_for_frame);
     }
 }
 

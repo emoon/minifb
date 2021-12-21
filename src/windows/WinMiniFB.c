@@ -254,11 +254,35 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_CHAR:
         case WM_SYSCHAR:
+        {
+            static WCHAR highSurrogate = 0;
+            if (window_data) {
+                if (wParam >= 0xd800 && wParam <= 0xdbff) {
+                    highSurrogate = (WCHAR) wParam;
+                }
+                else {
+                    unsigned int codepoint = 0;
+                    if (wParam >= 0xdc00 && wParam <= 0xdfff) {
+                        if (highSurrogate != 0) {
+                            codepoint += (highSurrogate - 0xd800) << 10;
+                            codepoint += (WCHAR) wParam - 0xdc00;
+                            codepoint += 0x10000;
+                        }
+                    }
+                    else {
+                        codepoint = (WCHAR) wParam;
+                    }
+                    highSurrogate = 0;
+                    kCall(char_input_func, codepoint);
+                }
+            }
+        }
+        break;
+
         case WM_UNICHAR:
         {
-
             if (window_data) {
-                if (message == WM_UNICHAR && wParam == UNICODE_NOCHAR) {
+                if (wParam == UNICODE_NOCHAR) {
                     // WM_UNICHAR is not sent by Windows, but is sent by some third-party input method engine
                     // Returning TRUE here announces support for this message
                     return TRUE;

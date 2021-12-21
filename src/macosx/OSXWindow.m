@@ -143,6 +143,7 @@
         window_data->key_status[key_code] = true;
         kCall(keyboard_func, key_code, window_data->mod_keys, true);
     }
+    [childContentView.superview interpretKeyEvents:@[event]];
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,33 +158,6 @@
         if (event.characters.length > 0) {
             unichar c = [event.characters characterAtIndex:0];
             kCall(char_input_func, c);
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-- (void)insertText:(id)string replacementRange:(NSRange)replacementRange
-{
-    kUnused(replacementRange);
-
-    if(window_data != 0x0) {
-        NSString    *characters;
-        NSUInteger  length;
-
-        if ([string isKindOfClass:[NSAttributedString class]])
-            characters = [string string];
-        else
-            characters = (NSString*) string;
-
-        length = [characters length];
-        for (NSUInteger i = 0;  i < length;  i++)
-        {
-            const unichar code = [characters characterAtIndex:i];
-            if ((code & 0xff00) == 0xf700)
-                continue;
-
-            kCall(char_input_func, code);
         }
     }
 }

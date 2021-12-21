@@ -8,6 +8,7 @@
 // I cannot find a way to get dpi under VirtualBox
 //#include <X11/Xresource.h>
 //#include <X11/extensions/Xrandr.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -236,6 +237,28 @@ processEvent(SWindowData *window_data, XEvent *event) {
 
             window_data->key_status[key_code] = is_pressed;
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+
+            if(event->type == KeyPress) {
+                KeySym keysym;
+                XLookupString(&event->xkey, NULL, 0, &keysym, NULL);
+
+                if ((keysym >= 0x0020 && keysym <= 0x007e) ||
+                    (keysym >= 0x00a0 && keysym <= 0x00ff)) {
+                    kCall(char_input_func, keysym);
+                }
+                else if ((keysym & 0xff000000) == 0x01000000) {
+                    keysym = keysym & 0x00ffffff;
+                }
+
+                kCall(char_input_func, keysym);
+
+                // TODO: Investigate a bit more the xkbcommon api
+
+                // This does not seem to be working properly
+                //unsigned int codepoint = xkb_state_key_get_utf32(state, keysym);
+                //if (codepoint != 0)
+                //    kCall(char_input_func, codepoint);
+            }
         }
         break;
 
