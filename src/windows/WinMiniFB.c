@@ -243,6 +243,12 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
         }
 
+        case WM_DESTROY:
+            if (window_data) {
+                window_data->close = true;
+            }
+            break;
+
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
         case WM_KEYUP:

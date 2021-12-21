@@ -139,7 +139,9 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE) {
         SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
+        if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+            window_data->close = true;
+        }
     }
 }
 
