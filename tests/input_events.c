@@ -42,6 +42,16 @@ resize(struct mfb_window *window, int width, int height) {
     mfb_set_viewport(window, x, y, width, height);
 }
 
+bool
+close(struct mfb_window *window) {
+    const char* window_title = "";
+    if (window) {
+        window_title = (const char*)mfb_get_user_data(window);
+    }
+	fprintf(stdout, "%s > close\n", window_title);
+    return true; // Yes, confirm close
+}
+
 void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
@@ -109,6 +119,7 @@ main()
 
     mfb_set_active_callback(window, active);
     mfb_set_resize_callback(window, resize);
+    mfb_set_close_callback(window, close);
     mfb_set_keyboard_callback(window, keyboard);
     mfb_set_char_input_callback(window, char_input);
     mfb_set_mouse_button_callback(window, mouse_btn);

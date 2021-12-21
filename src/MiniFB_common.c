@@ -44,6 +44,15 @@ mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback) {
 
 //-------------------------------------
 void
+mfb_set_close_callback(struct mfb_window* window, mfb_close_func callback) {
+    if (window != 0x0) {
+        SWindowData* window_data = (SWindowData*)window;
+        window_data->close_func = callback;
+    }
+}
+
+//-------------------------------------
+void
 mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;

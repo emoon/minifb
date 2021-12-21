@@ -47,6 +47,7 @@ void                mfb_get_monitor_scale(struct mfb_window *window, float *scal
 // Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window* window, mfb_close_func callback);
 void                mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback);
 void                mfb_set_char_input_callback(struct mfb_window *window, mfb_char_input_func callback);
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
