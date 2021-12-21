@@ -34,6 +34,13 @@ mfb_stub::resize_stub(struct mfb_window *window, int width, int height) {
 }
 
 //-------------------------------------
+bool 
+mfb_stub::close_stub(struct mfb_window *window) {
+    mfb_stub    *stub = mfb_stub::GetInstance(window);
+    return stub->m_close(window);
+}
+
+//-------------------------------------
 void 
 mfb_stub::keyboard_stub(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     mfb_stub    *stub = mfb_stub::GetInstance(window);

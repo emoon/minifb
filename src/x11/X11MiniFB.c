@@ -365,8 +365,19 @@ processEvent(SWindowData *window_data, XEvent *event) {
         case ClientMessage:
         {
             if ((Atom)event->xclient.data.l[0] == s_delete_window_atom) {
-                window_data->close = true;
-                return;
+                if (window_data) {
+                    bool destroy = false;
+
+                    // Obtain a confirmation of close
+                    if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+                        destroy = true;
+                    }
+
+                    if (destroy) {
+                        window_data->close = true;
+                        return;
+                    }
+                }
             }
         }
         break;

@@ -11,7 +11,7 @@ static bool         g_active = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void
+static void
 active(struct mfb_window *window, bool isActive) {
     const char *window_title = "";
     if(window) {
@@ -21,7 +21,7 @@ active(struct mfb_window *window, bool isActive) {
     g_active = isActive;
 }
 
-void
+static void
 resize(struct mfb_window *window, int width, int height) {
     uint32_t x = 0;
     uint32_t y = 0;
@@ -42,7 +42,18 @@ resize(struct mfb_window *window, int width, int height) {
     mfb_set_viewport(window, x, y, width, height);
 }
 
-void
+static bool
+close(struct mfb_window *window) {
+    const char* window_title = "";
+    if (window) {
+        window_title = (const char*)mfb_get_user_data(window);
+    }
+	fprintf(stdout, "%s > close\n", window_title);
+    return true;    // true => confirm close
+                    // false => don't close 
+}
+
+static void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
     if(window) {
@@ -54,7 +65,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed
     }
 }
 
-void
+static void
 char_input(struct mfb_window *window, unsigned int charCode) {
     const char *window_title = "";
     if(window) {
@@ -63,7 +74,7 @@ char_input(struct mfb_window *window, unsigned int charCode) {
     fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
 }
 
-void
+static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
     int x, y;
@@ -75,19 +86,19 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
 }
 
-void
+static void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
-    // const char *window_title = "";
-    // if(window) {
-    //     window_t(const char *) itle = mfb_get_user_data(window);
-    // }
-    //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
+    const char *window_title = "";
+    if(window) {
+        window_title = mfb_get_user_data(window);
+    }
+    fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
 }
 
-void
+static void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
     const char *window_title = "";
     if(window) {
@@ -109,6 +120,7 @@ main()
 
     mfb_set_active_callback(window, active);
     mfb_set_resize_callback(window, resize);
+    mfb_set_close_callback(window, close);
     mfb_set_keyboard_callback(window, keyboard);
     mfb_set_char_input_callback(window, char_input);
     mfb_set_mouse_button_callback(window, mouse_btn);

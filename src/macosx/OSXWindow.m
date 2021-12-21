@@ -154,6 +154,11 @@
         short int key_code = g_keycodes[[event keyCode] & 0x1ff];
         window_data->key_status[key_code] = false;
         kCall(keyboard_func, key_code, window_data->mod_keys, false);
+        
+        if (event.characters.length > 0) {
+            unichar c = [event.characters characterAtIndex:0];
+            kCall(char_input_func, c);
+        }
     }
 }
 
@@ -230,6 +235,21 @@
         window_data->is_active = false;
         kCall(active_func, false);
     }
+}
+
+- (BOOL)windowShouldClose:(NSWindow *) window 
+{
+    bool destroy = false;
+    if (!window_data) {
+        destroy = true;
+    } else {
+        // Obtain a confirmation of close
+        if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+            destroy = true;
+        }
+    }
+
+    return destroy;
 }
 
 - (void)windowWillClose:(NSNotification *)notification {

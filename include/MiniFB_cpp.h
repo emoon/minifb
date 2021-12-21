@@ -37,6 +37,8 @@ class mfb_stub {
     template <class T>
     friend void mfb_set_resize_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, int, int));
     template <class T>
+    friend void mfb_set_close_callback(struct mfb_window *window, T *obj, bool (T::*method)(struct mfb_window *));
+    template <class T>
     friend void mfb_set_mouse_button_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_mouse_button, mfb_key_mod, bool));
     template <class T>
     friend void mfb_set_keyboard_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_key, mfb_key_mod, bool));
@@ -53,6 +55,7 @@ class mfb_stub {
 
     static void active_stub(struct mfb_window *window, bool isActive);
     static void resize_stub(struct mfb_window *window, int width, int height);
+    static bool close_stub(struct mfb_window *window);
     static void keyboard_stub(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed);
     static void char_input_stub(struct mfb_window *window, unsigned int);
     static void mouse_btn_stub(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed);
@@ -62,11 +65,12 @@ class mfb_stub {
     struct mfb_window                                                           *m_window;
     std::function<void(struct mfb_window *window, bool)>                        m_active;
     std::function<void(struct mfb_window *window, int, int)>                    m_resize;
-    std::function<void(struct mfb_window *window, mfb_key, mfb_key_mod, bool)>           m_keyboard;
+    std::function<bool(struct mfb_window *window)>                              m_close;
+    std::function<void(struct mfb_window *window, mfb_key, mfb_key_mod, bool)>  m_keyboard;
     std::function<void(struct mfb_window *window, unsigned int)>                m_char_input;
     std::function<void(struct mfb_window *window, mfb_mouse_button, mfb_key_mod, bool)>   m_mouse_btn;
     std::function<void(struct mfb_window *window, int, int)>                    m_mouse_move;
-    std::function<void(struct mfb_window *window, mfb_key_mod, float, float)>        m_scroll;
+    std::function<void(struct mfb_window *window, mfb_key_mod, float, float)>   m_scroll;
 };
 
 //-------------------------------------
@@ -86,6 +90,15 @@ inline void mfb_set_resize_callback(struct mfb_window *window, T *obj, void (T::
     mfb_stub    *stub = mfb_stub::GetInstance(window);
     stub->m_resize = std::bind(method, obj, _1, _2, _3);
     mfb_set_resize_callback(window, mfb_stub::resize_stub);
+}
+
+template <class T>
+inline void mfb_set_close_callback(struct mfb_window *window, T *obj, bool (T::*method)(struct mfb_window *window)) {
+    using namespace std::placeholders;
+
+    mfb_stub    *stub = mfb_stub::GetInstance(window);
+    stub->m_close = std::bind(method, obj, _1);
+    mfb_set_close_callback(window, mfb_stub::close_stub);
 }
 
 template <class T>

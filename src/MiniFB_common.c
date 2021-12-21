@@ -44,6 +44,15 @@ mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback) {
 
 //-------------------------------------
 void
+mfb_set_close_callback(struct mfb_window* window, mfb_close_func callback) {
+    if (window != 0x0) {
+        SWindowData* window_data = (SWindowData*)window;
+        window_data->close_func = callback;
+    }
+}
+
+//-------------------------------------
+void
 mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
@@ -130,7 +139,9 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
     kUnused(isPressed);
     if (key == KB_KEY_ESCAPE) {
         SWindowData *window_data = (SWindowData *) window;
-        window_data->close = true;
+        if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+            window_data->close = true;
+        }
     }
 }
 

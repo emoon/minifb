@@ -223,15 +223,31 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
         }
 #endif
-
-        case WM_DESTROY:
         case WM_CLOSE:
         {
+            if (window_data) {
+                bool destroy = false;
+
+                // Obtain a confirmation of close
+                if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+                    destroy = true;
+                }
+
+                if (destroy) {
+                    window_data->close = true;
+                    if (window_data_win) {
+                        DestroyWindow(window_data_win->window);
+                    }
+                }
+            }
+            break;
+        }
+
+        case WM_DESTROY:
             if (window_data) {
                 window_data->close = true;
             }
             break;
-        }
 
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:

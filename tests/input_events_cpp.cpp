@@ -40,6 +40,16 @@ public:
         mfb_set_viewport(window, x, y, width, height);
     }
 
+    bool close(struct mfb_window *window) {
+        const char* window_title = "";
+        if (window) {
+            window_title = (const char*) mfb_get_user_data(window);
+        }
+        fprintf(stdout, "%s > close\n", window_titl0e);
+        return true;    // true => confirm close
+                        // false => don't close 
+    }
+
     void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
         const char *window_title = "";
         if(window) {
@@ -106,6 +116,7 @@ main()
 
     mfb_set_active_callback(window, &e, &Events::active);
     mfb_set_resize_callback(window, &e, &Events::resize);
+    mfb_set_close_callback(window, &e, &Events::close);
     mfb_set_keyboard_callback(window, &e, &Events::keyboard);
     mfb_set_char_input_callback(window, &e, &Events::char_input);
     mfb_set_mouse_button_callback(window, &e, &Events::mouse_btn);
