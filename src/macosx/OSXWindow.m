@@ -154,11 +154,6 @@
         short int key_code = g_keycodes[[event keyCode] & 0x1ff];
         window_data->key_status[key_code] = false;
         kCall(keyboard_func, key_code, window_data->mod_keys, false);
-        
-        if (event.characters.length > 0) {
-            unichar c = [event.characters characterAtIndex:0];
-            kCall(char_input_func, c);
-        }
     }
 }
 
