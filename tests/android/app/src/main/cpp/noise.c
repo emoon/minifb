@@ -123,6 +123,11 @@ main(int argc, char *argv[]) {
             seed >>= 1;
             seed |= (carry << 30);
             noise &= 0xFF;
+
+            // Comment out to test appropriate colour channel
+            //g_buffer[i] = MFB_RGB(noise, 0, 0);     // Test red channel
+            //g_buffer[i] = MFB_RGB(0, noise, 0);     // Test green channel
+            //g_buffer[i] = MFB_RGB(0, 0, noise);     // Test blue channel
             g_buffer[i] = MFB_RGB(noise, noise, noise);
         }
 
