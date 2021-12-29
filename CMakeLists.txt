@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.7)
 set(PROJECT_NAME MiniFB)
 project(${PROJECT_NAME})
 
-message("Processing " ${PROJECT_NAME})
+message(STATUS "Processing " ${PROJECT_NAME})
 
 # Detect iOS
 #--------------------------------------
@@ -339,4 +339,4 @@ if(MINIFB_BUILD_EXAMPLES)
 
 endif()
 
-message("Done " ${PROJECT_NAME})
+message(STATUS "Done " ${PROJECT_NAME})
