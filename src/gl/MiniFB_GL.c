@@ -150,7 +150,7 @@ create_GL_context(SWindowData *window_data) {
 
     init_GL(window_data);
 
-    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress("glXSwapIntervalEXT");
+    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress((const GLubyte *)"glXSwapIntervalEXT");
     set_target_fps_aux();
 
     return true;
@@ -355,7 +355,7 @@ set_target_fps_aux() {
 
         SwapIntervalEXT(dpy, drawable, interval);
         glXQueryDrawable(dpy, drawable, kGLX_SWAP_INTERVAL_EXT, &currentInterval);
-        if (interval != currentInterval) {
+        if (interval != (int)currentInterval) {
             glXQueryDrawable(dpy, drawable, kGLX_MAX_SWAP_INTERVAL_EXT, &maxInterval);
             fprintf(stderr, "Cannot set target swap interval. Current swap interval is %d (max: %d)\n", currentInterval, maxInterval);
         }
