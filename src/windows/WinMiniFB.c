@@ -671,26 +671,24 @@ mfb_wait_sync(struct mfb_window *window) {
     MSG             msg;
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
     double          current;
-    uint32_t        millis = 1;
     while (1) {
         current = mfb_timer_now(window_data_win->timer);
-        if (current >= g_time_for_frame * 0.96) {
+        if (current >= g_time_for_frame) {
             mfb_timer_reset(window_data_win->timer);
             return true;
-        }
-        else if(current >= g_time_for_frame * 0.8) {
-            millis = 0;
-        }
+        } else if (g_time_for_frame - current > 0.003d) {
+            timeBeginPeriod(1);
+            Sleep(1);
+            timeEndPeriod(1);
 
-        Sleep(millis);
+            if (PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
 
-        if(millis == 1 && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-
-            if (window_data->close) {
-                destroy_window_data(window_data);
-                return false;
+                if (window_data->close) {
+                    destroy_window_data(window_data);
+                    return false;
+                }
             }
         }
     }
