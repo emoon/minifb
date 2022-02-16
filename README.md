@@ -16,7 +16,7 @@ do {
 
     // TODO: add some fancy rendering to the buffer of size 800 * 600
 
-    state = mfb_update_ex(buffer, 800, 600);
+    state = mfb_update_ex(window, buffer, 800, 600);
 
     if (state < 0) {
         window = NULL;
