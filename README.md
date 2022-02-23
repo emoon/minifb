@@ -69,7 +69,7 @@ void resize(struct mfb_window *window, int width, int height) {
     mfb_set_viewport(window, x, y, width, height);
 }
 
-void close(struct mfb_window *window) {
+bool close(struct mfb_window *window) {
     ...
     return true;    // true => confirm close
                     // false => don't close
