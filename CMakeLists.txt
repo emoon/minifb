@@ -104,6 +104,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Code generation options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
+option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
 if(APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
@@ -348,10 +349,12 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
-set_property(TARGET noise PROPERTY FOLDER "Tests")
-set_property(TARGET input_events PROPERTY FOLDER "Tests")
-set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
-set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
-set_property(TARGET hidpi PROPERTY FOLDER "Tests")
+if(MINIFB_BUILD_EXAMPLES)
+    set_property(TARGET noise PROPERTY FOLDER "Tests")
+    set_property(TARGET input_events PROPERTY FOLDER "Tests")
+    set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
+    set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
+    set_property(TARGET hidpi PROPERTY FOLDER "Tests")
+endif()
 
 message(STATUS "Done " ${PROJECT_NAME})

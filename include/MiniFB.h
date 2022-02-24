@@ -93,7 +93,10 @@ double              mfb_timer_get_resolution(void);
 #ifdef __cplusplus
 }
 
-#include "MiniFB_cpp.h"
+#if !defined(MINIFB_AVOID_CPP_HEADERS)
+    #include "MiniFB_cpp.h"
+#endif
+
 #endif
 
 #endif
