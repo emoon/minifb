@@ -343,4 +343,15 @@ if(MINIFB_BUILD_EXAMPLES)
 
 endif()
 
+# Organize IDE Folders
+#--------------------------------------
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(TARGET minifb PROPERTY FOLDER "Libs")
+
+set_property(TARGET noise PROPERTY FOLDER "Tests")
+set_property(TARGET input_events PROPERTY FOLDER "Tests")
+set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
+set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
+set_property(TARGET hidpi PROPERTY FOLDER "Tests")
+
 message(STATUS "Done " ${PROJECT_NAME})

@@ -5,26 +5,31 @@
 //-------------------------------------
 mfb_stub *
 mfb_stub::GetInstance(struct mfb_window *window) {
-    struct stub_list {
-        std::vector<mfb_stub *> list;
-        stub_list() = default;
-        ~stub_list() {
-            for(mfb_stub *instance : list)
+    struct stub_vector {
+        std::vector<mfb_stub *> instances;
+
+        stub_vector() = default;
+
+        ~stub_vector() {
+            for(mfb_stub *instance : instances)
                 delete instance;
         }
+
         mfb_stub *Get(struct mfb_window *window) {
-            for(mfb_stub *instance : list) {
+            for(mfb_stub *instance : instances) {
                 if(instance->m_window == window) {
                     return instance;
                 }
             }
-            list.push_back(new mfb_stub);
-            list.back()->m_window = window;
-            return list.back();
+
+            instances.push_back(new mfb_stub);
+            instances.back()->m_window = window;
+
+            return instances.back();
         }
     };
 
-    static stub_list s_instances;
+    static stub_vector s_instances;
 
     return s_instances.Get(window);
 }
