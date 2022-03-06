@@ -354,7 +354,7 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 // Returns an array of attribute names recognized by the receiver.
 //-------------------------------------
-- (nonnull NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {
+- (nonnull NSArray<NSString *> *)validAttributesForMarkedText {
     return [NSArray array];
 }
 //----
