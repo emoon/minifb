@@ -65,6 +65,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     init_keycodes(window_data_x11);
+    XAutoRepeatOff(window_data_x11->display);
 
     window_data_x11->screen = DefaultScreen(window_data_x11->display);
 
