@@ -325,6 +325,10 @@ if(MINIFB_BUILD_EXAMPLES)
             tests/hidpi.c
         )
 
+        add_executable(fullscreen
+            tests/fullscreen.c
+        )
+
     else()
 
         add_executable(noise
