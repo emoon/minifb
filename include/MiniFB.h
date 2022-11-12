@@ -44,6 +44,8 @@ void *              mfb_get_user_data(struct mfb_window *window);
 
 // Set viewport (useful when resize)
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+// Let mfb to calculate the best fit from your framebuffer original size
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale

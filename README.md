@@ -67,6 +67,9 @@ void resize(struct mfb_window *window, int width, int height) {
     ...
     // Optionally you can also change the viewport size
     mfb_set_viewport(window, x, y, width, height);
+    // or let mfb caclculate the best fit from your original framebuffer size
+    mfb_set_viewport_best_fit(window, old_width, old_height);
+
 }
 
 bool close(struct mfb_window *window) {
@@ -304,6 +307,8 @@ void *              mfb_get_user_data(struct mfb_window *window);
 
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
+
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
@@ -404,6 +409,8 @@ void                mfb_set_user_data(struct mfb_window *window, void *user_data
 void *              mfb_get_user_data(struct mfb_window *window);
 
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);

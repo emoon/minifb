@@ -147,6 +147,35 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
 
 //-------------------------------------
 bool
+mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height) {
+    if(window != 0x0) {
+        SWindowData *window_data = (SWindowData *) window;
+
+        unsigned new_width  = window_data->window_width;
+        unsigned new_height = window_data->window_height;
+
+        float scale_x = new_width  / (float) old_width;
+        float scale_y = new_height / (float) old_height;
+        if(scale_x >= scale_y)
+            scale_x = scale_y;
+        else
+            scale_y = scale_x;
+
+        unsigned finalWidth  = (old_width  * scale_x) + 0.5f;
+        unsigned finalHeight = (old_height * scale_y) + 0.5f;
+
+        unsigned offset_x = (new_width  - finalWidth)  >> 1;
+        unsigned offset_y = (new_height - finalHeight) >> 1;
+
+        mfb_get_monitor_scale(window, &scale_x, &scale_y);
+        return mfb_set_viewport(window, offset_x / scale_x, offset_y / scale_y, finalWidth / scale_x, finalHeight / scale_y);
+    }
+
+    return false;
+}
+
+//-------------------------------------
+bool
 mfb_is_window_active(struct mfb_window *window) {
     if(window != 0x0) {
         SWindowData *window_data = (SWindowData *) window;
