@@ -12,6 +12,7 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 //#define kUse_Clean_UP
 #if defined(kUse_Clean_UP)
@@ -23,6 +24,43 @@
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
 
+//-------------------------------------
+static bool
+CheckGLExtension(const char *name) {
+    static const char *extensions = 0x0;
+
+    if (extensions == 0x0) {
+#if defined(_WIN32) || defined(WIN32)
+        // TODO: This is deprecated on OpenGL 3+.
+        // Use glGetIntegerv(GL_NUM_EXTENSIONS, &n) and glGetStringi(GL_EXTENSIONS, index)
+        extensions = (const char *) glGetString(GL_EXTENSIONS);
+#elif defined(linux)
+        Display *display = glXGetCurrentDisplay();
+
+        extensions = glXQueryExtensionsString(display, DefaultScreen(display));
+#endif
+    }
+
+    if (extensions != 0x0) {
+        const char *start = extensions;
+        const char *end, *where;
+        while(1) {
+            where = strstr(start, name);
+            if(where == 0x0)
+                return false;
+
+            end = where + strlen(name);
+            if (where == start || *(where - 1) == ' ') {
+                if (*end == ' ' || *end == 0)
+                    break;
+            }
+
+            start = end;
+        }
+    }
+
+    return true;
+}
 
 //-------------------------------------
 #if defined(_WIN32) || defined(WIN32)
@@ -150,8 +188,10 @@ create_GL_context(SWindowData *window_data) {
 
     init_GL(window_data);
 
-    SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress((const GLubyte *)"glXSwapIntervalEXT");
-    set_target_fps_aux();
+    if (CheckGLExtension("GLX_EXT_swap_control")) {
+        SwapIntervalEXT = (PFNGLXSWAPINTERVALEXTPROC) glXGetProcAddress((const GLubyte *)"glXSwapIntervalEXT");
+        set_target_fps_aux();
+    }
 
     return true;
 #endif
