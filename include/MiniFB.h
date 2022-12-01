@@ -81,7 +81,7 @@ const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // O
 
 // FPS
 void                mfb_set_target_fps(uint32_t fps);
-unsigned            mfb_get_target_fps();
+unsigned            mfb_get_target_fps(void);
 bool                mfb_wait_sync(struct mfb_window *window);
 
 // Timer
