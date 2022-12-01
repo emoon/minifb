@@ -503,6 +503,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *bu
     let framePixels = new Uint8ClampedArray(HEAPU8.buffer, buffer, width * height * 4);
     let imageData = new ImageData(framePixels, width, height);
     canvas.getContext("2d").putImageData(imageData, 0, 0);
+    Module._reverse_color_channels(buffer, buffer, width, height);
     return Module._window_data_get_close(windowData);
 });
 
