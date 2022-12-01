@@ -248,7 +248,7 @@ main()
             seed >>= 1;
             seed |= (carry << 30);
             noise &= 0xFF;
-            g_buffer[i] = MFB_RGB(noise, noise, noise);
+            g_buffer[i] = MFB_ARGB(0xff, noise, noise, noise);
         }
 
         state = mfb_update(window, g_buffer);

@@ -13,3 +13,7 @@ t2-output
 build
 kk
 vc
+cmake-build-debug
+cmake-build-debug-emscripten
+cmake-build-release
+cmake-build-release-emscripten
