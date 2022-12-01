@@ -10,7 +10,7 @@
 
 static bool g_initialized = false;
 
-EM_JS(void, setup_web_mfb, (), {
+EM_ASYNC_JS(void, setup_web_mfb, (), {
     // Use requestAnimationFrame instead of setTimeout for async processing.
     Asyncify.handleSleep(wakeUp => {
             requestAnimationFrame(wakeUp);

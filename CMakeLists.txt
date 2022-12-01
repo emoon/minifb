@@ -279,11 +279,6 @@ elseif(UNIX)
             "-lwayland-cursor"
         )
     elseif(EMSCRIPTEN)
-        add_compile_options(
-            "-DEMSCRIPTEN"
-            "-sSTRICT=1"
-            "--no-entry"
-        )
         add_link_options(
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
@@ -296,7 +291,6 @@ elseif(UNIX)
             "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
             "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
             "-sASYNCIFY"
-            "-sASYNCIFY_IMPORTS=[\"setup_web_mfb\"]"
             "--no-entry"
         )
     else()
