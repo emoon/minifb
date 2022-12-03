@@ -270,8 +270,11 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
 
 
     function getMousePos(event) {
-        var rect = canvas.getBoundingClientRect();
-        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        let rect = canvas.getBoundingClientRect();
+        let pos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        pos.x = pos.x / canvas.clientWidth * canvas.width;
+        pos.y = pos.y / canvas.clientHeight * canvas.height;
+        return pos;
     };
 
     function getMfbKeyModFromEvent(event) {
