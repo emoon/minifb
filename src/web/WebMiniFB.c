@@ -311,9 +311,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
             Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button, 1);
+            Module._window_data_set_mouse_button(windowData, event.button + 1, 1);
             Module._window_data_set_mod_keys(windowData, mod);
-            w.events.push({ type: "mousebutton", button: event.button, mod: mod, isPressed: true});
+            w.events.push({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: true});
     }, false);
 
     canvas.addEventListener("mousemove", (event) => {
@@ -327,9 +327,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
             Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button, 0);
+            Module._window_data_set_mouse_button(windowData, event.button + 1, 0);
             Module._window_data_set_mod_keys(windowData, mod);
-            w.events.push({ type: "mousebutton", button: event.button, mod: mod, isPressed: false});
+            w.events.push({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: false});
     }, false);
 
     document.body.addEventListener("mouseup", (event) => {
@@ -337,9 +337,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
             Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button, 0);
+            Module._window_data_set_mouse_button(windowData, event.button + 1, 0);
             Module._window_data_set_mod_keys(windowData, mod);
-            w.events.push({ type: "mousebutton", button: event.button, mod: mod, isPressed: false});
+            w.events.push({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: false});
     }, false);
 
     canvas.addEventListener('wheel', (event) => {
@@ -360,9 +360,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                 let touch = event.changedTouches[0];
                 let pos = getTouchPos(touch);
                 Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-                Module._window_data_set_mouse_button(windowData, 0, 1);
+                Module._window_data_set_mouse_button(windowData, 1, 1);
                 w.activeTouchId = touch.identifier;
-                w.events.push({ type: "mousebutton", button: 0, mod: 0, isPressed: true});
+                w.events.push({ type: "mousebutton", button: 1, mod: 0, isPressed: true});
             }
             event.preventDefault();
     }, false);
@@ -389,9 +389,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                 if (w.activeTouchId === touch.identifier) {
                     let pos = getTouchPos(touch);
                     Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-                    Module._window_data_set_mouse_button(windowData, 0, 0);
+                    Module._window_data_set_mouse_button(windowData, 1, 0);
                     w.activeTouchId = null;
-                    w.events.push({ type: "mousebutton", button: 0, mod: 0, isPressed: false});
+                    w.events.push({ type: "mousebutton", button: 1, mod: 0, isPressed: false});
                     break;
                 }
             }
