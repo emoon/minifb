@@ -353,15 +353,10 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             w.events.push({ type: "mousescroll", mod: mod, x: event.deltaX, y: event.deltaY});
     }, false);
 
-    function getTouchPos(event) {
-        var rect = canvas.getBoundingClientRect();
-        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    };
-
     canvas.addEventListener("touchstart", (event) => {
             if (!w.activeTouchId) {
                 let touch = event.changedTouches[0];
-                let pos = getTouchPos(touch);
+                let pos = getMousePos(touch);
                 Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
                 Module._window_data_set_mouse_button(windowData, 1, 1);
                 w.activeTouchId = touch.identifier;
@@ -375,7 +370,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                 for (let i = 0; i < event.changedTouches.length; i++) {
                     let touch = event.changedTouches[i];
                     if (w.activeTouchId === touch.identifier) {
-                        let pos = getTouchPos(touch);
+                        let pos = getMousePos(touch);
                         Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
                         w.events.push({ type: "mousemove", x: pos.x, y: pos.y});
                         break;
@@ -390,7 +385,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             for (let i = 0; i < event.changedTouches.length; i++) {
                 let touch = event.changedTouches[i];
                 if (w.activeTouchId === touch.identifier) {
-                    let pos = getTouchPos(touch);
+                    let pos = getMousePos(touch);
                     Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
                     Module._window_data_set_mouse_button(windowData, 1, 0);
                     w.activeTouchId = null;
