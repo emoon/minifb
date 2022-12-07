@@ -246,8 +246,10 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
     let id = window._minifb.nextId++;
     canvas.width = width;
     canvas.height = height;
-    if (!canvas.style.width) canvas.style.width = width + "px";
-    if (!canvas.style.height) canvas.style.height = height + "px";
+    if (!canvas.style.width && !canvas.style.height) {
+         canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+    }
     if (!canvas.style["image-rendering"]) canvas.style["image-rendering"] = "pixelated";
     if (!canvas.style["user-select"]) canvas.style["user-select"] = "none";
     if (!canvas.style["border"]) canvas.style["border"] = "none";
