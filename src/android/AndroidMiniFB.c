@@ -471,3 +471,28 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
         *scale_y = 1.0f;
     }
 }
+
+//-------------------------------------
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+    if(window == 0x0) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+
+    if(offset_x + width > window_data->window_width) {
+        return false;
+    }
+    if(offset_y + height > window_data->window_height) {
+        return false;
+    }
+
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
+
+    return true;
+}
