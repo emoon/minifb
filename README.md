@@ -607,6 +607,13 @@ mfb_open("my_app", 320, 240);
 <canvas id="my_app" style="width: 640px; height: 480px">
 ````
 
+If not already set, the backend will also set a handfull of CSS styles on the canvas that are good defaults for pixel graphics.
+
+* `image-rendering: pixelated`
+* `user-select: none`
+* `border: none`
+* `outline-style: none`;
+
 # How to add it to your project
 
 First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
