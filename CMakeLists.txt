@@ -81,6 +81,12 @@ set(SrcGL
     src/gl/MiniFB_GL.c
 )
 
+#--
+set(SrcDOS
+    src/dos/DOSMiniFB.c
+    src/dos/vesa.c
+)
+
 # Avoid RelWithDebInfo and MinSizeRel
 #--------------------------------------
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
@@ -123,13 +129,15 @@ endif()
 if(NOT MSVC)
     # Avoid default flag values
     #--------------------------------------
-    set(CMAKE_C_FLAGS "")
-    set(CMAKE_C_FLAGS_DEBUG "" )
-    set(CMAKE_C_FLAGS_RELEASE "")
+    if (NOT DJGPP)
+        set(CMAKE_C_FLAGS "")
+        set(CMAKE_C_FLAGS_DEBUG "" )
+        set(CMAKE_C_FLAGS_RELEASE "")
 
-    set(CMAKE_CXX_FLAGS "")
-    set(CMAKE_CXX_FLAGS_DEBUG "")
-    set(CMAKE_CXX_FLAGS_RELEASE "")
+        set(CMAKE_CXX_FLAGS "")
+        set(CMAKE_CXX_FLAGS_DEBUG "")
+        set(CMAKE_CXX_FLAGS_RELEASE "")
+    endif()
 
     set(CMAKE_OBJC_FLAGS "")
     set(CMAKE_OBJC_FLAGS_DEBUG "")
@@ -141,7 +149,12 @@ if(NOT MSVC)
 
     # Set our flags
     #--------------------------------------
-    add_compile_options("$<$<CONFIG:Debug>:-g>")
+    if (DJGPP)
+        add_compile_options("$<$<CONFIG:Debug>:-gdwarf>")
+        add_compile_options("$<$<CONFIG:Debug>:-save-temps>")
+    else()
+        add_compile_options("$<$<CONFIG:Debug>:-g>")
+    endif()
     add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
     add_compile_options(-Wall -Wextra)
     add_compile_options(-Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough)
@@ -231,6 +244,10 @@ elseif(UNIX)
         list(APPEND SrcLib ${SrcX11})
     endif()
 
+elseif(DJGPP)
+
+    list(APPEND SrcLib ${SrcDOS})
+
 endif()
 
 # Library
@@ -304,7 +321,6 @@ link_libraries(minifb)
 #--------------------------------------
 if(MINIFB_BUILD_EXAMPLES)
     if(NOT IOS)
-
         add_executable(noise
             tests/noise.c
         )
@@ -329,6 +345,13 @@ if(MINIFB_BUILD_EXAMPLES)
             tests/fullscreen.c
         )
 
+        if(DJGPP)
+
+            add_executable(dos
+                tests/dos/dos.c
+            )
+
+        endif()
     else()
 
         add_executable(noise
