@@ -292,6 +292,7 @@ elseif(UNIX)
             "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
             "-sASYNCIFY"
             "--no-entry"
+            "-sSINGLE_FILE"
         )
     else()
         target_link_libraries(minifb

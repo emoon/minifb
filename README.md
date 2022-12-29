@@ -521,10 +521,9 @@ Download and install [Emscripten](https://emscripten.org/). When configuring you
 ```bash
 cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build
 cmake --build build
-python3 -m http.server --directory build/
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) in your browser to view the example index.
+Then open the file `build/index.html` in your browser to view the example index.
 
 ### Integrating a MiniFB app in a website
 To build an executable target for the web, you need to add a linker option specifying its module name, e.g.:
