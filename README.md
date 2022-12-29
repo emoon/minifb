@@ -523,6 +523,8 @@ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/P
 cmake --build build
 ```
 
+> *Note*: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+
 Then open the file `build/index.html` in your browser to view the example index.
 
 ### Integrating a MiniFB app in a website
