@@ -58,18 +58,31 @@ curl $dosbox_url --output dosbox.zip &> /dev/null
 unzip -o dosbox.zip &> /dev/null
 rm dosbox.zip
 
-echo "Installing VS Code extensions"
-if [[ $(code --version) ]]; then
-    code --install-extension llvm-vs-code-extensions.vscode-clangd --install-extension ms-vscode.cmake-tools --install-extension ms-vscode.cpptools --install-extension webfreak.debug
-    cp -r .vscode ../../../.vscode
-else
-    echo "WARNING: could not find 'code' on path. Could not install VS Code extensions!"
-    echo "         Ensure 'code' is on your PATH and re-run 'download-tools.sh' to install"
-    echo "         the VS Code extensions."
+if [[ $1 = "--with-vs-code" ]]; then
+    echo "Installing VS Code extensions"
+    if [[ $(code --version) ]]; then
+        code --install-extension llvm-vs-code-extensions.vscode-clangd --install-extension ms-vscode.cmake-tools --install-extension ms-vscode.cpptools --install-extension webfreak.debug
+        cp -r .vscode ../../../.vscode
+    else
+        echo "WARNING: could not find 'code' on path. Could not install VS Code extensions!"
+        echo "         Ensure 'code' is on your PATH and re-run 'download-tools.sh' to install"
+        echo "         the VS Code extensions."
+    fi
 fi
 
 if [[ "$os" == "linux-gnu"* ]]; then
     chmod a+x gdb/gdb > /dev/null
+    chmod a+x dosbox-x/dosbox-x-sdl1
+    ln -s $(pwd)/dosbox-x/dosbox-x-sdl1 dosbox-x/dosbox-x
+    echo
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo
+    echo " Please install the following packages using your Linux distribution's "
+    echo " package manager:"
+    echo
+    echo " libncurses5 libfl-dev libslirp-dev libfluidsynth-dev"
+    echo
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 elif [[ "$os" == "darwin"* ]]; then
     chmod a+x gdb/gdb > /dev/null
     chmod a+x dosbox-x/dosbox-x.app/Contents/MacOS/dosbox-x
