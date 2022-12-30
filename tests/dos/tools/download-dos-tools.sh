@@ -17,7 +17,7 @@ os=$OSTYPE
 if [[ "$os" == "linux-gnu"* ]]; then
     gdb_url="$base_url/gdb/gdb-7.1a-djgpp-linux.zip"
     djgpp_url="$base_url/djgpp/djgpp-linux64-gcc1210.tar.bz2"
-    dosbox_url="$base_url/dosbox-x/dosbox-x-0.84.4-linux.zip"
+    dosbox_url="$base_url/dosbox-x/dosbox-x-0.84.5-linux.zip"
 elif [[ "$os" == "darwin"* ]]; then
     gdb_url="$base_url/gdb/gdb-7.1a-djgpp-macos-x86_64.zip"
     djgpp_url="$base_url/djgpp/djgpp-osx-gcc1210.tar.bz2"
