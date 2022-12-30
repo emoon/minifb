@@ -9,12 +9,15 @@ extern "C" {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef __ANDROID__
-#define MFB_RGB(r, g, b)    (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+#define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+#define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
 #else
     #ifdef HOST_WORDS_BIGENDIAN
-    #define MFB_RGB(r, g, b)    (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+    #define MFB_RGB(r, g, b)     (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+    #define MFB_ARGB(a, r, g, b) (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
     #else
-    #define MFB_RGB(r, g, b)    (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
+    #define MFB_ARGB(r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
+    #define MFB_RGB(r, g, b)     (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
     #endif
 #endif
 
@@ -78,7 +81,7 @@ const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // O
 
 // FPS
 void                mfb_set_target_fps(uint32_t fps);
-unsigned            mfb_get_target_fps();
+unsigned            mfb_get_target_fps(void);
 bool                mfb_wait_sync(struct mfb_window *window);
 
 // Timer

@@ -81,6 +81,11 @@ set(SrcGL
     src/gl/MiniFB_GL.c
 )
 
+#--
+set(SrcWeb
+    src/web/WebMiniFB.c
+)
+
 # Avoid RelWithDebInfo and MinSizeRel
 #--------------------------------------
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
@@ -110,9 +115,11 @@ if(APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
     option(USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
 elseif(UNIX)
-    option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
-    if(NOT USE_WAYLAND_API)
-        option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    if (NOT EMSCRIPTEN)
+        option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
+        if(NOT USE_WAYLAND_API)
+            option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+        endif()
     endif()
 elseif(WIN32)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
@@ -183,6 +190,9 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG)
     add_definitions(-DDEBUG)
+    if(EMSCRIPTEN)
+        add_link_options(-g)
+    endif()
 endif()
 
 # Set compiler/platform specific flags and dependencies
@@ -222,6 +232,8 @@ elseif(UNIX)
 
     if(USE_WAYLAND_API)
         list(APPEND SrcLib ${SrcWayland})
+    elseif(EMSCRIPTEN)
+        list(APPEND SrcLib ${SrcWeb})
     else()
         if(USE_OPENGL_API)
             list(APPEND SrcLib ${SrcGL})
@@ -265,6 +277,22 @@ elseif(UNIX)
         target_link_libraries(minifb
             "-lwayland-client"
             "-lwayland-cursor"
+        )
+    elseif(EMSCRIPTEN)
+        add_link_options(
+            "-sSTRICT=1"
+            "-sENVIRONMENT=web"
+            "-sLLD_REPORT_UNDEFINED"
+            "-sMODULARIZE=1"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sALLOW_TABLE_GROWTH"
+            "-sMALLOC=emmalloc"
+            "-sEXPORT_ALL=1"
+            "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
+            "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+            "-sASYNCIFY"
+            "--no-entry"
+            "-sSINGLE_FILE"
         )
     else()
         target_link_libraries(minifb
@@ -328,6 +356,28 @@ if(MINIFB_BUILD_EXAMPLES)
         add_executable(fullscreen
             tests/fullscreen.c
         )
+
+        add_executable(timer
+            tests/timer.c
+        )
+
+        if(EMSCRIPTEN)
+            add_custom_target(web_assets
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web
+                    ${CMAKE_CURRENT_BINARY_DIR}
+            )
+            add_dependencies(noise web_assets)
+            target_link_options(noise PRIVATE "-sEXPORT_NAME=noise")
+            add_dependencies(input_events web_assets)
+            target_link_options(input_events PRIVATE "-sEXPORT_NAME=input_events")
+            add_dependencies(hidpi web_assets)
+            target_link_options(hidpi PRIVATE "-sEXPORT_NAME=hidpi")
+            add_dependencies(multiple_windows web_assets)
+            target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
+            add_dependencies(timer web_assets)
+            target_link_options(timer PRIVATE "-sEXPORT_NAME=timer")
+        endif()
 
     else()
 
