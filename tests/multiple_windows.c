@@ -129,14 +129,14 @@ main()
     float       inc = 90.0f / 64.0f;
     for(uint32_t c=0; c<64; ++c) {
         int32_t col = (int32_t) ((255.0f * sinf(c * inc * kPI / 180.0f)) + 0.5f);
-        pallete[64*0 + c] = MFB_RGB(col,     0,       0);
-        pallete[64*1 + c] = MFB_RGB(255,     col,     0);
-        pallete[64*2 + c] = MFB_RGB(255-col, 255,     0);
-        pallete[64*3 + c] = MFB_RGB(0,       255,     col);
-        pallete[64*4 + c] = MFB_RGB(0,       255-col, 255);
-        pallete[64*5 + c] = MFB_RGB(col,     0,       255);
-        pallete[64*6 + c] = MFB_RGB(255,     0,       255-col);
-        pallete[64*7 + c] = MFB_RGB(255-col, 0,       0);
+        pallete[64*0 + c] = MFB_ARGB(255, col,     0,       0);
+        pallete[64*1 + c] = MFB_ARGB(255, 255,     col,     0);
+        pallete[64*2 + c] = MFB_ARGB(255, 255-col, 255,     0);
+        pallete[64*3 + c] = MFB_ARGB(255, 0,       255,     col);
+        pallete[64*4 + c] = MFB_ARGB(255, 0,       255-col, 255);
+        pallete[64*5 + c] = MFB_ARGB(255, col,     0,       255);
+        pallete[64*6 + c] = MFB_ARGB(255, 255,     0,       255-col);
+        pallete[64*7 + c] = MFB_ARGB(255, 255-col, 0,       0);
     }
 
     mfb_set_target_fps(10);
@@ -162,7 +162,7 @@ main()
                 seed >>= 1;
                 seed |= (carry << 30);
                 noise &= 0xFF;
-                g_buffer_a[i] = MFB_RGB(noise, noise, noise); 
+                g_buffer_a[i] = MFB_ARGB(255, noise, noise, noise);
             }
 
             //--

@@ -42,8 +42,9 @@ See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete exa
  - Wayland (Linux) [there are some issues]
  - iOS (beta)
  - Android (beta)
+ - Web (WASM) (beta)
 
-MiniFB has been tested on Windows, Mac OS X, Linux, iOS and Android but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
+MiniFB has been tested on Windows, Mac OS X, Linux, iOS, Android and web but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
 
 # Features:
 
@@ -511,6 +512,116 @@ mkdir build
 cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
+
+## Web (WASM)
+Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.
+
+### Building and running the examples
+
+```bash
+cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build
+cmake --build build
+```
+
+> *Note*: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+
+Then open the file `build/index.html` in your browser to view the example index.
+
+The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
+
+```
+python3 -m http.server build/
+```
+
+You can then open the index at [http://localhost:8000](http://localhost:8000) in your browser.
+
+### Integrating a MiniFB app in a website
+To build an executable target for the web, you need to add a linker option specifying its module name, e.g.:
+
+```
+target_link_options(my_app PRIVATE "-sEXPORT_NAME=my_app")
+```
+
+The Emscripten toolchain will then build a `my_app.wasm` and `my_app.js` file containing your app's WASM code and JavaScript glue code to load the WASM file and run it. To load and run your app, you need to:
+
+1. Create a `<canvas>` element with an `id` attribute matching the `title` you specify when calling `mfb_open_window()` or `mfb_open_window_ex()`.
+2. Call the `<my_module_name>()` in JavaScript.
+
+Example app:
+
+```c
+int main() {
+    struct mfb_window *window = mfb_open_ex("my_app", 320, 240);
+    if (!window)
+        return 0;
+    uint32_t *buffer = (uint32_t *) malloc(g_width * g_height * 4);
+    mfb_update_state state;
+    do {
+        state = mfb_update_ex(window, buffer, 320, 200);
+        if (state != STATE_OK) {
+            break;
+        }
+    } while(mfb_wait_sync(window));
+    return 0;
+}
+```
+
+Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.html` file to load and run the app would look like this:
+
+```html
+<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <!-- Load the app's .js file -->
+    <script src="./my_app.js"></script>
+</head>
+<body>
+<div>
+    <canvas id="Noise Test" style="background: #000;"></canvas>
+</div>
+<script>
+    // Call the app's main() function
+    noise();
+</script>
+</body>
+</html>
+```
+
+### Limitations & caveats
+The web backend currently does not support the following MiniFB features:
+
+* The flags to `mfb_open_ex()` are ignored
+* `mfb_set_viewport()` (no-op)
+* `mfb_set_viewport_best_fit()` (no-op)
+* `mfb_get_monitor_dpi()` (reports a fixed value)
+* `mfb_get_monitor_scale()` (reports a fixed value)
+* `mfb_set_target_fps()` (no-op)
+* `mfb_get_target_fps()` (no-op)
+
+Everything else is supported.
+
+When calling `mfb_open()` or `mfb_open_ex()`, the specified title must match the `id` attribute of a `<canvas>` element in the DOM. The functions will modify the `width` and `height` attribute of the `<canvas>` element. If not already set, then the functions will also modify the CSS style `width` and `height` attributes of the canvas.
+
+Setting the CSS width and height of the canvas allows you to up-scale the framebuffer arbitrarily:
+
+```
+// Request a 320x240 window
+mfb_open("my_app", 320, 240);
+
+// Up-scale 2x via CSS
+<canvas id="my_app" style="width: 640px; height: 480px">
+````
+
+If not already set, the backend will also set a handfull of CSS styles on the canvas that are good defaults for pixel graphics.
+
+* `image-rendering: pixelated`
+* `user-select: none`
+* `border: none`
+* `outline-style: none`;
 
 # How to add it to your project
 
