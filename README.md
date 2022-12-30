@@ -527,6 +527,14 @@ cmake --build build
 
 Then open the file `build/index.html` in your browser to view the example index.
 
+The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
+
+```
+python3 -m http.server build/
+```
+
+You can then open the index at [http://localhost:8000](http://localhost:8000) in your browser.
+
 ### Integrating a MiniFB app in a website
 To build an executable target for the web, you need to add a linker option specifying its module name, e.g.:
 
