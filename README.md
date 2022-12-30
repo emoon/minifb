@@ -727,6 +727,8 @@ GDB will show your app being halted on the `gdb_start()` line. You can now set b
 
 If your app is executing and you press `CTRL+C` to interrupt it, you will end up inside `gdb_checkpoint()`. You can then set breakpoints, or step out to inspect your program state.
 
+You can use this method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
+
 ### Limitations and caveats
 The DOS backend currently does not support the following MiniFB features:
 
