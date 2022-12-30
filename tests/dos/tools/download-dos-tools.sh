@@ -4,9 +4,9 @@ set -e
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 pushd $dir
 
-rm -rf tools/gdb
-rm -rf tools/djgpp
-rm -rf tools/dosbox-x
+rm -rf gdb
+rm -rf djgpp
+rm -rf dosbox-x
 
 base_url="https://marioslab.io/dump/dos"
 gdb_url=""
