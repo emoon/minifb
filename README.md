@@ -743,7 +743,7 @@ The DOS backend currently does not support the following MiniFB features:
 * `mfb_get_target_fps()` (no-op)
 * Multiple windows are not support
 * A window is always full-screen
-* The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported.
+* The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
 * Keyboard handling is limited to the keys found [here](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
 * Character input is limited to ASCII based on a US keyboard layout.
 
