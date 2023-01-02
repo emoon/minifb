@@ -146,20 +146,30 @@ bool vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
   }
 
   int found_mode = 0;
-  mode_info_t mode_info = {0};
-  // FILE *modes = fopen("modes.txt", "w");
-  printf("Number of modes: %i\n", number_of_modes);
+  mode_info_t found_mode_info = {0};
+  // FILE *modes = fopen("c:\\modes.txt", "w");
+  // printf("Number of modes: %i\n", number_of_modes);
   for (int i = 0; i < number_of_modes; i++) {
+    mode_info_t mode_info = {0};
     if (!get_mode_info(mode_list[i], &mode_info)) {
       printf("Couldn't get mode info: %i\n", i);
       continue;
     }
 
     // fprintf(modes,
-    //         "mode: %i, res: %ix%i bpp: %i, mem: %i, planes: %i, bps: %i\n",
+    //         "mode: %i, res: %ix%i bpp: %i, mem: %i, planes: %i, bps: %i, "
+    //         "linear: %s\n",
     //         mode_list[i], mode_info.width, mode_info.height,
     //         mode_info.bits_per_pixel, mode_info.memory_model,
-    //         mode_info.number_of_planes, mode_info.bytes_per_scanLine);
+    //         mode_info.number_of_planes, mode_info.bytes_per_scanLine,
+    //         (mode_info.mode_attributes & (1 << 7)) ? "true" : "false");
+
+    // printf("mode: %i, res: %ix%i bpp: %i, mem: %i, planes: %i, bps: %i, "
+    //        "linear: %s\n",
+    //        mode_list[i], mode_info.width, mode_info.height,
+    //        mode_info.bits_per_pixel, mode_info.memory_model,
+    //        mode_info.number_of_planes, mode_info.bytes_per_scanLine,
+    //        (mode_info.mode_attributes & (1 << 7)) ? "true" : "false");
 
     if (!(mode_info.width == width || mode_info.width == width * 2))
       continue;
@@ -173,20 +183,21 @@ bool vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
       continue;
 
     found_mode = mode_list[i];
+    found_mode_info = mode_info;
     if (mode_info.width == width && mode_info.height == height &&
         mode_info.bits_per_pixel == 32)
       break;
   }
+
+  // fprintf(modes, "Found mode: %i\n", found_mode);
+  // fclose(modes);
 
   if (!found_mode) {
     printf("Couldn't find fitting mode for %ix%i.\n", (int)width, (int)height);
     return false;
   }
 
-  // fprintf(modes, "Found mode: %i\n", found_mode);
-  // fclose(modes);
-
-  vesa_frame_buffer_mapping.address = mode_info.physical_base_ptr;
+  vesa_frame_buffer_mapping.address = found_mode_info.physical_base_ptr;
   vesa_frame_buffer_mapping.size = vesa_info.total_memory << 16;
   if (__dpmi_physical_address_mapping(&vesa_frame_buffer_mapping) != 0) {
     printf("Couldn't create VESA frame buffer address mapping.\n");
@@ -212,10 +223,10 @@ bool vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
     return false;
   }
   vesa_mode = found_mode;
-  *actual_width = mode_info.width;
-  *actual_height = mode_info.height;
-  *actual_bpp = mode_info.bits_per_pixel;
-  *bytes_per_scanline = mode_info.bytes_per_scanLine;
+  *actual_width = found_mode_info.width;
+  *actual_height = found_mode_info.height;
+  *actual_bpp = found_mode_info.bits_per_pixel;
+  *bytes_per_scanline = found_mode_info.bytes_per_scanLine;
   return true;
 }
 

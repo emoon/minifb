@@ -461,13 +461,18 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
   }
 
   if (a_bpp == 24) {
+    // Neither pitch nor bpp matched, worst case
     uint8_t *source = frame;
     uint8_t *dest = scanline_buffer;
+    uint32_t dest_skip = a_bytes_per_scanline - a_width * 3;
 
-    for (int i = 0, n = a_width * a_height << 2; i < n; i += 4, dest += 3) {
-      dest[0] = source[i];
-      dest[1] = source[i + 1];
-      dest[2] = source[i + 2];
+    for (uint32_t y = 0, i = 0; y < a_height; y++) {
+      for (uint32_t x = 0, xe = a_width; x < xe; x++, i += 4, dest += 3) {
+        dest[0] = source[i];
+        dest[1] = source[i + 1];
+        dest[2] = source[i + 2];
+      }
+      dest += dest_skip;
     }
 
     movedata(_my_ds(), (unsigned int)scanline_buffer,
@@ -479,13 +484,13 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
       uint8_t *source = (uint8_t *)frame;
       uint8_t *dest = (uint8_t *)scanline_buffer;
       uint32_t source_pitch = width << 2;
-      for (uint32_t y = 0; y < height;
+      for (uint32_t y = 0; y < a_height;
            y++, dest += a_bytes_per_scanline, source += source_pitch) {
         memcpy(dest, source, source_pitch);
-        movedata(_my_ds(), (unsigned int)scanline_buffer,
-                 vesa_get_frame_buffer_selector(), 0,
-                 a_height * a_bytes_per_scanline);
       }
+      movedata(_my_ds(), (unsigned int)scanline_buffer,
+               vesa_get_frame_buffer_selector(), 0,
+               a_height * a_bytes_per_scanline);
     } else {
       // Only stretched
       movedata(_my_ds(), (unsigned int)frame, vesa_get_frame_buffer_selector(),

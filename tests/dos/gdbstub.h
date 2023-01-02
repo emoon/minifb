@@ -1,5 +1,17 @@
 #pragma once
 
+void gdb_start();
+void gdb_checkpoint();
+
+#ifdef GDB_IMPLEMENTATION
+#ifdef NDEBUG
+void gdb_start() {}
+void gdb_checkpoint() {}
+#else
+#ifndef DJGPP
+void gdb_start() {}
+void gdb_checkpoint() {}
+#else
 #include <bios.h>
 #include <dpmi.h>
 #include <go32.h>
@@ -11,15 +23,6 @@
 #include <string.h>
 #include <sys/exceptn.h>
 #include <sys/farptr.h>
-
-void gdb_start();
-void gdb_checkpoint();
-
-#ifdef GDB_IMPLEMENTATION
-#ifdef NDEBUG
-void gdb_start() {}
-void gdb_checkpoint() {}
-#else
 void gdb_loop(int exception_number);
 void gdb_tick_handler();
 static unsigned char *gdb_read_packet();
@@ -607,5 +610,6 @@ void gdb_checkpoint() {
     asm("int $3");
   }
 }
+#endif
 #endif
 #endif
