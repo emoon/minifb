@@ -7,6 +7,7 @@
 #include <pc.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,8 +172,9 @@ typedef struct keyboard_state {
 static keyboard_state g_keyboard = {0};
 
 typedef struct SWindowData_DOS {
-  uint32_t actual_width, actual_height;
+  uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
   uint32_t *scale_buffer;
+  uint8_t *scanline_buffer;
 } SWindowData_DOS;
 
 static SWindowData *g_window = NULL;
@@ -231,6 +233,9 @@ static mfb_update_state check_window_closed(SWindowData *window_data) {
     if (window_data->specific) {
       g_window = NULL;
       vesa_dispose();
+      SWindowData_DOS *dos_window_data = window_data->specific;
+      free(dos_window_data->scale_buffer);
+      free(dos_window_data->scanline_buffer);
       free(window_data->specific);
       window_data->specific = NULL;
       return STATE_EXIT;
@@ -246,8 +251,9 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
   if (g_window)
     return NULL;
 
-  uint32_t actual_width, actual_height;
-  if (!vesa_init(width, height, &actual_width, &actual_height)) {
+  uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
+  if (!vesa_init(width, height, &actual_width, &actual_height, &actual_bpp,
+                 &bytes_per_scanline)) {
     printf("Couldn't set VESA mode %ix%i\n", width, height);
     return NULL;
   }
@@ -272,8 +278,14 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
   }
   specific->actual_width = actual_width;
   specific->actual_height = actual_height;
+  specific->actual_bpp = actual_bpp;
+  specific->bytes_per_scanline = bytes_per_scanline;
   specific->scale_buffer =
       (uint32_t *)malloc(actual_width * actual_height * sizeof(uint32_t));
+  specific->scanline_buffer =
+      actual_bpp != 32 || bytes_per_scanline != width << 2
+          ? (uint8_t *)malloc(actual_height * bytes_per_scanline)
+          : NULL;
   window_data->specific = specific;
 
   mfb_set_keyboard_callback((struct mfb_window *)window_data, keyboard_default);
@@ -404,6 +416,9 @@ mfb_update_state mfb_update_events(struct mfb_window *window) {
   return STATE_OK;
 }
 
+static void convert_to_24_bpp(uint32_t *source, uint32_t width,
+                              uint32_t height) {}
+
 mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
                                unsigned width, unsigned height) {
   if (!window)
@@ -417,19 +432,65 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
   mfb_update_events(window);
 
   SWindowData_DOS *dos_window_data = window_data->specific;
-  if (dos_window_data->actual_width == width &&
-      dos_window_data->actual_height == height) {
+
+  uint32_t *scale_buffer = dos_window_data->scale_buffer;
+  uint8_t *scanline_buffer = dos_window_data->scanline_buffer;
+  uint32_t a_width = dos_window_data->actual_width;
+  uint32_t a_height = dos_window_data->actual_height;
+  uint32_t a_bpp = dos_window_data->actual_bpp;
+  uint32_t a_bytes_per_scanline = dos_window_data->bytes_per_scanline;
+
+  // Exact match, copy directly. Unlikely to happen on a real device.
+  // Happens in DOSBox.
+  if (a_width == width && a_height == height && a_bpp == 32 &&
+      a_bytes_per_scanline == a_width * sizeof(uint32_t)) {
     movedata(_my_ds(), (unsigned int)buffer, vesa_get_frame_buffer_selector(),
-             0, width * height * sizeof(uint32_t));
-  } else {
-    uint32_t *scale_buffer = dos_window_data->scale_buffer;
+             0, height * a_bytes_per_scanline);
+    return STATE_OK;
+  }
+
+  // Else we need to transfer to scale, convert to 24-bit, pad the scanlines,
+  // or all of the above...
+  uint8_t *frame = NULL;
+  if (a_width != width) {
     stretch_image(buffer, 0, 0, width, height, width, scale_buffer, 0, 0,
-                  dos_window_data->actual_width, dos_window_data->actual_height,
-                  dos_window_data->actual_width);
-    movedata(_my_ds(), (unsigned int)scale_buffer,
+                  a_width, a_height, a_width);
+    frame = (uint8_t *)scale_buffer;
+  } else {
+    frame = (uint8_t *)buffer;
+  }
+
+  if (a_bpp == 24) {
+    uint8_t *source = frame;
+    uint8_t *dest = scanline_buffer;
+
+    for (int i = 0, n = a_width * a_height << 2; i < n; i += 4, dest += 3) {
+      dest[0] = source[i];
+      dest[1] = source[i + 1];
+      dest[2] = source[i + 2];
+    }
+
+    movedata(_my_ds(), (unsigned int)scanline_buffer,
              vesa_get_frame_buffer_selector(), 0,
-             dos_window_data->actual_width * dos_window_data->actual_height *
-                 sizeof(uint32_t));
+             a_height * a_bytes_per_scanline);
+  } else {
+    if (a_bytes_per_scanline != a_width * 4) {
+      // bpp matched, but pitch didn't. very unlikely to happen...
+      uint8_t *source = (uint8_t *)frame;
+      uint8_t *dest = (uint8_t *)scanline_buffer;
+      uint32_t source_pitch = width << 2;
+      for (uint32_t y = 0; y < height;
+           y++, dest += a_bytes_per_scanline, source += source_pitch) {
+        memcpy(dest, source, source_pitch);
+        movedata(_my_ds(), (unsigned int)scanline_buffer,
+                 vesa_get_frame_buffer_selector(), 0,
+                 a_height * a_bytes_per_scanline);
+      }
+    } else {
+      // Only stretched
+      movedata(_my_ds(), (unsigned int)frame, vesa_get_frame_buffer_selector(),
+               0, a_height * a_width * sizeof(uint32_t));
+    }
   }
   return STATE_OK;
 }

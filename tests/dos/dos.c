@@ -6,8 +6,8 @@
 #include "gdbstub.h"
 
 int main(void) {
-  int res_x = 800;
-  int res_y = 600;
+  int res_x = 320;
+  int res_y = 240;
   int buf_x = 320;
   int buf_y = 240;
   gdb_start();
