@@ -11,10 +11,16 @@
 static bool g_initialized = false;
 
 EM_ASYNC_JS(void, setup_web_mfb, (), {
+    // FIXME currently disabled. This will make requests pile up
+    // and potentially execute multiple C calls in parallel (sort of).
+    // which leads to stack/heap corruption.
+    //
+    // Wait for Emscripten to provide a RAF basd emscripten_sleep()
+    //
     // Use requestAnimationFrame instead of setTimeout for async processing.
-    Asyncify.handleSleep(wakeUp => {
-            requestAnimationFrame(wakeUp);
-    });
+    // Asyncify.handleSleep(wakeUp => {
+    //        requestAnimationFrame(wakeUp);
+    // });
 
     window._minifb.keyMap = {
             "Space": 32,
@@ -513,12 +519,6 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned
     state = mfb_update_events_js((SWindowData *)window);
     return state;
 }
-
-EM_JS(void, emscripten_sleep_using_raf, (), {
-    Asyncify.handleSleep(wakeUp => {
-            requestAnimationFrame(wakeUp);
-    });
-});
 
 bool mfb_wait_sync(struct mfb_window *window) {
     emscripten_sleep(0);
