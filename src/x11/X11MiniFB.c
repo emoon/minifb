@@ -65,7 +65,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     init_keycodes(window_data_x11);
-    XAutoRepeatOff(window_data_x11->display);
 
     window_data_x11->screen = DefaultScreen(window_data_x11->display);
 
@@ -232,6 +231,19 @@ processEvent(SWindowData *window_data, XEvent *event) {
         case KeyPress:
         case KeyRelease:
         {
+            SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+            if ((event->type == KeyRelease) &&
+                XEventsQueued(window_data_x11->display, QueuedAfterReading)) {
+                XEvent nev;
+                XPeekEvent(window_data_x11->display, &nev);
+
+                if ((nev.type == KeyPress) && (nev.xkey.time == event->xkey.time) &&
+                    (nev.xkey.keycode == event->xkey.keycode)) {
+                    /* Key wasn’t actually released */
+                    return;
+                }
+            }
+
             mfb_key key_code      = (mfb_key) translate_key(event->xkey.keycode);
             int is_pressed        = (event->type == KeyPress);
             window_data->mod_keys = translate_mod_ex(key_code, event->xkey.state, is_pressed);
