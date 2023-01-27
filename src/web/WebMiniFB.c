@@ -280,8 +280,8 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
     function getMousePos(event) {
         let rect = canvas.getBoundingClientRect();
         let pos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-        pos.x = pos.x / canvas.clientWidth * canvas.width;
-        pos.y = pos.y / canvas.clientHeight * canvas.height;
+        pos.x = pos.x / canvas.clientWidth * width;
+        pos.y = pos.y / canvas.clientHeight * height;
         return pos;
     };
 
