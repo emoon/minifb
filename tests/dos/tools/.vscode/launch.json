@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "gdb",
+            "request": "attach",
+            "name": "debug target",
+            "executable": "${command:cmake.getLaunchTargetPath}.exe",
+            "target": "localhost:5123",
+            "remote": true,
+            "cwd": "${workspaceRoot}",
+            "gdbpath": "${workspaceFolder}/tests/dos/tools/gdb/gdb",
+            "preLaunchTask": "task-dosbox-debug",
+            "printCalls": true
+        },
+        {
+            "type": "node-terminal",
+            "name": "run target",
+            "request": "launch",
+            "command": "cmake --build build && ${workspaceFolder}/tests/dos/tools/dosbox-x/dosbox-x -conf ${workspaceFolder}/tests/dos/tools/dosbox-x.conf -fastlaunch -exit ${command:cmake.getLaunchTargetPath}.exe && exit"
+        }
+    ]
+}

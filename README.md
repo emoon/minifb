@@ -43,8 +43,9 @@ See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete exa
  - iOS (beta)
  - Android (beta)
  - Web (WASM) (beta)
+ - DOS (DJGPP) (beta)
 
-MiniFB has been tested on Windows, Mac OS X, Linux, iOS, Android and web but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
+MiniFB has been tested on Windows, Mac OS X, Linux, iOS, Android, web, and DOSBox-x but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
 
 # Features:
 
@@ -643,3 +644,106 @@ target_link_libraries(${PROJECT_NAME}
 ```
 
 Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
+
+## DOS (DJGPP)
+Use the `tests/dos/tools/download-dos-tools.sh` file to download all the tools needed to compile, run and debug MiniFB DOS applications. The Bash script will download the following tools:
+
+* [DJGPP](https://www.delorie.com/djgpp/), a GCC fork targeting 32-bit protected mode DOS.
+* [GDB 7.1a](https://github.com/badlogic/gdb-7.1a), a GDB fork that can remotely debug 32-bit COFF executables via TCP, running in e.g. DOSBox-x, VirtualBox, or a real machine.
+* [DOSBox-x](https://github.com/badlogic/dosbox-x/), a fork of the popular DOS emulator with some modifications to enable remote debugging via GDB.
+
+The tools are downloaded to the `tests/dos/tools/` folder. The folder also contains a DOSBox-x configuration file `dosbox-x.conf` preconfigured for debugging. The `toolchain-djgpp.cmake` file is a CMake toolchain file for DJGPP.
+
+You can optionally run the script with the argument `--with-vs-code`. If you have [Visual Studio Code](https://code.visualstudio.com/) installed, the script will install extensions needed for C/C++ development and debugging, and create a `.vscode` folder in the repository root containing launch configurations, tasks, and various other settings for DOS development in VS Code.
+
+### Building and running the examples
+
+```bash
+cmake -DCMAKE_TOOLCHAIN_FILE=./tests/dos/tools/toolchain-djgpp.cmake -S . -B build
+cmake --build build
+```
+
+> *Note*: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+
+This will generate DOS 32-bit `.exe` files in the `build/` folder which you can run with DOSBox-x like this:
+
+```
+./tests/dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tests/dos/tools/dosbox-x.conf build/<executable-file>
+```
+
+Note that the DOS backend can not support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
+
+### Compiling your own MiniFB app for DOS
+Copy the folder `tests/dos/` from the MiniFB repository to your project and run the `dos/tools/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
+
+Then, when configuring your CMake build, specify the DJGPP toolchain file:
+
+```
+cmake -DCMAKE_TOOLCHAIN_FILE=./dos/tools/toolchain-djgpp.cmake ... rest of your configure parameters ...
+```
+
+The build will then generate DOS 32-bit protected mode executables and use the MiniFB DOS backend. You can run the executables as is in DOSBox-x or FreeDOS, or a Windows version that can run DOS applications.
+
+Running the executbales in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
+
+### Debugging your MiniFB app in DOSBox-x
+The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`tests/dos/gdbstub.h`](tests/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `dos/tools/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
+
+```c
+#define GDB_IMPLEMENTATION
+#include "gdbstub.h"
+
+int main(void) {
+    gdb_start();
+
+    ... setup code ...
+
+    do {
+        ... main loop ...
+        gdb_checkpoint();
+    } while (mfb_wait_sync(window));
+}
+```
+
+Configure your CMake build with `-DCMAKE_BUILD_TYPE=Debug` to generate debug binaries and build your application.
+
+Run your application with the downloaded DOSBox-x:
+
+```
+./dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./dos/tools/dosbox-x.conf path/to/your/executable.exe
+```
+
+DOSBox-x will start up, your application will wait for GDB to connect (`gdb_start()`).
+
+Run GDB, load the debugging information from the executable and connect to your app running and waiting in DOSBox-x:
+
+```
+./dos/tools/gdb/gdb
+(gdb) file path/to/your/executable.exe
+(gdb) target remote localhost:5123
+```
+
+GDB will show your app being halted on the `gdb_start()` line. You can now set breakpoints, step, continue, inspect local variables and so on.
+
+If your app is executing and you press `CTRL+C` to interrupt it, you will end up inside `gdb_checkpoint()`. You can then set breakpoints, or step out to inspect your program state.
+
+Alternatively, you can use VS Code to debug via a graphical user interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag. This will install C/C++/CMake VS Code extensions and copy the `dos/.vscode` to the project root folder. Open the project root folder in VS Code, select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html), select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant), and the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target), then run the `DOS debug target` launch configuration.
+
+You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
+
+### Limitations and caveats
+The DOS backend currently does not support the following MiniFB features:
+
+* The flags to `mfb_open_ex()` are ignored
+* `mfb_set_viewport()` (no-op)
+* `mfb_set_viewport_best_fit()` (no-op)
+* `mfb_get_monitor_dpi()` (reports a fixed value)
+* `mfb_get_monitor_scale()` (reports a fixed value)
+* `mfb_set_target_fps()` (no-op)
+* `mfb_get_target_fps()` (no-op)
+* Multiple windows are not support
+* A window is always full-screen
+* The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
+* Keyboard handling is limited to the keys found [here](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
+* Character input is limited to ASCII based on a US keyboard layout.
+

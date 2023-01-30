@@ -17,3 +17,9 @@ cmake-build-debug
 cmake-build-debug-emscripten
 cmake-build-release
 cmake-build-release-emscripten
+.cache
+tests/.DS_Store
+**/.DS_Store
+tests/dos/tools/djgpp
+tests/dos/tools/dosbox-x
+tests/dos/tools/gdb

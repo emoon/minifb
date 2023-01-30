@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "task-dosbox-debug",
+            "command": "${workspaceFolder}/tests/dos/tools/dosbox-x/dosbox-x",
+            "args": [
+                "-conf",
+                "${workspaceFolder}/tests/dos/tools/dosbox-x.conf",
+                "-fastlaunch",
+                "-exit",
+                "${command:cmake.getLaunchTargetPath}.exe"
+            ],
+            "dependsOn": "task-dosbox-build",
+            "isBackground": true,
+            "problemMatcher": [
+                {
+                    "pattern": [
+                        {
+                            "regexp": ".",
+                            "file": 1,
+                            "location": 2,
+                            "message": 3
+                        }
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": ".",
+                        "endsPattern": "."
+                    }
+                }
+            ]
+        },
+        {
+            "type": "shell",
+            "label": "task-dosbox-build",
+            "command": "cmake --build build"
+        }
+    ]
+}
