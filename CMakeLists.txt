@@ -5,6 +5,8 @@ project(${PROJECT_NAME})
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
+include(GNUInstallDirs)
+
 # Detect iOS
 #--------------------------------------
 if(NOT DEFINED IOS)
@@ -86,17 +88,6 @@ set(SrcWeb
     src/web/WebMiniFB.c
 )
 
-# Avoid RelWithDebInfo and MinSizeRel
-#--------------------------------------
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
-
-# Define Release by default
-#--------------------------------------
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-    message(STATUS "Build type not specified: Use Release by default")
-endif(NOT CMAKE_BUILD_TYPE)
-
 # Set features
 #--------------------------------------
 set(CMAKE_CXX_STANDARD 11)
@@ -172,8 +163,6 @@ else()
         add_compile_options(/Gm)
     endif()
     add_compile_options(/fp:fast)
-    # Runtime library
-    add_compile_options("$<IF:$<CONFIG:Debug>,/MDd,/MD>")
     # Program database for edit and continue
     add_compile_options("$<IF:$<CONFIG:Debug>,/ZI,/Zi>")
     # Optimizations
@@ -250,20 +239,21 @@ endif()
 add_library(minifb STATIC
     ${SrcLib}
 )
+add_library(minifb::minifb ALIAS minifb)
 
 # Link
 #--------------------------------------
 if(APPLE)
 
     if(IOS)
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "-framework UIKit"
             "-framework QuartzCore"
             "-framework Metal"
             "-framework MetalKit"
         )
     else()
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "-framework Cocoa"
             "-framework QuartzCore"
             "-framework Metal"
@@ -274,7 +264,7 @@ if(APPLE)
 elseif(UNIX)
 
     if(USE_WAYLAND_API)
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "-lwayland-client"
             "-lwayland-cursor"
         )
@@ -295,13 +285,13 @@ elseif(UNIX)
             "-sSINGLE_FILE"
         )
     else()
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "-lX11"
             #"-lxkbcommon"
             #"-lXrandr" DPI NOT WORKING
         )
         if(USE_OPENGL_API)
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "-lGL"
         )
         endif()
@@ -310,12 +300,12 @@ elseif(UNIX)
 elseif(WIN32)
 
     if(USE_OPENGL_API)
-        target_link_libraries(minifb
+        target_link_libraries(minifb PRIVATE
             "Opengl32.lib"
         )
     endif()
 
-    target_link_libraries(minifb
+    target_link_libraries(minifb PRIVATE
         "winmm.lib"
     )
 
@@ -323,7 +313,9 @@ endif()
 
 # For all projects
 #--------------------------------------
-target_include_directories(minifb PUBLIC  ${CMAKE_CURRENT_LIST_DIR}/include)
+target_include_directories(minifb PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(minifb PRIVATE src)
 
 link_libraries(minifb)
@@ -410,5 +402,10 @@ if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
     set_property(TARGET hidpi PROPERTY FOLDER "Tests")
 endif()
+
+install(TARGETS minifb EXPORT minifb)
+file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
+install(FILES ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(EXPORT minifb FILE minifb-config.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/minifb" NAMESPACE minifb::)
 
 message(STATUS "Done " ${PROJECT_NAME})
