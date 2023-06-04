@@ -306,7 +306,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
         Module._window_data_set_key(windowData, code, 1);
         let mod = getMfbKeyModFromEvent(event);
         Module._window_data_set_mod_keys(windowData, mod);
-        w.events.push({ type: "keydown", code: code, mod: mod });
+        w.events.push({ type: "keydown", code: code, mod: mod, isPressed: false});
     });
 
     canvas.addEventListener("keyup", (event) => {
@@ -314,7 +314,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
         Module._window_data_set_key(windowData, code, 0);
         let mod = getMfbKeyModFromEvent(event);
         Module._window_data_set_mod_keys(windowData, mod);
-        w.events.push({ type: "keydown", code: code, mod: mod });
+        w.events.push({ type: "keyup", code: code, mod: mod, isPressed: true});
     });
 
     canvas.addEventListener("mousedown", (event) => {
