@@ -199,7 +199,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
             // Upon receiving this command, android_app->window will contain the new window surface.
         case APP_CMD_INIT_WINDOW:
             if (app->window != NULL) {
-                format = ANativeWindow_getFormat(app->window);
+                //format = ANativeWindow_getFormat(app->window);
                 ANativeWindow_setBuffersGeometry(app->window,
                                                  ANativeWindow_getWidth(app->window),
                                                  ANativeWindow_getHeight(app->window),
