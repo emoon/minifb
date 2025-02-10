@@ -1,4 +1,5 @@
 #include <MiniFB.h>
+#include "generated/xdg-shell-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
@@ -78,6 +79,17 @@ destroy(SWindowData *window_data)
     destroy_window_data(window_data);
     close(window_data_way->fd);
 }
+
+static void
+handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
+{
+    kUnused(data);
+    xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+static struct xdg_wm_base_listener shell_listener = {
+    handle_ping
+};
 
 // This event provides a file descriptor to the client which can be memory-mapped
 // to provide a keyboard mapping description.
@@ -293,8 +305,8 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
 
     //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
     SWindowData *window_data = (SWindowData *) data;
-    window_data->mouse_pos_x = sx >> 24;
-    window_data->mouse_pos_y = sy >> 24;
+    window_data->mouse_pos_x = wl_fixed_to_int(sx);
+    window_data->mouse_pos_y = wl_fixed_to_int(sy);
     kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
 }
 
@@ -513,9 +525,12 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
             window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
         }
     }
-    else if (strcmp(iface, "wl_shell") == 0)
+    else if (strcmp(iface, "xdg_wm_base") == 0)
     {
-        window_data_way->shell = (struct wl_shell *) wl_registry_bind(registry, id, &wl_shell_interface, 1);
+        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, 6);
+        if (window_data_way->shell) {
+            xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, 0x0);
+        }
     }
     else if (strcmp(iface, "wl_seat") == 0)
     {
@@ -534,33 +549,55 @@ wl_registry_listener registry_listener = {
 };
 
 static void
-handle_ping(void *data, struct wl_shell_surface *shell_surface, uint32_t serial)
+handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial)
 {
     kUnused(data);
-    wl_shell_surface_pong(shell_surface, serial);
+    xdg_surface_ack_configure(shell_surface, serial);
+}
+
+static const struct xdg_surface_listener shell_surface_listener = {
+    handle_shell_surface_configure
+};
+
+static void
+handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states)
+{
+    kUnused(data);
+    kUnused(xdg_toplevel);
+    kUnused(width);
+    kUnused(height);
+    kUnused(states);
 }
 
 static void
-handle_configure(void *data, struct wl_shell_surface *shell_surface, uint32_t edges, int32_t width, int32_t height)
+handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 {
     kUnused(data);
-    kUnused(shell_surface);
-    kUnused(edges);
+    kUnused(xdg_toplevel);
+}
+
+static void
+handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height)
+{
+    kUnused(data);
+    kUnused(xdg_toplevel);
     kUnused(width);
     kUnused(height);
 }
 
 static void
-handle_popup_done(void *data, struct wl_shell_surface *shell_surface)
+handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities)
 {
     kUnused(data);
-    kUnused(shell_surface);
+    kUnused(xdg_toplevel);
+    kUnused(capabilities);
 }
 
-static const struct wl_shell_surface_listener shell_surface_listener = {
-    handle_ping,
-    handle_configure,
-    handle_popup_done
+static const struct xdg_toplevel_listener toplevel_listener = {
+    handle_toplevel_configure,
+    handle_toplevel_close,
+    handle_toplevel_configure_bounds,
+    handle_toplevel_wm_capabilities
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -647,13 +684,18 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     // There should always be a shell, right?
     if (window_data_way->shell)
     {
-        window_data_way->shell_surface = wl_shell_get_shell_surface(window_data_way->shell, window_data_way->surface);
+        window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
         if (!window_data_way->shell_surface)
             goto out;
 
-        wl_shell_surface_set_title(window_data_way->shell_surface, title);
-        wl_shell_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, 0x0);
-        wl_shell_surface_set_toplevel(window_data_way->shell_surface);
+        xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, 0x0);
+
+        window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
+        if (!window_data_way->toplevel)
+            goto out;
+
+        xdg_toplevel_set_title(window_data_way->toplevel, title);
+        xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, 0x0);
     }
 
     wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
