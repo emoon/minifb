@@ -67,6 +67,7 @@ set(SrcIOS
 #--
 set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
+    src/wayland/generated/fractional-scale.c
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
@@ -268,6 +269,7 @@ elseif(UNIX)
         target_link_libraries(minifb PRIVATE
             "-lwayland-client"
             "-lwayland-cursor"
+            "-lxkbcommon"
         )
     elseif(EMSCRIPTEN)
         add_link_options(

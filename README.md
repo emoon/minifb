@@ -503,7 +503,7 @@ cmake .. -DUSE_OPENGL_API=OFF -DUSE_WAYLAND_API=OFF
 
 ## Wayland (Linux)
 
-Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
+Depends on gcc, wayland-client, wayland-cursor, and libxkbcommon.
 
 If you use **CMake** just enable the flag:
 
@@ -512,6 +512,12 @@ mkdir build
 cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
+
+> *Note*: On Wayland, some of the behavior is different:
+- Out of the window flags, only `WF_RESIZABLE` and `WF_FULLSCREEN` are supported
+- If `WF_RESIZABLE` is used, the passed window size is not guaranteed, but a resize event is always sent immediately
+- Resizing is laggy (there is no good way to get around this, since the transparency could only be replaced by a base color, but there is no good way to let the user set that)
+- The update function must be called every frame, since all communication with the server happens in there (ping-pong, input processing)
 
 ## Web (WASM)
 Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.
