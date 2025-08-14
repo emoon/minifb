@@ -11,10 +11,16 @@
 static bool g_initialized = false;
 
 EM_ASYNC_JS(void, setup_web_mfb, (), {
+    // FIXME currently disabled. This will make requests pile up
+    // and potentially execute multiple C calls in parallel (sort of).
+    // which leads to stack/heap corruption.
+    //
+    // Wait for Emscripten to provide a RAF basd emscripten_sleep()
+    //
     // Use requestAnimationFrame instead of setTimeout for async processing.
-    Asyncify.handleSleep(wakeUp => {
-            requestAnimationFrame(wakeUp);
-    });
+    // Asyncify.handleSleep(wakeUp => {
+    //        requestAnimationFrame(wakeUp);
+    // });
 
     window._minifb.keyMap = {
             "Space": 32,
@@ -274,8 +280,8 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
     function getMousePos(event) {
         let rect = canvas.getBoundingClientRect();
         let pos = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-        pos.x = pos.x / canvas.clientWidth * canvas.width;
-        pos.y = pos.y / canvas.clientHeight * canvas.height;
+        pos.x = pos.x / canvas.clientWidth * width;
+        pos.y = pos.y / canvas.clientHeight * height;
         return pos;
     };
 
@@ -308,7 +314,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
         Module._window_data_set_key(windowData, code, 0);
         let mod = getMfbKeyModFromEvent(event);
         Module._window_data_set_mod_keys(windowData, mod);
-        w.events.push({ type: "keydown", code: code, mod: mod });
+        w.events.push({ type: "keyup", code: code, mod: mod });
     });
 
     canvas.addEventListener("mousedown", (event) => {
@@ -513,12 +519,6 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned
     state = mfb_update_events_js((SWindowData *)window);
     return state;
 }
-
-EM_JS(void, emscripten_sleep_using_raf, (), {
-    Asyncify.handleSleep(wakeUp => {
-            requestAnimationFrame(wakeUp);
-    });
-});
 
 bool mfb_wait_sync(struct mfb_window *window) {
     emscripten_sleep(0);
