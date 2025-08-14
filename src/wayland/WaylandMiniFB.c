@@ -1,5 +1,4 @@
 #include <MiniFB.h>
-#include "generated/xdg-shell-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
@@ -7,6 +6,8 @@
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
+#include "generated/xdg-shell-client-protocol.h"
+#include "generated/fractional-scale.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -18,38 +19,36 @@
 #include <linux/limits.h>
 #include <linux/input.h>
 #include <linux/input-event-codes.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include <sys/mman.h>
 
-void init_keycodes();
+static void stub() {}
 
 static void
 destroy_window_data(SWindowData *window_data)
 {
-    if(window_data == 0x0)
+    if (!window_data)
         return;
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if(window_data_way != 0x0) {
+    SWindowData_Way *window_data_way = window_data->specific;
+    if (window_data_way) {
         mfb_timer_destroy(window_data_way->timer);
-        memset(window_data_way, 0, sizeof(SWindowData_Way));
         free(window_data_way);
     }
-    memset(window_data, 0, sizeof(SWindowData));
+  
     free(window_data);
 }
 
 static void
 destroy(SWindowData *window_data)
 {
-    if(window_data == 0x0)
+    if (!window_data)
         return;
 
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == 0x0 || window_data_way->display == 0x0) {
-        destroy_window_data(window_data);
-        return;
-    }
+    SWindowData_Way *window_data_way = window_data->specific;
+    if (!window_data_way)
+        goto skip_specific;
 
 #define KILL(NAME)                                      \
     do                                                  \
@@ -57,39 +56,324 @@ destroy(SWindowData *window_data)
         if (window_data_way->NAME)                      \
             wl_##NAME##_destroy(window_data_way->NAME); \
     } while (0);                                        \
-    window_data_way->NAME = 0x0;
+    window_data_way->NAME = NULL;
 
-    KILL(shell_surface);
-    KILL(shell);
+    KILL(cursor_theme);
+    xdg_surface_destroy(window_data_way->shell_surface);
+    xdg_wm_base_destroy(window_data_way->shell);
     KILL(surface);
-    //KILL(buffer);
-    if(window_data->draw_buffer) {
+    wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
+    if (window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
-        window_data->draw_buffer = 0x0;
+        window_data->draw_buffer = NULL;
     }
     KILL(shm_pool);
     KILL(shm);
     KILL(compositor);
     KILL(keyboard);
     KILL(seat);
+    wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
     KILL(registry);
 #undef KILL
+    xkb_state_unref(window_data_way->xkb_state);
     wl_display_disconnect(window_data_way->display);
-
-    destroy_window_data(window_data);
     close(window_data_way->fd);
+
+skip_specific:
+    destroy_window_data(window_data);
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static mfb_key
+key_from_raw(uint32_t raw)
+{
+    switch (raw) {
+    case KEY_GRAVE:      return KB_KEY_GRAVE_ACCENT;
+    case KEY_1:          return KB_KEY_1;
+    case KEY_2:          return KB_KEY_2;
+    case KEY_3:          return KB_KEY_3;
+    case KEY_4:          return KB_KEY_4;
+    case KEY_5:          return KB_KEY_5;
+    case KEY_6:          return KB_KEY_6;
+    case KEY_7:          return KB_KEY_7;
+    case KEY_8:          return KB_KEY_8;
+    case KEY_9:          return KB_KEY_9;
+    case KEY_0:          return KB_KEY_0;
+    case KEY_SPACE:      return KB_KEY_SPACE;
+    case KEY_MINUS:      return KB_KEY_MINUS;
+    case KEY_EQUAL:      return KB_KEY_EQUAL;
+    case KEY_Q:          return KB_KEY_Q;
+    case KEY_W:          return KB_KEY_W;
+    case KEY_E:          return KB_KEY_E;
+    case KEY_R:          return KB_KEY_R;
+    case KEY_T:          return KB_KEY_T;
+    case KEY_Y:          return KB_KEY_Y;
+    case KEY_U:          return KB_KEY_U;
+    case KEY_I:          return KB_KEY_I;
+    case KEY_O:          return KB_KEY_O;
+    case KEY_P:          return KB_KEY_P;
+    case KEY_LEFTBRACE:  return KB_KEY_LEFT_BRACKET;
+    case KEY_RIGHTBRACE: return KB_KEY_RIGHT_BRACKET;
+    case KEY_A:          return KB_KEY_A;
+    case KEY_S:          return KB_KEY_S;
+    case KEY_D:          return KB_KEY_D;
+    case KEY_F:          return KB_KEY_F;
+    case KEY_G:          return KB_KEY_G;
+    case KEY_H:          return KB_KEY_H;
+    case KEY_J:          return KB_KEY_J;
+    case KEY_K:          return KB_KEY_K;
+    case KEY_L:          return KB_KEY_L;
+    case KEY_SEMICOLON:  return KB_KEY_SEMICOLON;
+    case KEY_APOSTROPHE: return KB_KEY_APOSTROPHE;
+    case KEY_Z:          return KB_KEY_Z;
+    case KEY_X:          return KB_KEY_X;
+    case KEY_C:          return KB_KEY_C;
+    case KEY_V:          return KB_KEY_V;
+    case KEY_B:          return KB_KEY_B;
+    case KEY_N:          return KB_KEY_N;
+    case KEY_M:          return KB_KEY_M;
+    case KEY_COMMA:      return KB_KEY_COMMA;
+    case KEY_DOT:        return KB_KEY_PERIOD;
+    case KEY_SLASH:      return KB_KEY_SLASH;
+    case KEY_BACKSLASH:  return KB_KEY_BACKSLASH;
+    case KEY_ESC:        return KB_KEY_ESCAPE;
+    case KEY_TAB:        return KB_KEY_TAB;
+    case KEY_LEFTSHIFT:  return KB_KEY_LEFT_SHIFT;
+    case KEY_RIGHTSHIFT: return KB_KEY_RIGHT_SHIFT;
+    case KEY_LEFTCTRL:   return KB_KEY_LEFT_CONTROL;
+    case KEY_RIGHTCTRL:  return KB_KEY_RIGHT_CONTROL;
+    case KEY_LEFTALT:    return KB_KEY_LEFT_ALT;
+    case KEY_RIGHTALT:   return KB_KEY_RIGHT_ALT;
+    case KEY_LEFTMETA:   return KB_KEY_LEFT_SUPER;
+    case KEY_RIGHTMETA:  return KB_KEY_RIGHT_SUPER;
+    case KEY_MENU:       return KB_KEY_MENU;
+    case KEY_NUMLOCK:    return KB_KEY_NUM_LOCK;
+    case KEY_CAPSLOCK:   return KB_KEY_CAPS_LOCK;
+    case KEY_PRINT:      return KB_KEY_PRINT_SCREEN;
+    case KEY_SCROLLLOCK: return KB_KEY_SCROLL_LOCK;
+    case KEY_PAUSE:      return KB_KEY_PAUSE;
+    case KEY_DELETE:     return KB_KEY_DELETE;
+    case KEY_BACKSPACE:  return KB_KEY_BACKSPACE;
+    case KEY_ENTER:      return KB_KEY_ENTER;
+    case KEY_HOME:       return KB_KEY_HOME;
+    case KEY_END:        return KB_KEY_END;
+    case KEY_PAGEUP:     return KB_KEY_PAGE_UP;
+    case KEY_PAGEDOWN:   return KB_KEY_PAGE_DOWN;
+    case KEY_INSERT:     return KB_KEY_INSERT;
+    case KEY_LEFT:       return KB_KEY_LEFT;
+    case KEY_RIGHT:      return KB_KEY_RIGHT;
+    case KEY_DOWN:       return KB_KEY_DOWN;
+    case KEY_UP:         return KB_KEY_UP;
+    case KEY_F1:         return KB_KEY_F1;
+    case KEY_F2:         return KB_KEY_F2;
+    case KEY_F3:         return KB_KEY_F3;
+    case KEY_F4:         return KB_KEY_F4;
+    case KEY_F5:         return KB_KEY_F5;
+    case KEY_F6:         return KB_KEY_F6;
+    case KEY_F7:         return KB_KEY_F7;
+    case KEY_F8:         return KB_KEY_F8;
+    case KEY_F9:         return KB_KEY_F9;
+    case KEY_F10:        return KB_KEY_F10;
+    case KEY_F11:        return KB_KEY_F11;
+    case KEY_F12:        return KB_KEY_F12;
+    case KEY_F13:        return KB_KEY_F13;
+    case KEY_F14:        return KB_KEY_F14;
+    case KEY_F15:        return KB_KEY_F15;
+    case KEY_F16:        return KB_KEY_F16;
+    case KEY_F17:        return KB_KEY_F17;
+    case KEY_F18:        return KB_KEY_F18;
+    case KEY_F19:        return KB_KEY_F19;
+    case KEY_F20:        return KB_KEY_F20;
+    case KEY_F21:        return KB_KEY_F21;
+    case KEY_F22:        return KB_KEY_F22;
+    case KEY_F23:        return KB_KEY_F23;
+    case KEY_F24:        return KB_KEY_F24;
+    case KEY_KPSLASH:    return KB_KEY_KP_DIVIDE;
+    case KEY_KPDOT:      return KB_KEY_KP_MULTIPLY;
+    case KEY_KPMINUS:    return KB_KEY_KP_SUBTRACT;
+    case KEY_KPPLUS:     return KB_KEY_KP_ADD;
+    case KEY_KP0:        return KB_KEY_KP_0;
+    case KEY_KP1:        return KB_KEY_KP_1;
+    case KEY_KP2:        return KB_KEY_KP_2;
+    case KEY_KP3:        return KB_KEY_KP_3;
+    case KEY_KP4:        return KB_KEY_KP_4;
+    case KEY_KP5:        return KB_KEY_KP_5;
+    case KEY_KP6:        return KB_KEY_KP_6;
+    case KEY_KP7:        return KB_KEY_KP_7;
+    case KEY_KP8:        return KB_KEY_KP_8;
+    case KEY_KP9:        return KB_KEY_KP_9;
+    case KEY_KPCOMMA:    return KB_KEY_KP_DECIMAL;
+    case KEY_KPEQUAL:    return KB_KEY_KP_EQUAL;
+    case KEY_KPENTER:    return KB_KEY_KP_ENTER;
+    }
+
+    return KB_KEY_UNKNOWN;
+}
+
+mfb_key
+key_from_xkb_sym(uint32_t sym)
+{
+    switch (sym) {
+    case XKB_KEY_grave:             return KB_KEY_GRAVE_ACCENT;
+    case XKB_KEY_1:                 return KB_KEY_1;
+    case XKB_KEY_2:                 return KB_KEY_2;
+    case XKB_KEY_3:                 return KB_KEY_3;
+    case XKB_KEY_4:                 return KB_KEY_4;
+    case XKB_KEY_5:                 return KB_KEY_5;
+    case XKB_KEY_6:                 return KB_KEY_6;
+    case XKB_KEY_7:                 return KB_KEY_7;
+    case XKB_KEY_8:                 return KB_KEY_8;
+    case XKB_KEY_9:                 return KB_KEY_9;
+    case XKB_KEY_0:                 return KB_KEY_0;
+    case XKB_KEY_space:             return KB_KEY_SPACE;
+    case XKB_KEY_minus:             return KB_KEY_MINUS;
+    case XKB_KEY_equal:             return KB_KEY_EQUAL;
+    case XKB_KEY_q: case XKB_KEY_Q: return KB_KEY_Q;
+    case XKB_KEY_w: case XKB_KEY_W: return KB_KEY_W;
+    case XKB_KEY_e: case XKB_KEY_E: return KB_KEY_E;
+    case XKB_KEY_r: case XKB_KEY_R: return KB_KEY_R;
+    case XKB_KEY_t: case XKB_KEY_T: return KB_KEY_T;
+    case XKB_KEY_y: case XKB_KEY_Y: return KB_KEY_Y;
+    case XKB_KEY_u: case XKB_KEY_U: return KB_KEY_U;
+    case XKB_KEY_i: case XKB_KEY_I: return KB_KEY_I;
+    case XKB_KEY_o: case XKB_KEY_O: return KB_KEY_O;
+    case XKB_KEY_p: case XKB_KEY_P: return KB_KEY_P;
+    case XKB_KEY_braceleft:         return KB_KEY_LEFT_BRACKET;
+    case XKB_KEY_braceright:        return KB_KEY_RIGHT_BRACKET;
+    case XKB_KEY_a: case XKB_KEY_A: return KB_KEY_A;
+    case XKB_KEY_s: case XKB_KEY_S: return KB_KEY_S;
+    case XKB_KEY_d: case XKB_KEY_D: return KB_KEY_D;
+    case XKB_KEY_f: case XKB_KEY_F: return KB_KEY_F;
+    case XKB_KEY_g: case XKB_KEY_G: return KB_KEY_G;
+    case XKB_KEY_h: case XKB_KEY_H: return KB_KEY_H;
+    case XKB_KEY_j: case XKB_KEY_J: return KB_KEY_J;
+    case XKB_KEY_k: case XKB_KEY_K: return KB_KEY_K;
+    case XKB_KEY_l: case XKB_KEY_L: return KB_KEY_L;
+    case XKB_KEY_semicolon:         return KB_KEY_SEMICOLON;
+    case XKB_KEY_apostrophe:        return KB_KEY_APOSTROPHE;
+    case XKB_KEY_z: case XKB_KEY_Z: return KB_KEY_Z;
+    case XKB_KEY_x: case XKB_KEY_X: return KB_KEY_X;
+    case XKB_KEY_c: case XKB_KEY_C: return KB_KEY_C;
+    case XKB_KEY_v: case XKB_KEY_V: return KB_KEY_V;
+    case XKB_KEY_b: case XKB_KEY_B: return KB_KEY_B;
+    case XKB_KEY_n: case XKB_KEY_N: return KB_KEY_N;
+    case XKB_KEY_m: case XKB_KEY_M: return KB_KEY_M;
+    case XKB_KEY_comma:             return KB_KEY_COMMA;
+    case XKB_KEY_period:            return KB_KEY_PERIOD;
+    case XKB_KEY_slash:             return KB_KEY_SLASH;
+    case XKB_KEY_backslash:         return KB_KEY_BACKSLASH;
+    case XKB_KEY_Escape:            return KB_KEY_ESCAPE;
+    case XKB_KEY_Tab:               return KB_KEY_TAB;
+    case XKB_KEY_Shift_L:           return KB_KEY_LEFT_SHIFT;
+    case XKB_KEY_Shift_R:           return KB_KEY_RIGHT_SHIFT;
+    case XKB_KEY_Control_L:         return KB_KEY_LEFT_CONTROL;
+    case XKB_KEY_Control_R:         return KB_KEY_RIGHT_CONTROL;
+    case XKB_KEY_Alt_L:             return KB_KEY_LEFT_ALT;
+    case XKB_KEY_Alt_R:             return KB_KEY_RIGHT_ALT;
+    case XKB_KEY_Super_L:           return KB_KEY_LEFT_SUPER;
+    case XKB_KEY_Super_R:           return KB_KEY_RIGHT_SUPER;
+    case XKB_KEY_Menu:              return KB_KEY_MENU;
+    case XKB_KEY_Num_Lock:          return KB_KEY_NUM_LOCK;
+    case XKB_KEY_Caps_Lock:         return KB_KEY_CAPS_LOCK;
+    case XKB_KEY_Print:             return KB_KEY_PRINT_SCREEN;
+    case XKB_KEY_Scroll_Lock:       return KB_KEY_SCROLL_LOCK;
+    case XKB_KEY_Pause:             return KB_KEY_PAUSE;
+    case XKB_KEY_Delete:            return KB_KEY_DELETE;
+    case XKB_KEY_BackSpace:         return KB_KEY_BACKSPACE;
+    case XKB_KEY_Return:            return KB_KEY_ENTER;
+    case XKB_KEY_Home:              return KB_KEY_HOME;
+    case XKB_KEY_End:               return KB_KEY_END;
+    case XKB_KEY_Page_Up:           return KB_KEY_PAGE_UP;
+    case XKB_KEY_Page_Down:         return KB_KEY_PAGE_DOWN;
+    case XKB_KEY_Insert:            return KB_KEY_INSERT;
+    case XKB_KEY_Left:              return KB_KEY_LEFT;
+    case XKB_KEY_Right:             return KB_KEY_RIGHT;
+    case XKB_KEY_Down:              return KB_KEY_DOWN;
+    case XKB_KEY_Up:                return KB_KEY_UP;
+    case XKB_KEY_F1:                return KB_KEY_F1;
+    case XKB_KEY_F2:                return KB_KEY_F2;
+    case XKB_KEY_F3:                return KB_KEY_F3;
+    case XKB_KEY_F4:                return KB_KEY_F4;
+    case XKB_KEY_F5:                return KB_KEY_F5;
+    case XKB_KEY_F6:                return KB_KEY_F6;
+    case XKB_KEY_F7:                return KB_KEY_F7;
+    case XKB_KEY_F8:                return KB_KEY_F8;
+    case XKB_KEY_F9:                return KB_KEY_F9;
+    case XKB_KEY_F10:               return KB_KEY_F10;
+    case XKB_KEY_F11:               return KB_KEY_F11;
+    case XKB_KEY_F12:               return KB_KEY_F12;
+    case XKB_KEY_F13:               return KB_KEY_F13;
+    case XKB_KEY_F14:               return KB_KEY_F14;
+    case XKB_KEY_F15:               return KB_KEY_F15;
+    case XKB_KEY_F16:               return KB_KEY_F16;
+    case XKB_KEY_F17:               return KB_KEY_F17;
+    case XKB_KEY_F18:               return KB_KEY_F18;
+    case XKB_KEY_F19:               return KB_KEY_F19;
+    case XKB_KEY_F20:               return KB_KEY_F20;
+    case XKB_KEY_F21:               return KB_KEY_F21;
+    case XKB_KEY_F22:               return KB_KEY_F22;
+    case XKB_KEY_F23:               return KB_KEY_F23;
+    case XKB_KEY_F24:               return KB_KEY_F24;
+    case XKB_KEY_KP_Divide:         return KB_KEY_KP_DIVIDE;
+    case XKB_KEY_KP_Multiply:       return KB_KEY_KP_MULTIPLY;
+    case XKB_KEY_KP_Subtract:       return KB_KEY_KP_SUBTRACT;
+    case XKB_KEY_KP_Add:            return KB_KEY_KP_ADD;
+    case XKB_KEY_KP_0:              return KB_KEY_KP_0;
+    case XKB_KEY_KP_1:              return KB_KEY_KP_1;
+    case XKB_KEY_KP_2:              return KB_KEY_KP_2;
+    case XKB_KEY_KP_3:              return KB_KEY_KP_3;
+    case XKB_KEY_KP_4:              return KB_KEY_KP_4;
+    case XKB_KEY_KP_5:              return KB_KEY_KP_5;
+    case XKB_KEY_KP_6:              return KB_KEY_KP_6;
+    case XKB_KEY_KP_7:              return KB_KEY_KP_7;
+    case XKB_KEY_KP_8:              return KB_KEY_KP_8;
+    case XKB_KEY_KP_9:              return KB_KEY_KP_9;
+    case XKB_KEY_KP_Decimal:        return KB_KEY_KP_DECIMAL;
+    case XKB_KEY_KP_Equal:          return KB_KEY_KP_EQUAL;
+    case XKB_KEY_KP_Enter:          return KB_KEY_KP_ENTER;
+    }
+
+    return KB_KEY_UNKNOWN;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)
+{
+    SWindowData *window_data = (SWindowData *) window;
+
+    if (offset_x + width > window_data->window_width)
+        return false;
+    if (offset_y + height > window_data->window_height)
+        return false;
+
+    // TODO: Not yet
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+    resize_dst(window_data, width, height);
+
+    return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void
 handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
 {
     kUnused(data);
+
     xdg_wm_base_pong(xdg_wm_base, serial);
 }
 
 static struct xdg_wm_base_listener shell_listener = {
-    handle_ping
+    .ping = handle_ping
 };
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // This event provides a file descriptor to the client which can be memory-mapped
 // to provide a keyboard mapping description.
@@ -101,9 +385,25 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
 {
     kUnused(data);
     kUnused(keyboard);
-    kUnused(format);
-    kUnused(fd);
-    kUnused(size);
+  
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
+
+    if (format == 0)
+        return;
+
+    struct xkb_context *xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    char *memory = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+  
+    struct xkb_keymap *xkb_keymap = xkb_keymap_new_from_string(xkb_context, memory, format, XKB_KEYMAP_COMPILE_NO_FLAGS);
+  
+    munmap(memory, size);
+    xkb_context_unref(xkb_context);
+    close(fd);
+
+    window_data_way->xkb_state = xkb_state_new(xkb_keymap);
+  
+    xkb_keymap_unref(xkb_keymap);
 }
 
 // Notification that this seat's keyboard focus is on a certain surface.
@@ -118,7 +418,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(surface);
     kUnused(keys);
 
-    SWindowData *window_data = (SWindowData *) data;
+    SWindowData *window_data = data;
     window_data->is_active = true;
     kCall(active_func, true);
 }
@@ -133,7 +433,7 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(serial);
     kUnused(surface);
 
-    SWindowData *window_data = (SWindowData *) data;
+    SWindowData *window_data = data;
     window_data->is_active = false;
     kCall(active_func, false);
 }
@@ -145,54 +445,25 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
 // key:    key that produced the event
 // state:  physical state of the key
 static void
-keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
+keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t code, uint32_t state)
 {
     kUnused(keyboard);
     kUnused(serial);
     kUnused(time);
 
-    SWindowData *window_data = (SWindowData *) data;
-    if(key < 512) {
-        mfb_key key_code = (mfb_key) g_keycodes[key];
-        bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        switch (key_code)
-        {
-            case KB_KEY_LEFT_SHIFT:
-            case KB_KEY_RIGHT_SHIFT:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_SHIFT;
-                else
-                    window_data->mod_keys &= ~KB_MOD_SHIFT;
-                break;
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
 
-            case KB_KEY_LEFT_CONTROL:
-            case KB_KEY_RIGHT_CONTROL:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_CONTROL;
-                else
-                    window_data->mod_keys &= ~KB_MOD_CONTROL;
-                break;
+    mfb_key key;
+    if (window_data_way->xkb_state)
+        key = key_from_xkb_sym(xkb_state_key_get_one_sym(window_data_way->xkb_state, code + 8));
+    else
+        key = key_from_raw(code);
 
-            case KB_KEY_LEFT_ALT:
-            case KB_KEY_RIGHT_ALT:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_ALT;
-                else
-                    window_data->mod_keys &= ~KB_MOD_ALT;
-                break;
+    bool is_pressed = state != WL_KEYBOARD_KEY_STATE_RELEASED;
 
-            case KB_KEY_LEFT_SUPER:
-            case KB_KEY_RIGHT_SUPER:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_SUPER;
-                else
-                    window_data->mod_keys &= ~KB_MOD_SUPER;
-                break;
-        }
-
-        window_data->key_status[key_code] = is_pressed;
-        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
-    }
+    window_data->key_status[key] = is_pressed;
+    kCall(keyboard_func, key, (mfb_key_mod) window_data->mod_keys, is_pressed);
 }
 
 // Notifies clients that the modifier and/or group state has changed,
@@ -205,26 +476,28 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 static void
 keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
 {
-    kUnused(data);
     kUnused(keyboard);
     kUnused(serial);
-    kUnused(mods_depressed);
-    kUnused(mods_latched);
-    kUnused(mods_locked);
-    kUnused(group);
-    // it is not easy to identify them here :(
-}
 
-// Informs the client about the keyboard's repeat rate and delay.
-// rate:  the rate of repeating keys in characters per second
-// delay: delay in milliseconds since key down until repeating starts
-static void
-keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay)
-{
-    kUnused(data);
-    kUnused(keyboard);
-    kUnused(rate);
-    kUnused(delay);
+    SWindowData      *window_data     = data;
+    SWindowData_Way  *window_data_way = window_data->specific;
+    struct xkb_state *xkb_state       = window_data_way->xkb_state;
+
+    xkb_state_update_mask(xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+
+    window_data->mod_keys = 0;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_SHIFT;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_CONTROL;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_VMOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_ALT;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_VMOD_NAME_SUPER, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_SUPER;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_MOD_NAME_CAPS, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_CAPS_LOCK;
+    if (xkb_state_mod_name_is_active(xkb_state, XKB_VMOD_NAME_NUM, XKB_STATE_MODS_EFFECTIVE))
+        window_data->mod_keys |= KB_MOD_NUM_LOCK;
 }
 
 static const struct
@@ -234,7 +507,6 @@ wl_keyboard_listener keyboard_listener = {
     .leave       = keyboard_leave,
     .key         = keyboard_key,
     .modifiers   = keyboard_modifiers,
-    .repeat_info = 0x0,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,42 +524,20 @@ wl_keyboard_listener keyboard_listener = {
 static void
 pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy)
 {
-    //kUnused(pointer);
-    //kUnused(serial);
     kUnused(surface);
     kUnused(sx);
     kUnused(sy);
-    struct wl_buffer *buffer;
-    struct wl_cursor_image *image;
+  
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
 
-    SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-
-    image  = window_data_way->default_cursor->images[0];
-    buffer = wl_cursor_image_get_buffer(image);
+    struct wl_cursor_image *image = window_data_way->default_cursor->images[0];
+    struct wl_buffer *buffer = wl_cursor_image_get_buffer(image);
 
     wl_pointer_set_cursor(pointer, serial, window_data_way->cursor_surface, image->hotspot_x, image->hotspot_y);
     wl_surface_attach(window_data_way->cursor_surface, buffer, 0, 0);
     wl_surface_damage(window_data_way->cursor_surface, 0, 0, image->width, image->height);
     wl_surface_commit(window_data_way->cursor_surface);
-    //fprintf(stderr, "Pointer entered surface %p at %d %d\n", surface, sx, sy);
-}
-
-// Notification that this seat's pointer is no longer focused on a certain surface.
-//
-// The leave notification is sent before the enter notification for the new focus.
-//
-// serial:  serial number of the leave event
-// surface: surface left by the pointer
-static void
-pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface)
-{
-    kUnused(data);
-    kUnused(pointer);
-    kUnused(serial);
-    kUnused(surface);
-
-    //fprintf(stderr, "Pointer left surface %p\n", surface);
 }
 
 // Notification of pointer location change.
@@ -303,8 +553,7 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
     kUnused(pointer);
     kUnused(time);
 
-    //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
-    SWindowData *window_data = (SWindowData *) data;
+    SWindowData *window_data = data;
     window_data->mouse_pos_x = wl_fixed_to_int(sx);
     window_data->mouse_pos_y = wl_fixed_to_int(sy);
     kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
@@ -336,7 +585,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
     kUnused(time);
 
     //printf("Pointer button '%d'(%d)\n", button, state);
-    SWindowData *window_data = (SWindowData *) data;
+    SWindowData *window_data = data;
     window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 }
@@ -368,58 +617,24 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     kUnused(time);
     kUnused(axis);
 
-    //printf("Pointer handle axis: axis: %d (0x%x)\n", axis, value);
-    SWindowData *window_data = (SWindowData *) data;
-    if(axis == 0) {
+    SWindowData *window_data = data;
+    if (axis == 0) {
         window_data->mouse_wheel_y = -(value / 256.0f);
         kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
     }
-    else if(axis == 1) {
+    else if (axis == 1) {
         window_data->mouse_wheel_x = -(value / 256.0f);
         kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
     }
 }
 
-static void
-frame(void *data, struct wl_pointer *pointer) {
-    kUnused(data);
-    kUnused(pointer);
-}
-
-static void
-axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
-    kUnused(data);
-    kUnused(pointer);
-    kUnused(axis_source);
-}
-
-static void
-axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) {
-    kUnused(data);
-    kUnused(pointer);
-    kUnused(time);
-    kUnused(axis);
-}
-
-static void
-axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
-    kUnused(data);
-    kUnused(pointer);
-    kUnused(axis);
-    kUnused(discrete);
-}
-
 static const struct
 wl_pointer_listener pointer_listener = {
     .enter         = pointer_enter,
-    .leave         = pointer_leave,
+    .leave         = stub,
     .motion        = pointer_motion,
     .button        = pointer_button,
     .axis          = pointer_axis,
-    .frame         = 0x0,
-    .axis_source   = 0x0,
-    .axis_stop     = 0x0,
-    .axis_discrete = 0x0,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,10 +642,9 @@ wl_pointer_listener pointer_listener = {
 static void
 seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps)
 {
-    kUnused(data);
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
 
-    SWindowData         *window_data = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_way->keyboard)
     {
         window_data_way->keyboard = wl_seat_get_keyboard(seat);
@@ -439,7 +653,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_way->keyboard)
     {
         wl_keyboard_destroy(window_data_way->keyboard);
-        window_data_way->keyboard = 0x0;
+        window_data_way->keyboard = NULL;
     }
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer)
@@ -450,21 +664,13 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer)
     {
         wl_pointer_destroy(window_data_way->pointer);
-        window_data_way->pointer = 0x0;
+        window_data_way->pointer = NULL;
     }
-}
-
-static void
-seat_name(void *data, struct wl_seat *seat, const char *name) {
-    kUnused(data);
-    kUnused(seat);
-    printf("Seat '%s'n", name);
 }
 
 static const struct
 wl_seat_listener seat_listener = {
     .capabilities = seat_capabilities,
-    .name         = 0x0,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -480,22 +686,10 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
 {
     kUnused(shm);
 
-    SWindowData         *window_data     = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way->shm_format == -1u)
-    {
-        switch (format)
-        {
-            // We could do RGBA, but that would not be what is expected from minifb...
-            // case WL_SHM_FORMAT_ARGB8888:
-            case WL_SHM_FORMAT_XRGB8888:
-                window_data_way->shm_format = format;
-            break;
-
-            default:
-            break;
-        }
-    }
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
+    if (window_data_way->shm_format == -1u && format == WL_SHM_FORMAT_XRGB8888)
+        window_data_way->shm_format = format;
 }
 
 static const struct
@@ -506,98 +700,108 @@ wl_shm_listener shm_listener = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void
-registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
+handle_toplevel_configure(void *data, struct xdg_toplevel *toplevel, int32_t width, int32_t height, struct wl_array *states)
 {
-    kUnused(version);
-
-    SWindowData         *window_data     = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (strcmp(iface, "wl_compositor") == 0)
-    {
-        window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
-    }
-    else if (strcmp(iface, "wl_shm") == 0)
-    {
-        window_data_way->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
-        if (window_data_way->shm) {
-            wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
-            window_data_way->cursor_theme = wl_cursor_theme_load(0x0, 32, window_data_way->shm);
-            window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
-        }
-    }
-    else if (strcmp(iface, "xdg_wm_base") == 0)
-    {
-        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, 6);
-        if (window_data_way->shell) {
-            xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, 0x0);
-        }
-    }
-    else if (strcmp(iface, "wl_seat") == 0)
-    {
-        window_data_way->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
-        if (window_data_way->seat)
-        {
-            wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
-        }
-    }
-}
-
-static const struct
-wl_registry_listener registry_listener = {
-    .global        = registry_global,
-    .global_remove = 0x0,
-};
-
-static void
-handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial)
-{
-    kUnused(data);
-    xdg_surface_ack_configure(shell_surface, serial);
-}
-
-static const struct xdg_surface_listener shell_surface_listener = {
-    handle_shell_surface_configure
-};
-
-static void
-handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states)
-{
-    kUnused(data);
-    kUnused(xdg_toplevel);
-    kUnused(width);
-    kUnused(height);
     kUnused(states);
+
+    SWindowData *window_data = data;
+  
+    bool update_width = width != 0 && (uint32_t) width != window_data->window_width;
+    if (update_width)
+        window_data->window_width = width;
+
+    bool update_height = height != 0 && (uint32_t) height != window_data->window_height;
+    if (update_height)
+        window_data->window_height = height;
+
+    if (update_width || update_height) {
+        resize_dst(window_data, window_data->window_width, window_data->window_height);
+        kCall(resize_func, window_data->window_width, window_data->window_height);
+    }
 }
 
 static void
 handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 {
-    kUnused(data);
     kUnused(xdg_toplevel);
-}
 
-static void
-handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height)
-{
-    kUnused(data);
-    kUnused(xdg_toplevel);
-    kUnused(width);
-    kUnused(height);
-}
-
-static void
-handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities)
-{
-    kUnused(data);
-    kUnused(xdg_toplevel);
-    kUnused(capabilities);
+    SWindowData *window_data = data;
+    if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data))
+        window_data->close = true;
 }
 
 static const struct xdg_toplevel_listener toplevel_listener = {
-    handle_toplevel_configure,
-    handle_toplevel_close,
-    handle_toplevel_configure_bounds,
-    handle_toplevel_wm_capabilities
+    .configure = handle_toplevel_configure,
+    .close = handle_toplevel_close,
+    .wm_capabilities = stub
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial)
+{
+    xdg_surface_ack_configure(shell_surface, serial);
+}
+
+static const struct xdg_surface_listener shell_surface_listener = {
+    .configure = handle_shell_surface_configure
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+handle_fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale)
+{
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
+
+    window_data_way->scale = scale / 120.0;
+}
+
+static const struct wp_fractional_scale_v1_listener fractional_scale_listener = {
+    .preferred_scale = handle_fractional_scale_preferred_scale
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+handle_surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t scale)
+{
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
+
+    window_data_way->scale = scale;
+}
+
+static const struct wl_surface_listener surface_listener = {
+    .preferred_buffer_scale = handle_surface_preferred_buffer_scale
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
+{
+    kUnused(version);
+
+    SWindowData     *window_data     = data;
+    SWindowData_Way *window_data_way = window_data->specific;
+    if (strcmp(iface, "wl_compositor") == 0)
+        window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
+    else if (strcmp(iface, "xdg_wm_base") == 0)
+        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, 1);
+    else if (strcmp(iface, "wl_shm") == 0)
+        window_data_way->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
+    else if (strcmp(iface, "wl_seat") == 0)
+        window_data_way->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
+    else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0)
+        window_data_way->fractional_scale_manager = wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, 1);
+}
+
+static const struct
+wl_registry_listener registry_listener = {
+    .global        = registry_global,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -605,43 +809,95 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
-    SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
-    if(window_data == 0x0) {
-        return 0x0;
+    SWindowData *window_data = malloc(sizeof(SWindowData));
+    if (!window_data) {
+        return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
-    if(window_data_way == 0x0) {
-        free(window_data);
-        return 0x0;
-    }
+    SWindowData_Way *window_data_way = malloc(sizeof(SWindowData_Way));
+    if (!window_data_way)
+        goto out;
     memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data->specific = window_data_way;
 
     window_data_way->shm_format = -1u;
+    window_data_way->scale = 1;
 
-    window_data_way->display = wl_display_connect(0x0);
-    if (!window_data_way->display) {
-        free(window_data);
-        free(window_data_way);
-        return 0x0;
-    }
+    window_data_way->display = wl_display_connect(NULL);
+    if (!window_data_way->display)
+        goto out;
     window_data_way->registry = wl_display_get_registry(window_data_way->display);
     wl_registry_add_listener(window_data_way->registry, &registry_listener, window_data);
 
-    init_keycodes();
+    if (wl_display_roundtrip(window_data_way->display) == -1)
+        goto out;
+    if (!window_data_way->compositor ||
+        !window_data_way->shell ||
+        !window_data_way->shm)
+        goto out;
 
-    if (wl_display_dispatch(window_data_way->display) == -1 ||
-        wl_display_roundtrip(window_data_way->display) == -1) {
-        return 0x0;
+    const char *xcursor_theme = getenv("XCURSOR_THEME");
+    const char *xcursor_size_string = getenv("XCURSOR_SIZE");
+    int xcursor_size = 24;
+    if (xcursor_size_string) {
+        int size = (int)strtol(xcursor_size_string, NULL, 10);
+        if (size > 0)
+            xcursor_size = size;
     }
 
-    // did not get a format we want... meh
+    window_data_way->cursor_theme = wl_cursor_theme_load(xcursor_theme, xcursor_size, window_data_way->shm);
+    window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
+    window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
+
+    xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, NULL);
+    wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
+    if (window_data_way->seat)
+        wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
+
+    window_data->window_width  = width;
+    window_data->window_height = height;
+
+    window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
+    if (!window_data_way->surface)
+        goto out;
+
+    if (window_data_way->fractional_scale_manager) {
+        window_data_way->fractional_scale = wp_fractional_scale_manager_v1_get_fractional_scale(window_data_way->fractional_scale_manager, window_data_way->surface);
+        wp_fractional_scale_v1_add_listener(window_data_way->fractional_scale, &fractional_scale_listener, window_data);
+    } else {
+        // This doesn't seem to work for me, but it doesn't hurt to keep it
+        wl_surface_add_listener(window_data_way->surface, &surface_listener, window_data);
+    }
+
+    window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
+    if (!window_data_way->shell_surface)
+        goto out;
+    xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, NULL);
+
+    window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
+    if (!window_data_way->toplevel)
+        goto out;
+    xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
+
+    xdg_toplevel_set_title(window_data_way->toplevel, title);
+    if (!(flags & WF_RESIZABLE)) {
+        xdg_toplevel_set_min_size(window_data_way->toplevel, width, height);
+        xdg_toplevel_set_max_size(window_data_way->toplevel, width, height);
+    }
+    if (flags & WF_FULLSCREEN)
+        xdg_toplevel_set_fullscreen(window_data_way->toplevel, NULL);
+  
+    wl_surface_commit(window_data_way->surface);
+
+    if (wl_display_roundtrip(window_data_way->display) == -1)
+        goto out;
+
     if (window_data_way->shm_format == -1u)
         goto out;
-    if (!window_data_way->compositor)
-        goto out;
+
+    width = window_data->window_width;
+    height = window_data->window_height;
 
     char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
     char shmfile[PATH_MAX];
@@ -654,58 +910,27 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         goto out;
     unlink(shmfile);
 
-    uint32_t length = sizeof(uint32_t) * width * height;
+    window_data_way->pool_size = sizeof(uint32_t) * width * height;
 
-    if (ftruncate(window_data_way->fd, length) == -1)
+    if (ftruncate(window_data_way->fd, window_data_way->pool_size) == -1)
         goto out;
 
-    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+    window_data_way->shm_ptr = (uint32_t *) mmap(NULL, window_data_way->pool_size, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
     if (window_data_way->shm_ptr == MAP_FAILED)
         goto out;
 
-    window_data->window_width  = width;
-    window_data->window_height = height;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * sizeof(uint32_t);
+    window_data->buffer_stride = sizeof(uint32_t) * width;
     calc_dst_factor(window_data, width, height);
 
-    window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
-    window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
+    window_data_way->shm_pool = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, window_data_way->pool_size);
+    window_data->draw_buffer  = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
 
-    window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
-    if (!window_data_way->surface)
-        goto out;
-
-    window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
-
-    // There should always be a shell, right?
-    if (window_data_way->shell)
-    {
-        window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
-        if (!window_data_way->shell_surface)
-            goto out;
-
-        xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, 0x0);
-
-        window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
-        if (!window_data_way->toplevel)
-            goto out;
-
-        xdg_toplevel_set_title(window_data_way->toplevel, title);
-        xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, 0x0);
-    }
-
-    wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
-    wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
-    wl_surface_commit(window_data_way->surface);
-
     window_data_way->timer = mfb_timer_create();
-
-    mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
-
+  
 #if defined(_DEBUG) || defined(DEBUG)
     printf("Window created using Wayland API\n");
 #endif
@@ -717,101 +942,69 @@ out:
     close(window_data_way->fd);
     destroy(window_data);
 
-    return 0x0;
+    return NULL;
 }
-
-// done event
-//
-// Notify the client when the related request is done.
-//
-// callback_data: request-specific data for the callback
-static void
-frame_done(void *data, struct wl_callback *callback, uint32_t cookie)
-{
-    kUnused(cookie);
-    wl_callback_destroy(callback);
-
-    *(uint32_t *)data = 1;
-}
-
-static const struct
-wl_callback_listener frame_listener = {
-    .done = frame_done,
-};
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height)
 {
-    uint32_t done = 0;
-
-    if(window == 0x0) {
+    if (!window)
         return STATE_INVALID_WINDOW;
-    }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         destroy(window_data);
         return STATE_EXIT;
     }
 
-    if(buffer == 0x0) {
+    if (!buffer)
         return STATE_INVALID_BUFFER;
+
+    SWindowData_Way *window_data_way = window_data->specific;
+
+    bool update_width = window_data->buffer_width != width;
+    if (update_width) {
+        window_data->buffer_width  = width;
+        window_data->buffer_stride = sizeof(uint32_t) * width;
     }
-
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
-        return STATE_INTERNAL_ERROR;
-
-    if(window_data->buffer_width != width || window_data->buffer_height != height) {
-        uint32_t oldLength = sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height;
-        uint32_t length    = sizeof(uint32_t) * width * height;
-
-        // For some reason it crash when you make it smaller
-        if(oldLength < length) {
-            if (ftruncate(window_data_way->fd, length) == -1)
+  
+    bool update_height = window_data->buffer_height != height;
+    if (update_height)
+        window_data->buffer_height = height;
+  
+    if (update_width || update_height) {
+        uint32_t required_size = sizeof(uint32_t) * width * height;
+        if (required_size > window_data_way->pool_size) {
+            if (ftruncate(window_data_way->fd, required_size) == -1)
                 return STATE_INTERNAL_ERROR;
 
-            //munmap(window_data_way->shm_ptr, sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height);
-            window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+            munmap(window_data_way->shm_ptr, window_data_way->pool_size);
+            window_data_way->shm_ptr = (uint32_t *) mmap(NULL, required_size, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
             if (window_data_way->shm_ptr == MAP_FAILED)
                 return STATE_INTERNAL_ERROR;
+            wl_shm_pool_resize(window_data_way->shm_pool, required_size);
 
-            wl_shm_pool_resize(window_data_way->shm_pool, length);
+            window_data_way->pool_size = required_size;
         }
-
-        window_data->buffer_width  = width;
-        window_data->buffer_height = height;
-        window_data->buffer_stride = width * sizeof(uint32_t);
-
-        // This must be in the resize event but we don't have it for Wayland :(
-        resize_dst(window_data, width, height);
-
+      
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                         window_data->buffer_width, window_data->buffer_height,
                                         window_data->buffer_stride, window_data_way->shm_format);
     }
+  
 
     // update shm buffer
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
     wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
-    struct wl_callback *frame_callback = wl_surface_frame(window_data_way->surface);
-    if (!frame_callback) {
-        return STATE_INTERNAL_ERROR;
-    }
-    wl_callback_add_listener(frame_callback, &frame_listener, &done);
     wl_surface_commit(window_data_way->surface);
 
-    while (!done && window_data->close == false) {
-        if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
-            wl_callback_destroy(frame_callback);
-            return STATE_INTERNAL_ERROR;
-        }
-    }
+    if (wl_display_roundtrip(window_data_way->display) == -1)
+        return STATE_INTERNAL_ERROR;
 
     return STATE_OK;
 }
@@ -821,17 +1014,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 mfb_update_state
 mfb_update_events(struct mfb_window *window)
 {
-    if(window == 0x0) {
+    if (!window) {
         return STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         destroy(window_data);
         return STATE_EXIT;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    SWindowData_Way *window_data_way = window_data->specific;
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
         return STATE_INTERNAL_ERROR;
 
@@ -844,42 +1037,42 @@ mfb_update_events(struct mfb_window *window)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern double   g_time_for_frame;
+extern double g_time_for_frame;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if(window == 0x0) {
+    if (!window) {
         return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         destroy(window_data);
         return false;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    SWindowData_Way *window_data_way = window_data->specific;
     double      current;
     uint32_t    millis = 1;
-    while(1) {
+    while (true) {
         current = mfb_timer_now(window_data_way->timer);
         if (current >= g_time_for_frame * 0.96) {
             mfb_timer_reset(window_data_way->timer);
             return true;
         }
-        else if(current >= g_time_for_frame * 0.8) {
+        else if (current >= g_time_for_frame * 0.8) {
             millis = 0;
         }
 
         usleep(millis * 1000);
         //sched_yield();
 
-        if(millis == 1) {
+        if (millis == 1) {
             if (wl_display_dispatch_pending(window_data_way->display) == -1) {
                 return false;
             }
 
-            if(window_data->close) {
+            if (window_data->close) {
                 destroy_window_data(window_data);
                 return false;
             }
@@ -891,182 +1084,19 @@ mfb_wait_sync(struct mfb_window *window) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-extern short int g_keycodes[512];
-
 void
-init_keycodes(void)
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 {
-    // Clear keys
-    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
-        g_keycodes[i] = 0;
-
-    g_keycodes[KEY_GRAVE]      = KB_KEY_GRAVE_ACCENT;
-    g_keycodes[KEY_1]          = KB_KEY_1;
-    g_keycodes[KEY_2]          = KB_KEY_2;
-    g_keycodes[KEY_3]          = KB_KEY_3;
-    g_keycodes[KEY_4]          = KB_KEY_4;
-    g_keycodes[KEY_5]          = KB_KEY_5;
-    g_keycodes[KEY_6]          = KB_KEY_6;
-    g_keycodes[KEY_7]          = KB_KEY_7;
-    g_keycodes[KEY_8]          = KB_KEY_8;
-    g_keycodes[KEY_9]          = KB_KEY_9;
-    g_keycodes[KEY_0]          = KB_KEY_0;
-    g_keycodes[KEY_SPACE]      = KB_KEY_SPACE;
-    g_keycodes[KEY_MINUS]      = KB_KEY_MINUS;
-    g_keycodes[KEY_EQUAL]      = KB_KEY_EQUAL;
-    g_keycodes[KEY_Q]          = KB_KEY_Q;
-    g_keycodes[KEY_W]          = KB_KEY_W;
-    g_keycodes[KEY_E]          = KB_KEY_E;
-    g_keycodes[KEY_R]          = KB_KEY_R;
-    g_keycodes[KEY_T]          = KB_KEY_T;
-    g_keycodes[KEY_Y]          = KB_KEY_Y;
-    g_keycodes[KEY_U]          = KB_KEY_U;
-    g_keycodes[KEY_I]          = KB_KEY_I;
-    g_keycodes[KEY_O]          = KB_KEY_O;
-    g_keycodes[KEY_P]          = KB_KEY_P;
-    g_keycodes[KEY_LEFTBRACE]  = KB_KEY_LEFT_BRACKET;
-    g_keycodes[KEY_RIGHTBRACE] = KB_KEY_RIGHT_BRACKET;
-    g_keycodes[KEY_A]          = KB_KEY_A;
-    g_keycodes[KEY_S]          = KB_KEY_S;
-    g_keycodes[KEY_D]          = KB_KEY_D;
-    g_keycodes[KEY_F]          = KB_KEY_F;
-    g_keycodes[KEY_G]          = KB_KEY_G;
-    g_keycodes[KEY_H]          = KB_KEY_H;
-    g_keycodes[KEY_J]          = KB_KEY_J;
-    g_keycodes[KEY_K]          = KB_KEY_K;
-    g_keycodes[KEY_L]          = KB_KEY_L;
-    g_keycodes[KEY_SEMICOLON]  = KB_KEY_SEMICOLON;
-    g_keycodes[KEY_APOSTROPHE] = KB_KEY_APOSTROPHE;
-    g_keycodes[KEY_Z]          = KB_KEY_Z;
-    g_keycodes[KEY_X]          = KB_KEY_X;
-    g_keycodes[KEY_C]          = KB_KEY_C;
-    g_keycodes[KEY_V]          = KB_KEY_V;
-    g_keycodes[KEY_B]          = KB_KEY_B;
-    g_keycodes[KEY_N]          = KB_KEY_N;
-    g_keycodes[KEY_M]          = KB_KEY_M;
-    g_keycodes[KEY_COMMA]      = KB_KEY_COMMA;
-    g_keycodes[KEY_DOT]        = KB_KEY_PERIOD;
-    g_keycodes[KEY_SLASH]      = KB_KEY_SLASH;
-    g_keycodes[KEY_BACKSLASH]  = KB_KEY_BACKSLASH;
-    g_keycodes[KEY_ESC]        = KB_KEY_ESCAPE;
-    g_keycodes[KEY_TAB]        = KB_KEY_TAB;
-    g_keycodes[KEY_LEFTSHIFT]  = KB_KEY_LEFT_SHIFT;
-    g_keycodes[KEY_RIGHTSHIFT] = KB_KEY_RIGHT_SHIFT;
-    g_keycodes[KEY_LEFTCTRL]   = KB_KEY_LEFT_CONTROL;
-    g_keycodes[KEY_RIGHTCTRL]  = KB_KEY_RIGHT_CONTROL;
-    g_keycodes[KEY_LEFTALT]    = KB_KEY_LEFT_ALT;
-    g_keycodes[KEY_RIGHTALT]   = KB_KEY_RIGHT_ALT;
-    g_keycodes[KEY_LEFTMETA]   = KB_KEY_LEFT_SUPER;
-    g_keycodes[KEY_RIGHTMETA]  = KB_KEY_RIGHT_SUPER;
-    g_keycodes[KEY_MENU]       = KB_KEY_MENU;
-    g_keycodes[KEY_NUMLOCK]    = KB_KEY_NUM_LOCK;
-    g_keycodes[KEY_CAPSLOCK]   = KB_KEY_CAPS_LOCK;
-    g_keycodes[KEY_PRINT]      = KB_KEY_PRINT_SCREEN;
-    g_keycodes[KEY_SCROLLLOCK] = KB_KEY_SCROLL_LOCK;
-    g_keycodes[KEY_PAUSE]      = KB_KEY_PAUSE;
-    g_keycodes[KEY_DELETE]     = KB_KEY_DELETE;
-    g_keycodes[KEY_BACKSPACE]  = KB_KEY_BACKSPACE;
-    g_keycodes[KEY_ENTER]      = KB_KEY_ENTER;
-    g_keycodes[KEY_HOME]       = KB_KEY_HOME;
-    g_keycodes[KEY_END]        = KB_KEY_END;
-    g_keycodes[KEY_PAGEUP]     = KB_KEY_PAGE_UP;
-    g_keycodes[KEY_PAGEDOWN]   = KB_KEY_PAGE_DOWN;
-    g_keycodes[KEY_INSERT]     = KB_KEY_INSERT;
-    g_keycodes[KEY_LEFT]       = KB_KEY_LEFT;
-    g_keycodes[KEY_RIGHT]      = KB_KEY_RIGHT;
-    g_keycodes[KEY_DOWN]       = KB_KEY_DOWN;
-    g_keycodes[KEY_UP]         = KB_KEY_UP;
-    g_keycodes[KEY_F1]         = KB_KEY_F1;
-    g_keycodes[KEY_F2]         = KB_KEY_F2;
-    g_keycodes[KEY_F3]         = KB_KEY_F3;
-    g_keycodes[KEY_F4]         = KB_KEY_F4;
-    g_keycodes[KEY_F5]         = KB_KEY_F5;
-    g_keycodes[KEY_F6]         = KB_KEY_F6;
-    g_keycodes[KEY_F7]         = KB_KEY_F7;
-    g_keycodes[KEY_F8]         = KB_KEY_F8;
-    g_keycodes[KEY_F9]         = KB_KEY_F9;
-    g_keycodes[KEY_F10]        = KB_KEY_F10;
-    g_keycodes[KEY_F11]        = KB_KEY_F11;
-    g_keycodes[KEY_F12]        = KB_KEY_F12;
-    g_keycodes[KEY_F13]        = KB_KEY_F13;
-    g_keycodes[KEY_F14]        = KB_KEY_F14;
-    g_keycodes[KEY_F15]        = KB_KEY_F15;
-    g_keycodes[KEY_F16]        = KB_KEY_F16;
-    g_keycodes[KEY_F17]        = KB_KEY_F17;
-    g_keycodes[KEY_F18]        = KB_KEY_F18;
-    g_keycodes[KEY_F19]        = KB_KEY_F19;
-    g_keycodes[KEY_F20]        = KB_KEY_F20;
-    g_keycodes[KEY_F21]        = KB_KEY_F21;
-    g_keycodes[KEY_F22]        = KB_KEY_F22;
-    g_keycodes[KEY_F23]        = KB_KEY_F23;
-    g_keycodes[KEY_F24]        = KB_KEY_F24;
-    g_keycodes[KEY_KPSLASH]    = KB_KEY_KP_DIVIDE;
-    g_keycodes[KEY_KPDOT]      = KB_KEY_KP_MULTIPLY;
-    g_keycodes[KEY_KPMINUS]    = KB_KEY_KP_SUBTRACT;
-    g_keycodes[KEY_KPPLUS]     = KB_KEY_KP_ADD;
-    g_keycodes[KEY_KP0]        = KB_KEY_KP_0;
-    g_keycodes[KEY_KP1]        = KB_KEY_KP_1;
-    g_keycodes[KEY_KP2]        = KB_KEY_KP_2;
-    g_keycodes[KEY_KP3]        = KB_KEY_KP_3;
-    g_keycodes[KEY_KP4]        = KB_KEY_KP_4;
-    g_keycodes[KEY_KP5]        = KB_KEY_KP_5;
-    g_keycodes[KEY_KP6]        = KB_KEY_KP_6;
-    g_keycodes[KEY_KP7]        = KB_KEY_KP_7;
-    g_keycodes[KEY_KP8]        = KB_KEY_KP_8;
-    g_keycodes[KEY_KP9]        = KB_KEY_KP_9;
-    g_keycodes[KEY_KPCOMMA]    = KB_KEY_KP_DECIMAL;
-    g_keycodes[KEY_KPEQUAL]    = KB_KEY_KP_EQUAL;
-    g_keycodes[KEY_KPENTER]    = KB_KEY_KP_ENTER;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool
-mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-
-    SWindowData *window_data = (SWindowData *) window;
-
-    if(offset_x + width > window_data->window_width) {
-        return false;
-    }
-    if(offset_y + height > window_data->window_height) {
-        return false;
+    if (!window)
+    {
+        *scale_x = 1.0;
+        *scale_y = 1.0;
+        return;
     }
 
-    // TODO: Not yet
-    window_data->dst_offset_x = offset_x;
-    window_data->dst_offset_y = offset_y;
-    window_data->dst_width    = width;
-    window_data->dst_height   = height;
-    resize_dst(window_data, width, height);
+    SWindowData     *window_data     = (SWindowData *) window;
+    SWindowData_Way *window_data_way = window_data->specific;
 
-    return false;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void
-mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float x = 96.0, y = 96.0;
-
-    if(window != 0x0) {
-        //SWindowData     *window_data     = (SWindowData *) window;
-        //SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-
-        // I cannot find a way to get dpi under VirtualBox
-    }
-
-    if (scale_x) {
-        *scale_x = x / 96.0f;
-        if(*scale_x == 0) {
-            *scale_x = 1.0f;
-        }
-    }
-
-    if (scale_y) {
-        *scale_y = y / 96.0f;
-        if (*scale_y == 0) {
-            *scale_y = 1.0f;
-        }
-    }
+    *scale_x = window_data_way->scale;
+    *scale_y = window_data_way->scale;
 }
