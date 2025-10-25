@@ -432,6 +432,8 @@ set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
 if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
+    set_property(TARGET timer PROPERTY FOLDER "Tests")
+	set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
     set_property(TARGET input_events PROPERTY FOLDER "Tests")
     set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
