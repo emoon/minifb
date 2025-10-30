@@ -211,7 +211,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
 #if defined(_DEBUG) || defined(DEBUG)
-    printf("Window created using X11 API\n");
+    #if defined(USE_OPENGL_API)
+        printf("Window created using OpenGL API\n");
+    #else
+        printf("Window created using X11 API\n");
+    #endif
 #endif
 
     window_data->is_initialized = true;
@@ -546,31 +550,20 @@ mfb_wait_sync(struct mfb_window *window) {
 
     XFlush(dpy); // send any pending requests before we potentially sleep
 
-    // Hardware sync: update events, no software pacing
+    update_events(window_data, dpy);
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    // Hardware sync: no software pacing
     if (g_use_hardware_sync) {
-        update_events(window_data, dpy);
-        if (window_data->close) {
-            destroy_window_data(window_data);
-            return false;
-        }
         return true;
     }
 
-    // Software pacing: do not exceed g_time_for_frame
-    double elapsed_time = mfb_timer_now(window_data_x11->timer);
-    if (elapsed_time >= g_time_for_frame) {
-        mfb_timer_compensated_reset(window_data_x11->timer);
-        update_events(window_data, dpy);
-        if (window_data->close) {
-            destroy_window_data(window_data);
-            return false;
-        }
-        return true;
-    }
-
-    // Wait only the remaining time; wake on input
+    // Software pacing: Wait only the remaining time; wake on input
     for (;;) {
-        elapsed_time = mfb_timer_now(window_data_x11->timer);
+        double elapsed_time = mfb_timer_now(window_data_x11->timer);
         if (elapsed_time >= g_time_for_frame)
             break;
 

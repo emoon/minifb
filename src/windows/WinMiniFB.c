@@ -716,31 +716,20 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    // Hardware sync: update events, no software pacing
+    update_events(NULL);
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    // Hardware sync: no software pacing
     if (g_use_hardware_sync) {
-        update_events(NULL);
-        if (window_data->close) {
-            destroy_window_data(window_data);
-            return false;
-        }
         return true;
     }
 
-    // Software pacing: do not exceed g_time_for_frame
-    double elapsed_time = mfb_timer_now(window_data_win->timer);
-    if (elapsed_time >= g_time_for_frame) {
-        mfb_timer_compensated_reset(window_data_win->timer);
-        update_events(NULL);
-        if (window_data->close) {
-            destroy_window_data(window_data);
-            return false;
-        }
-        return true;
-    }
-
-    // Wait only the remaining time; wake on input
+    // Software pacing: Wait only the remaining time; wake on input
     for (;;) {
-        elapsed_time = mfb_timer_now(window_data_win->timer);
+        double elapsed_time = mfb_timer_now(window_data_win->timer);
         if (elapsed_time >= g_time_for_frame)
             break;
 
