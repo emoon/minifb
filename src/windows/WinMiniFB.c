@@ -657,7 +657,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 //-------------------------------------
 static inline void
-update_windows_messages(HWND window) {
+update_events(HWND window) {
     MSG msg;
 
     while (PeekMessage(&msg, window, 0, 0, PM_REMOVE)) {
@@ -683,7 +683,7 @@ mfb_update_events(struct mfb_window *window) {
         return STATE_INVALID_WINDOW;
     }
 
-    update_windows_messages(window_data_win->window);
+    update_events(window_data_win->window);
 
     if (window_data->close) {
         destroy_window_data(window_data);
@@ -712,13 +712,13 @@ mfb_wait_sync(struct mfb_window *window) {
     }
 
     SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    if (!window_data_win) {
+    if (window_data_win == NULL) {
         return false;
     }
 
     // Hardware sync: update events, no software pacing
     if (g_use_hardware_sync) {
-        update_windows_messages(NULL);
+        update_events(NULL);
         if (window_data->close) {
             destroy_window_data(window_data);
             return false;
@@ -729,8 +729,8 @@ mfb_wait_sync(struct mfb_window *window) {
     // Software pacing: do not exceed g_time_for_frame
     double elapsed_time = mfb_timer_now(window_data_win->timer);
     if (elapsed_time >= g_time_for_frame) {
-        mfb_timer_reset(window_data_win->timer);
-        update_windows_messages(NULL);
+        mfb_timer_compensated_reset(window_data_win->timer);
+        update_events(NULL);
         if (window_data->close) {
             destroy_window_data(window_data);
             return false;
@@ -749,6 +749,7 @@ mfb_wait_sync(struct mfb_window *window) {
         // Leave ~1 ms margin to avoid oversleep
         if (remaining_ms > 1.5) {
             DWORD timeout_ms = (DWORD) (remaining_ms - 1.0);
+
             MsgWaitForMultipleObjectsEx(
                 0,
                 NULL,
@@ -761,7 +762,7 @@ mfb_wait_sync(struct mfb_window *window) {
             SwitchToThread();
         }
 
-        update_windows_messages(NULL);
+        update_events(NULL);
         if (window_data->close) {
             destroy_window_data(window_data);
             return false;
