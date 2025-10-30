@@ -768,7 +768,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
     }
 
-    mfb_timer_reset(window_data_win->timer);
+    mfb_timer_compensated_reset(window_data_win->timer);
     return true;
 }
 

@@ -87,6 +87,7 @@ bool                mfb_wait_sync(struct mfb_window *window);
 struct mfb_timer *  mfb_timer_create(void);
 void                mfb_timer_destroy(struct mfb_timer *tmr);
 void                mfb_timer_reset(struct mfb_timer *tmr);
+void                mfb_timer_compensated_reset(struct mfb_timer *tmr);
 double              mfb_timer_now(struct mfb_timer *tmr);
 double              mfb_timer_delta(struct mfb_timer *tmr);
 double              mfb_timer_get_frequency(void);

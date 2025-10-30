@@ -7,9 +7,9 @@
 #define kUnused(var)        (void) var;
 
 typedef struct mfb_timer {
-    int64_t     start_time;
-    int64_t     delta_counter;
-    uint64_t    time;
+    int64_t     start_ticks;
+    int64_t     last_delta_ticks;
+    uint64_t    accumulated_ticks;
 } mfb_timer;
 
 #if defined(__cplusplus)
