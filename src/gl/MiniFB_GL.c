@@ -375,16 +375,19 @@ set_target_fps_aux() {
         if (GetSwapIntervalEXT != 0x0) {
             int currentInterval = GetSwapIntervalEXT();
             if (interval != currentInterval) {
-                fprintf(stderr, "Cannot set target swap interval. Current swap interval is %d\n", currentInterval);
+                fprintf(stderr, "Cannot set target swap interval.\n");
             }
+            fprintf(stdout, "Current swap interval is %d\n", currentInterval);
         }
         else if (success == false) {
             fprintf(stderr, "Cannot set target swap interval.\n");
         }
+
         g_use_hardware_sync = true;
     }
 
 #elif defined(linux)
+
     #define kGLX_SWAP_INTERVAL_EXT               0x20F1
     #define kGLX_MAX_SWAP_INTERVAL_EXT           0x20F2
 
@@ -399,6 +402,7 @@ set_target_fps_aux() {
             glXQueryDrawable(dpy, drawable, kGLX_MAX_SWAP_INTERVAL_EXT, &maxInterval);
             fprintf(stderr, "Cannot set target swap interval. Current swap interval is %d (max: %d)\n", currentInterval, maxInterval);
         }
+
         g_use_hardware_sync = true;
     }
 

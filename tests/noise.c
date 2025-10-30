@@ -3,13 +3,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+//-------------------------------------
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
-static uint32_t *g_buffer = 0x0;
+static uint32_t *g_buffer = NULL;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void 
+//-------------------------------------
+void
 resize(struct mfb_window *window, int width, int height) {
     (void) window;
     g_width  = width;
@@ -17,11 +17,9 @@ resize(struct mfb_window *window, int width, int height) {
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-int 
-main()
-{
+//-------------------------------------
+int
+main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, WF_RESIZABLE);

@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+//-------------------------------------
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
-static uint32_t *g_buffer = 0x0;
+static uint32_t *g_buffer = NULL;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
     (void) window;
@@ -17,11 +17,9 @@ resize(struct mfb_window *window, int width, int height) {
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int
-main()
-{
+main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Timer Test", g_width, g_height, WF_RESIZABLE);
@@ -35,9 +33,11 @@ main()
     resize(window, g_width - 100, g_height - 100);  // to resize buffer
 
     struct mfb_timer *timer = mfb_timer_create();
+    double time = 0;
+    int frames = 0;
+
     mfb_update_state state;
     do {
-        mfb_timer_now(timer);
         for (i = 0; i < g_width * g_height; ++i) {
             noise = seed;
             noise >>= 3;
@@ -49,12 +49,21 @@ main()
             noise &= 0xFF;
             g_buffer[i] = MFB_ARGB(0xff, noise, noise, noise);
         }
+
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != STATE_OK) {
             window = 0x0;
             break;
         }
-        printf("frame time: %f\n", mfb_timer_delta(timer));
+
+        time += mfb_timer_delta(timer);
+        ++frames;
+        if (frames >= 60) {
+            printf("FPS: %.3f\n", (frames / time));
+            frames = 0;
+            time = 0;
+
+        }
     } while(mfb_wait_sync(window));
 
     return 0;
