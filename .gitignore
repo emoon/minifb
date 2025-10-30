@@ -1,12 +1,16 @@
 .tundra2.*
 t2-output
 /.vscode
+/.vs
 /win
 /macosx
 /linux
+/vs
+/vs
+/mingw
 /build
-/.history
 /xcode
+/.history
 .gradle
 .idea
 .cxx
