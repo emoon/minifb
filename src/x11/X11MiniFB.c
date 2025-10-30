@@ -13,7 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
+#include <poll.h>
+#include <sched.h>
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
 #include "WindowData.h"
@@ -25,16 +28,14 @@
 
 static Atom s_delete_window_atom;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void init_keycodes(SWindowData_X11 *window_data_x11);
 
 extern void
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
               uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     int depth, i, formatCount, convDepth = -1;
@@ -45,14 +46,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     if (!window_data) {
-        return 0x0;
+        return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
     if (!window_data_x11) {
         free(window_data);
-        return 0x0;
+        return NULL;
     }
     memset(window_data_x11, 0, sizeof(SWindowData_X11));
     window_data->specific = window_data_x11;
@@ -61,7 +62,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (!window_data_x11->display) {
         free(window_data);
         free(window_data_x11);
-        return 0x0;
+        return NULL;
     }
 
     init_keycodes(window_data_x11);
@@ -74,10 +75,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     Window defaultRootWindow = DefaultRootWindow(window_data_x11->display);
 
-    for (i = 0; i < formatCount; ++i)
-    {
-        if (depth == formats[i].depth)
-        {
+    for (i = 0; i < formatCount; ++i) {
+        if (depth == formats[i].depth) {
             convDepth = formats[i].bits_per_pixel;
             break;
         }
@@ -86,10 +85,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     XFree(formats);
 
     // We only support 32-bit right now
-    if (convDepth != 32)
-    {
+    if (convDepth != 32) {
         XCloseDisplay(window_data_x11->display);
-        return 0x0;
+        return NULL;
     }
 
     int screenWidth  = DisplayWidth(window_data_x11->display, window_data_x11->screen);
@@ -133,8 +131,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
                     visual,
                     CWBackPixel | CWBorderPixel | CWBackingStore,
                     &windowAttributes);
-    if (!window_data_x11->window)
-        return 0x0;
+    if (!window_data_x11->window) {
+        return NULL;
+    }
 
     XSelectInput(window_data_x11->display, window_data_x11->window,
         KeyPressMask | KeyReleaseMask
@@ -193,11 +192,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #if defined(USE_OPENGL_API)
     if(create_GL_context(window_data) == false) {
-        return 0x0;
+        return NULL;
     }
 
 #else
-    window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, width, height, 32, width * 4);
+    window_data_x11->image = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, width * 4);
 #endif
 
     XSetWMNormalHints(window_data_x11->display, window_data_x11->window, &sizeHints);
@@ -219,12 +218,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     return (struct mfb_window *) window_data;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int translate_key(int scancode);
 int translate_mod(int state);
 int translate_mod_ex(int key, int state, int is_pressed);
 
+//-------------------------------------
 static void
 processEvent(SWindowData *window_data, XEvent *event) {
     switch (event->type) {
@@ -343,10 +342,10 @@ processEvent(SWindowData *window_data, XEvent *event) {
             resize_GL(window_data);
 #else
             SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-            if(window_data_x11->image_scaler != 0x0) {
-                window_data_x11->image_scaler->data = 0x0;
+            if(window_data_x11->image_scaler != NULL) {
+                window_data_x11->image_scaler->data = NULL;
                 XDestroyImage(window_data_x11->image_scaler);
-                window_data_x11->image_scaler        = 0x0;
+                window_data_x11->image_scaler        = NULL;
                 window_data_x11->image_scaler_width  = 0;
                 window_data_x11->image_scaler_height = 0;
             }
@@ -397,6 +396,7 @@ processEvent(SWindowData *window_data, XEvent *event) {
     }
 }
 
+//-------------------------------------
 static void
 processEvents(SWindowData *window_data) {
     XEvent          event;
@@ -408,13 +408,13 @@ processEvents(SWindowData *window_data) {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void destroy_window_data(SWindowData *window_data);
 
+//-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    if (window == 0x0) {
+    if (window == NULL) {
         return STATE_INVALID_WINDOW;
     }
 
@@ -424,7 +424,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_EXIT;
     }
 
-    if (buffer == 0x0) {
+    if (buffer == NULL) {
         return STATE_INVALID_BUFFER;
     }
 
@@ -446,26 +446,26 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     if (different_size || window_data->buffer_width != window_data->dst_width || window_data->buffer_height != window_data->dst_height) {
         if (window_data_x11->image_scaler_width != window_data->dst_width || window_data_x11->image_scaler_height != window_data->dst_height) {
-            if (window_data_x11->image_scaler != 0x0) {
-                window_data_x11->image_scaler->data = 0x0;
+            if (window_data_x11->image_scaler != NULL) {
+                window_data_x11->image_scaler->data = NULL;
                 XDestroyImage(window_data_x11->image_scaler);
             }
-            if (window_data_x11->image_buffer != 0x0) {
+            if (window_data_x11->image_buffer != NULL) {
                 free(window_data_x11->image_buffer);
-                window_data_x11->image_buffer = 0x0;
+                window_data_x11->image_buffer = NULL;
             }
             int depth = DefaultDepth(window_data_x11->display, window_data_x11->screen);
             window_data_x11->image_buffer = malloc(window_data->dst_width * window_data->dst_height * 4);
-            if(window_data_x11->image_buffer == 0x0) {
+            if(window_data_x11->image_buffer == NULL) {
                 return STATE_INTERNAL_ERROR;
             }
             window_data_x11->image_scaler_width  = window_data->dst_width;
             window_data_x11->image_scaler_height = window_data->dst_height;
-            window_data_x11->image_scaler = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, 0x0, window_data_x11->image_scaler_width, window_data_x11->image_scaler_height, 32, window_data_x11->image_scaler_width * 4);
+            window_data_x11->image_scaler = XCreateImage(window_data_x11->display, CopyFromParent, depth, ZPixmap, 0, NULL, window_data_x11->image_scaler_width, window_data_x11->image_scaler_height, 32, window_data_x11->image_scaler_width * 4);
         }
     }
 
-    if (window_data_x11->image_scaler != 0x0) {
+    if (window_data_x11->image_scaler != NULL) {
         stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
                       (uint32_t *) window_data_x11->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
         window_data_x11->image_scaler->data = (char *) window_data_x11->image_buffer;
@@ -488,11 +488,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    if (window == 0x0) {
+    if (window == NULL) {
         return STATE_INVALID_WINDOW;
     }
 
@@ -509,14 +508,25 @@ mfb_update_events(struct mfb_window *window) {
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
 
+//-------------------------------------
+static inline void
+update_events(SWindowData *window_data, Display *dpy) {
+    XEvent ev;
+
+    while (XPending(dpy) > 0) {
+        XNextEvent(dpy, &ev);
+        processEvent(window_data, &ev);
+    }
+}
+
+//-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if (window == 0x0) {
+    if (window == NULL) {
         return false;
     }
 
@@ -526,55 +536,87 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    if(g_use_hardware_sync) {
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    if (window_data_x11 == NULL) {
+        return false;
+    }
+
+    Display *dpy = window_data_x11->display;
+    const int xfd = ConnectionNumber(dpy);
+
+    XFlush(dpy); // send any pending requests before we potentially sleep
+
+    // Hardware sync: update events, no software pacing
+    if (g_use_hardware_sync) {
+        update_events(window_data, dpy);
+        if (window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
         return true;
     }
 
-    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-    XFlush(window_data_x11->display);
-    XEvent      event;
-    double      current;
-    uint32_t    millis = 1;
-    while(1) {
-        current = mfb_timer_now(window_data_x11->timer);
-        if (current >= g_time_for_frame * 0.96) {
-            mfb_timer_reset(window_data_x11->timer);
-            return true;
+    // Software pacing: do not exceed g_time_for_frame
+    double elapsed_time = mfb_timer_now(window_data_x11->timer);
+    if (elapsed_time >= g_time_for_frame) {
+        mfb_timer_compensated_reset(window_data_x11->timer);
+        update_events(window_data, dpy);
+        if (window_data->close) {
+            destroy_window_data(window_data);
+            return false;
         }
-        else if(current >= g_time_for_frame * 0.8) {
-            millis = 0;
+        return true;
+    }
+
+    // Wait only the remaining time; wake on input
+    for (;;) {
+        elapsed_time = mfb_timer_now(window_data_x11->timer);
+        if (elapsed_time >= g_time_for_frame)
+            break;
+
+        double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
+
+        // Leave ~1 ms margin to avoid oversleep
+        if (remaining_ms > 1.5) {
+            int timeout_ms = (int) (remaining_ms - 1.0);
+            if (timeout_ms < 0)
+                timeout_ms = 0;
+
+            struct pollfd pfd;
+            pfd.fd = xfd;
+            pfd.events = POLLIN;
+            pfd.revents = 0;
+
+            poll(&pfd, 1, timeout_ms);
+        }
+        else {
+            sched_yield(); // or nanosleep((const struct timespec){0,0}, NULL);
         }
 
-        usleep(millis * 1000);
-        //sched_yield();
+        update_events(window_data, dpy);
 
-        if(millis == 1 && XEventsQueued(window_data_x11->display, QueuedAlready) > 0) {
-            XNextEvent(window_data_x11->display, &event);
-            processEvent(window_data, &event);
-
-            if(window_data->close) {
-                destroy_window_data(window_data);
-                return false;
-            }
+        if (window_data->close) {
+            destroy_window_data(window_data);
+            return false;
         }
     }
 
+    mfb_timer_compensated_reset(window_data_x11->timer);
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 destroy_window_data(SWindowData *window_data)  {
-    if (window_data != 0x0) {
-        if (window_data->specific != 0x0) {
+    if (window_data != NULL) {
+        if (window_data->specific != NULL) {
             SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
 #if defined(USE_OPENGL_API)
             destroy_GL_context(window_data);
 #else
-            if (window_data_x11->image != 0x0) {
-                window_data_x11->image->data = 0x0;
+            if (window_data_x11->image != NULL) {
+                window_data_x11->image->data = NULL;
                 XDestroyImage(window_data_x11->image);
                 XDestroyWindow(window_data_x11->display, window_data_x11->window);
                 XCloseDisplay(window_data_x11->display);
@@ -590,8 +632,7 @@ destroy_window_data(SWindowData *window_data)  {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern short int g_keycodes[512];
 
 static int
@@ -618,7 +659,9 @@ translateKeyCodeB(int keySym) {
     return KB_KEY_UNKNOWN;
 }
 
-static int translateKeyCodeA(int keySym) {
+//-------------------------------------
+static int
+translateKeyCodeA(int keySym) {
     switch (keySym)
     {
         case XK_Escape:         return KB_KEY_ESCAPE;
@@ -758,6 +801,7 @@ static int translateKeyCodeA(int keySym) {
     return KB_KEY_UNKNOWN;
 }
 
+//-------------------------------------
 void
 init_keycodes(SWindowData_X11 *window_data_x11) {
     size_t  i;
@@ -779,8 +823,7 @@ init_keycodes(SWindowData_X11 *window_data_x11) {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int
 translate_key(int scancode) {
     if (scancode < 0 || scancode > 255)
@@ -789,8 +832,7 @@ translate_key(int scancode) {
     return g_keycodes[scancode];
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int
 translate_mod(int state) {
     int mod_keys = 0;
@@ -811,8 +853,7 @@ translate_mod(int state) {
     return mod_keys;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int
 translate_mod_ex(int key, int state, int is_pressed) {
     int mod_keys = 0;
@@ -857,8 +898,7 @@ translate_mod_ex(int key, int state, int is_pressed) {
     return mod_keys;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
     SWindowData *window_data = (SWindowData *) window;
@@ -879,13 +919,12 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 96.0, y = 96.0;
 
-    if(window != 0x0) {
+    if(window != NULL) {
         //SWindowData     *window_data     = (SWindowData *) window;
         //SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
 
