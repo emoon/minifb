@@ -381,6 +381,10 @@ if(MINIFB_BUILD_EXAMPLES)
             tests/timer.c
         )
 
+		add_executable(hide_cursor
+			tests/hide_cursor.c
+		)
+
         if(EMSCRIPTEN)
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -438,6 +442,7 @@ if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
     set_property(TARGET hidpi PROPERTY FOLDER "Tests")
+	set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
 endif()
 
 install(TARGETS minifb EXPORT minifb)
