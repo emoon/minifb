@@ -55,6 +55,9 @@ void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x,
 // Use this instead
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
 
+// Show/hide cursor
+void				mfb_show_cursor(struct mfb_window *window, bool show);
+
 // Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
