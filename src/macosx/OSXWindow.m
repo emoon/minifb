@@ -207,6 +207,12 @@
     return childContentView;
 }
 
+// Return the real content view (the internal frame view created via super setContentView:)
+- (NSView *)rootContentView
+{
+    return [super contentView];
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (BOOL)canBecomeKeyWindow
@@ -232,7 +238,7 @@
     }
 }
 
-- (BOOL)windowShouldClose:(NSWindow *) window 
+- (BOOL)windowShouldClose:(NSWindow *) window
 {
     bool destroy = false;
     if (!window_data) {

@@ -14,4 +14,7 @@
                windowData:(SWindowData *) windowData;
 
 - (void) removeWindowData;
+// Return the real content view (the internal frame view that implements drawRect:)
+- (NSView *)rootContentView;
+
 @end
