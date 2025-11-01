@@ -47,6 +47,17 @@ else
     exit 1
 fi
 
+# Check if wayland-protocols directory exists
+if [ ! -d "$PROTOCOL_DIR" ]; then
+    echo "Error: wayland-protocols directory not found at $PROTOCOL_DIR"
+    echo "Please install wayland-protocols package:"
+    echo " - Ubuntu/Debian: sudo apt install wayland-protocols"
+    echo " - Fedora: sudo dnf install wayland-protocols-devel"
+    echo " - Arch: sudo pacman -S wayland-protocols"
+    echo " - openSUSE: sudo zypper install wayland-protocols-devel"
+    exit 1
+fi
+
 # Create directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 

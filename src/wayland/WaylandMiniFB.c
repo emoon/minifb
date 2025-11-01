@@ -615,6 +615,9 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     kUnused(width);
     kUnused(height);
     kUnused(states);
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("Toplevel configure: width=%d, height=%d\n", width, height);
+#endif
 }
 
 static void
@@ -622,6 +625,9 @@ handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 {
     kUnused(data);
     kUnused(xdg_toplevel);
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("Toplevel close\n");
+#endif
 }
 
 static void
@@ -631,6 +637,9 @@ handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, 
     kUnused(xdg_toplevel);
     kUnused(width);
     kUnused(height);
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("Toplevel configure bounds: width=%d, height=%d\n", width, height);
+#endif
 }
 
 static void
@@ -639,6 +648,9 @@ handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, s
     kUnused(data);
     kUnused(xdg_toplevel);
     kUnused(capabilities);
+#if defined(_DEBUG) || defined(DEBUG)
+    printf("Toplevel wm capabilities\n");
+#endif
 }
 
 static const struct xdg_toplevel_listener toplevel_listener = {
