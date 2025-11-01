@@ -150,26 +150,6 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
 }
 
 //-------------------------------------
-void
-mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    HWND hWnd = NULL;
-
-    if (window == NULL)
-        return;
-
-    SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL)
-        return;
-
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    if (window_data_win == NULL)
-        return;
-
-    hWnd = window_data_win->window;
-    get_monitor_scale(hWnd, scale_x, scale_y);
-}
-
-//-------------------------------------
 long    g_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
 //-------------------------------------
@@ -185,9 +165,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT res = 0;
 
     SWindowData     *window_data     = (SWindowData *) GetWindowLongPtr(hWnd, GWLP_USERDATA);
-    SWindowData_Win *window_data_win = NULL;
+    SWindowData_Win *window_data_specific = NULL;
     if (window_data != NULL) {
-        window_data_win = (SWindowData_Win *) window_data->specific;
+        window_data_specific = (SWindowData_Win *) window_data->specific;
     }
 
     switch (message) {
@@ -216,9 +196,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
-            if (window_data && window_data->draw_buffer && window_data_win) {
-                StretchDIBits(window_data_win->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
-                              window_data_win->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+            if (window_data && window_data->draw_buffer && window_data_specific) {
+                StretchDIBits(window_data_specific->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
+                              window_data_specific->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
             }
             ValidateRect(hWnd, NULL);
             break;
@@ -234,8 +214,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
                 if (destroy) {
                     window_data->close = true;
-                    if (window_data_win) {
-                        DestroyWindow(window_data_win->window);
+                    if (window_data_specific) {
+                        DestroyWindow(window_data_specific->window);
                     }
                 }
             }
@@ -364,8 +344,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSEMOVE:
             if (window_data) {
-                if (window_data_win->mouse_inside == false) {
-                    window_data_win->mouse_inside = true;
+                if (window_data_specific->mouse_inside == false) {
+                    window_data_specific->mouse_inside = true;
                     TRACKMOUSEEVENT tme;
                     ZeroMemory(&tme, sizeof(tme));
                     tme.cbSize = sizeof(tme);
@@ -381,7 +361,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSELEAVE:
             if (window_data) {
-                window_data_win->mouse_inside = false;
+                window_data_specific->mouse_inside = false;
             }
             break;
 
@@ -400,7 +380,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
-                BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+                BitBlt(window_data_specific->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 #else
                 resize_GL(window_data);
 #endif
@@ -434,7 +414,18 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 }
 
 //-------------------------------------
-static unsigned g_window_counter = 0;
+static inline void
+update_events(HWND window) {
+    MSG msg;
+
+    while (PeekMessage(&msg, window, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+}
+
+//-------------------------------------
+static unsigned g_window_counter = 0;   // (not thread safe)
 
 //-------------------------------------
 struct mfb_window *
@@ -442,9 +433,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     RECT rect = { 0 };
     int  x = 0, y = 0;
 
-    load_functions();
-    dpi_aware();
-    init_keycodes();
+    if (g_window_counter == 0) {
+        timeBeginPeriod(1); // To be able to sleep 1 ms on Windows
+        load_functions();
+        dpi_aware();
+        init_keycodes();
+    }
+    ++g_window_counter;
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
@@ -452,14 +447,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Win *window_data_win = malloc(sizeof(SWindowData_Win));
-    if(window_data_win == NULL) {
+    SWindowData_Win *window_data_specific = malloc(sizeof(SWindowData_Win));
+    if(window_data_specific == NULL) {
         free(window_data);
         return NULL;
     }
-    memset(window_data_win, 0, sizeof(SWindowData_Win));
+    memset(window_data_specific, 0, sizeof(SWindowData_Win));
 
-    window_data->specific      = window_data_win;
+    window_data->specific      = window_data_specific;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
@@ -528,18 +523,18 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom + rect.top) / 2;
     }
 
-    window_data_win->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-    window_data_win->wc.lpfnWndProc   = WndProc;
-    window_data_win->wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    window_data_win->wc.lpszClassName = title;
-    RegisterClass(&window_data_win->wc);
+    window_data_specific->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
+    window_data_specific->wc.lpfnWndProc   = WndProc;
+    window_data_specific->wc.hCursor       = LoadCursor(0, IDC_ARROW);
+    window_data_specific->wc.lpszClassName = title;
+    RegisterClass(&window_data_specific->wc);
 
     calc_dst_factor(window_data, width, height);
 
     window_data->window_width  = rect.right;
     window_data->window_height = rect.bottom;
 
-    window_data_win->window = CreateWindowEx(
+    window_data_specific->window = CreateWindowEx(
         0,
         title, title,
         g_window_style,
@@ -547,39 +542,39 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         window_data->window_width, window_data->window_height,
         0, 0, 0, 0);
 
-    if (!window_data_win->window) {
+    if (!window_data_specific->window) {
         free(window_data);
-        free(window_data_win);
+        free(window_data_specific);
         return NULL;
     }
 
-    SetWindowLongPtr(window_data_win->window, GWLP_USERDATA, (LONG_PTR) window_data);
+    SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, (LONG_PTR) window_data);
 
     if (flags & WF_ALWAYS_ON_TOP)
-        SetWindowPos(window_data_win->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        SetWindowPos(window_data_specific->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-    ShowWindow(window_data_win->window, SW_NORMAL);
+    ShowWindow(window_data_specific->window, SW_NORMAL);
 
-    window_data_win->hdc = GetDC(window_data_win->window);
+    window_data_specific->hdc = GetDC(window_data_specific->window);
 
 #if !defined(USE_OPENGL_API)
 
-    window_data_win->bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
-    if(window_data_win->bitmapInfo == NULL) {
+    window_data_specific->bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
+    if(window_data_specific->bitmapInfo == NULL) {
         free(window_data);
-        free(window_data_win);
+        free(window_data_specific);
         return NULL;
     }
 
-    window_data_win->bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    window_data_win->bitmapInfo->bmiHeader.biPlanes      = 1;
-    window_data_win->bitmapInfo->bmiHeader.biBitCount    = 32;
-    window_data_win->bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
-    window_data_win->bitmapInfo->bmiHeader.biWidth       = window_data->buffer_width;
-    window_data_win->bitmapInfo->bmiHeader.biHeight      = -(LONG)window_data->buffer_height;
-    window_data_win->bitmapInfo->bmiColors[0].rgbRed     = 0xff;
-    window_data_win->bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
-    window_data_win->bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
+    window_data_specific->bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    window_data_specific->bitmapInfo->bmiHeader.biPlanes      = 1;
+    window_data_specific->bitmapInfo->bmiHeader.biBitCount    = 32;
+    window_data_specific->bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
+    window_data_specific->bitmapInfo->bmiHeader.biWidth       = window_data->buffer_width;
+    window_data_specific->bitmapInfo->bmiHeader.biHeight      = -(LONG)window_data->buffer_height;
+    window_data_specific->bitmapInfo->bmiColors[0].rgbRed     = 0xff;
+    window_data_specific->bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
+    window_data_specific->bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
 
 #else
 
@@ -587,7 +582,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #endif
 
-    window_data_win->timer = mfb_timer_create();
+    window_data_specific->timer = mfb_timer_create();
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
@@ -598,11 +593,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         printf("Window created using GDI API\n");
     #endif
 #endif
-
-    // To be able to sleep 1 ms on Windows (not thread safe)
-    if (g_window_counter == 0)
-        timeBeginPeriod(1);
-    ++g_window_counter;
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -618,6 +608,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     SWindowData *window_data = (SWindowData *) window;
+    if (window_data ==  NULL) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    // Early exit
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -627,19 +622,22 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_INVALID_BUFFER;
     }
 
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific ==  NULL) {
+        return STATE_INVALID_WINDOW;
+    }
+
     window_data->draw_buffer   = buffer;
     window_data->buffer_width  = width;
     window_data->buffer_stride = width * 4;
     window_data->buffer_height = height;
 
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-
 #if !defined(USE_OPENGL_API)
 
-    window_data_win->bitmapInfo->bmiHeader.biWidth = window_data->buffer_width;
-    window_data_win->bitmapInfo->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
-    InvalidateRect(window_data_win->window, NULL, TRUE);
-    SendMessage(window_data_win->window, WM_PAINT, 0, 0);
+    window_data_specific->bitmapInfo->bmiHeader.biWidth = window_data->buffer_width;
+    window_data_specific->bitmapInfo->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
+    InvalidateRect(window_data_specific->window, NULL, TRUE);
+    SendMessage(window_data_specific->window, WM_PAINT, 0, 0);
 
 #else
 
@@ -647,23 +645,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 #endif
 
-    while (window_data->close == false && PeekMessage(&msg, window_data_win->window, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    update_events(window_data_specific->window);
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
     }
 
     return STATE_OK;
-}
-
-//-------------------------------------
-static inline void
-update_events(HWND window) {
-    MSG msg;
-
-    while (PeekMessage(&msg, window, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
 }
 
 //-------------------------------------
@@ -678,13 +666,18 @@ mfb_update_events(struct mfb_window *window) {
         return STATE_INVALID_WINDOW;
     }
 
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    if (window_data_win == NULL) {
+    // Early exit
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
+    }
+
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL) {
         return STATE_INVALID_WINDOW;
     }
 
-    update_events(window_data_win->window);
-
+    update_events(window_data_specific->window);
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -695,7 +688,6 @@ mfb_update_events(struct mfb_window *window) {
 
 //-------------------------------------
 extern double   g_time_for_frame;
-extern int64_t  g_ticks_for_frame;
 extern bool     g_use_hardware_sync;
 
 //-------------------------------------
@@ -711,8 +703,8 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    if (window_data_win == NULL) {
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL) {
         return false;
     }
 
@@ -729,7 +721,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     // Software pacing: Wait only the remaining time; wake on input
     for (;;) {
-        double elapsed_time = mfb_timer_now(window_data_win->timer);
+        double elapsed_time = mfb_timer_now(window_data_specific->timer);
         if (elapsed_time >= g_time_for_frame)
             break;
 
@@ -737,12 +729,14 @@ mfb_wait_sync(struct mfb_window *window) {
 
         // Leave ~1 ms margin to avoid oversleep
         if (remaining_ms > 1.5) {
-            DWORD timeout_ms = (DWORD) (remaining_ms - 1.0);
+            int timeout_ms = (int) (remaining_ms - 1.0);
+            if (timeout_ms < 0)
+                timeout_ms = 0;
 
             MsgWaitForMultipleObjectsEx(
                 0,
                 NULL,
-                timeout_ms,
+                (DWORD) timeout_ms,
                 QS_ALLINPUT,
                 MWMO_INPUTAVAILABLE | MWMO_ALERTABLE
             );
@@ -758,7 +752,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
     }
 
-    mfb_timer_compensated_reset(window_data_win->timer);
+    mfb_timer_compensated_reset(window_data_specific->timer);
     return true;
 }
 
@@ -768,61 +762,42 @@ destroy_window_data(SWindowData *window_data) {
     if (window_data == NULL)
         return;
 
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
 
 #if !defined(USE_OPENGL_API)
-    if (window_data_win->bitmapInfo != NULL) {
-        free(window_data_win->bitmapInfo);
-        window_data_win->bitmapInfo = NULL;
+    if (window_data_specific->bitmapInfo != NULL) {
+        free(window_data_specific->bitmapInfo);
+        window_data_specific->bitmapInfo = NULL;
     }
 #else
     destroy_GL_context(window_data);
 #endif
 
-    if (window_data_win->window != 0 && window_data_win->hdc != 0) {
-        ReleaseDC(window_data_win->window, window_data_win->hdc);
-        DestroyWindow(window_data_win->window);
+    if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
+        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        DestroyWindow(window_data_specific->window);
     }
 
-    window_data_win->window = 0;
-    window_data_win->hdc    = 0;
+    window_data_specific->window = 0;
+    window_data_specific->hdc    = 0;
 
-    mfb_timer_destroy(window_data_win->timer);
-    window_data_win->timer = NULL;
+    mfb_timer_destroy(window_data_specific->timer);
+    window_data_specific->timer = NULL;
 
     window_data->draw_buffer = NULL;
     window_data->close       = true;
 
     // To be able to sleep 1 ms on Windows (not thread safe)
     --g_window_counter;
-    if (g_window_counter == 0)
+    if (g_window_counter == 0) {
         timeEndPeriod(1);
-}
-
-//-------------------------------------
-uint32_t
-translate_mod() {
-    uint32_t mods = 0;
-
-    if (GetKeyState(VK_SHIFT) & 0x8000)
-        mods |= KB_MOD_SHIFT;
-    if (GetKeyState(VK_CONTROL) & 0x8000)
-        mods |= KB_MOD_CONTROL;
-    if (GetKeyState(VK_MENU) & 0x8000)
-        mods |= KB_MOD_ALT;
-    if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)
-        mods |= KB_MOD_SUPER;
-    if (GetKeyState(VK_CAPITAL) & 1)
-        mods |= KB_MOD_CAPS_LOCK;
-    if (GetKeyState(VK_NUMLOCK) & 1)
-        mods |= KB_MOD_NUM_LOCK;
-
-    return mods;
+    }
 }
 
 //-------------------------------------
 extern short int g_keycodes[512];
 
+//-------------------------------------
 void
 init_keycodes() {
     if(g_keycodes[0x00B] != KB_KEY_0) {
@@ -976,10 +951,31 @@ translate_key(unsigned int wParam, unsigned long lParam) {
 }
 
 //-------------------------------------
+uint32_t
+translate_mod() {
+    uint32_t mods = 0;
+
+    if (GetKeyState(VK_SHIFT) & 0x8000)
+        mods |= KB_MOD_SHIFT;
+    if (GetKeyState(VK_CONTROL) & 0x8000)
+        mods |= KB_MOD_CONTROL;
+    if (GetKeyState(VK_MENU) & 0x8000)
+        mods |= KB_MOD_ALT;
+    if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)
+        mods |= KB_MOD_SUPER;
+    if (GetKeyState(VK_CAPITAL) & 1)
+        mods |= KB_MOD_CAPS_LOCK;
+    if (GetKeyState(VK_NUMLOCK) & 1)
+        mods |= KB_MOD_NUM_LOCK;
+
+    return mods;
+}
+
+//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
-    SWindowData_Win *window_data_win = NULL;
+    SWindowData_Win *window_data_specific = NULL;
     float           scale_x, scale_y;
 
     if(window_data == NULL) {
@@ -993,9 +989,9 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    window_data_win = (SWindowData_Win *) window_data->specific;
+    window_data_specific = (SWindowData_Win *) window_data->specific;
 
-    get_monitor_scale(window_data_win->window, &scale_x, &scale_y);
+    get_monitor_scale(window_data_specific->window, &scale_x, &scale_y);
     window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);
     window_data->dst_offset_y = (uint32_t) (offset_y * scale_y);
 
@@ -1005,11 +1001,31 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
-    window_data_win = (SWindowData_Win *) window_data->specific;
-    BitBlt(window_data_win->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+    window_data_specific = (SWindowData_Win *) window_data->specific;
+    BitBlt(window_data_specific->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
 #endif
 
     return true;
+}
+
+//-------------------------------------
+void
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
+    HWND hWnd = NULL;
+
+    if (window == NULL)
+        return;
+
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL)
+        return;
+
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL)
+        return;
+
+    hWnd = window_data_specific->window;
+    get_monitor_scale(hWnd, scale_x, scale_y);
 }
 
 //-------------------------------------
