@@ -13,6 +13,7 @@ typedef struct {
     Display             *display;
     int                 screen;
     GC                  gc;
+	Cursor				invis_cursor;
 #if defined(USE_OPENGL_API)
     GLXContext          context;
     uint32_t            text_id;

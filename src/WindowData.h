@@ -43,6 +43,7 @@ typedef struct {
     uint8_t                 key_status[512];
     uint32_t                mod_keys;
 
+    bool					is_cursor_visible;
     bool                    is_active;
     bool                    is_initialized;
 
