@@ -223,7 +223,17 @@ bool                mfb_wait_sync(struct mfb_window *window);
 
 Note that if you have several windows running on the same thread it makes no sense to wait them all...
 
-.
+## Cursor Control
+
+### Hiding the cursor
+
+Yow can Show/Hide the mouse cursor while it hovers over your window.
+
+```c
+void mfb_hide_cursor(struct mfb_window *window, bool show);
+```
+
+_Note: **AS OF RIGHT NOW** this is only implemented for Windows and X11_
 
 ## Build instructions
 
