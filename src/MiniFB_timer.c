@@ -141,26 +141,25 @@ mfb_timer_get_ticks_per_frame() {
 //-------------------------------------
 void
 mfb_timer_compensated_reset(struct mfb_timer *tmr) {
-    static const double ERROR_THRESHOLD = 0.05; // 5% threshold
-    static const double MAX_CORRECTION  = 0.50; // 50% max correction
-    static const double MAX_FRAME_TIME  = 2.0;  // 5x target frame time = fallback threshold
+    static const double ERROR_THRESHOLD    = 0.01; // % threshold
+    static const double MAX_CORRECTION     = 0.50; // % max correction
+    static const double MAX_FRAME_TIME     = 2.0;  // 5x target frame time = fallback threshold
     static int64_t accumulated_error_ticks = 0;
-
-    if(tmr == 0x0) {
-        return;
-    }
 
     if (g_time_for_frame == 0) {
         mfb_timer_reset(tmr);
         return;
     }
 
+    if(tmr == 0x0) {
+        return;
+    }
 
     // Work entirely with ticks for maximum precision
     int64_t  target_ticks_per_frame = mfb_timer_get_ticks_per_frame();
-    int64_t  threshold_ticks = (int64_t)(target_ticks_per_frame * ERROR_THRESHOLD);
-    int64_t  max_frame_ticks = (int64_t)(target_ticks_per_frame * MAX_FRAME_TIME);
-    uint64_t current_ticks = mfb_timer_tick();
+    int64_t  threshold_ticks        = (int64_t) (target_ticks_per_frame * ERROR_THRESHOLD);
+    int64_t  max_frame_ticks        = (int64_t) (target_ticks_per_frame * MAX_FRAME_TIME);
+    uint64_t current_ticks          = mfb_timer_tick();
 
     // Calculate actual frame time in ticks
     int64_t actual_frame_ticks = current_ticks - tmr->last_delta_ticks;
@@ -180,12 +179,12 @@ mfb_timer_compensated_reset(struct mfb_timer *tmr) {
     // Apply correction if error exceeds threshold
     int64_t correction_ticks = 0;
     if (llabs(accumulated_error_ticks) > threshold_ticks) {
-        correction_ticks = (int64_t)(accumulated_error_ticks * MAX_CORRECTION);
+        correction_ticks = (int64_t) (accumulated_error_ticks * MAX_CORRECTION);
         accumulated_error_ticks -= correction_ticks;
     }
 
     // Reset with compensation
-    tmr->start_ticks = current_ticks - correction_ticks;
-    tmr->last_delta_ticks = tmr->start_ticks;
+    tmr->start_ticks       = current_ticks - correction_ticks;
+    tmr->last_delta_ticks  = tmr->start_ticks;
     tmr->accumulated_ticks = 0;
 }
