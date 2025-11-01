@@ -1,5 +1,6 @@
 #include "MiniFB_internal.h"
 #include <stdint.h>
+#include <stddef.h>
 
 //#define kUseBilinearInterpolation
 
@@ -48,7 +49,7 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
     uint32_t    x, y;
     uint32_t    srcOffsetX, srcOffsetY;
 
-    if(srcImage == 0x0 || dstImage == 0x0)
+    if (srcImage == NULL || dstImage == NULL)
         return;
 
     srcImage += srcX + srcY * srcPitch;
@@ -70,7 +71,7 @@ stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidt
         }
 
         srcOffsetY += deltaY;
-        if(srcOffsetY >= 0x10000) {
+        if (srcOffsetY >= 0x10000) {
             srcImage += (srcOffsetY >> 16) * srcPitch;
             srcOffsetY &= 0xffff;
         }

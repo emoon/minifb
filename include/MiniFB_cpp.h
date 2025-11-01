@@ -2,6 +2,7 @@
 
 #if defined(__cplusplus)
 
+#include <stddef.h>
 #include <functional>
 #include "MiniFB.h"
 
@@ -51,7 +52,7 @@ void mfb_set_mouse_scroll_callback(struct mfb_window *window, T *obj, void (T::*
 // To avoid clumsy hands
 //-------------------------------------
 class mfb_stub {
-    mfb_stub() : m_window(0x0) {}
+    mfb_stub() : m_window(NULL) {}
 
     friend void mfb_set_active_callback      (std::function<void(struct mfb_window *window, bool)>                          func, struct mfb_window *window);
     friend void mfb_set_resize_callback      (std::function<void(struct mfb_window *, int, int)>                            func, struct mfb_window *window);

@@ -12,7 +12,7 @@ int main(void) {
   int buf_y = 240;
   gdb_start();
   uint32_t *pixels = (uint32_t *)malloc(sizeof(uint32_t) * buf_x * buf_y);
-  memset(pixels, 0x0, buf_x * buf_y * 4);
+  memset(pixels, NULL, buf_x * buf_y * 4);
   struct mfb_window *window =
       mfb_open_ex("Noise Test", res_x, res_y, WF_RESIZABLE);
 

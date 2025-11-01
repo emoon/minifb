@@ -23,8 +23,9 @@ main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Timer Test", g_width, g_height, WF_RESIZABLE);
-    if (!window)
+    if (!window) {
         return 0;
+    }
 
     g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
     mfb_set_resize_callback(window, resize);
@@ -52,7 +53,7 @@ main() {
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != STATE_OK) {
-            window = 0x0;
+            window = NULL;
             break;
         }
 

@@ -18,7 +18,7 @@
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,   LOG_TAG, __VA_ARGS__)
 #define  LOGF(...)  __android_log_print(ANDROID_LOG_FATAL,   LOG_TAG, __VA_ARGS__)
 
-#define kCall(func, ...)    if(window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
+#define kCall(func, ...)    if (window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
 
 #define kUnused(var)        (void) var;
 
@@ -36,11 +36,11 @@ main(int argc, char *argv[]);
 //-------------------------------------
 static void
 draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
-    if(window_data == 0x0 || window_data->draw_buffer == 0x0 || window_buffer == 0x0)
+    if (window_data == NULL || window_data->draw_buffer == NULL || window_buffer == NULL)
         return;
 
-    if((window_data->buffer_width == window_buffer->width) && (window_data->buffer_height == window_buffer->height)) {
-        if(window_data->buffer_stride == window_buffer->stride*4) {
+    if ((window_data->buffer_width == window_buffer->width) && (window_data->buffer_height == window_buffer->height)) {
+        if (window_data->buffer_stride == window_buffer->stride*4) {
             memcpy(window_buffer->bits, window_data->draw_buffer, window_data->buffer_width * window_data->buffer_height * 4);
         }
         else {
@@ -132,7 +132,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                 break;
         }
 
-        if(window_data != 0x0) {
+        if (window_data != NULL) {
             window_data->is_active = true;
         }
         return 1;
@@ -160,7 +160,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
     SWindowData_Android *window_data_android;
 
     window_data = (SWindowData *) app->userData;
-    if(window_data != 0x0) {
+    if (window_data != NULL) {
         window_data_android = (SWindowData_Android *) window_data->specific;
     }
 
@@ -216,12 +216,12 @@ handle_cmd(struct android_app* app, int32_t cmd) {
             // The content area of the window has changed, such as from the soft input window being shown or hidden.
             // You can find the new content rect in android_app::contentRect.
         case APP_CMD_CONTENT_RECT_CHANGED:
-            if(window_data_android != 0x0) {
+            if (window_data_android != NULL) {
                 // This does not work
                 //int32_t width  = window_data_android->app->contentRect.right  - window_data_android->app->contentRect.left;
                 //int32_t height = window_data_android->app->contentRect.bottom - window_data_android->app->contentRect.top;
                 // TODO: Check the DPI?
-                if(window_data != 0x0) {
+                if (window_data != NULL) {
                     window_data->window_width  = ANativeWindow_getWidth(app->window);
                     window_data->window_height = ANativeWindow_getHeight(app->window);
                     kCall(resize_func, window_data->window_width, window_data->window_height);
@@ -236,7 +236,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
 
             // The app's activity window has gained input focus.
         case APP_CMD_GAINED_FOCUS:
-            if(window_data != 0x0) {
+            if (window_data != NULL) {
                 window_data->is_active = true;
             }
             kCall(active_func, true);
@@ -248,7 +248,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
 
             // The app's activity window has lost input focus.
         case APP_CMD_LOST_FOCUS:
-            if(window_data != 0x0) {
+            if (window_data != NULL) {
                 window_data->is_active = true;
                 //engine_draw_frame(window_data_android);
             }
@@ -259,7 +259,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
             // Upon receiving this command, android_app->window still contains the existing window;
             // after calling android_app_exec_cmd it will be set to NULL.
         case APP_CMD_TERM_WINDOW:
-            if(window_data != 0x0) {
+            if (window_data != NULL) {
                 window_data->is_active = false;
             }
             ANativeWindow_setBuffersGeometry(app->window,
@@ -282,7 +282,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
 
             // The app's activity is being destroyed, and waiting for the app thread to clean up and exit before proceeding.
         case APP_CMD_DESTROY:
-            if(window_data != 0x0) {
+            if (window_data != NULL) {
                 window_data->close = true;
             }
             break;
@@ -308,7 +308,7 @@ android_main(struct android_app* app) {
     int ident;
     int events;
     struct android_poll_source* source;
-    while(app->window == 0x0) {
+    while(app->window == NULL) {
         while ((ident = ALooper_pollAll(0, NULL, &events, (void **) &source)) >= 0) {
             // Process this event.
             if (source != NULL) {
@@ -339,15 +339,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     kUnused(flags);
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
-    if (window_data == 0x0) {
-        return 0x0;
+    if (window_data == NULL) {
+        return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Android *window_data_android = malloc(sizeof(SWindowData_Android));
-    if(window_data_android == 0x0) {
+    if (window_data_android == NULL) {
         free(window_data);
-        return 0x0;
+        return NULL;
     }
     memset(window_data_android, 0, sizeof(SWindowData_Android));
     window_data->specific = window_data_android;
@@ -361,7 +361,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->buffer_stride = width * 4;
 
     gApplication->userData = window_data;
-    if(gApplication->window != 0x0) {
+    if (gApplication->window != NULL) {
         window_data->window_width  = ANativeWindow_getWidth(gApplication->window);
         window_data->window_height = ANativeWindow_getHeight(gApplication->window);
     }
@@ -373,7 +373,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    if (window == 0x0) {
+    if (window == NULL) {
         return STATE_INVALID_WINDOW;
     }
 
@@ -383,7 +383,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_EXIT;
     }
 
-    if (buffer == 0x0) {
+    if (buffer == NULL) {
         return STATE_INVALID_BUFFER;
     }
 
@@ -412,7 +412,7 @@ extern double   g_time_for_frame;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if (window == 0x0) {
+    if (window == NULL) {
         return false;
     }
 
@@ -464,10 +464,10 @@ void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     kUnused(window);
 
-    if(scale_x != 0x0) {
+    if (scale_x != NULL) {
         *scale_x = 1.0f;
     }
-    if(scale_y != 0x0) {
+    if (scale_y != NULL) {
         *scale_y = 1.0f;
     }
 }
@@ -475,16 +475,16 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 //-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-    if(window == 0x0) {
+    if (window == NULL) {
         return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
 
-    if(offset_x + width > window_data->window_width) {
+    if (offset_x + width > window_data->window_width) {
         return false;
     }
-    if(offset_y + height > window_data->window_height) {
+    if (offset_y + height > window_data->window_height) {
         return false;
     }
 

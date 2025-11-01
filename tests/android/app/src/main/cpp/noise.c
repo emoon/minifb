@@ -28,7 +28,7 @@ typedef struct {
 
 static uint32_t  g_width  = 200;
 static uint32_t  g_height = 100;
-static uint32_t *g_buffer = 0x0;
+static uint32_t *g_buffer = NULL;
 static Pos      g_positions[16] = {};
 
 void
@@ -89,7 +89,7 @@ main(int argc, char *argv[]) {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open("Ignored", g_width, g_height);
-    if(window == 0x0)
+    if (window == NULL)
         return 0;
 
     mfb_set_active_callback(window, active);
@@ -148,7 +148,7 @@ main(int argc, char *argv[]) {
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != STATE_OK) {
-            window = 0x0;
+            window = NULL;
             break;
         }
     } while(mfb_wait_sync(window));}

@@ -16,7 +16,7 @@ extern void     mfb_timer_init(void);
 //-------------------------------------
 void
 mfb_set_target_fps(uint32_t fps) {
-    if(fps <= 0) {
+    if (fps <= 0) {
         g_time_for_frame  = 0;
     }
     else {
@@ -44,7 +44,7 @@ mfb_timer_create() {
     static int  once = 1;   // Not thread safe
     mfb_timer   *tmr;
 
-    if(once) {
+    if (once) {
         once = 0;
         mfb_timer_init();
     }
@@ -59,7 +59,7 @@ mfb_timer_create() {
 //-------------------------------------
 void
 mfb_timer_destroy(struct mfb_timer *tmr) {
-    if(tmr != 0x0) {
+    if (tmr != NULL) {
         free(tmr);
     }
 }
@@ -68,7 +68,7 @@ mfb_timer_destroy(struct mfb_timer *tmr) {
 //-------------------------------------
 void
 mfb_timer_reset(struct mfb_timer *tmr) {
-    if(tmr == 0x0)
+    if (tmr == NULL)
         return;
 
     tmr->start_ticks       = mfb_timer_tick();
@@ -82,7 +82,7 @@ double
 mfb_timer_now(struct mfb_timer *tmr) {
     uint64_t    current_ticks;
 
-    if(tmr == 0x0)
+    if (tmr == NULL)
         return 0.0;
 
     current_ticks           = mfb_timer_tick();
@@ -99,7 +99,7 @@ mfb_timer_delta(struct mfb_timer *tmr) {
     int64_t     current_ticks;
     uint64_t    delta_ticks;
 
-    if(tmr == 0x0)
+    if (tmr == NULL)
         return 0.0;
 
     current_ticks         = mfb_timer_tick();
@@ -151,7 +151,7 @@ mfb_timer_compensated_reset(struct mfb_timer *tmr) {
         return;
     }
 
-    if(tmr == 0x0) {
+    if (tmr == NULL) {
         return;
     }
 

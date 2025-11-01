@@ -17,7 +17,7 @@ mfb_stub::GetInstance(struct mfb_window *window) {
 
         mfb_stub *Get(struct mfb_window *window) {
             for(mfb_stub *instance : instances) {
-                if(instance->m_window == window) {
+                if (instance->m_window == window) {
                     return instance;
                 }
             }

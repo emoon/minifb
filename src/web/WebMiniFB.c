@@ -195,42 +195,42 @@ EM_EXPORT void *window_data_get_specific(SWindowData *windowData) {
 }
 
 EM_EXPORT void window_data_call_active_func(SWindowData *windowData, bool is_active) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->active_func) windowData->active_func((struct mfb_window*)windowData, is_active);
 }
 
 EM_EXPORT void window_data_call_resize_func(SWindowData *windowData, int width, int height) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->resize_func) windowData->resize_func((struct mfb_window*)windowData, width, height);
 }
 
 EM_EXPORT void window_data_call_close_func(SWindowData *windowData) {
-    if (windowData == 0x0) return;
-    if(windowData->close_func) windowData->close_func((struct mfb_window*)windowData);
+    if (windowData == NULL) return;
+    if (windowData->close_func) windowData->close_func((struct mfb_window*)windowData);
 }
 
 EM_EXPORT void window_data_call_keyboard_func(SWindowData *windowData, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->keyboard_func) windowData->keyboard_func((struct mfb_window*)windowData, key, mod, is_pressed);
 }
 
 EM_EXPORT void window_data_call_char_input_func(SWindowData *windowData, unsigned int code) {
-    if (windowData == 0x0) return;
-    if(windowData->char_input_func) windowData->char_input_func((struct mfb_window*)windowData, code);
+    if (windowData == NULL) return;
+    if (windowData->char_input_func) windowData->char_input_func((struct mfb_window*)windowData, code);
 }
 
 EM_EXPORT void window_data_call_mouse_btn_func(SWindowData *windowData, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->mouse_btn_func) windowData->mouse_btn_func((struct mfb_window*)windowData, button, mod, is_pressed);
 }
 
 EM_EXPORT void window_data_call_mouse_move_func(SWindowData *windowData, int x, int y) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->mouse_move_func) windowData->mouse_move_func((struct mfb_window*)windowData, x, y);
 }
 
 EM_EXPORT void window_data_call_mouse_wheel_func(SWindowData *windowData, mfb_key_mod mod, float x, float y) {
-    if (windowData == 0x0) return;
+    if (windowData == NULL) return;
     if (windowData->mouse_wheel_func) windowData->mouse_wheel_func((struct mfb_window*)windowData, mod, x, y);
 }
 
@@ -415,16 +415,16 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned heigh
     SWindowData *window_data;
 
     window_data = malloc(sizeof(SWindowData));
-    if(window_data == 0x0) {
+    if (window_data == NULL) {
         printf("Cannot allocate window data\n");
-        return 0x0;
+        return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     void *specific = mfb_open_ex_js(window_data, title, width, height, 0);
     if (!specific) {
         printf("Cannot allocate JavaScript window data\n");
-        return 0x0;
+        return NULL;
     }
     window_data->specific = specific;
 
@@ -480,7 +480,7 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * windowData), {
 });
 
 mfb_update_state mfb_update_events(struct mfb_window *window) {
-    if (window == 0x0) return STATE_INVALID_WINDOW;
+    if (window == NULL) return STATE_INVALID_WINDOW;
     return mfb_update_events_js((SWindowData *)window);
 }
 

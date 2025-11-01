@@ -261,9 +261,9 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
   SWindowData *window_data;
 
   window_data = malloc(sizeof(SWindowData));
-  if (window_data == 0x0) {
+  if (window_data == NULL) {
     printf("Cannot allocate window data\n");
-    return 0x0;
+    return NULL;
   }
   memset(window_data, 0, sizeof(SWindowData));
   window_data->window_width = width;
@@ -274,7 +274,7 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
   SWindowData_DOS *specific = malloc(sizeof(SWindowData_DOS));
   if (!specific) {
     printf("Cannot allocate DOS window data\n");
-    return 0x0;
+    return NULL;
   }
   specific->actual_width = actual_width;
   specific->actual_height = actual_height;

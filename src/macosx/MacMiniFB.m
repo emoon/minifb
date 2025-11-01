@@ -16,7 +16,10 @@
 #include <MiniFB_enums.h>
 
 //-------------------------------------
-void init_keycodes();
+void     init_keycodes();
+uint32_t translate_mod();
+mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
+void     destroy_window_data(SWindowData *window_data);
 
 //-------------------------------------
 SWindowData *
@@ -180,53 +183,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 }
 
 //-------------------------------------
-static void
-destroy_window_data(SWindowData *window_data) {
-    if (window_data == NULL)
-        return;
-
-    @autoreleasepool {
-        SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
-        if (window_data_specific != NULL) {
-            OSXWindow   *window = window_data_specific->window;
-            [window performClose:nil];
-
-            // Flush events!
-            NSEvent* event;
-            do {
-                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-                if (event) {
-                    [NSApp sendEvent:event];
-                }
-            } while (event);
-            [window removeWindowData];
-
-            mfb_timer_destroy(window_data_specific->timer);
-
-            memset(window_data_specific, 0, sizeof(SWindowData_OSX));
-            free(window_data_specific);
-        }
-
-#if defined(USE_METAL_API)
-        if (window_data->draw_buffer != NULL) {
-            free(window_data->draw_buffer);
-            window_data->draw_buffer = NULL;
-        }
-#endif
-
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
-    }
-}
-
-//-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    if (window == NULL) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
         return STATE_INVALID_WINDOW;
     }
 
-    SWindowData *window_data = (SWindowData *) window;
+    // Early exit
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -237,6 +201,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (window_data_specific ==  NULL) {
+        return STATE_INVALID_WINDOW;
+    }
 
 #if defined(USE_METAL_API)
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
@@ -274,11 +241,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    if (window == NULL) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
         return STATE_INVALID_WINDOW;
     }
-
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
         destroy_window_data(window_data);
         return STATE_EXIT;
@@ -301,13 +267,13 @@ mfb_update_events(struct mfb_window *window) {
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
 
+//-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if (window == NULL) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
         return false;
     }
-
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
         destroy_window_data(window_data);
         return false;
@@ -363,13 +329,54 @@ mfb_wait_sync(struct mfb_window *window) {
 }
 
 //-------------------------------------
+void
+destroy_window_data(SWindowData *window_data) {
+    if (window_data == NULL)
+        return;
+
+    @autoreleasepool {
+        SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
+        if (window_data_specific != NULL) {
+            OSXWindow   *window = window_data_specific->window;
+            [window performClose:nil];
+
+            // Flush events!
+            NSEvent* event;
+            do {
+                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+                }
+            } while (event);
+            [window removeWindowData];
+
+            mfb_timer_destroy(window_data_specific->timer);
+
+            memset(window_data_specific, 0, sizeof(SWindowData_OSX));
+            free(window_data_specific);
+        }
+
+#if defined(USE_METAL_API)
+        if (window_data->draw_buffer != NULL) {
+            free(window_data->draw_buffer);
+            window_data->draw_buffer = NULL;
+        }
+#endif
+
+        memset(window_data, 0, sizeof(SWindowData));
+        free(window_data);
+    }
+}
+
+//-------------------------------------
 extern short int g_keycodes[512];
 
+//-------------------------------------
 void
 init_keycodes() {
-    // Clear keys
-    for (unsigned int i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
-        g_keycodes[i] = 0;
+    if ((g_keycodes[0x1D] == KB_KEY_0) && (g_keycodes[0x12] = KB_KEY_1)) {
+        return;
+    }
 
     g_keycodes[0x1D] = KB_KEY_0;
     g_keycodes[0x12] = KB_KEY_1;
@@ -488,9 +495,55 @@ init_keycodes() {
 }
 
 //-------------------------------------
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
+        return false;
+    }
+
+    if (offset_x + width > window_data->window_width) {
+        return false;
+    }
+    if (offset_y + height > window_data->window_height) {
+        return false;
+    }
+
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
+
+#if defined(USE_METAL_API)
+    float x1 =  ((float) offset_x           / window_data->window_width)  * 2.0f - 1.0f;
+    float x2 = (((float) offset_x + width)  / window_data->window_width)  * 2.0f - 1.0f;
+    float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
+    float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
+
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+
+    window_data_specific->metal.vertices[0].x = x1;
+    window_data_specific->metal.vertices[0].y = y1;
+
+    window_data_specific->metal.vertices[1].x = x1;
+    window_data_specific->metal.vertices[1].y = y2;
+
+    window_data_specific->metal.vertices[2].x = x2;
+    window_data_specific->metal.vertices[2].y = y1;
+
+    window_data_specific->metal.vertices[3].x = x2;
+    window_data_specific->metal.vertices[3].y = y2;
+#endif
+
+    return true;
+}
+
+//-------------------------------------
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
+//-------------------------------------
 uint64_t
 mfb_timer_tick() {
     static mach_timebase_info_data_t    timebase = { 0 };

@@ -68,7 +68,7 @@ process_event(SWindowData *window_data, XEvent *event) {
             window_data->key_status[key_code] = is_pressed;
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
 
-            if(event->type == KeyPress) {
+            if (event->type == KeyPress) {
                 KeySym keysym;
                 XLookupString(&event->xkey, NULL, 0, &keysym, NULL);
 
@@ -160,7 +160,7 @@ process_event(SWindowData *window_data, XEvent *event) {
             resize_GL(window_data);
 #else
             SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
-            if(window_data_specific->image_scaler != NULL) {
+            if (window_data_specific->image_scaler != NULL) {
                 window_data_specific->image_scaler->data = NULL;
                 XDestroyImage(window_data_specific->image_scaler);
                 window_data_specific->image_scaler        = NULL;
@@ -381,7 +381,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     XSetWMProtocols(window_data_specific->display, window_data_specific->window, &s_delete_window_atom, 1);
 
 #if defined(USE_OPENGL_API)
-    if(create_GL_context(window_data) == false) {
+    if (create_GL_context(window_data) == false) {
         return NULL;
     }
 
@@ -415,10 +415,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    if (window == NULL) {
-        return STATE_INVALID_WINDOW;
-    }
-
     SWindowData *window_data = (SWindowData *) window;
     if (window_data ==  NULL) {
         return STATE_INVALID_WINDOW;
@@ -445,7 +441,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     bool different_size = false;
 #endif
 
-    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+    if (window_data->buffer_width != width || window_data->buffer_height != height) {
         window_data->buffer_width  = width;
         window_data->buffer_stride = width * 4;
         window_data->buffer_height = height;
@@ -468,7 +464,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             }
             int depth = DefaultDepth(display, window_data_specific->screen);
             window_data_specific->image_buffer = malloc(window_data->dst_width * window_data->dst_height * 4);
-            if(window_data_specific->image_buffer == NULL) {
+            if (window_data_specific->image_buffer == NULL) {
                 return STATE_INTERNAL_ERROR;
             }
             window_data_specific->image_scaler_width  = window_data->dst_width;
@@ -507,10 +503,6 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    if (window == NULL) {
-        return STATE_INVALID_WINDOW;
-    }
-
     SWindowData *window_data = (SWindowData *) window;
     if (window_data ==  NULL) {
         return STATE_INVALID_WINDOW;
@@ -546,11 +538,10 @@ extern bool     g_use_hardware_sync;
 //-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if (window == NULL) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
         return false;
     }
-
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
         destroy_window_data(window_data);
         return false;
@@ -911,7 +902,7 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
     SWindowData *window_data = (SWindowData *) window;
 
-    if(window_data == NULL) {
+    if (window_data == NULL) {
         return false;
     }
 
@@ -936,7 +927,7 @@ void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 96.0, y = 96.0;
 
-    if(window != NULL) {
+    if (window != NULL) {
         //SWindowData     *window_data     = (SWindowData *) window;
         //SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
@@ -949,7 +940,7 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 
     if (scale_x) {
         *scale_x = x / 96.0f;
-        if(*scale_x == 0) {
+        if (*scale_x == 0) {
             *scale_x = 1.0f;
         }
     }

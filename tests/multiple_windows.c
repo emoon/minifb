@@ -4,99 +4,105 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+//-------------------------------------
 #define kPI             3.14159265358979323846f
 #define kUnused(var)    (void) var;
 
+//-------------------------------------
 #define WIDTH_A      800
 #define HEIGHT_A     600
 static unsigned int g_buffer_a[WIDTH_A * HEIGHT_A];
 
+//-------------------------------------
 #define WIDTH_B      320
 #define HEIGHT_B     240
 static unsigned int g_buffer_b[WIDTH_B * HEIGHT_B];
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void 
+//-------------------------------------
+void
 active(struct mfb_window *window, bool isActive) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > active: %d\n", window_title, isActive);
 }
 
-void 
+//-------------------------------------
+void
 resize(struct mfb_window *window, int width, int height) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
     fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
 }
 
-void 
+//-------------------------------------
+void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
-    if(key == KB_KEY_ESCAPE) {
+    if (key == KB_KEY_ESCAPE) {
         mfb_close(window);
-    }    
+    }
 }
 
-void 
+//-------------------------------------
+void
 char_input(struct mfb_window *window, unsigned int charCode) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
 }
 
-void 
+//-------------------------------------
+void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]\n", window_title, button, isPressed, mod);
 }
 
-void 
+//-------------------------------------
+void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
     // const char *window_title = "";
-    // if(window) {
+    // if (window) {
     //     window_t(const char *) itle = mfb_get_user_data(window);
     // }
     //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
 }
 
-void 
+void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
     const char *window_title = "";
-    if(window) {
+    if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, deltaX, deltaY, mod);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-int 
-main()
-{
+//-------------------------------------
+int
+main() {
     int noise, carry, seed = 0xbeef;
 
     struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, WF_RESIZABLE);
-    if (!window_a)
+    if (!window_a) {
         return 0;
+    }
 
     mfb_set_active_callback(window_a, active);
     mfb_set_resize_callback(window_a, resize);
@@ -111,8 +117,9 @@ main()
 
     //--
     struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
-    if (!window_b)
+    if (!window_b) {
         return 0;
+    }
 
     mfb_set_active_callback(window_b, active);
     mfb_set_resize_callback(window_b, resize);
@@ -143,17 +150,15 @@ main()
 
     //--
     float   time = 0;
-    for (;;)
-    {
+    for (;;) {
         int      i, x, y;
         float    dx, dy, time_x, time_y;
         int      index;
-        
+
         mfb_update_state state_a, state_b;
 
-        if(window_a != 0x0) {
-            for (i = 0; i < WIDTH_A * HEIGHT_A; ++i)
-            {
+        if (window_a != NULL) {
+            for (i = 0; i < WIDTH_A * HEIGHT_A; ++i){
                 noise = seed;
                 noise >>= 3;
                 noise ^= seed;
@@ -168,12 +173,12 @@ main()
             //--
             state_a = mfb_update(window_a, g_buffer_a);
             if (state_a != STATE_OK) {
-                window_a = 0x0;
+                window_a = NULL;
             }
         }
 
         //--
-        if(window_b != 0x0) {
+        if (window_b != NULL) {
             time_x = sinf(time * kPI / 180.0f);
             time_y = cosf(time * kPI / 180.0f);
             i = 0;
@@ -191,23 +196,23 @@ main()
             //--
             state_b = mfb_update(window_b, g_buffer_b);
             if (state_b != STATE_OK) {
-                window_b = 0x0;
+                window_b = NULL;
             }
         }
 
-        if(window_a == 0x0 && window_b == 0x0) {
+        if (window_a == NULL && window_b == NULL) {
             break;
         }
 
         // Don't need to do this for both windows in the same thread
-        if(window_a != 0x0) {
-            if(mfb_wait_sync(window_a) == false) {
-                window_a = 0x0;
+        if (window_a != NULL) {
+            if (mfb_wait_sync(window_a) == false) {
+                window_a = NULL;
             }
         }
-        else if(window_b != 0x0) {
-            if(mfb_wait_sync(window_b) == false) {
-                window_b = 0x0;
+        else if (window_b != NULL) {
+            if (mfb_wait_sync(window_b) == false) {
+                window_b = NULL;
             }
         }
     }

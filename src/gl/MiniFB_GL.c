@@ -27,9 +27,9 @@ extern bool     g_use_hardware_sync;
 //-------------------------------------
 static bool
 CheckGLExtension(const char *name) {
-    static const char *extensions = 0x0;
+    static const char *extensions = NULL;
 
-    if (extensions == 0x0) {
+    if (extensions == NULL) {
 #if defined(_WIN32) || defined(WIN32)
         // TODO: This is deprecated on OpenGL 3+.
         // Use glGetIntegerv(GL_NUM_EXTENSIONS, &n) and glGetStringi(GL_EXTENSIONS, index)
@@ -41,12 +41,12 @@ CheckGLExtension(const char *name) {
 #endif
     }
 
-    if (extensions != 0x0) {
+    if (extensions != NULL) {
         const char *start = extensions;
         const char *end, *where;
         while(1) {
             where = strstr(start, name);
-            if(where == 0x0)
+            if (where == NULL)
                 return false;
 
             end = where + strlen(name);
@@ -105,8 +105,8 @@ setup_pixel_format(HDC hDC) {
 
 typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC)(int);
 typedef int (WINAPI * PFNWGLGETSWAPINTERVALEXTPROC)(void);
-PFNWGLSWAPINTERVALEXTPROC       SwapIntervalEXT    = 0x0;
-PFNWGLGETSWAPINTERVALEXTPROC    GetSwapIntervalEXT = 0x0;
+PFNWGLSWAPINTERVALEXTPROC       SwapIntervalEXT    = NULL;
+PFNWGLGETSWAPINTERVALEXTPROC    GetSwapIntervalEXT = NULL;
 
 #elif defined(linux)
 
@@ -139,7 +139,7 @@ setup_pixel_format(SWindowData_X11 *window_data_x11) {
 }
 
 typedef void (*PFNGLXSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);
-PFNGLXSWAPINTERVALEXTPROC   SwapIntervalEXT = 0x0;
+PFNGLXSWAPINTERVALEXTPROC   SwapIntervalEXT = NULL;
 
 #endif
 
@@ -370,9 +370,9 @@ set_target_fps_aux() {
 
 #if defined(_WIN32) || defined(WIN32)
 
-    if (SwapIntervalEXT != 0x0) {
+    if (SwapIntervalEXT != NULL) {
         bool success = SwapIntervalEXT(interval);
-        if (GetSwapIntervalEXT != 0x0) {
+        if (GetSwapIntervalEXT != NULL) {
             int currentInterval = GetSwapIntervalEXT();
             if (interval != currentInterval) {
                 fprintf(stderr, "Cannot set target swap interval.\n");
@@ -391,7 +391,7 @@ set_target_fps_aux() {
     #define kGLX_SWAP_INTERVAL_EXT               0x20F1
     #define kGLX_MAX_SWAP_INTERVAL_EXT           0x20F2
 
-    if (SwapIntervalEXT != 0x0) {
+    if (SwapIntervalEXT != NULL) {
         Display         *dpy     = glXGetCurrentDisplay();
         GLXDrawable     drawable = glXGetCurrentDrawable();
         unsigned int    currentInterval, maxInterval;
