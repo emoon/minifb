@@ -32,31 +32,31 @@ do {
 
 Note that, by default, if ESC key is pressed **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
 
-See https://github.com/emoon/minifb/blob/master/tests/noise.c for a complete example.
+See <https://github.com/emoon/minifb/blob/master/tests/noise.c> for a complete example.
 
-# Supported Platforms:
+**Supported Platforms**:
 
- - Windows
- - MacOS X
- - X11 (FreeBSD, Linux, *nix)
- - Wayland (Linux) [there are some issues]
- - iOS (beta)
- - Android (beta)
- - Web (WASM) (beta)
- - DOS (DJGPP) (beta)
+- Windows
+- MacOS X
+- X11 (FreeBSD, Linux, *nix)
+- Wayland (Linux) [there are some issues]
+- iOS (beta)
+- Android (beta)
+- Web (WASM) (beta)
+- DOS (DJGPP) (beta)
 
 MiniFB has been tested on Windows, Mac OS X, Linux, iOS, Android, web, and DOSBox-x but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
 
-# Features:
+**Features**:
 
- - Window creation
- - Callbacks to window events
- - Get information from windows
- - Add per window data
- - Timers and target FPS
- - C and C++ interface
+- Window creation
+- Callbacks to window events
+- Get information from windows
+- Add per window data
+- Timers and target FPS
+- C and C++ interface
 
-## Callbacks to window events:
+## Callbacks to window events
 
 You can _add callbacks to the windows_:
 
@@ -126,7 +126,7 @@ int main(int argc, char argv[]) {
 }
 ```
 
-### C++ event interface:
+### C++ event interface
 
 If you are using C++ you can set the callbacks to a class, or use lambda expressions:
 
@@ -225,7 +225,7 @@ Note that if you have several windows running on the same thread it makes no sen
 
 .
 
-# Build instructions
+## Build instructions
 
 The current build system is **CMake**.
 
@@ -233,7 +233,7 @@ Initially MiniFB used tundra [https://github.com/deplinenoise/tundra](https://gi
 
 In any case, not many changes should be needed if you want to use MiniFB directly in your own code.
 
-## MacOS X
+### MacOS X
 
 Cocoa and clang is assumed to be installed on the system (downloading latest XCode + installing the command line tools should do the trick).
 
@@ -242,7 +242,7 @@ To enable it just compile defining the preprocessor macro USE_METAL_API.
 
 If you use **CMake** just enable the flag:
 
-```
+```sh
 mkdir build
 cd build
 cmake .. -DUSE_METAL_API=ON
@@ -250,40 +250,40 @@ cmake .. -DUSE_METAL_API=ON
 
 or if you don't want to use Metal API:
 
-```
+```sh
 mkdir build
 cd build
 cmake .. -DUSE_METAL_API=OFF
 ```
 
-### Coordinate system
+#### Coordinate system
 
 On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
 
 In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
 
-```
+```sh
 mkdir build
 cd build
 cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
 ```
 
-_Note: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y_
+**Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
 
 if you use **tundra**:
 
-```
+```sh
 tundra2 macosx-clang-debug
 ```
 
 and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
 
-## iOS (beta)
+### iOS (beta)
 
 It works with and without an UIWindow created.
 If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
 
-**Issues:**
+**Issues**:
 
 - It seems that you have to manually set 'tvOS Deployment Target' to less than 13.
 - It seems that you have to manually set 'Launch Screen File' in project > executable > general to be able to get the real device height.
@@ -291,7 +291,7 @@ If you want to create the UIWindow through an Story Board, remember to set the U
 - No multitouch is available yet.
 - As this version uses Metal API it cannot be run in the emulator.
 
-**Functions:**
+**Functions**:
 
 Some of the MiniFB functions don't make sense on mobile.
 The available functions for iOS are:
@@ -341,7 +341,7 @@ double              mfb_timer_get_resolution(void);
 
 For now, no multitouch is available.
 
-**Example:**
+**Example**:
 
 ```objective-c
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -382,19 +382,19 @@ For now, no multitouch is available.
 }
 ```
 
-**CMake**
+**CMake**:
 
-```
+```sh
 mkdir build
 cd build
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
 ```
 
-## Android (beta)
+### Android (beta)
 
 Take a look at the example in tests/android. You need **Android Studio** to build and run it.
 
-**Functions:**
+**Functions**:
 
 Some of the MiniFB functions don't make sense on mobile.
 The available functions for Android are:
@@ -440,7 +440,7 @@ double              mfb_timer_get_frequency(void);
 double              mfb_timer_get_resolution(void);
 ```
 
-## Windows
+### Windows
 
 If you use **CMake** the Visual Studio project will be generated (2015, 2017 and 2019 have been tested).
 
@@ -450,31 +450,31 @@ if you use **tundra**:
 
 Visual Studio (ver 2012 express has been tested) tools needed (using the vcvars32.bat (for 32-bit) will set up the enviroment) to build run:
 
-```bash
+```sh
 tundra2 win32-msvc-debug
 ```
 
 and you should be able to run noise in t2-output/win32-msvc-debug-default/noise.exe
 
-### OpenGL API backend
+#### OpenGL API backend (Windows)
 
 Now, by default, OpenGL backend is used, instead of Windows GDI, because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
-```bash
+```sh
 cmake .. -DUSE_OPENGL_API=ON
 # or
 cmake .. -DUSE_OPENGL_API=OFF
 ```
 
-## X11 (FreeBSD, Linux, *nix)
+### X11 (FreeBSD, Linux, *nix)
 
 gcc and x11-dev libs needs to be installed.
 
 If you use **CMake** just disable the flag:
 
-```bash
+```sh
 mkdir build
 cd build
 cmake .. -DUSE_WAYLAND_API=OFF
@@ -484,62 +484,83 @@ If you use **tundra**:
 
 To build the code run:
 
-```bash
+```sh
 tundra2 x11-gcc-debug
 ```
 
 and you should be able to run t2-output/x11-gcc-debug-default/noise
 
-### OpenGL API backend
+#### OpenGL API backend (X11)
 
 Now, by default, OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
-```bash
+```sh
 cmake .. -DUSE_OPENGL_API=ON -DUSE_WAYLAND_API=OFF
 # or
 cmake .. -DUSE_OPENGL_API=OFF -DUSE_WAYLAND_API=OFF
 ```
 
-## Wayland (Linux)
+### Wayland (Linux)
 
 Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
 
+**Wayland Protocol Compatibility**:
+
+Different Linux distributions and versions may ship with different versions of Wayland and its protocols. MiniFB includes pre-generated protocol headers and code that work with most common setups. However, if you encounter compatibility issues or want to ensure optimal compatibility with your specific Wayland version, you can regenerate the protocol files using your system's Wayland version.
+
+To regenerate Wayland protocol files for your system:
+
+```sh
+# First, ensure you have the required packages installed:
+# - Ubuntu/Debian: sudo apt install libwayland-dev wayland-protocols
+# - Fedora: sudo dnf install wayland-devel wayland-protocols-devel
+# - Arch: sudo pacman -S wayland wayland-protocols
+# - openSUSE: sudo zypper install wayland-devel wayland-protocols-devel
+
+# Then run the protocol generation script:
+./scripts/generate-protocols.sh
+```
+
+This script will generate protocol headers and code that are specifically compatible with your installed Wayland version, potentially resolving any version mismatch issues.
+
 If you use **CMake** just enable the flag:
 
-```bash
+```sh
 mkdir build
 cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
 
-## Web (WASM)
+### Web (WASM)
+
 Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.
 
-### Building and running the examples
+#### Building and running the examples (WASM)
 
-```bash
+```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build
 cmake --build build
 ```
 
-> *Note*: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+> **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
 
 Then open the file `build/index.html` in your browser to view the example index.
 
 The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
 
-```
+```sh
 python3 -m http.server build/
 ```
 
 You can then open the index at [http://localhost:8000](http://localhost:8000) in your browser.
 
-### Integrating a MiniFB app in a website
+#### Integrating a MiniFB app in a website
+
 To build an executable target for the web, you need to add a linker option specifying its module name, e.g.:
 
-```
+```cmake
 target_link_options(my_app PRIVATE "-sEXPORT_NAME=my_app")
 ```
 
@@ -592,16 +613,17 @@ Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.h
 </html>
 ```
 
-### Limitations & caveats
+#### Limitations & caveats
+
 The web backend currently does not support the following MiniFB features:
 
-* The flags to `mfb_open_ex()` are ignored
-* `mfb_set_viewport()` (no-op)
-* `mfb_set_viewport_best_fit()` (no-op)
-* `mfb_get_monitor_dpi()` (reports a fixed value)
-* `mfb_get_monitor_scale()` (reports a fixed value)
-* `mfb_set_target_fps()` (no-op)
-* `mfb_get_target_fps()` (no-op)
+- The flags to `mfb_open_ex()` are ignored
+- `mfb_set_viewport()` (no-op)
+- `mfb_set_viewport_best_fit()` (no-op)
+- `mfb_get_monitor_dpi()` (reports a fixed value)
+- `mfb_get_monitor_scale()` (reports a fixed value)
+- `mfb_set_target_fps()` (no-op)
+- `mfb_get_target_fps()` (no-op)
 
 Everything else is supported.
 
@@ -609,7 +631,7 @@ When calling `mfb_open()` or `mfb_open_ex()`, the specified title must match the
 
 Setting the CSS width and height of the canvas allows you to up-scale the framebuffer arbitrarily:
 
-```
+```js
 // Request a 320x240 window
 mfb_open("my_app", 320, 240);
 
@@ -619,16 +641,16 @@ mfb_open("my_app", 320, 240);
 
 If not already set, the backend will also set a handfull of CSS styles on the canvas that are good defaults for pixel graphics.
 
-* `image-rendering: pixelated`
-* `user-select: none`
-* `border: none`
-* `outline-style: none`;
+- `image-rendering: pixelated`
+- `user-select: none`
+- `border: none`
+- `outline-style: none`;
 
-# How to add it to your project
+## How to add it to your project
 
 First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
 
-```bash
+```sh
 git submodule add https://github.com/emoon/minifb.git dependencies/minifb
 ```
 
@@ -645,40 +667,42 @@ target_link_libraries(${PROJECT_NAME}
 
 Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
 
-## DOS (DJGPP)
+### DOS (DJGPP)
+
 Use the `tests/dos/tools/download-dos-tools.sh` file to download all the tools needed to compile, run and debug MiniFB DOS applications. The Bash script will download the following tools:
 
-* [DJGPP](https://www.delorie.com/djgpp/), a GCC fork targeting 32-bit protected mode DOS.
-* [GDB 7.1a](https://github.com/badlogic/gdb-7.1a), a GDB fork that can remotely debug 32-bit COFF executables via TCP, running in e.g. DOSBox-x, VirtualBox, or a real machine.
-* [DOSBox-x](https://github.com/badlogic/dosbox-x/), a fork of the popular DOS emulator with some modifications to enable remote debugging via GDB.
+- [DJGPP](https://www.delorie.com/djgpp/), a GCC fork targeting 32-bit protected mode DOS.
+- [GDB 7.1a](https://github.com/badlogic/gdb-7.1a), a GDB fork that can remotely debug 32-bit COFF executables via TCP, running in e.g. DOSBox-x, VirtualBox, or a real machine.
+- [DOSBox-x](https://github.com/badlogic/dosbox-x/), a fork of the popular DOS emulator with some modifications to enable remote debugging via GDB.
 
 The tools are downloaded to the `tests/dos/tools/` folder. The folder also contains a DOSBox-x configuration file `dosbox-x.conf` preconfigured for debugging. The `toolchain-djgpp.cmake` file is a CMake toolchain file for DJGPP.
 
 You can optionally run the script with the argument `--with-vs-code`. If you have [Visual Studio Code](https://code.visualstudio.com/) installed, the script will install extensions needed for C/C++ development and debugging, and create a `.vscode` folder in the repository root containing launch configurations, tasks, and various other settings for DOS development in VS Code.
 
-### Building and running the examples
+#### Building and running the examples (DOS)
 
-```bash
+```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=./tests/dos/tools/toolchain-djgpp.cmake -S . -B build
 cmake --build build
 ```
 
-> *Note*: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+> **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
 
 This will generate DOS 32-bit `.exe` files in the `build/` folder which you can run with DOSBox-x like this:
 
-```
+```sh
 ./tests/dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tests/dos/tools/dosbox-x.conf build/<executable-file>
 ```
 
 Note that the DOS backend can not support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
 
-### Compiling your own MiniFB app for DOS
+#### Compiling your own MiniFB app for DOS
+
 Copy the folder `tests/dos/` from the MiniFB repository to your project and run the `dos/tools/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
 
 Then, when configuring your CMake build, specify the DJGPP toolchain file:
 
-```
+```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=./dos/tools/toolchain-djgpp.cmake ... rest of your configure parameters ...
 ```
 
@@ -686,7 +710,8 @@ The build will then generate DOS 32-bit protected mode executables and use the M
 
 Running the executbales in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
 
-### Debugging your MiniFB app in DOSBox-x
+#### Debugging your MiniFB app in DOSBox-x
+
 The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`tests/dos/gdbstub.h`](tests/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `dos/tools/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
 
 ```c
@@ -709,7 +734,7 @@ Configure your CMake build with `-DCMAKE_BUILD_TYPE=Debug` to generate debug bin
 
 Run your application with the downloaded DOSBox-x:
 
-```
+```sh
 ./dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./dos/tools/dosbox-x.conf path/to/your/executable.exe
 ```
 
@@ -717,7 +742,7 @@ DOSBox-x will start up, your application will wait for GDB to connect (`gdb_star
 
 Run GDB, load the debugging information from the executable and connect to your app running and waiting in DOSBox-x:
 
-```
+```sh
 ./dos/tools/gdb/gdb
 (gdb) file path/to/your/executable.exe
 (gdb) target remote localhost:5123
@@ -731,19 +756,19 @@ Alternatively, you can use VS Code to debug via a graphical user interface. Run 
 
 You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
 
-### Limitations and caveats
+#### Limitations and caveats
+
 The DOS backend currently does not support the following MiniFB features:
 
-* The flags to `mfb_open_ex()` are ignored
-* `mfb_set_viewport()` (no-op)
-* `mfb_set_viewport_best_fit()` (no-op)
-* `mfb_get_monitor_dpi()` (reports a fixed value)
-* `mfb_get_monitor_scale()` (reports a fixed value)
-* `mfb_set_target_fps()` (no-op)
-* `mfb_get_target_fps()` (no-op)
-* Multiple windows are not support
-* A window is always full-screen
-* The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
-* Keyboard handling is limited to the keys found [here](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
-* Character input is limited to ASCII based on a US keyboard layout.
-
+- The flags to `mfb_open_ex()` are ignored
+- `mfb_set_viewport()` (no-op)
+- `mfb_set_viewport_best_fit()` (no-op)
+- `mfb_get_monitor_dpi()` (reports a fixed value)
+- `mfb_get_monitor_scale()` (reports a fixed value)
+- `mfb_set_target_fps()` (no-op)
+- `mfb_get_target_fps()` (no-op)
+- Multiple windows are not support
+- A window is always full-screen
+- The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
+- Keyboard handling is limited to the keys found [here](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
+- Character input is limited to ASCII based on a US keyboard layout.

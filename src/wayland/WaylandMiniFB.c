@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <poll.h>
+#include <sched.h>
+#include <errno.h>
 
 #include <linux/limits.h>
 #include <linux/input.h>
@@ -51,26 +54,56 @@ destroy(SWindowData *window_data)
         return;
     }
 
+    // Destroy XDG objects with correct functions
+    if (window_data_way->toplevel) {
+        xdg_toplevel_destroy(window_data_way->toplevel);
+        window_data_way->toplevel = 0x0;
+    }
+    if (window_data_way->shell_surface) {
+        xdg_surface_destroy(window_data_way->shell_surface);
+        window_data_way->shell_surface = 0x0;
+    }
+    if (window_data_way->shell) {
+        xdg_wm_base_destroy(window_data_way->shell);
+        window_data_way->shell = 0x0;
+    }
+    if (window_data_way->surface) {
+        wl_surface_destroy(window_data_way->surface);
+        window_data_way->surface = 0x0;
+    }
+
+    // Restore KILL macro for remaining Wayland objects
 #define KILL(NAME)                                      \
     do                                                  \
     {                                                   \
         if (window_data_way->NAME)                      \
             wl_##NAME##_destroy(window_data_way->NAME); \
-    } while (0);                                        \
-    window_data_way->NAME = 0x0;
+        window_data_way->NAME = 0x0;                    \
+    } while (0)
 
-    KILL(shell_surface);
-    KILL(shell);
-    KILL(surface);
     //KILL(buffer);
     if(window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = 0x0;
     }
+    // Clean up cursor objects
+    if (window_data_way->cursor_surface) {
+        wl_surface_destroy(window_data_way->cursor_surface);
+        window_data_way->cursor_surface = 0x0;
+    }
+    if (window_data_way->cursor_theme) {
+        wl_cursor_theme_destroy(window_data_way->cursor_theme);
+        window_data_way->cursor_theme = 0x0;
+    }
+
     KILL(shm_pool);
     KILL(shm);
     KILL(compositor);
     KILL(keyboard);
+    if (window_data_way->pointer) {
+        wl_pointer_destroy(window_data_way->pointer);
+        window_data_way->pointer = 0x0;
+    }
     KILL(seat);
     KILL(registry);
 #undef KILL
@@ -508,16 +541,16 @@ wl_shm_listener shm_listener = {
 static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
 {
-    kUnused(version);
-
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (strcmp(iface, "wl_compositor") == 0)
     {
+        // Use version 1 for compositor (stable)
         window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
     }
     else if (strcmp(iface, "wl_shm") == 0)
     {
+        // Use version 1 for shm (stable)
         window_data_way->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
         if (window_data_way->shm) {
             wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
@@ -527,13 +560,16 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
     else if (strcmp(iface, "xdg_wm_base") == 0)
     {
-        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, 6);
+        // Use minimum of compositor version and our supported version (6)
+        uint32_t use_version = version < 6 ? version : 6;
+        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
         if (window_data_way->shell) {
             xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, 0x0);
         }
     }
     else if (strcmp(iface, "wl_seat") == 0)
     {
+        // Use version 1 for seat (stable)
         window_data_way->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
         if (window_data_way->seat)
         {
@@ -551,8 +587,20 @@ wl_registry_listener registry_listener = {
 static void
 handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial)
 {
-    kUnused(data);
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+
     xdg_surface_ack_configure(shell_surface, serial);
+
+    // On first configure, attach buffer and commit
+    if (!window_data->is_initialized) {
+        wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer,
+                         window_data->dst_offset_x, window_data->dst_offset_y);
+        wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y,
+                         window_data->dst_width, window_data->dst_height);
+        wl_surface_commit(window_data_way->surface);
+        window_data->is_initialized = true;
+    }
 }
 
 static const struct xdg_surface_listener shell_surface_listener = {
@@ -596,6 +644,7 @@ handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, s
 static const struct xdg_toplevel_listener toplevel_listener = {
     handle_toplevel_configure,
     handle_toplevel_close,
+    // In recent versions, these fields have disappeared
     handle_toplevel_configure_bounds,
     handle_toplevel_wm_capabilities
 };
@@ -688,7 +737,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         if (!window_data_way->shell_surface)
             goto out;
 
-        xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, 0x0);
+        xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, window_data);
 
         window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
         if (!window_data_way->toplevel)
@@ -696,11 +745,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
         xdg_toplevel_set_title(window_data_way->toplevel, title);
         xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, 0x0);
-    }
 
-    wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
-    wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
-    wl_surface_commit(window_data_way->surface);
+        // Commit without a buffer to trigger initial configure event
+        wl_surface_commit(window_data_way->surface);
+
+        // Process events until we get the configure event and the surface is mapped
+        while (!window_data->is_initialized) {
+            if (wl_display_dispatch(window_data_way->display) == -1) {
+                goto out;
+            }
+        }
+    }
 
     window_data_way->timer = mfb_timer_create();
 
@@ -709,8 +764,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 #if defined(_DEBUG) || defined(DEBUG)
     printf("Window created using Wayland API\n");
 #endif
-
-    window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
 
 out:
@@ -848,6 +901,98 @@ extern double   g_time_for_frame;
 
 bool
 mfb_wait_sync(struct mfb_window *window) {
+    if (window == NULL) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data->close) {
+        destroy(window_data);
+        return false;
+    }
+
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL) {
+        return false;
+    }
+
+    struct wl_display *display = window_data_specific->display;
+    const int fd = wl_display_get_fd(display);
+
+    // Flush outgoing requests and dispatch pending events once before pacing
+    wl_display_flush(display);
+    if (wl_display_dispatch_pending(display) == -1) {
+        return false;
+    }
+
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return false;
+    }
+
+    // Software pacing: Wait only the remaining time; wake on input
+    for (;;) {
+        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        if (elapsed_time >= g_time_for_frame)
+            break;
+
+        double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
+
+        // Leave ~1 ms margin to avoid oversleep
+        if (remaining_ms > 1.5) {
+            int timeout_ms = (int) (remaining_ms - 1.0);
+            if (timeout_ms < 0)
+                timeout_ms = 0;
+
+            // Wayland read/dispatch pattern with poll
+            int prepared = wl_display_prepare_read(display);
+            if (prepared == 0) {
+                wl_display_flush(display);
+
+                struct pollfd pfd;
+                pfd.fd = fd;
+                pfd.events = POLLIN;
+                pfd.revents = 0;
+
+                int rc;
+                do {
+                    rc = poll(&pfd, 1, timeout_ms);
+                } while (rc < 0 && errno == EINTR);
+
+                if (rc > 0) {
+                    if (wl_display_read_events(display) == -1) {
+                        return false;
+                    }
+                } else {
+                    wl_display_cancel_read(display);
+                }
+            } else {
+                // Could not prepare read because there are pending events
+                if (wl_display_dispatch_pending(display) == -1) {
+                    return false;
+                }
+            }
+        }
+        else {
+            sched_yield(); // or nanosleep((const struct timespec){0,0}, NULL);
+        }
+
+        if (wl_display_dispatch_pending(display) == -1) {
+            return false;
+        }
+
+        if (window_data->close) {
+            destroy_window_data(window_data);
+            return false;
+        }
+    }
+
+    mfb_timer_compensated_reset(window_data_specific->timer);
+    return true;
+}
+
+bool
+mfb_wait_sync2(struct mfb_window *window) {
     if(window == 0x0) {
         return false;
     }
