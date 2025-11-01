@@ -30,6 +30,7 @@ static Atom s_delete_window_atom;
 
 //-------------------------------------
 void init_keycodes(SWindowData_X11 *window_data_x11);
+Cursor create_blank_cursor(Display *display, Window window);
 
 extern void
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
@@ -207,6 +208,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_x11->gc = DefaultGC(window_data_x11->display, window_data_x11->screen);
 
     window_data_x11->timer = mfb_timer_create();
+
+	window_data->is_cursor_visible = true;
+	window_data_x11->invis_cursor = create_blank_cursor(window_data_x11->display, window_data_x11->window);
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
@@ -601,28 +605,30 @@ mfb_wait_sync(struct mfb_window *window) {
 //-------------------------------------
 void
 destroy_window_data(SWindowData *window_data)  {
-    if (window_data != NULL) {
-        if (window_data->specific != NULL) {
-            SWindowData_X11   *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    if (window_data == NULL)
+        return;
+
+    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+
+    if (window_data_x11 != NULL) {
+		XFreeCursor(window_data_x11->display, window_data_x11->invis_cursor);
 
 #if defined(USE_OPENGL_API)
-            destroy_GL_context(window_data);
+        destroy_GL_context(window_data);
 #else
-            if (window_data_x11->image != NULL) {
-                window_data_x11->image->data = NULL;
-                XDestroyImage(window_data_x11->image);
-                XDestroyWindow(window_data_x11->display, window_data_x11->window);
-                XCloseDisplay(window_data_x11->display);
-            }
+        if (window_data_x11->image != NULL) {
+            window_data_x11->image->data = NULL;
+            XDestroyImage(window_data_x11->image);
+            XDestroyWindow(window_data_x11->display, window_data_x11->window);
+            XCloseDisplay(window_data_x11->display);
+        }
 #endif
 
-            mfb_timer_destroy(window_data_x11->timer);
-            memset(window_data_x11, 0, sizeof(SWindowData_X11));
-            free(window_data_x11);
-        }
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
+        mfb_timer_destroy(window_data_x11->timer);
+        free(window_data_x11);
     }
+
+    free(window_data);
 }
 
 //-------------------------------------
@@ -941,4 +947,42 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
             *scale_y = 1.0f;
         }
     }
+}
+
+//-------------------------------------
+Cursor
+create_blank_cursor(Display *display, Window window) {
+	static char data[1] = {0};
+	Pixmap pixmap = XCreateBitmapFromData(display, window, data, 1, 1);
+
+	XColor dummy;
+	Cursor invis_cursor =  XCreatePixmapCursor(display, pixmap, pixmap, &dummy, &dummy, 0, 0);
+	XFreePixmap(display, pixmap);
+	
+	return invis_cursor;
+}
+
+//-------------------------------------
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+	SWindowData *window_data = (SWindowData *) window;
+	if (window_data == NULL)
+		return;
+	SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+	if (window_data_x11 == NULL)
+		return;
+
+	if (window_data->is_cursor_visible == show)
+		return;
+
+	window_data->is_cursor_visible = show;
+	
+	// stupid. very stupid. really stupid.
+	// could be way better if i wasn't too stubborn to use xfixes
+
+	if (show) {
+		XDefineCursor(window_data_x11->display, window_data_x11->window, None);
+	} else {
+		XDefineCursor(window_data_x11->display, window_data_x11->window, window_data_x11->invis_cursor);
+	}
 }
