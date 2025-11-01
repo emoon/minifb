@@ -1,7 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #if defined(USE_METAL_API)
-#include <Carbon/Carbon.h>
-#include <MetalKit/MetalKit.h>
+    #include <Carbon/Carbon.h>
+    #include <MetalKit/MetalKit.h>
 #endif
 #include <unistd.h>
 #include <sched.h>
@@ -17,8 +17,7 @@
 
 //-------------------------------------
 void     init_keycodes();
-uint32_t translate_mod();
-mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
+
 void     destroy_window_data(SWindowData *window_data);
 
 //-------------------------------------
@@ -540,6 +539,36 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 }
 
 //-------------------------------------
+void
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
+    float scale = 1.0f;
+
+    if (window != NULL) {
+        SWindowData     *window_data     = (SWindowData *) window;
+        SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+
+        scale = [window_data_specific->window backingScaleFactor];
+    }
+    else {
+        scale = [[NSScreen mainScreen] backingScaleFactor];
+    }
+
+    if (scale_x) {
+        *scale_x = scale;
+        if (*scale_x == 0) {
+            *scale_x = 1;
+        }
+    }
+
+    if (scale_y) {
+        *scale_y = scale;
+        if (*scale_y == 0) {
+            *scale_y = 1;
+        }
+    }
+}
+
+//-------------------------------------
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
@@ -570,34 +599,4 @@ void
 mfb_timer_init() {
     g_timer_frequency  = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
-}
-
-//-------------------------------------
-void
-mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float scale = 1.0f;
-
-    if (window != NULL) {
-        SWindowData     *window_data     = (SWindowData *) window;
-        SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
-
-        scale = [window_data_specific->window backingScaleFactor];
-    }
-    else {
-        scale = [[NSScreen mainScreen] backingScaleFactor];
-    }
-
-    if (scale_x) {
-        *scale_x = scale;
-        if (*scale_x == 0) {
-            *scale_x = 1;
-        }
-    }
-
-    if (scale_y) {
-        *scale_y = scale;
-        if (*scale_y == 0) {
-            *scale_y = 1;
-        }
-    }
 }
