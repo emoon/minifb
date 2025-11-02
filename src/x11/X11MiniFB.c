@@ -400,7 +400,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->timer = mfb_timer_create();
 
     window_data->is_cursor_visible = true;
-    window_data_x11->invis_cursor = create_blank_cursor(window_data_x11->display, window_data_x11->window);
+    window_data_specific->invis_cursor = create_blank_cursor(window_data_specific->display, window_data_specific->window);
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
@@ -628,7 +628,7 @@ destroy_window_data(SWindowData *window_data)  {
 #endif
 
             mfb_timer_destroy(window_data_specific->timer);
-            XFreeCursor(window_data_x11->display, window_data_x11->invis_cursor);
+            XFreeCursor(window_data_specific->display, window_data_specific->invis_cursor);
 
             memset(window_data_specific, 0, sizeof(SWindowData_X11));
             free(window_data_specific);
@@ -978,8 +978,8 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL)
         return;
-    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-    if (window_data_x11 == NULL)
+    SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+    if (window_data_specific == NULL)
         return;
 
     if (window_data->is_cursor_visible == show)
@@ -991,8 +991,8 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     // could be way better if i wasn't too stubborn to use xfixes
 
     if (show) {
-        XDefineCursor(window_data_x11->display, window_data_x11->window, None);
+        XDefineCursor(window_data_specific->display, window_data_specific->window, None);
     } else {
-        XDefineCursor(window_data_x11->display, window_data_x11->window, window_data_x11->invis_cursor);
+        XDefineCursor(window_data_specific->display, window_data_specific->window, window_data_specific->invis_cursor);
     }
 }
