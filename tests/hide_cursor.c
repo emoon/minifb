@@ -23,11 +23,15 @@ resize(struct mfb_window *window, int width, int height) {
 
 void
 keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
-	if (key == KB_KEY_H) {
-		mfb_show_cursor(window, false);
-	} else if (key == KB_KEY_S) {
-		mfb_show_cursor(window, true);
-	}
+    if (key == KB_KEY_H) {
+        mfb_show_cursor(window, false);
+    }
+    else if (key == KB_KEY_S) {
+        mfb_show_cursor(window, true);
+    }
+    else if (key == KB_KEY_ESCAPE) {
+        mfb_close(window);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

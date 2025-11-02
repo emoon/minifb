@@ -21,7 +21,7 @@ typedef struct {
 
 #if defined(USE_METAL_API)
     struct {
-        Vertex                      vertices[4];
+        Vertex          vertices[4];
     } metal;
 #endif
 } SWindowData_OSX;

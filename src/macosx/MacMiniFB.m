@@ -600,3 +600,24 @@ mfb_timer_init() {
     g_timer_frequency  = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
+
+//-------------------------------------
+void mfb_show_cursor(struct mfb_window *window, bool show) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
+        return;
+    }
+
+    @autoreleasepool {
+        if (window_data->is_cursor_visible != show) {
+            window_data->is_cursor_visible = show;
+
+            // Update cursor rects on the window so we can use a per-window
+            // invisible cursor instead of hiding the global cursor.
+            SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
+            if (window_data_osx && window_data_osx->window) {
+                [window_data_osx->window performSelectorOnMainThread:@selector(updateCursorRects) withObject:nil waitUntilDone:YES];
+            }
+        }
+    }
+}
