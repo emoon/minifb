@@ -199,12 +199,51 @@
 - (void)mouseExited:(NSEvent *)event {
     (void)event;
     //printf("mouse exit\n");
+    // On mouse exit, refresh cursor rects so the window-specific cursor state is applied.
+    if (window_data != 0x0 && window_data->is_cursor_visible == false) {
+        OSXWindow *window = (OSXWindow *)[self window];
+        if (window) {
+            [window updateCursorRects];
+        }
+    }
 }
 
 //-------------------------------------
 - (void)mouseEntered:(NSEvent *)event {
     (void)event;
     //printf("mouse enter\n");
+    // On mouse enter, refresh cursor rects so the window-specific cursor state is applied.
+    if (window_data != 0x0 && window_data->is_cursor_visible == false) {
+        OSXWindow *window = (OSXWindow *)[self window];
+        if (window) {
+            [window updateCursorRects];
+        }
+    }
+}
+
+// Ensure the view provides per-window cursor control by installing a cursor rect
+// for the whole view. When the view requests cursor hiding for its window this
+// will use an invisible cursor instead of hiding the global cursor.
+- (void)resetCursorRects {
+    [super resetCursorRects];
+
+    static NSCursor *invisibleCursor = nil;
+    if (invisibleCursor == nil) {
+        NSImage *img = [[NSImage alloc] initWithSize:NSMakeSize(16, 16)];
+        [img lockFocus];
+        [[NSColor clearColor] set];
+        NSRectFill(NSMakeRect(0, 0, 16, 16));
+        [img unlockFocus];
+
+        invisibleCursor = [[NSCursor alloc] initWithImage:img hotSpot:NSMakePoint(0,0)];
+        [img release];
+    }
+
+    if (window_data != 0x0 && window_data->is_cursor_visible == false) {
+        [self addCursorRect:[self bounds] cursor:invisibleCursor];
+    } else {
+        [self addCursorRect:[self bounds] cursor:[NSCursor arrowCursor]];
+    }
 }
 
 //-------------------------------------

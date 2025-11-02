@@ -34,7 +34,7 @@ typedef struct {
     uint32_t                buffer_width;
     uint32_t                buffer_height;
     uint32_t                buffer_stride;
-    
+
     int32_t                 mouse_pos_x;
     int32_t                 mouse_pos_y;
     float                   mouse_wheel_x;
@@ -43,7 +43,7 @@ typedef struct {
     uint8_t                 key_status[512];
     uint32_t                mod_keys;
 
-    bool					is_cursor_visible;
+    bool                    is_cursor_visible;
     bool                    is_active;
     bool                    is_initialized;
 

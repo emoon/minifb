@@ -307,4 +307,17 @@
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)updateCursorRects {
+    // The frame view is the superview of the childContentView.
+    OSXView *frameView = (OSXView *) self->childContentView.superview;
+    if (frameView) {
+        // Ask the window to invalidate the cursor rects for that view. The system
+        // will call -resetCursorRects on the view, where we install the proper
+        // per-window cursor.
+        [self invalidateCursorRectsForView:frameView];
+    }
+}
+
 @end
