@@ -351,6 +351,10 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     tme.dwFlags = TME_LEAVE;
                     tme.hwndTrack = hWnd;
                     TrackMouseEvent(&tme);
+
+                    if (window_data->is_cursor_visible == false) {
+                        ShowCursor(FALSE);
+                    }
                 }
                 window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
                 window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
@@ -362,6 +366,11 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             if (window_data) {
                 window_data_specific->mouse_inside = false;
             }
+
+            if (window_data->is_cursor_visible == false) {
+                ShowCursor(TRUE);
+            }
+
             break;
 
         case WM_SIZE:
@@ -457,6 +466,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
+
+    window_data->is_cursor_visible = true;
 
     g_window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
     if (flags & WF_FULLSCREEN) {
@@ -1043,3 +1054,21 @@ mfb_timer_tick() {
 
     return counter;
 }
+
+//-------------------------------------
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL)
+        return;
+
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL)
+        return;
+
+    if ((window_data_specific->mouse_inside) && (window_data->is_cursor_visible != show)) {
+        ShowCursor((BOOL) show);
+    }
+
+    window_data->is_cursor_visible = show;
+}    

@@ -296,14 +296,20 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
 
-    image  = window_data_way->default_cursor->images[0];
-    buffer = wl_cursor_image_get_buffer(image);
+    if (window_data->is_cursor_visible) {
+        image  = window_data_way->default_cursor->images[0];
+        buffer = wl_cursor_image_get_buffer(image);
 
-    wl_pointer_set_cursor(pointer, serial, window_data_way->cursor_surface, image->hotspot_x, image->hotspot_y);
-    wl_surface_attach(window_data_way->cursor_surface, buffer, 0, 0);
-    wl_surface_damage(window_data_way->cursor_surface, 0, 0, image->width, image->height);
-    wl_surface_commit(window_data_way->cursor_surface);
-    //fprintf(stderr, "Pointer entered surface %p at %d %d\n", surface, sx, sy);
+        wl_pointer_set_cursor(pointer, serial, window_data_way->cursor_surface, image->hotspot_x, image->hotspot_y);
+        wl_surface_attach(window_data_way->cursor_surface, buffer, 0, 0);
+        wl_surface_damage(window_data_way->cursor_surface, 0, 0, image->width, image->height);
+        wl_surface_commit(window_data_way->cursor_surface);
+    }
+    else {
+        wl_pointer_set_cursor(pointer, 0, NULL, 0, 0);
+    }
+
+    //fprintf(stderr, "Pointer entered surface %p at %d %d (serial: %d)\n", surface, sx, sy, serial);
 }
 
 // Notification that this seat's pointer is no longer focused on a certain surface.
@@ -320,7 +326,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     kUnused(serial);
     kUnused(surface);
 
-    //fprintf(stderr, "Pointer left surface %p\n", surface);
+    //fprintf(stderr, "Pointer left surface %p (serial: %d)\n", surface, serial);
 }
 
 // Notification of pointer location change.
@@ -336,11 +342,13 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
     kUnused(pointer);
     kUnused(time);
 
-    //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
     SWindowData *window_data = (SWindowData *) data;
+
     window_data->mouse_pos_x = wl_fixed_to_int(sx);
     window_data->mouse_pos_y = wl_fixed_to_int(sy);
     kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
+
+    //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
 }
 
 // Mouse button click and release notifications.
@@ -372,6 +380,8 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
     SWindowData *window_data = (SWindowData *) data;
     window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
+
+    fprintf(stderr, "Pointer button %x, state %x (serial: %d)\n", button, state, serial);
 }
 
 //  Scroll and other axis notifications.
@@ -730,6 +740,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     window_data->buffer_height = height;
     window_data->buffer_stride = width * sizeof(uint32_t);
     calc_dst_factor(window_data, width, height);
+
+    window_data->is_cursor_visible = true;
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
@@ -1226,4 +1238,49 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
             *scale_y = 1.0f;
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data == NULL) {
+        return;
+    }
+
+    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+    if (window_data_way == NULL) {
+        return;
+    }
+
+    struct wl_pointer *pointer = window_data_way->pointer;
+    struct wl_surface *cursor_surface = window_data_way->cursor_surface;
+    if (pointer == NULL) {
+        return;
+    }
+
+    uint32_t serial = 0;
+    if (show) {
+        struct wl_cursor *cursor = window_data_way->default_cursor;
+        if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
+            return;
+        }
+
+        struct wl_cursor_image *cursor_image = cursor->images[0];
+        struct wl_buffer *cursor_image_buffer = wl_cursor_image_get_buffer(cursor_image);
+        if (cursor_image_buffer == NULL) {
+            return;
+        }
+
+        wl_pointer_set_cursor(pointer, serial, cursor_surface, cursor_image->hotspot_x, cursor_image->hotspot_y);
+        wl_surface_attach(cursor_surface, cursor_image_buffer, 0, 0);
+        wl_surface_damage(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
+        wl_surface_commit(cursor_surface);
+    }
+    else {
+        wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
+    }
+
+    window_data->is_cursor_visible = show;
 }

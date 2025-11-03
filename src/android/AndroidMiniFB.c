@@ -353,6 +353,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->specific = window_data_android;
 
     window_data->is_active         = true;
+    window_data->is_cursor_visible = false;
+
     window_data_android->app       = gApplication;
     window_data_android->timer     = mfb_timer_create();
 
@@ -496,3 +498,10 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     return true;
 }
+
+//-------------------------------------
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    // window_data->is_cursor_visible is always false on android
+}
+
