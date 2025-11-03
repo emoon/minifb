@@ -326,8 +326,6 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     kUnused(serial);
     kUnused(surface);
 
-    SWindowData *window_data = (SWindowData *) data;
-
     //fprintf(stderr, "Pointer left surface %p (serial: %d)\n", surface, serial);
 }
 
@@ -742,6 +740,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     window_data->buffer_height = height;
     window_data->buffer_stride = width * sizeof(uint32_t);
     calc_dst_factor(window_data, width, height);
+
+    window_data->is_cursor_visible = true;
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
