@@ -227,13 +227,13 @@ Note that if you have several windows running on the same thread it makes no sen
 
 ### Hiding the cursor
 
-Yow can Show/Hide the mouse cursor while it hovers over your window.
+You can Show/Hide the mouse cursor while it hovers over your window.
 
 ```c
 void mfb_show_cursor(struct mfb_window *window, bool show);
 ```
 
-_Note: **AS OF RIGHT NOW** this is only implemented for Windows and X11_
+This is only available on Windows, MacOS, X11, and Wayland.
 
 ## Build instructions
 
@@ -335,6 +335,8 @@ const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // O
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 // [Deprecated] Use mfb_get_monitor_scale instead
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y)
+
+void                mfb_show_cursor(struct mfb_window *window, bool show);
 ```
 
 Timers are also available.
@@ -436,6 +438,8 @@ unsigned            mfb_get_window_height(struct mfb_window *window);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+
+void                mfb_show_cursor(struct mfb_window *window, bool show);
 ```
 
 Timers are also available.
@@ -634,6 +638,7 @@ The web backend currently does not support the following MiniFB features:
 - `mfb_get_monitor_scale()` (reports a fixed value)
 - `mfb_set_target_fps()` (no-op)
 - `mfb_get_target_fps()` (no-op)
+- `mfb_show_cursor()` (no-op)
 
 Everything else is supported.
 
@@ -777,6 +782,7 @@ The DOS backend currently does not support the following MiniFB features:
 - `mfb_get_monitor_scale()` (reports a fixed value)
 - `mfb_set_target_fps()` (no-op)
 - `mfb_get_target_fps()` (no-op)
+- `mfb_show_cursor()` (no-op)
 - Multiple windows are not support
 - A window is always full-screen
 - The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
