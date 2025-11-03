@@ -42,6 +42,8 @@ create_window_data(unsigned width, unsigned height) {
     window_data->buffer_height = height;
     window_data->buffer_stride = width * 4;
 
+    window_data->is_cursor_visible = false;
+
     window_data->draw_buffer   = malloc(width * height * 4);
     if (!window_data->draw_buffer) {
         free(window_data_ios);
@@ -270,3 +272,10 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
         }
     }
 }
+
+//-------------------------------------
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    // window_data->is_cursor_visible is always false on iOS
+}
+

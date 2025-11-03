@@ -438,6 +438,7 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned heigh
 
     window_data->is_active = true;
     window_data->is_initialized = true;
+    window_data->is_cursor_visible = true;
 
     return (struct mfb_window*)window_data;
 }
@@ -546,4 +547,9 @@ EM_JS(double, mfb_timer_tick_js, (), {
 uint64_t mfb_timer_tick(void) {
     uint64_t now = (uint64_t)(mfb_timer_tick_js() * 1e+6);
     return now;
+}
+
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    // window_data->is_cursor_visible is always true on web
 }

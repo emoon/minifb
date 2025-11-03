@@ -292,6 +292,7 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
 
   window_data->is_active = true;
   window_data->is_initialized = true;
+  window_data->is_cursor_visible = false;
 
   g_window = window_data;
 
@@ -531,3 +532,8 @@ void mfb_timer_init(void) {
 }
 
 uint64_t mfb_timer_tick(void) { return uclock(); }
+
+void
+mfb_show_cursor(struct mfb_window *window, bool show) {
+    // window_data->is_cursor_visible is always false on dos
+}
