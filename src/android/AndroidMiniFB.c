@@ -502,6 +502,6 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
-    // window_data->is_cursor_visible is always true on android
+    // window_data->is_cursor_visible is always false on android
 }
 
