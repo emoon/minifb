@@ -368,6 +368,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         window_data->window_height = ANativeWindow_getHeight(gApplication->window);
     }
 
+    // Initialize dst_* fields to match drawable area (same as buffer dimensions)
+    calc_dst_factor(window_data, width, height);
+
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
 }
@@ -504,4 +507,3 @@ void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     // window_data->is_cursor_visible is always false on android
 }
-
