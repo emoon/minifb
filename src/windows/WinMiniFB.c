@@ -220,9 +220,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 return 0; // Not handled
             }
 
-            SIZE *newSize = (SIZE *) lParam;
-            newSize->cx   = client_rect.right  - client_rect.left;
-            newSize->cy   = client_rect.bottom - client_rect.top;
+            SIZE *new_size = (SIZE *) lParam;
+            new_size->cx   = client_rect.right  - client_rect.left;
+            new_size->cy   = client_rect.bottom - client_rect.top;
 
             // Handled
             return 1;
@@ -251,7 +251,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT:
             if (window_data && window_data->draw_buffer && window_data_specific) {
                 StretchDIBits(window_data_specific->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
-                              window_data_specific->bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+                              window_data_specific->bitmap_info, DIB_RGB_COLORS, SRCCOPY);
             }
             ValidateRect(hWnd, NULL);
             break;
@@ -299,16 +299,16 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_CHAR:
         case WM_SYSCHAR:
-            static WCHAR highSurrogate = 0;
+            static WCHAR high_surrogate = 0;
             if (window_data) {
                 if (wParam >= 0xd800 && wParam <= 0xdbff) {
-                    highSurrogate = (WCHAR) wParam;
+                    high_surrogate = (WCHAR) wParam;
                 }
                 else {
                     unsigned int codepoint = 0;
                     if (wParam >= 0xdc00 && wParam <= 0xdfff) {
-                        if (highSurrogate != 0) {
-                            codepoint += (highSurrogate - 0xd800) << 10;
+                        if (high_surrogate != 0) {
+                            codepoint += (high_surrogate - 0xd800) << 10;
                             codepoint += (WCHAR) wParam - 0xdc00;
                             codepoint += 0x10000;
                         }
@@ -316,7 +316,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     else {
                         codepoint = (WCHAR) wParam;
                     }
-                    highSurrogate = 0;
+                    high_surrogate = 0;
                     kCall(char_input_func, codepoint);
                 }
             }
@@ -623,22 +623,22 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #if !defined(USE_OPENGL_API)
 
-    window_data_specific->bitmapInfo = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
-    if (window_data_specific->bitmapInfo == NULL) {
+    window_data_specific->bitmap_info = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
+    if (window_data_specific->bitmap_info == NULL) {
         free(window_data);
         free(window_data_specific);
         return NULL;
     }
 
-    window_data_specific->bitmapInfo->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    window_data_specific->bitmapInfo->bmiHeader.biPlanes      = 1;
-    window_data_specific->bitmapInfo->bmiHeader.biBitCount    = 32;
-    window_data_specific->bitmapInfo->bmiHeader.biCompression = BI_BITFIELDS;
-    window_data_specific->bitmapInfo->bmiHeader.biWidth       = window_data->buffer_width;
-    window_data_specific->bitmapInfo->bmiHeader.biHeight      = -(LONG)window_data->buffer_height;
-    window_data_specific->bitmapInfo->bmiColors[0].rgbRed     = 0xff;
-    window_data_specific->bitmapInfo->bmiColors[1].rgbGreen   = 0xff;
-    window_data_specific->bitmapInfo->bmiColors[2].rgbBlue    = 0xff;
+    window_data_specific->bitmap_info->bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    window_data_specific->bitmap_info->bmiHeader.biPlanes      = 1;
+    window_data_specific->bitmap_info->bmiHeader.biBitCount    = 32;
+    window_data_specific->bitmap_info->bmiHeader.biCompression = BI_BITFIELDS;
+    window_data_specific->bitmap_info->bmiHeader.biWidth       = window_data->buffer_width;
+    window_data_specific->bitmap_info->bmiHeader.biHeight      = -(LONG)window_data->buffer_height;
+    window_data_specific->bitmap_info->bmiColors[0].rgbRed     = 0xff;
+    window_data_specific->bitmap_info->bmiColors[1].rgbGreen   = 0xff;
+    window_data_specific->bitmap_info->bmiColors[2].rgbBlue    = 0xff;
 
 #else
 
@@ -692,8 +692,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 #if !defined(USE_OPENGL_API)
 
-    window_data_specific->bitmapInfo->bmiHeader.biWidth = window_data->buffer_width;
-    window_data_specific->bitmapInfo->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
+    window_data_specific->bitmap_info->bmiHeader.biWidth = window_data->buffer_width;
+    window_data_specific->bitmap_info->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
     InvalidateRect(window_data_specific->window, NULL, TRUE);
     SendMessage(window_data_specific->window, WM_PAINT, 0, 0);
 
@@ -819,9 +819,9 @@ destroy_window_data(SWindowData *window_data) {
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
 
 #if !defined(USE_OPENGL_API)
-    if (window_data_specific->bitmapInfo != NULL) {
-        free(window_data_specific->bitmapInfo);
-        window_data_specific->bitmapInfo = NULL;
+    if (window_data_specific->bitmap_info != NULL) {
+        free(window_data_specific->bitmap_info);
+        window_data_specific->bitmap_info = NULL;
     }
 #else
     destroy_GL_context(window_data);

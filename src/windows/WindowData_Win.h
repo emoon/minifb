@@ -12,7 +12,7 @@ typedef struct {
     HGLRC               hGLRC;
     uint32_t            text_id;
 #else
-    BITMAPINFO          *bitmapInfo;
+    BITMAPINFO          *bitmap_info;
 #endif
     struct mfb_timer    *timer;
     bool                mouse_inside;

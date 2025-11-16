@@ -111,7 +111,7 @@ PFNWGLGETSWAPINTERVALEXTPROC    GetSwapIntervalEXT = NULL;
 #elif defined(linux)
 
 bool
-setup_pixel_format(SWindowData_X11 *window_data_x11) {
+setup_pixel_format(SWindowData_X11 *window_data_specific) {
     GLint glxAttribs[] = {
         GLX_RGBA,
         GLX_DOUBLEBUFFER,
@@ -127,13 +127,13 @@ setup_pixel_format(SWindowData_X11 *window_data_x11) {
         None
     };
 
-    XVisualInfo* visualInfo = glXChooseVisual(window_data_x11->display, window_data_x11->screen, glxAttribs);
+    XVisualInfo* visualInfo = glXChooseVisual(window_data_specific->display, window_data_specific->screen, glxAttribs);
     if (visualInfo == 0) {
         fprintf(stderr, "Could not create correct visual window.\n");
-        XCloseDisplay(window_data_x11->display);
+        XCloseDisplay(window_data_specific->display);
         return false;
     }
-    window_data_x11->context = glXCreateContext(window_data_x11->display, visualInfo, NULL, GL_TRUE);
+    window_data_specific->context = glXCreateContext(window_data_specific->display, visualInfo, NULL, GL_TRUE);
 
     return true;
 }
@@ -147,13 +147,13 @@ PFNGLXSWAPINTERVALEXTPROC   SwapIntervalEXT = NULL;
 bool
 create_GL_context(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
 
-    if (setup_pixel_format(window_data_win->hdc) == false)
+    if (setup_pixel_format(window_data_specific->hdc) == false)
         return false;
 
-    window_data_win->hGLRC = wglCreateContext(window_data_win->hdc);
-    wglMakeCurrent(window_data_win->hdc, window_data_win->hGLRC);
+    window_data_specific->hGLRC = wglCreateContext(window_data_specific->hdc);
+    wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC);
     init_GL(window_data);
 
     SwapIntervalEXT    = (PFNWGLSWAPINTERVALEXTPROC)    wglGetProcAddress("wglSwapIntervalEXT");
@@ -163,23 +163,23 @@ create_GL_context(SWindowData *window_data) {
     return true;
 
 #elif defined(linux)
-    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
+    SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
     GLint majorGLX, minorGLX = 0;
-    glXQueryVersion(window_data_x11->display, &majorGLX, &minorGLX);
+    glXQueryVersion(window_data_specific->display, &majorGLX, &minorGLX);
     if (majorGLX <= 1 && minorGLX < 2) {
         fprintf(stderr, "GLX 1.2 or greater is required.\n");
-        XCloseDisplay(window_data_x11->display);
+        XCloseDisplay(window_data_specific->display);
         return false;
     }
     else {
         //fprintf(stdout, "GLX version: %d.%d\n", majorGLX, minorGLX);
     }
 
-    if (setup_pixel_format(window_data_x11) == false)
+    if (setup_pixel_format(window_data_specific) == false)
         return false;
 
-    glXMakeCurrent(window_data_x11->display, window_data_x11->window, window_data_x11->context);
+    glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context);
 
     //fprintf(stdout, "GL Vendor: %s\n", glGetString(GL_VENDOR));
     //fprintf(stdout, "GL Renderer: %s\n", glGetString(GL_RENDERER));
@@ -202,17 +202,17 @@ void
 destroy_GL_context(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
 
-    SWindowData_Win *window_data_win = (SWindowData_Win *) window_data->specific;
-    if (window_data_win->hGLRC) {
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific->hGLRC) {
         wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(window_data_win->hGLRC);
-        window_data_win->hGLRC = 0;
+        wglDeleteContext(window_data_specific->hGLRC);
+        window_data_specific->hGLRC = 0;
     }
 
 #elif defined(linux)
 
-    SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-    glXDestroyContext(window_data_x11->display, window_data_x11->context);
+    SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+    glXDestroyContext(window_data_specific->display, window_data_specific->context);
 
 #endif
 }
@@ -233,14 +233,13 @@ void
 init_GL(SWindowData *window_data) {
 #if defined(_WIN32) || defined(WIN32)
 
-    SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
 
 #elif defined(linux)
 
-    SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
+    SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
 #endif
-
 
     glViewport(0, 0, window_data->window_width, window_data->window_height);
 
@@ -256,9 +255,9 @@ init_GL(SWindowData *window_data) {
 
     glEnable(GL_TEXTURE_2D);
 
-    glGenTextures(1, &window_data_ex->text_id);
+    glGenTextures(1, &window_data_specific->text_id);
     //glActiveTexture(TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, window_data_ex->text_id);
+    glBindTexture(GL_TEXTURE_2D, window_data_specific->text_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -299,13 +298,13 @@ effective_resize_GL(SWindowData *window_data) {
 
     #if defined(_WIN32) || defined(WIN32)
 
-        SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
-        wglMakeCurrent(window_data_ex->hdc, window_data_ex->hGLRC);
+        SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+        wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC);
 
     #elif defined(linux)
 
-        SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
-        glXMakeCurrent(window_data_ex->display, window_data_ex->window, window_data_ex->context);
+        SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+        glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context);
 
     #endif
 
@@ -327,17 +326,17 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     }
 #if defined(_WIN32) || defined(WIN32)
 
-    SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     GLenum format = BGRA;
 
-    wglMakeCurrent(window_data_ex->hdc, window_data_ex->hGLRC);
+    wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC);
 
 #elif defined(linux)
 
-    SWindowData_X11 *window_data_ex = (SWindowData_X11 *) window_data->specific;
+    SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     GLenum format = BGRA;
 
-    glXMakeCurrent(window_data_ex->display, window_data_ex->window, window_data_ex->context);
+    glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context);
 
 #endif
 
@@ -364,7 +363,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 
     glClear(GL_COLOR_BUFFER_BIT);
 
-    UseCleanUp(glBindTexture(GL_TEXTURE_2D, window_data_ex->text_id));
+    UseCleanUp(glBindTexture(GL_TEXTURE_2D, window_data_specific->text_id));
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, window_data->buffer_width, window_data->buffer_height, 0, format, GL_UNSIGNED_BYTE, pixels);
     //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window_data->buffer_width, window_data->buffer_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
@@ -380,9 +379,9 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     UseCleanUp(glBindTexture(GL_TEXTURE_2D, 0));
 
 #if defined(_WIN32) || defined(WIN32)
-    SwapBuffers(window_data_ex->hdc);
+    SwapBuffers(window_data_specific->hdc);
 #elif defined(linux)
-    glXSwapBuffers(window_data_ex->display, window_data_ex->window);
+    glXSwapBuffers(window_data_specific->display, window_data_specific->window);
 #endif
 }
 
