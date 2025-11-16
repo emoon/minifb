@@ -168,6 +168,9 @@ unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
 
+// Key utilities
+const char *        mfb_get_key_name(mfb_key key);
+
 // Drawable area (considering viewport scaling/DPI)
 unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
 unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
@@ -201,6 +204,7 @@ Create and manage timers independently:
 struct mfb_timer *  mfb_timer_create(void);
 void                mfb_timer_destroy(struct mfb_timer *tmr);
 void                mfb_timer_reset(struct mfb_timer *tmr);
+void                mfb_timer_compensated_reset(struct mfb_timer *tmr);
 double              mfb_timer_now(struct mfb_timer *tmr);
 double              mfb_timer_delta(struct mfb_timer *tmr);
 double              mfb_timer_get_frequency(void);
@@ -297,6 +301,7 @@ sudo apt-get update
 sudo apt-get install -y \
     build-essential \
     cmake \
+    pkg-config \
     libx11-dev \
     libxkbcommon-dev \
     libgl1-mesa-dev
@@ -304,6 +309,7 @@ sudo apt-get install -y \
 
 - **build-essential**: Compiler toolchain (gcc, g++, make)
 - **cmake**: Build system
+- **pkg-config**: Helper tool for compiling applications and libraries
 - **libx11-dev**: X11 core libraries and headers
 - **libxkbcommon-dev**: Keyboard handling library
 - **libgl1-mesa-dev**: OpenGL libraries (required if using OpenGL backend, which is default)
@@ -312,9 +318,9 @@ If you prefer to use X11 without OpenGL (XImage rendering), you can omit `libgl1
 
 Equivalent packages for other distros:
 
-- Fedora: `gcc`, `cmake`, `libX11-devel`, `libxkbcommon-devel`, `mesa-libGL-devel`
-- Arch: `base-devel`, `cmake`, `libx11`, `libxkbcommon`, `mesa`
-- openSUSE: `gcc`, `cmake`, `libX11-devel`, `libxkbcommon-devel`, `Mesa-libGL-devel`
+- Fedora: `gcc`, `cmake`, `pkg-config`, `libX11-devel`, `libxkbcommon-devel`, `mesa-libGL-devel`
+- Arch: `base-devel`, `cmake`, `pkgconf`, `libx11`, `libxkbcommon`, `mesa`
+- openSUSE: `gcc`, `cmake`, `pkg-config`, `libX11-devel`, `libxkbcommon-devel`, `Mesa-libGL-devel`
 
 #### Building with CMake
 
@@ -361,6 +367,7 @@ sudo apt-get update
 sudo apt-get install -y \
     build-essential \
     cmake \
+    pkg-config \
     libwayland-dev \
     libxkbcommon-dev \
     wayland-protocols
@@ -368,15 +375,16 @@ sudo apt-get install -y \
 
 - **build-essential**: Compiler toolchain (gcc, g++, make)
 - **cmake**: Build system
+- **pkg-config**: Helper tool for compiling applications and libraries
 - **libwayland-dev**: Wayland client libraries and headers
 - **libxkbcommon-dev**: Keyboard handling library
 - **wayland-protocols**: Wayland protocol definitions
 
 Equivalent packages for other distros:
 
-- Fedora: `gcc`, `cmake`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
-- Arch: `base-devel`, `cmake`, `wayland`, `libxkbcommon`, `wayland-protocols`
-- openSUSE: `gcc`, `cmake`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
+- Fedora: `gcc`, `cmake`, `pkg-config`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
+- Arch: `base-devel`, `cmake`, `pkgconf`, `wayland`, `libxkbcommon`, `wayland-protocols`
+- openSUSE: `gcc`, `cmake`, `pkg-config`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
 
 #### Wayland Protocol Compatibility
 
@@ -457,64 +465,16 @@ If you want to create the UIWindow through an Story Board, remember to set the U
 - No multitouch is available yet.
 - As this version uses Metal API it cannot be run in the emulator.
 
-**Functions**:
+**Limitations**:
 
-Some of the MiniFB functions don't make sense on mobile.
-The available functions for iOS are:
+- No keyboard input callbacks (iOS handles touch events instead)
+- Single window only (flags to `mfb_open_ex()` are ignored)
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced to display refresh rate)
+- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
+- No multitouch support yet
+- Mouse events represent touch events (last touch position)
 
-```c
-struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
-struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
-
-mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
-
-void                mfb_close(struct mfb_window *window);
-
-void                mfb_set_user_data(struct mfb_window *window, void *user_data);
-void *              mfb_get_user_data(struct mfb_window *window);
-
-bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
-
-bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
-
-void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
-void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
-void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
-void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
-
-unsigned            mfb_get_window_width(struct mfb_window *window);
-unsigned            mfb_get_window_height(struct mfb_window *window);
-void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
-
-// Drawable area (considering viewport scaling/DPI)
-unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
-unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
-unsigned            mfb_get_drawable_width(struct mfb_window *window);
-unsigned            mfb_get_drawable_height(struct mfb_window *window);
-void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
-
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last touch pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last touch pos Y
-const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
-
-void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
-
-void                mfb_show_cursor(struct mfb_window *window, bool show);  // No-op on iOS
-```
-
-Timers are also available.
-
-```c
-struct mfb_timer *  mfb_timer_create(void);
-void                mfb_timer_destroy(struct mfb_timer *tmr);
-void                mfb_timer_reset(struct mfb_timer *tmr);
-double              mfb_timer_now(struct mfb_timer *tmr);
-double              mfb_timer_delta(struct mfb_timer *tmr);
-double              mfb_timer_get_frequency(void);
-double              mfb_timer_get_resolution(void);
-```
-
-For now, no multitouch is available.
+All other MiniFB functions work normally, including timers and user data management.
 
 **Example**:
 
@@ -569,55 +529,16 @@ cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
 
 Take a look at the example in tests/android. You need **Android Studio** to build and run it.
 
-**Functions**:
+**Limitations**:
 
-Some of the MiniFB functions don't make sense on mobile.
-The available functions for Android are:
+- No keyboard input callbacks (use char input callbacks instead)
+- Single window only (flags to `mfb_open_ex()` are ignored)
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
+- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
+- No multitouch support
+- Mouse events represent touch events (last touch position)
 
-```c
-struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
-struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
-
-mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
-
-void                mfb_close(struct mfb_window *window);
-
-void                mfb_set_user_data(struct mfb_window *window, void *user_data);
-void *              mfb_get_user_data(struct mfb_window *window);
-
-bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
-
-bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
-
-void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
-void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
-void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
-void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
-void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
-
-bool                mfb_is_window_active(struct mfb_window *window);
-unsigned            mfb_get_window_width(struct mfb_window *window);
-unsigned            mfb_get_window_height(struct mfb_window *window);
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
-const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
-
-void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
-
-void                mfb_show_cursor(struct mfb_window *window, bool show);  // No-op on Android
-```
-
-Timers are also available.
-
-```c
-struct mfb_timer *  mfb_timer_create(void);
-void                mfb_timer_destroy(struct mfb_timer *tmr);
-void                mfb_timer_reset(struct mfb_timer *tmr);
-double              mfb_timer_now(struct mfb_timer *tmr);
-double              mfb_timer_delta(struct mfb_timer *tmr);
-double              mfb_timer_get_frequency(void);
-double              mfb_timer_get_resolution(void);
-```
+All other MiniFB functions work normally, including timers, viewports, and user data management.
 
 ### Web (WASM)
 
@@ -692,11 +613,11 @@ Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.h
 </head>
 <body>
 <div>
-    <canvas id="Noise Test" style="background: #000;"></canvas>
+    <canvas id="my_app" style="background: #000;"></canvas>
 </div>
 <script>
     // Call the app's main() function
-    noise();
+    my_app();
 </script>
 </body>
 </html>
@@ -856,34 +777,31 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 |---------|---------|-------|-----------|---------|-----|---------|-----|-----|
 | Window creation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | mfb_update | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Keyboard input | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | Limited |
-| Mouse input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
+| Keyboard input | ✓ | ✓ | ✓ | ✓ | - | Limited | ✓ | Limited |
+| Mouse input | ✓ | ✓ | ✓ | ✓ | Touch | Touch | ✓ | - |
 | Multi-window | ✓ | ✓ | ✓ | ✓ | - | - | - | ✗ |
 | Viewport | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
-| Cursor hiding | ✓ | ✓ | ✓ | ✓ | - | ✓ | (no-op) | (no-op) |
+| Cursor hiding | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
 | Monitor DPI | ✓ | ✓ | Limited | Limited | ✓ | ✓ | Fixed | Fixed |
-| Target FPS | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
+| Target FPS | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
 
 ### iOS Limitations
 
-Some MiniFB functions don't make sense on mobile:
-
-- No keyboard input (use char input instead)
-- No mouse button callbacks (use touch events)
-- Single window only
-- Flags to `mfb_open_ex()` are ignored
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced)
+- No keyboard input callbacks (iOS handles touch events instead)
+- Mouse events represent touch events (last touch position)
+- Single window only (flags to `mfb_open_ex()` are ignored)
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced to display refresh rate)
+- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
 - No multitouch support yet
 
 ### Android Limitations
 
-Similar to iOS, certain features are unavailable:
-
-- No keyboard callbacks (char input available)
-- Single window only
-- Flags to `mfb_open_ex()` are ignored
+- No keyboard input callbacks (use char input callbacks instead)
+- Mouse events represent touch events (last touch position)
+- Single window only (flags to `mfb_open_ex()` are ignored)
 - `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
+- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
 - No multitouch support
 
 ### Web (WASM) Limitations
@@ -915,5 +833,5 @@ The DOS backend currently does not support the following MiniFB features:
 - Multiple windows are not support
 - A window is always full-screen
 - The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
-- Keyboard handling is limited to the keys found [here](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
+- Keyboard handling is limited to the keys found in [DOSMiniFB.c line 24](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
 - Character input is limited to ASCII based on a US keyboard layout.
