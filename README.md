@@ -37,9 +37,14 @@ See <https://github.com/emoon/minifb/blob/master/tests/noise.c> for a complete e
 **Supported Platforms**:
 
 - Windows
+  - GDI
+  - OpenGL
 - MacOS X
-- X11 (FreeBSD, Linux, *nix)
-- Wayland (Linux) [there are some issues]
+  - Cocoa
+  - Metal
+- Unix
+  - X11 (FreeBSD, Linux, *nix)
+  - Wayland (Linux) [there are some issues]
 - iOS (beta)
 - Android (beta)
 - Web (WASM) (beta)
@@ -166,6 +171,13 @@ bool                mfb_is_window_active(struct mfb_window *window);
 
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
+void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
+
+unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
+unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
+unsigned            mfb_get_drawable_width(struct mfb_window *window);
+unsigned            mfb_get_drawable_height(struct mfb_window *window);
+void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
 
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
@@ -484,7 +496,35 @@ cmake .. -DUSE_OPENGL_API=OFF
 
 ### X11 (FreeBSD, Linux, *nix)
 
-gcc and x11-dev libs needs to be installed.
+#### Dependencies for X11 on Ubuntu/Debian
+
+To compile MiniFB with X11 backend on Ubuntu/Debian, install the following packages:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    build-essential \
+    cmake \
+    libx11-dev \
+    libxkbcommon-dev \
+    libgl1-mesa-dev
+```
+
+- **build-essential**: Compiler toolchain (gcc, g++, make)
+- **cmake**: Build system
+- **libx11-dev**: X11 core libraries and headers
+- **libxkbcommon-dev**: Keyboard handling library
+- **libgl1-mesa-dev**: OpenGL libraries (required if using OpenGL backend, which is default)
+
+If you prefer to use X11 without OpenGL (XImage rendering), you can omit `libgl1-mesa-dev`.
+
+Equivalent packages for other distros:
+
+- Fedora: `gcc`, `cmake`, `libX11-devel`, `libxkbcommon-devel`, `mesa-libGL-devel`
+- Arch: `base-devel`, `cmake`, `libx11`, `libxkbcommon`, `mesa`
+- openSUSE: `gcc`, `cmake`, `libX11-devel`, `libxkbcommon-devel`, `Mesa-libGL-devel`
+
+#### Building with CMake
 
 If you use **CMake** just disable the flag:
 
@@ -520,20 +560,39 @@ cmake .. -DUSE_OPENGL_API=OFF -DUSE_WAYLAND_API=OFF
 
 Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
 
-**Wayland Protocol Compatibility**:
+#### Dependencies for Wayland on Ubuntu/Debian
+
+To compile MiniFB with Wayland backend on Ubuntu/Debian, install the following packages:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    build-essential \
+    cmake \
+    libwayland-dev \
+    libxkbcommon-dev \
+    wayland-protocols
+```
+
+- **build-essential**: Compiler toolchain (gcc, g++, make)
+- **cmake**: Build system
+- **libwayland-dev**: Wayland client libraries and headers
+- **libxkbcommon-dev**: Keyboard handling library
+- **wayland-protocols**: Wayland protocol definitions
+
+Equivalent packages for other distros:
+
+- Fedora: `gcc`, `cmake`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
+- Arch: `base-devel`, `cmake`, `wayland`, `libxkbcommon`, `wayland-protocols`
+- openSUSE: `gcc`, `cmake`, `wayland-devel`, `libxkbcommon-devel`, `wayland-protocols-devel`
+
+#### Wayland Protocol Compatibility
 
 Different Linux distributions and versions may ship with different versions of Wayland and its protocols. MiniFB includes pre-generated protocol headers and code that work with most common setups. However, if you encounter compatibility issues or want to ensure optimal compatibility with your specific Wayland version, you can regenerate the protocol files using your system's Wayland version.
 
-To regenerate Wayland protocol files for your system:
+To regenerate Wayland protocol files for your system you must run first the protocol generation script:
 
 ```sh
-# First, ensure you have the required packages installed:
-# - Ubuntu/Debian: sudo apt install libwayland-dev wayland-protocols
-# - Fedora: sudo dnf install wayland-devel wayland-protocols-devel
-# - Arch: sudo pacman -S wayland wayland-protocols
-# - openSUSE: sudo zypper install wayland-devel wayland-protocols-devel
-
-# Then run the protocol generation script:
 ./scripts/generate-protocols.sh
 ```
 
