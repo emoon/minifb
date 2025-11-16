@@ -2,6 +2,8 @@
 
 MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy to render (32-bit) pixels in a window.
 
+## Quick Start
+
 An example is the best way to show how it works:
 
 ```c
@@ -25,333 +27,175 @@ do {
 } while(mfb_wait_sync(window));
 ```
 
+### How it works
+
 1. First the application creates a **window** calling **mfb_open** or **mfb_open_ex**.
 2. Next it's the application responsibility to allocate a buffer to work with.
 3. Next calling **mfb_update** or **mfb_update_ex** the buffer will be copied over to the window and displayed. If this function return a value lower than 0 the window will have been destroyed internally and cannot be used anymore.
 4. Last the code waits to synchronize with the monitor calling **mfb_wait_sync**.
 
-Note that, by default, if ESC key is pressed **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
+**Note:** By default, if ESC key is pressed, **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
 
 See <https://github.com/emoon/minifb/blob/master/tests/noise.c> for a complete example.
 
-**Supported Platforms**:
+## Supported Platforms
 
-- Windows
-  - GDI
-  - OpenGL
-- MacOS X
-  - Cocoa
-  - Metal
-- Unix
-  - X11 (FreeBSD, Linux, *nix)
-  - Wayland (Linux) [there are some issues]
-- iOS (beta)
-- Android (beta)
-- Web (WASM) (beta)
-- DOS (DJGPP) (beta)
+| Platform | Backends | Status |
+|----------|----------|--------|
+| **Windows** | GDI, OpenGL | Fully supported |
+| **macOS** | Cocoa, Metal | Fully supported |
+| **Linux/Unix** | X11, Wayland | Fully supported (X11), Some issues (Wayland) |
+| **iOS** | Metal | Beta |
+| **Android** | Native | Beta |
+| **Web** | WASM | Beta |
+| **DOS** | DJGPP | Beta |
 
-MiniFB has been tested on Windows, Mac OS X, Linux, iOS, Android, web, and DOSBox-x but may of course have trouble depending on your setup. Currently the code will not do any converting of data if not a proper 32-bit display can be created.
+MiniFB has been tested on Windows, macOS, Linux, iOS, Android, web, and DOSBox-x. Compatibility may vary depending on your setup. Currently, the library does not perform any data conversion if a proper 32-bit display cannot be created.
 
-**Features**:
+## Features
 
-- Window creation
-- Callbacks to window events
-- Get information from windows
-- Add per window data
-- Timers and target FPS
-- C and C++ interface
+- ✓ Window creation and management
+- ✓ Event callbacks (keyboard, mouse, window lifecycle)
+- ✓ Direct window state queries
+- ✓ Per-window custom data
+- ✓ Built-in timers and FPS control
+- ✓ C and C++ interfaces
+- ✓ Cursor control
 
-## Callbacks to window events
+## API Reference
 
-You can _add callbacks to the windows_:
+### Window Management
+
+```c
+// Create and manage windows
+struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
+struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);
+void                mfb_close(struct mfb_window *window);
+
+// Update and synchronization
+mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+mfb_update_state    mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height);
+mfb_update_state    mfb_update_events(struct mfb_window *window);
+bool                mfb_wait_sync(struct mfb_window *window);
+
+// Viewport control
+bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
+```
+
+### Event Callbacks
+
+Register callbacks to handle window events:
+
+```c
+// Callback types
+void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
+void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
+void                mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback);
+void                mfb_set_char_input_callback(struct mfb_window *window, mfb_char_input_func callback);
+void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
+void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback);
+```
+
+#### Callback Signature Examples
 
 ```c
 void active(struct mfb_window *window, bool isActive) {
-    ...
+    // Called when window gains/loses focus
 }
 
 void resize(struct mfb_window *window, int width, int height) {
-    ...
-    // Optionally you can also change the viewport size
-    mfb_set_viewport(window, x, y, width, height);
-    // or let mfb caclculate the best fit from your original framebuffer size
-    mfb_set_viewport_best_fit(window, old_width, old_height);
-
+    // Called when window is resized
+    // Optionally adjust viewport:
+    // mfb_set_viewport(window, x, y, width, height);
 }
 
 bool close(struct mfb_window *window) {
-    ...
-    return true;    // true => confirm close
-                    // false => don't close
+    // Called when close is requested
+    return true;    // true => confirm close, false => cancel
 }
 
 void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
-    ...
-    // Remember to close the window in some way
     if(key == KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
 
 void char_input(struct mfb_window *window, unsigned int charCode) {
-    ...
+    // Unicode character input
 }
 
 void mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
-    ...
+    // Mouse button events
 }
 
-// Use wisely this event. It can be sent too often
 void mouse_move(struct mfb_window *window, int x, int y) {
-    ...
+    // Mouse movement (note: fired frequently)
 }
 
-// Mouse wheel
 void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
-    ...
-}
-
-
-int main(int argc, char argv[]) {
-
-    struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
-    if (!window)
-        return 0;
-
-    mfb_set_active_callback(window, active);
-    mfb_set_resize_callback(window, resize);
-    mfb_set_close_callback(window, close);
-    mfb_set_keyboard_callback(window, keyboard);
-    mfb_set_char_input_callback(window, char_input);
-    mfb_set_mouse_button_callback(window, mouse_btn);
-    mfb_set_mouse_move_callback(window, mouse_move);
-    mfb_set_mouse_scroll_callback(window, mouse_scroll);
-
-    ...
+    // Mouse wheel/scroll events
 }
 ```
 
-### C++ event interface
+#### C++ Callback Interface
 
-If you are using C++ you can set the callbacks to a class, or use lambda expressions:
+If you are using C++, you can set callbacks to class methods or lambda expressions:
 
 ```cpp
-struct Events {
-    void active(struct mfb_window *window, bool isActive) {
-        ...
-    }
-    ...
-}
+// Using object and pointer to member
+mfb_set_active_callback(window, &myObject, &MyClass::onActive);
 
-int main(int argc, char argv[]) {
-    Events e;
+// Using std::bind
+mfb_set_active_callback(std::bind(&MyClass::onActive, &myObject, _1, _2), window);
 
-    // Using object and pointer to member
-    mfb_set_active_callback(window, &e, &Events::active);
-
-    // Using std::bind
-    mfb_set_active_callback(std::bind(&Events::active, &e, _1, _2), window);
-
-    // Using a lambda
-    mfb_set_active_callback([](struct mfb_window *window, bool isActive) {
-        ...
-    }, window);
-
-    ...
-}
-
+// Using lambda
+mfb_set_active_callback([](struct mfb_window *window, bool isActive) {
+    // Handle event
+}, window);
 ```
 
-## Get information from windows (direct interface)
+### Window State Queries
 
-If you don't want to use callbacks, you can _get information about the window events directly_:
+Query window and input state directly (alternative to callbacks):
 
 ```c
+// Window state
 bool                mfb_is_window_active(struct mfb_window *window);
-
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
 
+// Drawable area (considering viewport scaling/DPI)
 unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
 unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
 unsigned            mfb_get_drawable_width(struct mfb_window *window);
 unsigned            mfb_get_drawable_height(struct mfb_window *window);
 void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
 
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
-
-float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel X as a sum. When you call this function it resets.
-float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel Y as a sum. When you call this function it resets.
-
-const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
-
-const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
+// Input state
+int                 mfb_get_mouse_x(struct mfb_window *window);
+int                 mfb_get_mouse_y(struct mfb_window *window);
+float               mfb_get_mouse_scroll_x(struct mfb_window *window);    // Resets after call
+float               mfb_get_mouse_scroll_y(struct mfb_window *window);    // Resets after call
+const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1=pressed, 0=released (8 buttons)
+const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);        // 1=pressed, 0=released
 ```
 
-## Add per window data
+### Per-Window Data
 
-Additionally you can _set per window data and recover it_:
+Attach and retrieve custom data per window:
 
 ```c
-mfb_set_user_data(window, (void *) myData);
-...
-myData = (someCast *) mfb_get_user_data(window);
-```
-
-## Timers and target FPS
-
-You can create timers for your own purposes.
-
-```c
-struct mfb_timer *  mfb_timer_create();
-void                mfb_timer_destroy(struct mfb_timer *tmr);
-
-void                mfb_timer_reset(struct mfb_timer *tmr);
-double              mfb_timer_now(struct mfb_timer *tmr);
-double              mfb_timer_delta(struct mfb_timer *tmr);
-
-double              mfb_timer_get_frequency();
-double              mfb_timer_get_resolution();
-```
-
-Furthermore you can set (and get) a target fps for the application. The default is 60 frames per second.
-
-```c
-void                mfb_set_target_fps(uint32_t fps);
-unsigned            mfb_get_target_fps();
-```
-
-This avoid the problem of update too fast the window collapsing the redrawing in fast processors.
-
-Note: OpenGL and iOS have hardware support for syncing. Other systems will use software syncing. Including MacOS Metal.
-
-In order to be able to use it you need to call the function:
-
-```c
-bool                mfb_wait_sync(struct mfb_window *window);
-```
-
-Note that if you have several windows running on the same thread it makes no sense to wait them all...
-
-## Cursor Control
-
-### Hiding the cursor
-
-You can Show/Hide the mouse cursor while it hovers over your window.
-
-```c
-void mfb_show_cursor(struct mfb_window *window, bool show);
-```
-
-This is only available on Windows, MacOS, X11, and Wayland.
-
-## Build instructions
-
-The current build system is **CMake**.
-
-Initially MiniFB used tundra [https://github.com/deplinenoise/tundra](https://github.com/deplinenoise/tundra) as build system and it was required to build the code (but now is not maintained).
-
-In any case, not many changes should be needed if you want to use MiniFB directly in your own code.
-
-### MacOS X
-
-Cocoa and clang is assumed to be installed on the system (downloading latest XCode + installing the command line tools should do the trick).
-
-Note that MacOS X Mojave+ does not support Cocoa framework as expected. For that reason you can switch to Metal API.
-To enable it just compile defining the preprocessor macro USE_METAL_API.
-
-If you use **CMake** just enable the flag:
-
-```sh
-mkdir build
-cd build
-cmake .. -DUSE_METAL_API=ON
-```
-
-or if you don't want to use Metal API:
-
-```sh
-mkdir build
-cd build
-cmake .. -DUSE_METAL_API=OFF
-```
-
-#### Coordinate system
-
-On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
-
-In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
-
-```sh
-mkdir build
-cd build
-cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
-```
-
-**Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
-
-if you use **tundra**:
-
-```sh
-tundra2 macosx-clang-debug
-```
-
-and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
-
-### iOS (beta)
-
-It works with and without an UIWindow created.
-If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
-
-**Issues**:
-
-- It seems that you have to manually set 'tvOS Deployment Target' to less than 13.
-- It seems that you have to manually set 'Launch Screen File' in project > executable > general to be able to get the real device height.
-- You need to manually set the 'Signing Team' and 'Bundle Identifier'.
-- No multitouch is available yet.
-- As this version uses Metal API it cannot be run in the emulator.
-
-**Functions**:
-
-Some of the MiniFB functions don't make sense on mobile.
-The available functions for iOS are:
-
-```c
-struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
-struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
-
-mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
-
-void                mfb_close(struct mfb_window *window);
-
 void                mfb_set_user_data(struct mfb_window *window, void *user_data);
 void *              mfb_get_user_data(struct mfb_window *window);
-
-bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
-
-bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
-
-void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
-void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
-void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
-void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
-
-unsigned            mfb_get_window_width(struct mfb_window *window);
-unsigned            mfb_get_window_height(struct mfb_window *window);
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
-const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
-
-void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
-// [Deprecated] Use mfb_get_monitor_scale instead
-void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y)
-
-void                mfb_show_cursor(struct mfb_window *window, bool show);
 ```
 
-Timers are also available.
+### Timers
+
+Create and manage timers independently:
 
 ```c
 struct mfb_timer *  mfb_timer_create(void);
@@ -363,108 +207,56 @@ double              mfb_timer_get_frequency(void);
 double              mfb_timer_get_resolution(void);
 ```
 
-For now, no multitouch is available.
+### Frame Rate Control
 
-**Example**:
-
-```objective-c
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    if(g_window == 0x0) {
-        g_width  = [UIScreen mainScreen].bounds.size.width;
-        g_height = [UIScreen mainScreen].bounds.size.height;
-        g_window = mfb_open("noise", g_width, g_height);
-        if(g_window != 0x0) {
-            g_buffer = malloc(g_width * g_height * 4);
-        }
-    }
-
-    return YES;
-}
-
-- (void)applicationDidBecomeActive:(UIApplication *)application {
-    mDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(OnUpdateFrame)];
-    [mDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-}
-
-- (void)applicationWillTerminate:(UIApplication *)application {
-    [mDisplayLink invalidate];
-    mfb_close(g_window);
-}
-
-- (void) OnUpdateFrame {
-    if(g_buffer != 0x0) {
-        // Do your wonderful rendering stuff
-    }
-
-    mfb_update_state state = mfb_update(g_window, g_buffer);
-    if (state != STATE_OK) {
-        free(g_buffer);
-        g_buffer  = 0x0;
-        g_width   = 0;
-        g_height  = 0;
-    }
-}
-```
-
-**CMake**:
-
-```sh
-mkdir build
-cd build
-cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
-```
-
-### Android (beta)
-
-Take a look at the example in tests/android. You need **Android Studio** to build and run it.
-
-**Functions**:
-
-Some of the MiniFB functions don't make sense on mobile.
-The available functions for Android are:
+Control target FPS and frame synchronization:
 
 ```c
-struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
-struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
+void                mfb_set_target_fps(uint32_t fps);         // Default: 60 fps
+unsigned            mfb_get_target_fps(void);
 
-mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+bool                mfb_wait_sync(struct mfb_window *window); // Frame sync point
+```
 
-void                mfb_close(struct mfb_window *window);
+**Note:** Hardware-accelerated syncing (OpenGL, iOS) will use vertical sync. Other platforms use software pacing.
 
-void                mfb_set_user_data(struct mfb_window *window, void *user_data);
-void *              mfb_get_user_data(struct mfb_window *window);
+### Cursor Control
 
-bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
-
-bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
-
-void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
-void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
-void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
-void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
-void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
-
-bool                mfb_is_window_active(struct mfb_window *window);
-unsigned            mfb_get_window_width(struct mfb_window *window);
-unsigned            mfb_get_window_height(struct mfb_window *window);
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
-const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
-
+```c
 void                mfb_show_cursor(struct mfb_window *window, bool show);
 ```
 
-Timers are also available.
+**Note:** Cursor hiding is supported on Windows, macOS, X11, and Wayland only.
+
+### Monitor Information
 
 ```c
-struct mfb_timer *  mfb_timer_create(void);
-void                mfb_timer_destroy(struct mfb_timer *tmr);
-void                mfb_timer_reset(struct mfb_timer *tmr);
-double              mfb_timer_now(struct mfb_timer *tmr);
-double              mfb_timer_delta(struct mfb_timer *tmr);
-double              mfb_timer_get_frequency(void);
-double              mfb_timer_get_resolution(void);
+void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
+void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y); // [Deprecated]
 ```
+
+## Integration
+
+### Adding MiniFB to Your Project
+
+Add this **repository as a submodule** in your dependencies folder:
+
+```sh
+git submodule add https://github.com/emoon/minifb.git dependencies/minifb
+```
+
+Then in your `CMakeLists.txt` file:
+
+```cmake
+add_subdirectory(dependencies/minifb)
+
+# Link MiniFB to your project:
+target_link_libraries(${PROJECT_NAME} minifb)
+```
+
+## Build Instructions
+
+The build system is **CMake**. MiniFB supports the legacy **tundra** build system, though it's no longer actively maintained.
 
 ### Windows
 
@@ -593,6 +385,7 @@ Different Linux distributions and versions may ship with different versions of W
 To regenerate Wayland protocol files for your system you must run first the protocol generation script:
 
 ```sh
+chmod +x ./scripts/generate-protocols.sh
 ./scripts/generate-protocols.sh
 ```
 
@@ -606,6 +399,226 @@ cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
 
+### MacOS X
+
+Cocoa and clang is assumed to be installed on the system (downloading latest XCode + installing the command line tools should do the trick).
+
+Note that MacOS X Mojave+ does not support Cocoa framework as expected. For that reason you can switch to Metal API.
+To enable it just compile defining the preprocessor macro USE_METAL_API.
+
+If you use **CMake** just enable the flag:
+
+```sh
+mkdir build
+cd build
+cmake .. -DUSE_METAL_API=ON
+```
+
+or if you don't want to use Metal API:
+
+```sh
+mkdir build
+cd build
+cmake .. -DUSE_METAL_API=OFF
+```
+
+#### Coordinate system
+
+On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
+
+In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
+
+```sh
+mkdir build
+cd build
+cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
+```
+
+**Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
+
+if you use **tundra**:
+
+```sh
+tundra2 macosx-clang-debug
+```
+
+and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
+
+### iOS (beta)
+
+It works with and without an UIWindow created.
+If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
+
+**Issues**:
+
+- It seems that you have to manually set 'tvOS Deployment Target' to less than 13.
+- It seems that you have to manually set 'Launch Screen File' in project > executable > general to be able to get the real device height.
+- You need to manually set the 'Signing Team' and 'Bundle Identifier'.
+- No multitouch is available yet.
+- As this version uses Metal API it cannot be run in the emulator.
+
+**Functions**:
+
+Some of the MiniFB functions don't make sense on mobile.
+The available functions for iOS are:
+
+```c
+struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
+struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
+
+mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+
+void                mfb_close(struct mfb_window *window);
+
+void                mfb_set_user_data(struct mfb_window *window, void *user_data);
+void *              mfb_get_user_data(struct mfb_window *window);
+
+bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
+
+void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
+void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
+
+unsigned            mfb_get_window_width(struct mfb_window *window);
+unsigned            mfb_get_window_height(struct mfb_window *window);
+void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
+
+// Drawable area (considering viewport scaling/DPI)
+unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
+unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
+unsigned            mfb_get_drawable_width(struct mfb_window *window);
+unsigned            mfb_get_drawable_height(struct mfb_window *window);
+void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
+
+int                 mfb_get_mouse_x(struct mfb_window *window);             // Last touch pos X
+int                 mfb_get_mouse_y(struct mfb_window *window);             // Last touch pos Y
+const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+
+void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
+
+void                mfb_show_cursor(struct mfb_window *window, bool show);  // No-op on iOS
+```
+
+Timers are also available.
+
+```c
+struct mfb_timer *  mfb_timer_create(void);
+void                mfb_timer_destroy(struct mfb_timer *tmr);
+void                mfb_timer_reset(struct mfb_timer *tmr);
+double              mfb_timer_now(struct mfb_timer *tmr);
+double              mfb_timer_delta(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency(void);
+double              mfb_timer_get_resolution(void);
+```
+
+For now, no multitouch is available.
+
+**Example**:
+
+```objective-c
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    if(g_window == 0x0) {
+        g_width  = [UIScreen mainScreen].bounds.size.width;
+        g_height = [UIScreen mainScreen].bounds.size.height;
+        g_window = mfb_open("noise", g_width, g_height);
+        if(g_window != 0x0) {
+            g_buffer = malloc(g_width * g_height * 4);
+        }
+    }
+
+    return YES;
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application {
+    mDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(OnUpdateFrame)];
+    [mDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+}
+
+- (void)applicationWillTerminate:(UIApplication *)application {
+    [mDisplayLink invalidate];
+    mfb_close(g_window);
+}
+
+- (void) OnUpdateFrame {
+    if(g_buffer != 0x0) {
+        // Do your wonderful rendering stuff
+    }
+
+    mfb_update_state state = mfb_update(g_window, g_buffer);
+    if (state != STATE_OK) {
+        free(g_buffer);
+        g_buffer  = 0x0;
+        g_width   = 0;
+        g_height  = 0;
+    }
+}
+```
+
+**CMake**:
+
+```sh
+mkdir build
+cd build
+cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
+```
+
+### Android (beta)
+
+Take a look at the example in tests/android. You need **Android Studio** to build and run it.
+
+**Functions**:
+
+Some of the MiniFB functions don't make sense on mobile.
+The available functions for Android are:
+
+```c
+struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
+struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);    // flags ignored
+
+mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
+
+void                mfb_close(struct mfb_window *window);
+
+void                mfb_set_user_data(struct mfb_window *window, void *user_data);
+void *              mfb_get_user_data(struct mfb_window *window);
+
+bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
+
+bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
+
+void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
+void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
+void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
+void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
+
+bool                mfb_is_window_active(struct mfb_window *window);
+unsigned            mfb_get_window_width(struct mfb_window *window);
+unsigned            mfb_get_window_height(struct mfb_window *window);
+int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
+int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
+
+void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
+
+void                mfb_show_cursor(struct mfb_window *window, bool show);  // No-op on Android
+```
+
+Timers are also available.
+
+```c
+struct mfb_timer *  mfb_timer_create(void);
+void                mfb_timer_destroy(struct mfb_timer *tmr);
+void                mfb_timer_reset(struct mfb_timer *tmr);
+double              mfb_timer_now(struct mfb_timer *tmr);
+double              mfb_timer_delta(struct mfb_timer *tmr);
+double              mfb_timer_get_frequency(void);
+double              mfb_timer_get_resolution(void);
+```
+
 ### Web (WASM)
 
 Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.
@@ -617,7 +630,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/P
 cmake --build build
 ```
 
-> **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
+> **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere in your path, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
 
 Then open the file `build/index.html` in your browser to view the example index.
 
@@ -649,7 +662,9 @@ int main() {
     struct mfb_window *window = mfb_open_ex("my_app", 320, 240);
     if (!window)
         return 0;
+
     uint32_t *buffer = (uint32_t *) malloc(g_width * g_height * 4);
+
     mfb_update_state state;
     do {
         state = mfb_update_ex(window, buffer, 320, 200);
@@ -657,6 +672,7 @@ int main() {
             break;
         }
     } while(mfb_wait_sync(window));
+
     return 0;
 }
 ```
@@ -719,27 +735,6 @@ If not already set, the backend will also set a handfull of CSS styles on the ca
 - `user-select: none`
 - `border: none`
 - `outline-style: none`;
-
-## How to add it to your project
-
-First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
-
-```sh
-git submodule add https://github.com/emoon/minifb.git dependencies/minifb
-```
-
-Then in your `CMakeLists.txt` file, include the following:
-
-```cmake
-add_subdirectory(dependencies/minifb)
-
-# Link MiniFB to your project:
-target_link_libraries(${PROJECT_NAME}
-    minifb
-)
-```
-
-Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
 
 ### DOS (DJGPP)
 
@@ -830,7 +825,82 @@ Alternatively, you can use VS Code to debug via a graphical user interface. Run 
 
 You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
 
-#### Limitations and caveats
+## How to add it to your project
+
+First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
+
+```sh
+git submodule add https://github.com/emoon/minifb.git dependencies/minifb
+```
+
+Then in your `CMakeLists.txt` file, include the following:
+
+```cmake
+add_subdirectory(dependencies/minifb)
+
+# Link MiniFB to your project:
+target_link_libraries(${PROJECT_NAME}
+    minifb
+)
+```
+
+Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
+
+## Platform-Specific Limitations
+
+Some MiniFB features are not available on all platforms. Here's a summary of what's supported:
+
+### Feature Support Matrix
+
+| Feature | Windows | macOS | Linux X11 | Wayland | iOS | Android | Web | DOS |
+|---------|---------|-------|-----------|---------|-----|---------|-----|-----|
+| Window creation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| mfb_update | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Keyboard input | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | Limited |
+| Mouse input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
+| Multi-window | ✓ | ✓ | ✓ | ✓ | - | - | - | ✗ |
+| Viewport | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
+| Cursor hiding | ✓ | ✓ | ✓ | ✓ | - | ✓ | (no-op) | (no-op) |
+| Monitor DPI | ✓ | ✓ | Limited | Limited | ✓ | ✓ | Fixed | Fixed |
+| Target FPS | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
+| Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
+
+### iOS Limitations
+
+Some MiniFB functions don't make sense on mobile:
+
+- No keyboard input (use char input instead)
+- No mouse button callbacks (use touch events)
+- Single window only
+- Flags to `mfb_open_ex()` are ignored
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced)
+- No multitouch support yet
+
+### Android Limitations
+
+Similar to iOS, certain features are unavailable:
+
+- No keyboard callbacks (char input available)
+- Single window only
+- Flags to `mfb_open_ex()` are ignored
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
+- No multitouch support
+
+### Web (WASM) Limitations
+
+Browser limitations are significant:
+
+- Flags to `mfb_open_ex()` are ignored
+- `mfb_set_viewport()` is a no-op
+- `mfb_set_viewport_best_fit()` is a no-op
+- `mfb_get_monitor_dpi()` reports a fixed value
+- `mfb_get_monitor_scale()` reports a fixed value
+- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
+- `mfb_show_cursor()` is a no-op
+- Window title must match a `<canvas>` element ID in the DOM
+- No multitouch support
+
+### DOS (DJGPP) Limitations
 
 The DOS backend currently does not support the following MiniFB features:
 
