@@ -29,17 +29,28 @@ typedef enum mfb_MONITOR_DPI_TYPE {
 #define mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2  ((HANDLE) -4)
 #define mfb_DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((HANDLE) -5)
 
+// Windows message constants (not available in older Windows SDK versions)
+#if !defined(WM_GETDPISCALEDSIZE)
+    #define WM_GETDPISCALEDSIZE 0x02E4
+#endif
+
+#if !defined(WM_DPICHANGED)
+    #define WM_DPICHANGED 0x02E0
+#endif
+
 // user32.dll
 typedef BOOL(WINAPI *PFN_SetProcessDPIAware)(void);
 typedef BOOL(WINAPI *PFN_SetProcessDpiAwarenessContext)(HANDLE);
 typedef UINT(WINAPI *PFN_GetDpiForWindow)(HWND);
 typedef BOOL(WINAPI *PFN_EnableNonClientDpiScaling)(HWND);
+typedef BOOL(WINAPI *PFN_AdjustWindowRectExForDpi)(LPRECT lpRect, DWORD dwStyle, BOOL bMenu, DWORD dwExStyle, UINT dpi);
 
 HMODULE                           mfb_user32_dll                    = NULL;
 PFN_SetProcessDPIAware            mfb_SetProcessDPIAware            = NULL;
 PFN_SetProcessDpiAwarenessContext mfb_SetProcessDpiAwarenessContext = NULL;
 PFN_GetDpiForWindow               mfb_GetDpiForWindow               = NULL;
 PFN_EnableNonClientDpiScaling     mfb_EnableNonClientDpiScaling     = NULL;
+PFN_AdjustWindowRectExForDpi      mfb_AdjustWindowRectExForDpi      = NULL;
 
 // shcore.dll
 typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(mfb_PROCESS_DPI_AWARENESS);
@@ -59,6 +70,7 @@ load_functions() {
             mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
             mfb_GetDpiForWindow = (PFN_GetDpiForWindow) GetProcAddress(mfb_user32_dll, "GetDpiForWindow");
             mfb_EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling) GetProcAddress(mfb_user32_dll, "EnableNonClientDpiScaling");
+            mfb_AdjustWindowRectExForDpi = (PFN_AdjustWindowRectExForDpi) GetProcAddress(mfb_user32_dll, "AdjustWindowRectExForDpi");
         }
     }
 
@@ -176,22 +188,64 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
             return DefWindowProc(hWnd, message, wParam, lParam);
 
-        // TODO
-        //case 0x02E4://WM_GETDPISCALEDSIZE:
-        //{
-        //    SIZE* size = (SIZE*) lParam;
-        //    WORD dpi = LOWORD(wParam);
-        //    return true;
-        //    break;
-        //}
+        // This message is only sent on Windows 10 v1703+ with Per Monitor v2 awareness
+        case WM_GETDPISCALEDSIZE:
+        {
+            const uint32_t dpi = (uint32_t) wParam;
 
-        // TODO
-        //case WM_DPICHANGED:
-        //{
-        //    const float xscale = HIWORD(wParam);
-        //    const float yscale = LOWORD(wParam);
-        //    break;
-        //}
+            // Scale factor from 96dpi
+            const float scale = dpi / (float) USER_DEFAULT_SCREEN_DPI;
+
+            RECT client_rect;
+
+            GetClientRect(hWnd, &client_rect); // Client area
+            LONG client_width  = client_rect.right  - client_rect.left;
+            LONG client_height = client_rect.bottom - client_rect.top;
+
+            // Desired client size in physical pixels on this monitor
+            client_rect.left   = 0;
+            client_rect.top    = 0;
+            client_rect.right  = (LONG) (client_width  * scale);
+            client_rect.bottom = (LONG) (client_height * scale);
+
+            if (mfb_AdjustWindowRectExForDpi != NULL) {
+                // Turn client size into *window* size for this DPI
+                DWORD style   = (DWORD) (GetWindowLongPtr(hWnd, GWL_STYLE));
+                DWORD exStyle = (DWORD) (GetWindowLongPtr(hWnd, GWL_EXSTYLE));
+                if (!mfb_AdjustWindowRectExForDpi(&client_rect, style, FALSE, exStyle, dpi)) {
+                    return 0; // Not handled
+                }
+            }
+            else {
+                return 0; // Not handled
+            }
+
+            SIZE *newSize = (SIZE *) lParam;
+            newSize->cx   = client_rect.right  - client_rect.left;
+            newSize->cy   = client_rect.bottom - client_rect.top;
+
+            // Handled
+            return 1;
+        }
+
+        case WM_DPICHANGED:
+        {
+            if (window_data) {
+                const RECT *   pRect  = (RECT *) (lParam);
+                const uint32_t width  = pRect->right  - pRect->left;
+                const uint32_t height = pRect->bottom - pRect->top;
+
+                SetWindowPos(hWnd,
+                            NULL,
+                            pRect->left,
+                            pRect->top,
+                            width,
+                            height,
+                            SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
+
 
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
@@ -611,8 +665,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    MSG msg;
-
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         return STATE_INVALID_WINDOW;
@@ -1071,4 +1123,4 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     }
 
     window_data->is_cursor_visible = show;
-}    
+}
