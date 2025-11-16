@@ -56,7 +56,7 @@ void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x,
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
 
 // Show/hide cursor
-void				mfb_show_cursor(struct mfb_window *window, bool show);
+void                mfb_show_cursor(struct mfb_window *window, bool show);
 
 // Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
@@ -74,6 +74,12 @@ const char *        mfb_get_key_name(mfb_key key);
 bool                mfb_is_window_active(struct mfb_window *window);
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
+void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
+unsigned            mfb_get_drawable_offset_x(struct mfb_window *window);
+unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
+unsigned            mfb_get_drawable_width(struct mfb_window *window);
+unsigned            mfb_get_drawable_height(struct mfb_window *window);
+void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
 float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel X as a sum. When you call this function it resets.

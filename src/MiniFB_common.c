@@ -188,6 +188,7 @@ mfb_is_window_active(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->is_active;
     }
+
     return false;
 }
 
@@ -198,6 +199,7 @@ mfb_get_window_width(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->window_width;
     }
+
     return 0;
 }
 
@@ -208,6 +210,7 @@ mfb_get_window_height(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->window_height;
     }
+
     return 0;
 }
 
@@ -218,6 +221,7 @@ mfb_get_mouse_x(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_pos_x;
     }
+
     return 0;
 }
 
@@ -228,6 +232,7 @@ mfb_get_mouse_y(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_pos_y;
     }
+
     return 0;
 }
 
@@ -238,6 +243,7 @@ mfb_get_mouse_scroll_x(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_wheel_x;
     }
+
     return 0;
 }
 
@@ -248,6 +254,7 @@ mfb_get_mouse_scroll_y(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_wheel_y;
     }
+
     return 0;
 }
 
@@ -258,6 +265,7 @@ mfb_get_mouse_button_buffer(struct mfb_window *window) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->mouse_button_status;
     }
+
     return 0;
 }
 
@@ -274,11 +282,87 @@ mfb_get_key_buffer(struct mfb_window *window)  {
 //-------------------------------------
 const char *
 mfb_get_key_name(mfb_key key) {
-	switch (key) {
-		#define KEY_CASE(NAME, _, STR) case NAME: return STR;
-	KEY_LIST(KEY_CASE)
-		#undef KEY_CASE
-	}
+    switch (key) {
+        #define KEY_CASE(NAME, _, STR) case NAME: return STR;
+        KEY_LIST(KEY_CASE)
+        #undef KEY_CASE
+    }
 
-	return NULL;	// preprocessor trickery up there should catch every possible value, shouldn't ever run
+    return NULL;    // preprocessor trickery up there should catch every possible value, shouldn't ever run
+}
+
+//-------------------------------------
+unsigned
+mfb_get_drawable_width(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        return window_data->dst_width;
+    }
+
+    return 0;
+}
+
+//-------------------------------------
+unsigned
+mfb_get_drawable_height(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        return window_data->dst_height;
+    }
+
+    return 0;
+}
+
+//-------------------------------------
+unsigned
+mfb_get_drawable_offset_x(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        return window_data->dst_offset_x;
+    }
+
+    return 0;
+}
+
+//-------------------------------------
+unsigned
+mfb_get_drawable_offset_y(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        return window_data->dst_offset_y;
+    }
+
+    return 0;
+}
+
+//-------------------------------------
+void
+mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        if (width  != NULL) *width  = window_data->window_width;
+        if (height != NULL) *height = window_data->window_height;
+        return;
+    }
+
+    if (width  != NULL) *width  = 0;
+    if (height != NULL) *height = 0;
+}
+
+//-------------------------------------
+void
+mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        if (offset_x != NULL) *offset_x = window_data->dst_offset_x;
+        if (offset_y != NULL) *offset_y = window_data->dst_offset_y;
+        if (width    != NULL) *width    = window_data->dst_width;
+        if (height   != NULL) *height   = window_data->dst_height;
+        return;
+    }
+
+    if (offset_x != NULL) *offset_x = 0;
+    if (offset_y != NULL) *offset_y = 0;
+    if (width    != NULL) *width    = 0;
+    if (height   != NULL) *height   = 0;
 }
