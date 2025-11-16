@@ -10,6 +10,8 @@ t2-output
 /mingw
 /build
 /xcode
+/bin
+/web
 /.history
 .gradle
 .idea

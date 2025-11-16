@@ -273,9 +273,30 @@ init_GL(SWindowData *window_data) {
 }
 
 //-------------------------------------
+// When the DPI or window state changes, Windows may emit several WM_SIZE events
+// within the same frame. Each event would trigger a glViewport call, which can
+// leave the OpenGL context in an inconsistent state (on some systems this causes
+// the viewport to end up slightly offset).
+//
+// To avoid this, we do not apply the resize immediately. Instead, WM_SIZE sets a
+// boolean flag, and just before drawing the next frame we perform a single
+// glViewport update. This guarantees that glViewport is called only once per
+// frame and fixes the offset issue.
+//-------------------------------------
 void
 resize_GL(SWindowData *window_data) {
+    if (window_data != NULL) {
+        window_data->must_resize_context = true;
+    }
+}
+
+//-------------------------------------
+static void
+effective_resize_GL(SWindowData *window_data) {
+    window_data->must_resize_context = false;
+
     if (window_data->is_initialized) {
+
     #if defined(_WIN32) || defined(WIN32)
 
         SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
@@ -301,6 +322,9 @@ resize_GL(SWindowData *window_data) {
 //-------------------------------------
 void
 redraw_GL(SWindowData *window_data, const void *pixels) {
+    if (window_data->must_resize_context) {
+        effective_resize_GL(window_data);
+    }
 #if defined(_WIN32) || defined(WIN32)
 
     SWindowData_Win *window_data_ex = (SWindowData_Win *) window_data->specific;
@@ -317,7 +341,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 
 #endif
 
-    float           x, y, w, h;
+    float x, y, w, h;
 
     x = (float) window_data->dst_offset_x;
     y = (float) window_data->dst_offset_y;

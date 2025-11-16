@@ -47,5 +47,6 @@ typedef struct {
     bool                    is_active;
     bool                    is_initialized;
 
+    bool                    must_resize_context;
     bool                    close;
 } SWindowData;
