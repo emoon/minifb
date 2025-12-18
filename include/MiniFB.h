@@ -8,34 +8,34 @@
 
 // C++ [[deprecated]] attribute
 #if !defined(__MFB_DEPRECATED) && defined(__has_cpp_attribute)
-	#if __has_cpp_attribute(deprecated)
-		#define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
-	#endif
+    #if __has_cpp_attribute(deprecated)
+        #define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
+    #endif
 #endif
 // C23 [[deprecated]] attribute
 #if !defined(__MFB_DEPRECATED) && defined(__has_c_attribute)
-	#if __has_c_attribute(deprecated)
-		#define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
-	#endif
+    #if __has_c_attribute(deprecated)
+        #define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
+    #endif
 #endif
 // gcc/clang __attribute__ method
 #if !defined(__MFB_DEPRECATED) && (defined(__GNUC__) || defined(__clang__))
-	#define __MFB_DEPRECATED(msg) __attribute__((deprecated(msg)))
+    #define __MFB_DEPRECATED(msg) __attribute__((deprecated(msg)))
 #endif
 // msvc __declspec method
 #if !defined(__MFB_DEPRECATED) && defined(_MSC_VER) && !defined(deprecated)
-	#define __MFB_DEPRECATED(msg) __declspec(deprecated(msg))
+    #define __MFB_DEPRECATED(msg) __declspec(deprecated(msg))
 #endif
 // if we can't use any of those, just don't bother
 #if !defined(__MFB_DEPRECATED)
-	#define __MFB_DEPRECATED(msg)
+    #define __MFB_DEPRECATED(msg)
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef __ANDROID__
-	#define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
-	#define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+    #define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+    #define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
 #else
     #ifdef HOST_WORDS_BIGENDIAN
     #define MFB_RGB(r, g, b)     (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
