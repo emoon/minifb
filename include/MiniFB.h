@@ -2,14 +2,40 @@
 
 #include "MiniFB_enums.h"
 
-#ifdef __cplusplus
-extern "C" {
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// cross-platform deprecation macro, try to use the clean [[deprecated]] if it's avalible, if not, use compiler-specific fallbacks
+
+// C++ [[deprecated]] attribute
+#if !defined(__MFB_DEPRECATED) && defined(__has_cpp_attribute)
+	#if __has_cpp_attribute(deprecated)
+		#define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
+	#endif
+#endif
+// C23 [[deprecated]] attribute
+#if !defined(__MFB_DEPRECATED) && defined(__has_c_attribute)
+	#if __has_c_attribute(deprecated)
+		#define __MFB_DEPRECATED(msg) [[deprecated(msg)]]
+	#endif
+#endif
+// gcc/clang __attribute__ method
+#if !defined(__MFB_DEPRECATED) && (defined(__GNUC__) || defined(__clang__))
+	#define __MFB_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#endif
+// msvc __declspec method
+#if !defined(__MFB_DEPRECATED) && defined(_MSC_VER) && !defined(deprecated)
+	#define __MFB_DEPRECATED(msg) __declspec(deprecated(msg))
+#endif
+// if we can't use any of those, just don't bother
+#if !defined(__MFB_DEPRECATED)
+	#define __MFB_DEPRECATED(msg)
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #ifndef __ANDROID__
-#define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
-#define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+	#define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+	#define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
 #else
     #ifdef HOST_WORDS_BIGENDIAN
     #define MFB_RGB(r, g, b)     (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
@@ -21,6 +47,10 @@ extern "C" {
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Create a window that is used to display the buffer sent into the mfb_update function, returns 0 if fails
 struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
@@ -51,6 +81,7 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale
+__MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead!")
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
 // Use this instead
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
@@ -110,5 +141,8 @@ double              mfb_timer_get_resolution(void);
 #if !defined(MINIFB_AVOID_CPP_HEADERS)
     #include "MiniFB_cpp.h"
 #endif
+
+// don't want to bleed our deprecation macro
+#undef __MFB_DEPRECATED
 
 #endif
