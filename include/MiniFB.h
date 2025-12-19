@@ -23,7 +23,7 @@
     #define __MFB_DEPRECATED(msg) __attribute__((deprecated(msg)))
 #endif
 // msvc __declspec method
-#if !defined(__MFB_DEPRECATED) && defined(_MSC_VER) && !defined(deprecated)
+#if !defined(__MFB_DEPRECATED) && defined(_MSC_VER)
     #define __MFB_DEPRECATED(msg) __declspec(deprecated(msg))
 #endif
 // if we can't use any of those, just don't bother
@@ -81,7 +81,7 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale
-__MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead!")
+__MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead")
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
 // Use this instead
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
