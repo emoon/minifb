@@ -5,8 +5,8 @@
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
 
-// I cannot find a way to get dpi under VirtualBox
-//#include <X11/Xresource.h>
+// DPI detection via Xft.dpi using XRM (if available)
+// I cannot find a way to get dpi under VirtualBox with Xrandr
 //#include <X11/extensions/Xrandr.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -929,30 +929,83 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 }
 
 //-------------------------------------
+static float
+get_dpi_from_display(Display *display) {
+    float dpi = 96.0f;  // Default DPI (standard)
+
+    if (display == NULL) {
+        return dpi;
+    }
+
+    int screen = DefaultScreen(display);
+
+    // Try to calculate DPI from physical monitor dimensions
+    // DPI = (pixels * 25.4) / physical_size_mm
+    int width_pixels  = DisplayWidth(display, screen);
+    int height_pixels = DisplayHeight(display, screen);
+    int width_mm      = DisplayWidthMM(display, screen);
+    int height_mm     = DisplayHeightMM(display, screen);
+
+    // Sanity checks - physical dimensions should be reasonable
+    if (width_mm > 0 && width_pixels > 0) {
+        float dpi_x = (width_pixels * 25.4f) / width_mm;
+
+        // Reasonable DPI range: 50 to 500 (handles normal monitors, high-DPI, and unusual setups)
+        if (dpi_x >= 50.0f && dpi_x <= 500.0f) {
+            dpi = dpi_x;
+            return dpi;
+        }
+    }
+
+    if (height_mm > 0 && height_pixels > 0) {
+        float dpi_y = (height_pixels * 25.4f) / height_mm;
+
+        // Reasonable DPI range
+        if (dpi_y >= 50.0f && dpi_y <= 500.0f) {
+            dpi = dpi_y;
+            return dpi;
+        }
+    }
+
+    return dpi;
+}
+
+//-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float x = 96.0, y = 96.0;
+    float dpi_x = 96.0f, dpi_y = 96.0f;
 
     if (window != NULL) {
-        //SWindowData     *window_data     = (SWindowData *) window;
-        //SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+        SWindowData *window_data = (SWindowData *) window;
+        SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
-        // I cannot find a way to get dpi under VirtualBox
-        // XrmGetResource "Xft.dpi", "Xft.Dpi"
-        // XRRGetOutputInfo
-        // DisplayWidthMM, DisplayHeightMM
-        // All returning invalid values or 0
+        if (window_data_specific != NULL && window_data_specific->display != NULL) {
+            // Try to get DPI from display metrics
+            float dpi = get_dpi_from_display(window_data_specific->display);
+            dpi_x = dpi_y = dpi;
+            printf("get_dpi_from_display = %f\n", dpi);
+        }
+    }
+
+    else {
+        // If no window provided, try to open a temporary display connection
+        Display *display = XOpenDisplay(NULL);
+        if (display != NULL) {
+            float dpi = get_dpi_from_display(display);
+            dpi_x = dpi_y = dpi;
+            XCloseDisplay(display);
+        }
     }
 
     if (scale_x) {
-        *scale_x = x / 96.0f;
+        *scale_x = dpi_x / 96.0f;
         if (*scale_x == 0) {
             *scale_x = 1.0f;
         }
     }
 
     if (scale_y) {
-        *scale_y = y / 96.0f;
+        *scale_y = dpi_y / 96.0f;
         if (*scale_y == 0) {
             *scale_y = 1.0f;
         }
@@ -968,7 +1021,7 @@ create_blank_cursor(Display *display, Window window) {
     XColor dummy;
     Cursor invis_cursor =  XCreatePixmapCursor(display, pixmap, pixmap, &dummy, &dummy, 0, 0);
     XFreePixmap(display, pixmap);
-    
+
     return invis_cursor;
 }
 
@@ -986,7 +1039,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
 
     window_data->is_cursor_visible = show;
-    
+
     // stupid. very stupid. really stupid.
     // could be way better if i wasn't too stubborn to use xfixes
 
