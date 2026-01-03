@@ -231,6 +231,11 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_DPICHANGED:
         {
             if (window_data) {
+                const uint32_t dpi_x   = LOWORD(wParam);
+                const uint32_t dpi_y   = HIWORD(wParam);
+                const float    scale_x = dpi_x / (float) USER_DEFAULT_SCREEN_DPI;
+                const float    scale_y = dpi_y / (float) USER_DEFAULT_SCREEN_DPI;
+
                 const RECT *   pRect  = (RECT *) (lParam);
                 const uint32_t width  = pRect->right  - pRect->left;
                 const uint32_t height = pRect->bottom - pRect->top;
@@ -242,6 +247,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                             width,
                             height,
                             SWP_NOZORDER | SWP_NOACTIVATE);
+
+                kCall(dpi_changed_func, scale_x, scale_y);
             }
             return 0;
         }

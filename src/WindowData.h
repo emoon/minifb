@@ -12,11 +12,12 @@ typedef struct {
     mfb_active_func         active_func;
     mfb_resize_func         resize_func;
     mfb_close_func          close_func;
-	mfb_keyboard_func       keyboard_func;
+    mfb_keyboard_func       keyboard_func;
     mfb_char_input_func     char_input_func;
     mfb_mouse_button_func   mouse_btn_func;
     mfb_mouse_move_func     mouse_move_func;
     mfb_mouse_scroll_func   mouse_wheel_func;
+    mfb_dpi_changed_func    dpi_changed_func;
 
     uint32_t                window_width;
     uint32_t                window_height;

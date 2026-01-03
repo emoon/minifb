@@ -381,9 +381,13 @@ if(MINIFB_BUILD_EXAMPLES)
             tests/timer.c
         )
 
-		add_executable(hide_cursor
-			tests/hide_cursor.c
-		)
+        add_executable(hide_cursor
+            tests/hide_cursor.c
+        )
+
+        add_executable(dpi_change_test
+            tests/dpi_change_test.c
+        )
 
         if(EMSCRIPTEN)
             add_custom_target(web_assets
@@ -437,12 +441,13 @@ set_property(TARGET minifb PROPERTY FOLDER "Libs")
 if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
     set_property(TARGET timer PROPERTY FOLDER "Tests")
-	set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
+    set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
     set_property(TARGET input_events PROPERTY FOLDER "Tests")
     set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
     set_property(TARGET hidpi PROPERTY FOLDER "Tests")
-	set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
+    set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
+    set_property(TARGET dpi_change_test PROPERTY FOLDER "Tests")
 endif()
 
 install(TARGETS minifb EXPORT minifb)

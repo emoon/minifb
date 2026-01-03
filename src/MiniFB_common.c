@@ -101,6 +101,15 @@ mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func c
 
 //-------------------------------------
 void
+mfb_set_dpi_callback(struct mfb_window *window, mfb_dpi_changed_func callback) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->dpi_changed_func = callback;
+    }
+}
+
+//-------------------------------------
+void
 mfb_set_user_data(struct mfb_window *window, void *user_data) {
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
