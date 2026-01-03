@@ -94,9 +94,6 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-#--------------------------------------
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
 # Code generation options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
