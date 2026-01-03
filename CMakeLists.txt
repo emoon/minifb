@@ -4,6 +4,10 @@ project(MiniFB)
 message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
+if (POLICY CMP0072)
+    cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
+endif()
+set(OpenGL_GL_PREFERENCE "GLVND")
 
 # Detect iOS (it was added in CMake 3.14 but we require CMake 3.10)
 #--------------------------------------
@@ -95,17 +99,23 @@ set(SrcDOS
 
 # Avoid RelWithDebInfo and MinSizeRel
 #--------------------------------------
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+if (CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+endif()
 
 # Define Release by default
 #--------------------------------------
-if (NOT CMAKE_BUILD_TYPE)
+if (NOT CMAKE_GENERATOR MATCHES "Multi" AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
-endif(NOT CMAKE_BUILD_TYPE)
+endif()
 
 # Set features
 #--------------------------------------
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -309,9 +319,16 @@ if (APPLE)
 elseif (UNIX)
 
     if (USE_WAYLAND_API)
+        find_package(PkgConfig)
+        if (NOT PKG_CONFIG_FOUND)
+            message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
+        endif()
+        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor)
+
+        target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
+        target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
         target_link_libraries(minifb PRIVATE
-            "-lwayland-client"
-            "-lwayland-cursor"
+            ${WAYLAND_LIBRARIES}
         )
     elseif (EMSCRIPTEN)
         add_link_options(
@@ -330,14 +347,23 @@ elseif (UNIX)
             "-sSINGLE_FILE"
         )
     else()
+        find_package(X11)
+        if (NOT X11_FOUND)
+            message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
+        endif()
+
         target_link_libraries(minifb PRIVATE
-            "-lX11"
+            X11::X11
             #"-lxkbcommon"
             #"-lXrandr" DPI NOT WORKING
         )
         if (USE_OPENGL_API)
+            find_package(OpenGL)
+            if (NOT OpenGL_FOUND)
+                message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
+            endif()
             target_link_libraries(minifb PRIVATE
-                "-lGL"
+                OpenGL::GL
             )
         endif()
     endif()
@@ -345,8 +371,12 @@ elseif (UNIX)
 elseif (WIN32)
 
     if (USE_OPENGL_API)
+        find_package(OpenGL)
+        if (NOT OpenGL_FOUND)
+            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
+        endif()
         target_link_libraries(minifb PRIVATE
-            "Opengl32.lib"
+            OpenGL::GL
         )
     endif()
 
