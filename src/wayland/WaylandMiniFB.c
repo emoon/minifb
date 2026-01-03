@@ -1,3 +1,11 @@
+#ifndef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE 700  // for mkstemp, ftruncate, usleep
+#endif
+
+#ifndef _DEFAULT_SOURCE
+    #define _DEFAULT_SOURCE     // ensure usleep prototype on glibc
+#endif
+
 #include <MiniFB.h>
 #include "generated/xdg-shell-client-protocol.h"
 #include "MiniFB_internal.h"
@@ -664,11 +672,15 @@ handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, s
 }
 
 static const struct xdg_toplevel_listener toplevel_listener = {
-    handle_toplevel_configure,
-    handle_toplevel_close,
+    .configure        = handle_toplevel_configure,
+    .close            = handle_toplevel_close,
     // In recent versions, these fields have disappeared
-    handle_toplevel_configure_bounds,
-    handle_toplevel_wm_capabilities
+#if defined(XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION)
+    .configure_bounds = handle_toplevel_configure_bounds,
+#endif
+#if defined(XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION)
+    .wm_capabilities  = handle_toplevel_wm_capabilities
+#endif
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -5,7 +5,7 @@
 #if defined(_WIN32) || defined(WIN32)
     #include <windows/WindowData_Win.h>
     #include <gl/gl.h>
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
     #include <x11/WindowData_X11.h>
     #include <GL/gl.h>
     #include <GL/glx.h>
@@ -34,7 +34,7 @@ CheckGLExtension(const char *name) {
         // TODO: This is deprecated on OpenGL 3+.
         // Use glGetIntegerv(GL_NUM_EXTENSIONS, &n) and glGetStringi(GL_EXTENSIONS, index)
         extensions = (const char *) glGetString(GL_EXTENSIONS);
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
         Display *display = glXGetCurrentDisplay();
 
         extensions = glXQueryExtensionsString(display, DefaultScreen(display));
@@ -108,7 +108,7 @@ typedef int (WINAPI * PFNWGLGETSWAPINTERVALEXTPROC)(void);
 PFNWGLSWAPINTERVALEXTPROC       SwapIntervalEXT    = NULL;
 PFNWGLGETSWAPINTERVALEXTPROC    GetSwapIntervalEXT = NULL;
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
 
 bool
 setup_pixel_format(SWindowData_X11 *window_data_specific) {
@@ -162,7 +162,7 @@ create_GL_context(SWindowData *window_data) {
 
     return true;
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
     GLint majorGLX, minorGLX = 0;
@@ -209,7 +209,7 @@ destroy_GL_context(SWindowData *window_data) {
         window_data_specific->hGLRC = 0;
     }
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     glXDestroyContext(window_data_specific->display, window_data_specific->context);
@@ -235,7 +235,7 @@ init_GL(SWindowData *window_data) {
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
@@ -301,7 +301,7 @@ effective_resize_GL(SWindowData *window_data) {
         SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
         wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC);
 
-    #elif defined(linux)
+    #elif defined(__linux__) || defined(linux)
 
         SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
         glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context);
@@ -331,7 +331,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 
     wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC);
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     GLenum format = BGRA;
@@ -380,7 +380,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
 
 #if defined(_WIN32) || defined(WIN32)
     SwapBuffers(window_data_specific->hdc);
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
     glXSwapBuffers(window_data_specific->display, window_data_specific->window);
 #endif
 }
@@ -409,7 +409,7 @@ set_target_fps_aux() {
         g_use_hardware_sync = true;
     }
 
-#elif defined(linux)
+#elif defined(__linux__) || defined(linux)
 
     #define kGLX_SWAP_INTERVAL_EXT               0x20F1
     #define kGLX_MAX_SWAP_INTERVAL_EXT           0x20F2
