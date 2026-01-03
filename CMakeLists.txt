@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.10)
 
 set(PROJECT_NAME MiniFB)
 project(${PROJECT_NAME})
@@ -6,17 +6,6 @@ project(${PROJECT_NAME})
 message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
-
-# Detect iOS
-#--------------------------------------
-if(NOT DEFINED IOS)
-    if(DEFINED CMAKE_SYSTEM_NAME)
-        string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
-        if(CMAKE_SYSTEM_NAME_LOWER STREQUAL "ios")
-            set(IOS true)
-        endif()
-    endif()
-endif()
 
 # Sources
 #--------------------------------------
@@ -33,13 +22,11 @@ set(SrcLib
     src/WindowData.h
 )
 
-#--
 set(SrcWindows
     src/windows/WinMiniFB.c
     src/windows/WindowData_Win.h
 )
 
-#--
 set(SrcMacOSX
     src/macosx/MacMiniFB.m
     src/macosx/OSXWindow.h
@@ -51,7 +38,6 @@ set(SrcMacOSX
     src/macosx/WindowData_OSX.h
 )
 
-#--
 set(SrcIOS
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
@@ -64,7 +50,6 @@ set(SrcIOS
     include/MiniFB_ios.h
 )
 
-#--
 set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
     src/wayland/WaylandMiniFB.c
@@ -72,7 +57,6 @@ set(SrcWayland
     src/MiniFB_linux.c
 )
 
-#--
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
@@ -84,12 +68,10 @@ set(SrcGL
     src/gl/MiniFB_GL.c
 )
 
-#--
 set(SrcWeb
     src/web/WebMiniFB.c
 )
 
-#--
 set(SrcDOS
     src/dos/DOSMiniFB.c
     src/dos/vesa.c
@@ -134,9 +116,12 @@ elseif(WIN32)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
 endif()
 
-# Set GCC/Clang flags
+# Set compile flags depending on the compiler
 #--------------------------------------
 if(NOT MSVC)
+
+    # GCC/Clang
+
     # Avoid default flag values
     #--------------------------------------
     if (NOT DJGPP)
@@ -172,32 +157,43 @@ if(NOT MSVC)
     if(NOT APPLE)
         add_compile_options(-Wno-cast-function-type)
     endif()
+
 else()
-    # Security check
-    add_compile_options(/GS)
-    # Function level linking
-    add_compile_options(/Gy)
-    # Exceptions
-    add_compile_options(/EHsc)
+
+    # MSVC
+    #--------------------------------------
+
+    add_compile_options(
+        # Security check
+        /GS
+        # Function level linking
+        /Gy
+        # Exceptions
+        /EHsc
+        # Fast floating point maths
+        /fp:fast
+        # Force Visual Studio to actualize __cplusplus version macro
+        /Zc:__cplusplus
+
+        # Program database for edit and continue
+        "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
+        # Optimizations
+        "$<IF:$<CONFIG:Debug>,/Od,/O2>"
+        # Inline function expansion
+        "$<IF:$<CONFIG:Debug>,/Ob0/Ob2>"
+        # Basic runtime checks
+        "$<$<CONFIG:Debug>:/RTC1>"
+    )
+
     if(MSVC_VERSION GREATER_EQUAL 1900)
         # SDL checks 2015+
         add_compile_options(/sdl)
     endif()
+
     if(MSVC_VERSION LESS_EQUAL 1920)
         # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
         add_compile_options(/Gm)
     endif()
-    add_compile_options(/fp:fast)
-    # Program database for edit and continue
-    add_compile_options("$<IF:$<CONFIG:Debug>,/ZI,/Zi>")
-    # Optimizations
-    add_compile_options("$<IF:$<CONFIG:Debug>,/Od,/O2>")
-    # Inline function expansion
-    add_compile_options("$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>")
-    # Basic runtime checks
-    add_compile_options("$<$<CONFIG:Debug>:/RTC1>")
-    # Force Visual Studio to actualize __cplusplus version macro
-    add_compile_options(/Zc:__cplusplus)
 
 endif()
 
@@ -265,9 +261,7 @@ endif()
 
 # Library
 #--------------------------------------
-add_library(minifb STATIC
-    ${SrcLib}
-)
+add_library(minifb STATIC ${SrcLib})
 add_library(minifb::minifb ALIAS minifb)
 
 # Link
@@ -320,9 +314,9 @@ elseif(UNIX)
             #"-lXrandr" DPI NOT WORKING
         )
         if(USE_OPENGL_API)
-        target_link_libraries(minifb PRIVATE
-            "-lGL"
-        )
+            target_link_libraries(minifb PRIVATE
+                "-lGL"
+            )
         endif()
     endif()
 
@@ -352,40 +346,20 @@ link_libraries(minifb)
 # Examples
 #--------------------------------------
 if(MINIFB_BUILD_EXAMPLES)
+
     if(NOT IOS)
-        add_executable(noise
-            tests/noise.c
-        )
 
-        add_executable(input_events
-            tests/input_events.c
-        )
-
-        add_executable(input_events_cpp
-            tests/input_events_cpp.cpp
-        )
-
-        add_executable(multiple_windows
-            tests/multiple_windows.c
-        )
-
-        add_executable(hidpi
-            tests/hidpi.c
-        )
-
-        add_executable(fullscreen
-            tests/fullscreen.c
-        )
-
-        add_executable(timer
-            tests/timer.c
-        )
-
-		add_executable(hide_cursor
-			tests/hide_cursor.c
-		)
+        add_executable(noise tests/noise.c)
+        add_executable(input_events tests/input_events.c)
+        add_executable(input_events_cpp tests/input_events_cpp.cpp)
+        add_executable(multiple_windows tests/multiple_windows.c)
+        add_executable(hidpi tests/hidpi.c)
+        add_executable(fullscreen tests/fullscreen.c)
+        add_executable(timer tests/timer.c)
+        add_executable(hide_cursor tests/hide_cursor.c)
 
         if(EMSCRIPTEN)
+
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/web
@@ -401,15 +375,13 @@ if(MINIFB_BUILD_EXAMPLES)
             target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
             add_dependencies(timer web_assets)
             target_link_options(timer PRIVATE "-sEXPORT_NAME=timer")
+
         endif()
 
         if(DJGPP)
-
-            add_executable(dos
-                tests/dos/dos.c
-            )
-
+            add_executable(dos tests/dos/dos.c)
         endif()
+
     else()
 
         add_executable(noise
@@ -437,12 +409,12 @@ set_property(TARGET minifb PROPERTY FOLDER "Libs")
 if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
     set_property(TARGET timer PROPERTY FOLDER "Tests")
-	set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
+    set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
     set_property(TARGET input_events PROPERTY FOLDER "Tests")
     set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
     set_property(TARGET hidpi PROPERTY FOLDER "Tests")
-	set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
+    set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
 endif()
 
 install(TARGETS minifb EXPORT minifb)
