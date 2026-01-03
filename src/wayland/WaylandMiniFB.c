@@ -625,7 +625,7 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     kUnused(width);
     kUnused(height);
     kUnused(states);
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     printf("Toplevel configure: width=%d, height=%d\n", width, height);
 #endif
 }
@@ -635,7 +635,7 @@ handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 {
     kUnused(data);
     kUnused(xdg_toplevel);
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     printf("Toplevel close\n");
 #endif
 }
@@ -647,7 +647,7 @@ handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, 
     kUnused(xdg_toplevel);
     kUnused(width);
     kUnused(height);
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     printf("Toplevel configure bounds: width=%d, height=%d\n", width, height);
 #endif
 }
@@ -658,7 +658,7 @@ handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, s
     kUnused(data);
     kUnused(xdg_toplevel);
     kUnused(capabilities);
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     printf("Toplevel wm capabilities\n");
 #endif
 }
@@ -785,7 +785,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     printf("Window created using Wayland API\n");
 #endif
     return (struct mfb_window *) window_data;

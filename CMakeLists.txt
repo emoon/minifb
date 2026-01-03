@@ -199,7 +199,6 @@ endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG)
-    add_definitions(-DDEBUG)
     if(EMSCRIPTEN)
         add_link_options(-g)
     endif()
