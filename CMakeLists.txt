@@ -4,6 +4,21 @@ project(MiniFB)
 message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
+if (POLICY CMP0072)
+    cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
+endif()
+set(OpenGL_GL_PREFERENCE "GLVND")
+
+# Detect iOS (it was added in CMake 3.14 but we require CMake 3.10)
+#--------------------------------------
+if(NOT DEFINED IOS)
+    if(DEFINED CMAKE_SYSTEM_NAME)
+        string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
+        if(CMAKE_SYSTEM_NAME_LOWER STREQUAL "ios")
+            set(IOS true)
+        endif()
+    endif()
+endif()
 
 # Sources
 #--------------------------------------
@@ -20,11 +35,13 @@ set(SrcLib
     src/WindowData.h
 )
 
+#--
 set(SrcWindows
     src/windows/WinMiniFB.c
     src/windows/WindowData_Win.h
 )
 
+#--
 set(SrcMacOSX
     src/macosx/MacMiniFB.m
     src/macosx/OSXWindow.h
@@ -36,6 +53,7 @@ set(SrcMacOSX
     src/macosx/WindowData_OSX.h
 )
 
+#--
 set(SrcIOS
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
@@ -48,6 +66,7 @@ set(SrcIOS
     include/MiniFB_ios.h
 )
 
+#--
 set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
     src/wayland/WaylandMiniFB.c
@@ -55,6 +74,7 @@ set(SrcWayland
     src/MiniFB_linux.c
 )
 
+#--
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
@@ -66,10 +86,12 @@ set(SrcGL
     src/gl/MiniFB_GL.c
 )
 
+#--
 set(SrcWeb
     src/web/WebMiniFB.c
 )
 
+#--
 set(SrcDOS
     src/dos/DOSMiniFB.c
     src/dos/vesa.c
@@ -77,17 +99,23 @@ set(SrcDOS
 
 # Avoid RelWithDebInfo and MinSizeRel
 #--------------------------------------
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+if (CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+endif()
 
 # Define Release by default
 #--------------------------------------
-if(NOT CMAKE_BUILD_TYPE)
+if (NOT CMAKE_GENERATOR MATCHES "Multi" AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
     message(STATUS "Build type not specified: Use Release by default")
-endif(NOT CMAKE_BUILD_TYPE)
+endif()
 
 # Set features
 #--------------------------------------
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -97,25 +125,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
-if(APPLE AND NOT IOS)
+if (APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
     option(USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-elseif(UNIX AND NOT EMSCRIPTEN)
+elseif (UNIX AND NOT EMSCRIPTEN)
     option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
-elseif(WIN32)
+elseif (WIN32)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
 endif()
 
 # Set compile flags depending on the compiler
 #--------------------------------------
-if(NOT MSVC)
+if (NOT MSVC)
 
     # GCC/Clang
 
     # Avoid default flag values
     #--------------------------------------
-    if(NOT DJGPP)
+    if (NOT DJGPP)
         set(CMAKE_C_FLAGS "")
         set(CMAKE_C_FLAGS_DEBUG "" )
         set(CMAKE_C_FLAGS_RELEASE "")
@@ -133,7 +161,7 @@ if(NOT MSVC)
     set(CMAKE_OBJCXX_FLAGS_DEBUG "")
     set(CMAKE_OBJCXX_FLAGS_RELEASE "")
 
-    if(DJGPP)
+    if (DJGPP)
         add_compile_options(
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
@@ -145,12 +173,16 @@ if(NOT MSVC)
     endif()
 
     add_compile_options(
-        -Wall -Wextra
-        -Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough
+        -Wall
+        -Wextra
+        -Wno-switch
+        -Wno-unused-function
+        -Wno-unused-parameter
+        -Wno-implicit-fallthrough
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
     )
 
-    if(NOT APPLE)
+    if (NOT APPLE)
         add_compile_options(
             -Wno-cast-function-type
         )
@@ -183,35 +215,36 @@ else()
         "$<$<CONFIG:Debug>:/RTC1>"
     )
 
-    if(MSVC_VERSION GREATER_EQUAL 1900)
+    if (MSVC_VERSION GREATER_EQUAL 1900)
         # SDL checks 2015+
         add_compile_options(/sdl)
     endif()
 
-    if(MSVC_VERSION LESS_EQUAL 1920)
+    if (MSVC_VERSION LESS_EQUAL 1920)
         # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
         add_compile_options(/Gm)
     endif()
 
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG)
-    if(EMSCRIPTEN)
+    add_definitions(-DDEBUG)
+    if (EMSCRIPTEN)
         add_link_options(-g)
     endif()
 endif()
 
 # Set compiler/platform specific flags and dependencies
 #--------------------------------------
-if(WIN32)
+if (WIN32)
 
-    if(MSVC)
+    if (MSVC)
         add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     endif()
     add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
 
-    if(USE_OPENGL_API)
+    if (USE_OPENGL_API)
         list(APPEND SrcLib ${SrcGL})
 
         add_definitions(-DUSE_OPENGL_API)
@@ -219,30 +252,30 @@ if(WIN32)
 
     list(APPEND SrcLib ${SrcWindows})
 
-elseif(IOS)
+elseif (IOS)
 
     list(APPEND SrcLib ${SrcIOS})
 
-elseif(APPLE)
+elseif (APPLE)
 
-    if(USE_METAL_API)
+    if (USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
     endif()
 
-    if(USE_INVERTED_Y_ON_MACOS)
+    if (USE_INVERTED_Y_ON_MACOS)
         add_definitions(-DUSE_INVERTED_Y_ON_MACOS)
     endif()
 
     list(APPEND SrcLib ${SrcMacOSX})
 
-elseif(UNIX)
+elseif (UNIX)
 
-    if(USE_WAYLAND_API)
+    if (USE_WAYLAND_API)
         list(APPEND SrcLib ${SrcWayland})
-    elseif(EMSCRIPTEN)
+    elseif (EMSCRIPTEN)
         list(APPEND SrcLib ${SrcWeb})
     else()
-        if(USE_OPENGL_API)
+        if (USE_OPENGL_API)
             list(APPEND SrcLib ${SrcGL})
 
             add_definitions(-DUSE_OPENGL_API)
@@ -250,7 +283,7 @@ elseif(UNIX)
         list(APPEND SrcLib ${SrcX11})
     endif()
 
-elseif(DJGPP)
+elseif (DJGPP)
 
     list(APPEND SrcLib ${SrcDOS})
 
@@ -258,14 +291,16 @@ endif()
 
 # Library
 #--------------------------------------
-add_library(minifb STATIC ${SrcLib})
+add_library(minifb STATIC
+    ${SrcLib}
+)
 add_library(minifb::minifb ALIAS minifb)
 
 # Link
 #--------------------------------------
-if(APPLE)
+if (APPLE)
 
-    if(IOS)
+    if (IOS)
         target_link_libraries(minifb PRIVATE
             "-framework UIKit"
             "-framework QuartzCore"
@@ -281,14 +316,21 @@ if(APPLE)
         )
     endif()
 
-elseif(UNIX)
+elseif (UNIX)
 
-    if(USE_WAYLAND_API)
+    if (USE_WAYLAND_API)
+        find_package(PkgConfig)
+        if (NOT PKG_CONFIG_FOUND)
+            message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
+        endif()
+        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor)
+
+        target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
+        target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
         target_link_libraries(minifb PRIVATE
-            "-lwayland-client"
-            "-lwayland-cursor"
+            ${WAYLAND_LIBRARIES}
         )
-    elseif(EMSCRIPTEN)
+    elseif (EMSCRIPTEN)
         add_link_options(
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
@@ -305,23 +347,36 @@ elseif(UNIX)
             "-sSINGLE_FILE"
         )
     else()
+        find_package(X11)
+        if (NOT X11_FOUND)
+            message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
+        endif()
+
         target_link_libraries(minifb PRIVATE
-            "-lX11"
+            X11::X11
             #"-lxkbcommon"
             #"-lXrandr" DPI NOT WORKING
         )
-        if(USE_OPENGL_API)
+        if (USE_OPENGL_API)
+            find_package(OpenGL)
+            if (NOT OpenGL_FOUND)
+                message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
+            endif()
             target_link_libraries(minifb PRIVATE
-                "-lGL"
+                OpenGL::GL
             )
         endif()
     endif()
 
-elseif(WIN32)
+elseif (WIN32)
 
-    if(USE_OPENGL_API)
+    if (USE_OPENGL_API)
+        find_package(OpenGL)
+        if (NOT OpenGL_FOUND)
+            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
+        endif()
         target_link_libraries(minifb PRIVATE
-            "Opengl32.lib"
+            OpenGL::GL
         )
     endif()
 
@@ -342,46 +397,21 @@ link_libraries(minifb)
 
 # Examples
 #--------------------------------------
-if(MINIFB_BUILD_EXAMPLES)
+if (MINIFB_BUILD_EXAMPLES)
 
-    if(NOT IOS)
-        add_executable(noise
-            tests/noise.c
-        )
+    if (NOT IOS)
 
-        add_executable(input_events
-            tests/input_events.c
-        )
+        add_executable(noise tests/noise.c)
+        add_executable(input_events tests/input_events.c)
+        add_executable(input_events_cpp tests/input_events_cpp.cpp)
+        add_executable(multiple_windows tests/multiple_windows.c)
+        add_executable(hidpi tests/hidpi.c)
+        add_executable(fullscreen tests/fullscreen.c)
+        add_executable(timer tests/timer.c)
+        add_executable(hide_cursor tests/hide_cursor.c)
+        add_executable(dpi_change_test tests/dpi_change_test.c)
 
-        add_executable(input_events_cpp
-            tests/input_events_cpp.cpp
-        )
-
-        add_executable(multiple_windows
-            tests/multiple_windows.c
-        )
-
-        add_executable(hidpi
-            tests/hidpi.c
-        )
-
-        add_executable(fullscreen
-            tests/fullscreen.c
-        )
-
-        add_executable(timer
-            tests/timer.c
-        )
-
-        add_executable(hide_cursor
-            tests/hide_cursor.c
-        )
-
-        add_executable(dpi_change_test
-            tests/dpi_change_test.c
-        )
-
-        if(EMSCRIPTEN)
+        if (EMSCRIPTEN)
 
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -401,8 +431,12 @@ if(MINIFB_BUILD_EXAMPLES)
 
         endif()
 
-        if(DJGPP)
-            add_executable(dos tests/dos/dos.c)
+        if (DJGPP)
+
+            add_executable(dos
+                tests/dos/dos.c
+            )
+
         endif()
 
     else()
@@ -429,7 +463,7 @@ endif()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
-if(MINIFB_BUILD_EXAMPLES)
+if (MINIFB_BUILD_EXAMPLES)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
     set_property(TARGET timer PROPERTY FOLDER "Tests")
     set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
@@ -441,6 +475,7 @@ if(MINIFB_BUILD_EXAMPLES)
     set_property(TARGET dpi_change_test PROPERTY FOLDER "Tests")
 endif()
 
+#--------------------------------------
 install(TARGETS minifb EXPORT minifb)
 file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
@@ -448,6 +483,6 @@ install(EXPORT minifb FILE minifb-config.cmake DESTINATION "${CMAKE_INSTALL_LIBD
 
 message(STATUS "Done " ${PROJECT_NAME})
 
-if(MSVC)
+if (MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
