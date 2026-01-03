@@ -5,6 +5,17 @@ message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
 
+# Detect iOS (it was added in CMake 3.14 but we require CMake 3.10)
+#--------------------------------------
+if(NOT DEFINED IOS)
+    if(DEFINED CMAKE_SYSTEM_NAME)
+        string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
+        if(CMAKE_SYSTEM_NAME_LOWER STREQUAL "ios")
+            set(IOS true)
+        endif()
+    endif()
+endif()
+
 # Sources
 #--------------------------------------
 set(SrcLib
@@ -20,11 +31,13 @@ set(SrcLib
     src/WindowData.h
 )
 
+#--
 set(SrcWindows
     src/windows/WinMiniFB.c
     src/windows/WindowData_Win.h
 )
 
+#--
 set(SrcMacOSX
     src/macosx/MacMiniFB.m
     src/macosx/OSXWindow.h
@@ -36,6 +49,7 @@ set(SrcMacOSX
     src/macosx/WindowData_OSX.h
 )
 
+#--
 set(SrcIOS
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
@@ -48,6 +62,7 @@ set(SrcIOS
     include/MiniFB_ios.h
 )
 
+#--
 set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
     src/wayland/WaylandMiniFB.c
@@ -55,6 +70,7 @@ set(SrcWayland
     src/MiniFB_linux.c
 )
 
+#--
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
@@ -66,10 +82,12 @@ set(SrcGL
     src/gl/MiniFB_GL.c
 )
 
+#--
 set(SrcWeb
     src/web/WebMiniFB.c
 )
 
+#--
 set(SrcDOS
     src/dos/DOSMiniFB.c
     src/dos/vesa.c
@@ -100,10 +118,10 @@ option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 if (APPLE AND NOT IOS)
     option(USE_METAL_API "Build the project using metal API code" ON)
     option(USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-elseif(UNIX AND NOT EMSCRIPTEN)
+elseif (UNIX AND NOT EMSCRIPTEN)
     option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
-elseif(WIN32)
+elseif (WIN32)
     option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
 endif()
 
@@ -145,8 +163,12 @@ if (NOT MSVC)
     endif()
 
     add_compile_options(
-        -Wall -Wextra
-        -Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough
+        -Wall
+        -Wextra
+        -Wno-switch
+        -Wno-unused-function
+        -Wno-unused-parameter
+        -Wno-implicit-fallthrough
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
     )
 
@@ -197,6 +219,7 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG)
+    add_definitions(-DDEBUG)
     if (EMSCRIPTEN)
         add_link_options(-g)
     endif()
@@ -219,11 +242,11 @@ if (WIN32)
 
     list(APPEND SrcLib ${SrcWindows})
 
-elseif(IOS)
+elseif (IOS)
 
     list(APPEND SrcLib ${SrcIOS})
 
-elseif(APPLE)
+elseif (APPLE)
 
     if (USE_METAL_API)
         add_definitions(-DUSE_METAL_API)
@@ -235,11 +258,11 @@ elseif(APPLE)
 
     list(APPEND SrcLib ${SrcMacOSX})
 
-elseif(UNIX)
+elseif (UNIX)
 
     if (USE_WAYLAND_API)
         list(APPEND SrcLib ${SrcWayland})
-    elseif(EMSCRIPTEN)
+    elseif (EMSCRIPTEN)
         list(APPEND SrcLib ${SrcWeb})
     else()
         if (USE_OPENGL_API)
@@ -250,7 +273,7 @@ elseif(UNIX)
         list(APPEND SrcLib ${SrcX11})
     endif()
 
-elseif(DJGPP)
+elseif (DJGPP)
 
     list(APPEND SrcLib ${SrcDOS})
 
@@ -258,7 +281,9 @@ endif()
 
 # Library
 #--------------------------------------
-add_library(minifb STATIC ${SrcLib})
+add_library(minifb STATIC
+    ${SrcLib}
+)
 add_library(minifb::minifb ALIAS minifb)
 
 # Link
@@ -281,14 +306,14 @@ if (APPLE)
         )
     endif()
 
-elseif(UNIX)
+elseif (UNIX)
 
     if (USE_WAYLAND_API)
         target_link_libraries(minifb PRIVATE
             "-lwayland-client"
             "-lwayland-cursor"
         )
-    elseif(EMSCRIPTEN)
+    elseif (EMSCRIPTEN)
         add_link_options(
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
@@ -317,7 +342,7 @@ elseif(UNIX)
         endif()
     endif()
 
-elseif(WIN32)
+elseif (WIN32)
 
     if (USE_OPENGL_API)
         target_link_libraries(minifb PRIVATE
@@ -376,7 +401,11 @@ if (MINIFB_BUILD_EXAMPLES)
         endif()
 
         if (DJGPP)
-            add_executable(dos tests/dos/dos.c)
+
+            add_executable(dos
+                tests/dos/dos.c
+            )
+
         endif()
 
     else()
@@ -414,6 +443,7 @@ if (MINIFB_BUILD_EXAMPLES)
     set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
 endif()
 
+#--------------------------------------
 install(TARGETS minifb EXPORT minifb)
 file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
