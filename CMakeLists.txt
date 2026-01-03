@@ -115,7 +115,7 @@ if(NOT MSVC)
 
     # Avoid default flag values
     #--------------------------------------
-    if (NOT DJGPP)
+    if(NOT DJGPP)
         set(CMAKE_C_FLAGS "")
         set(CMAKE_C_FLAGS_DEBUG "" )
         set(CMAKE_C_FLAGS_RELEASE "")
@@ -133,20 +133,27 @@ if(NOT MSVC)
     set(CMAKE_OBJCXX_FLAGS_DEBUG "")
     set(CMAKE_OBJCXX_FLAGS_RELEASE "")
 
-    # Set our flags
-    #--------------------------------------
-    if (DJGPP)
-        add_compile_options("$<$<CONFIG:Debug>:-gdwarf>")
-        add_compile_options("$<$<CONFIG:Debug>:-save-temps>")
+    if(DJGPP)
+        add_compile_options(
+            "$<$<CONFIG:Debug>:-gdwarf>"
+            "$<$<CONFIG:Debug>:-save-temps>"
+        )
     else()
-        add_compile_options("$<$<CONFIG:Debug>:-g>")
+        add_compile_options(
+            "$<$<CONFIG:Debug>:-g>"
+        )
     endif()
-    add_compile_options("$<IF:$<CONFIG:Debug>,-O0,-O2>")
-    add_compile_options(-Wall -Wextra)
-    add_compile_options(-Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough)
+
+    add_compile_options(
+        -Wall -Wextra
+        -Wno-switch -Wno-unused-function -Wno-unused-parameter -Wno-implicit-fallthrough
+        "$<IF:$<CONFIG:Debug>,-O0,-O2>"
+    )
 
     if(NOT APPLE)
-        add_compile_options(-Wno-cast-function-type)
+        add_compile_options(
+            -Wno-cast-function-type
+        )
     endif()
 
 else()
@@ -202,7 +209,7 @@ if(WIN32)
     if(MSVC)
         add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     endif()
-    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 (we are in 2020)
+    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
 
     if(USE_OPENGL_API)
         list(APPEND SrcLib ${SrcGL})
@@ -414,6 +421,6 @@ install(EXPORT minifb FILE minifb-config.cmake DESTINATION "${CMAKE_INSTALL_LIBD
 
 message(STATUS "Done " ${PROJECT_NAME})
 
-if (MSVC)
+if(MSVC)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
