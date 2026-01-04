@@ -11,16 +11,15 @@ struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
 if (!window)
     return 0;
 
-buffer = (uint32_t *) malloc(800 * 600 * 4);
+uint32_t *buffer = malloc(800 * 600 * 4);
 
+mfb_update_state state;
 do {
-    int state;
-
     // TODO: add some fancy rendering to the buffer of size 800 * 600
 
     state = mfb_update_ex(window, buffer, 800, 600);
 
-    if (state < 0) {
+    if (state != STATE_OK) {
         window = NULL;
         break;
     }
@@ -580,16 +579,20 @@ Example app:
 
 ```c
 int main() {
-    struct mfb_window *window = mfb_open_ex("my_app", 320, 240);
+    struct mfb_window *window = mfb_open("my_app", 320, 240);
     if (!window)
         return 0;
 
-    uint32_t *buffer = (uint32_t *) malloc(g_width * g_height * 4);
+    uint32_t *buffer = malloc(320 * 240 * 4);
 
     mfb_update_state state;
     do {
-        state = mfb_update_ex(window, buffer, 320, 200);
+        // TODO: add some fancy rendering to the buffer of size 320 * 240
+
+        state = mfb_update_ex(window, buffer, 320, 240);
+
         if (state != STATE_OK) {
+            window = NULL;
             break;
         }
     } while(mfb_wait_sync(window));
