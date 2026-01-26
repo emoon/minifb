@@ -7,24 +7,30 @@ MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy t
 An example is the best way to show how it works:
 
 ```c
-struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
-if (!window)
+int main() {
+    struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
+    if (window == NULL)
+        return 0;
+
+    uint32_t *buffer = malloc(800 * 600 * 4);
+
+    mfb_update_state state;
+    do {
+        // TODO: add some fancy rendering to the buffer of size 800 * 600
+
+        state = mfb_update_ex(window, buffer, 800, 600);
+
+        if (state != STATE_OK)
+            break;
+
+    } while(mfb_wait_sync(window));
+
+    free(buffer);
+    buffer = NULL;
+    window = NULL;
+
     return 0;
-
-buffer = (uint32_t *) malloc(800 * 600 * 4);
-
-do {
-    int state;
-
-    // TODO: add some fancy rendering to the buffer of size 800 * 600
-
-    state = mfb_update_ex(window, buffer, 800, 600);
-
-    if (state < 0) {
-        window = NULL;
-        break;
-    }
-} while(mfb_wait_sync(window));
+}
 ```
 
 ### How it works
@@ -102,7 +108,7 @@ void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb
 #### Callback Signature Examples
 
 ```c
-void active(struct mfb_window *window, bool isActive) {
+void active(struct mfb_window *window, bool is_active) {
     // Called when window gains/loses focus
 }
 
@@ -117,17 +123,17 @@ bool close(struct mfb_window *window) {
     return true;    // true => confirm close, false => cancel
 }
 
-void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
-    if(key == KB_KEY_ESCAPE) {
+void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
+    if (key == KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
 
-void char_input(struct mfb_window *window, unsigned int charCode) {
+void char_input(struct mfb_window *window, unsigned int char_code) {
     // Unicode character input
 }
 
-void mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+void mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     // Mouse button events
 }
 
@@ -135,7 +141,7 @@ void mouse_move(struct mfb_window *window, int x, int y) {
     // Mouse movement (note: fired frequently)
 }
 
-void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     // Mouse wheel/scroll events
 }
 ```
@@ -181,10 +187,10 @@ void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned 
 // Input state
 int                 mfb_get_mouse_x(struct mfb_window *window);
 int                 mfb_get_mouse_y(struct mfb_window *window);
-float               mfb_get_mouse_scroll_x(struct mfb_window *window);    // Resets after call
-float               mfb_get_mouse_scroll_y(struct mfb_window *window);    // Resets after call
+float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Resets after call
+float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Resets after call
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1=pressed, 0=released (8 buttons)
-const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);        // 1=pressed, 0=released
+const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // 1=pressed, 0=released
 ```
 
 ### Per-Window Data
@@ -480,14 +486,15 @@ All other MiniFB functions work normally, including timers and user data managem
 
 ```objective-c
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    if(g_window == 0x0) {
-        g_width  = [UIScreen mainScreen].bounds.size.width;
-        g_height = [UIScreen mainScreen].bounds.size.height;
-        g_window = mfb_open("noise", g_width, g_height);
-        if(g_window != 0x0) {
-            g_buffer = malloc(g_width * g_height * 4);
-        }
+    g_width  = [UIScreen mainScreen].bounds.size.width;
+    g_height = [UIScreen mainScreen].bounds.size.height;
+
+    g_window = mfb_open("noise", g_width, g_height);
+    if (g_window == NULL) {
+        return NO;
     }
+
+    g_buffer = malloc(g_width * g_height * 4);
 
     return YES;
 }
@@ -503,16 +510,17 @@ All other MiniFB functions work normally, including timers and user data managem
 }
 
 - (void) OnUpdateFrame {
-    if(g_buffer != 0x0) {
+    if(g_buffer != NULL) {
         // Do your wonderful rendering stuff
     }
 
-    mfb_update_state state = mfb_update(g_window, g_buffer);
+    mfb_update_state state = mfb_update_ex(g_window, g_buffer, g_width, g_height);
     if (state != STATE_OK) {
         free(g_buffer);
-        g_buffer  = 0x0;
-        g_width   = 0;
-        g_height  = 0;
+        g_window = NULL;
+        g_buffer = NULL;
+        g_width  = 0;
+        g_height = 0;
     }
 }
 ```
@@ -580,19 +588,26 @@ Example app:
 
 ```c
 int main() {
-    struct mfb_window *window = mfb_open_ex("my_app", 320, 240);
-    if (!window)
+    struct mfb_window *window = mfb_open("my_app", 320, 240);
+    if (window == NULL)
         return 0;
 
-    uint32_t *buffer = (uint32_t *) malloc(g_width * g_height * 4);
+    uint32_t *buffer = malloc(320 * 240 * 4);
 
     mfb_update_state state;
     do {
-        state = mfb_update_ex(window, buffer, 320, 200);
-        if (state != STATE_OK) {
+        // TODO: add some fancy rendering to the buffer of size 320 * 240
+
+        state = mfb_update_ex(window, buffer, 320, 240);
+
+        if (state != STATE_OK)
             break;
-        }
+
     } while(mfb_wait_sync(window));
+
+    free(buffer);
+    buffer = NULL;
+    window = NULL;
 
     return 0;
 }
@@ -760,9 +775,7 @@ Then in your `CMakeLists.txt` file, include the following:
 add_subdirectory(dependencies/minifb)
 
 # Link MiniFB to your project:
-target_link_libraries(${PROJECT_NAME}
-    minifb
-)
+target_link_libraries(${PROJECT_NAME} minifb)
 ```
 
 Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
