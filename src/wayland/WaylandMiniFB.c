@@ -8,6 +8,7 @@
 
 #include <MiniFB.h>
 #include "generated/xdg-shell-client-protocol.h"
+#include "generated/xdg-decoration-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
@@ -68,6 +69,10 @@ destroy(SWindowData *window_data)
     }
 
     // Destroy XDG objects with correct functions
+    if (window_data_way->toplevel_decoration) {
+        zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
+        window_data_way->toplevel_decoration = 0x0;
+    }
     if (window_data_way->toplevel) {
         xdg_toplevel_destroy(window_data_way->toplevel);
         window_data_way->toplevel = 0x0;
@@ -79,6 +84,10 @@ destroy(SWindowData *window_data)
     if (window_data_way->shell) {
         xdg_wm_base_destroy(window_data_way->shell);
         window_data_way->shell = 0x0;
+    }
+    if (window_data_way->decoration_manager) {
+        zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
+        window_data_way->decoration_manager = 0x0;
     }
     if (window_data_way->surface) {
         wl_surface_destroy(window_data_way->surface);
@@ -562,6 +571,20 @@ wl_shm_listener shm_listener = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void
+toplevel_decoration_configure(void *data, struct zxdg_toplevel_decoration_v1 *decoration, uint32_t mode)
+{
+    kUnused(data);
+    kUnused(decoration);
+    kUnused(mode);
+}
+
+static const struct zxdg_toplevel_decoration_v1_listener toplevel_decoration_listener = {
+    .configure = toplevel_decoration_configure
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
 {
     SWindowData         *window_data     = (SWindowData *) data;
@@ -602,6 +625,13 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
             wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
         }
     }
+    else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0)
+    {
+        uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_way->decoration_manager = (struct zxdg_decoration_manager_v1 *)
+            wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
+    }
 }
 
 static const struct
@@ -636,11 +666,18 @@ static const struct xdg_surface_listener shell_surface_listener = {
 static void
 handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states)
 {
-    kUnused(data);
     kUnused(xdg_toplevel);
-    kUnused(width);
-    kUnused(height);
     kUnused(states);
+
+    SWindowData *window_data = (SWindowData *) data;
+    if (window_data && width > 0 && height > 0) {
+        if (window_data->window_width != (unsigned) width || window_data->window_height != (unsigned) height) {
+            window_data->window_width  = (unsigned) width;
+            window_data->window_height = (unsigned) height;
+            resize_dst(window_data, (unsigned) width, (unsigned) height);
+            kCall(resize_func, window_data->window_width, window_data->window_height);
+        }
+    }
 #if defined(_DEBUG)
     printf("Toplevel configure: width=%d, height=%d\n", width, height);
 #endif
@@ -649,8 +686,22 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
 static void
 handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 {
-    kUnused(data);
     kUnused(xdg_toplevel);
+
+    SWindowData *window_data = (SWindowData *) data;
+    if (window_data) {
+        bool destroy = false;
+
+        // Keep parity with X11: ask close callback before closing.
+        if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
+            destroy = true;
+        }
+
+        if (destroy) {
+            window_data->close = true;
+        }
+    }
+
 #if defined(_DEBUG)
     printf("Toplevel close\n");
 #endif
@@ -822,8 +873,45 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
             goto out;
         }
 
+        if (window_data_way->decoration_manager) {
+            window_data_way->toplevel_decoration =
+                zxdg_decoration_manager_v1_get_toplevel_decoration(window_data_way->decoration_manager, window_data_way->toplevel);
+            if (window_data_way->toplevel_decoration) {
+                zxdg_toplevel_decoration_v1_add_listener(window_data_way->toplevel_decoration,
+                                                         &toplevel_decoration_listener, window_data);
+                if (flags & WF_BORDERLESS) {
+                    zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
+                                                         ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+                }
+                else {
+                    zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
+                                                         ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+                }
+            }
+        }
+
+        if (flags & WF_FULLSCREEN) {
+            xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
+            xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
+            xdg_toplevel_set_fullscreen(window_data_way->toplevel, 0x0);
+        }
+        else if (flags & WF_FULLSCREEN_DESKTOP) {
+            xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
+            xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
+            xdg_toplevel_set_maximized(window_data_way->toplevel);
+        }
+        else {
+            xdg_toplevel_set_min_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
+            if (flags & WF_RESIZABLE) {
+                xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
+            }
+            else {
+                xdg_toplevel_set_max_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
+            }
+        }
+
         xdg_toplevel_set_title(window_data_way->toplevel, title);
-        xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, 0x0);
+        xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
 
         // Commit without a buffer to trigger initial configure event
         wl_surface_commit(window_data_way->surface);

@@ -16,6 +16,11 @@ struct wl_shm_pool;
 struct wl_surface;
 struct wl_shell_surface;
 struct wl_buffer;
+struct xdg_wm_base;
+struct xdg_surface;
+struct xdg_toplevel;
+struct zxdg_decoration_manager_v1;
+struct zxdg_toplevel_decoration_v1;
 
 typedef struct
 {
@@ -36,6 +41,8 @@ typedef struct
     struct wl_surface       *surface;
     struct xdg_surface      *shell_surface;
     struct xdg_toplevel     *toplevel;
+    struct zxdg_decoration_manager_v1 *decoration_manager;
+    struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
 
     uint32_t                seat_version;
     uint32_t                shm_format;
