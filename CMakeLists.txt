@@ -324,7 +324,7 @@ elseif (UNIX)
         if (NOT PKG_CONFIG_FOUND)
             message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
         endif()
-        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor)
+        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
 
         target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
         target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})

@@ -21,6 +21,9 @@ struct xdg_surface;
 struct xdg_toplevel;
 struct zxdg_decoration_manager_v1;
 struct zxdg_toplevel_decoration_v1;
+struct xkb_context;
+struct xkb_keymap;
+struct xkb_state;
 
 typedef struct
 {
@@ -51,4 +54,7 @@ typedef struct
     int                     fd;
 
     struct mfb_timer        *timer;
+    struct xkb_context      *xkb_context;
+    struct xkb_keymap       *xkb_keymap;
+    struct xkb_state        *xkb_state;
 } SWindowData_Way;

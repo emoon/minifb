@@ -16,6 +16,7 @@
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include <inttypes.h>
 #include <limits.h>
@@ -33,6 +34,13 @@
 
 #include <sys/mman.h>
 
+#ifndef MFB_APP_ID
+    #define MFB_APP_ID minifb
+#endif
+
+#define MFB_STR_IMPL(x) #x
+#define MFB_STR(x) MFB_STR_IMPL(x)
+
 void init_keycodes();
 
 static void
@@ -45,6 +53,15 @@ destroy_window_data(SWindowData *window_data)
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if(window_data_way != 0x0) {
+        if (window_data_way->xkb_state) {
+            xkb_state_unref(window_data_way->xkb_state);
+        }
+        if (window_data_way->xkb_keymap) {
+            xkb_keymap_unref(window_data_way->xkb_keymap);
+        }
+        if (window_data_way->xkb_context) {
+            xkb_context_unref(window_data_way->xkb_context);
+        }
         mfb_timer_destroy(window_data_way->timer);
         memset(window_data_way, 0, sizeof(SWindowData_Way));
         free(window_data_way);
@@ -154,11 +171,68 @@ static struct xdg_wm_base_listener shell_listener = {
 static void
 keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size)
 {
-    kUnused(data);
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
     kUnused(keyboard);
-    kUnused(format);
-    kUnused(fd);
-    kUnused(size);
+
+    if (window_data_way == 0x0) {
+        if (fd >= 0) {
+            close(fd);
+        }
+        fprintf(stderr, "WaylandMiniFB error: keyboard_keymap received without valid window state.\n");
+        return;
+    }
+
+    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 || fd < 0 || size == 0) {
+        if (fd >= 0) {
+            close(fd);
+        }
+        fprintf(stderr, "WaylandMiniFB error: unsupported or invalid keymap payload.\n");
+        return;
+    }
+
+    char *keymap_data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (keymap_data == MAP_FAILED) {
+        fprintf(stderr, "WaylandMiniFB error: failed to map Wayland keymap (%s).\n", strerror(errno));
+        return;
+    }
+
+    if (window_data_way->xkb_context == 0x0) {
+        window_data_way->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        if (window_data_way->xkb_context == 0x0) {
+            munmap(keymap_data, size);
+            fprintf(stderr, "WaylandMiniFB error: xkb_context_new failed.\n");
+            return;
+        }
+    }
+
+    struct xkb_keymap *keymap = xkb_keymap_new_from_string(window_data_way->xkb_context,
+                                                            keymap_data,
+                                                            XKB_KEYMAP_FORMAT_TEXT_V1,
+                                                            XKB_KEYMAP_COMPILE_NO_FLAGS);
+    munmap(keymap_data, size);
+    if (keymap == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: xkb_keymap_new_from_string failed.\n");
+        return;
+    }
+
+    struct xkb_state *state = xkb_state_new(keymap);
+    if (state == 0x0) {
+        xkb_keymap_unref(keymap);
+        fprintf(stderr, "WaylandMiniFB error: xkb_state_new failed.\n");
+        return;
+    }
+
+    if (window_data_way->xkb_state) {
+        xkb_state_unref(window_data_way->xkb_state);
+    }
+    if (window_data_way->xkb_keymap) {
+        xkb_keymap_unref(window_data_way->xkb_keymap);
+    }
+
+    window_data_way->xkb_keymap = keymap;
+    window_data_way->xkb_state = state;
 }
 
 // Notification that this seat's keyboard focus is on a certain surface.
@@ -207,6 +281,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     kUnused(time);
 
     SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if(key < 512) {
         mfb_key key_code = (mfb_key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
@@ -247,6 +322,17 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
         window_data->key_status[key_code] = is_pressed;
         kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+
+        if (window_data_way && window_data_way->xkb_state) {
+            xkb_keycode_t xkb_keycode = (xkb_keycode_t) key + 8;
+            xkb_state_update_key(window_data_way->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+            if (is_pressed) {
+                uint32_t codepoint = xkb_state_key_get_utf32(window_data_way->xkb_state, xkb_keycode);
+                if (codepoint != 0) {
+                    kCall(char_input_func, codepoint);
+                }
+            }
+        }
     }
 }
 
@@ -909,6 +995,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
                 xdg_toplevel_set_max_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
             }
         }
+
+        if (flags & WF_ALWAYS_ON_TOP) {
+            fprintf(stderr, "WaylandMiniFB warning: WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.\n");
+        }
+
+        xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
 
         xdg_toplevel_set_title(window_data_way->toplevel, title);
         xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
