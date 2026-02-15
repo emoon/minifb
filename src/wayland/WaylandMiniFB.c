@@ -35,6 +35,7 @@
 
 #include <sys/mman.h>
 
+//-------------------------------------
 #ifndef MFB_APP_ID
     #define MFB_APP_ID minifb
 #endif
@@ -42,15 +43,16 @@
 #define MFB_STR_IMPL(x) #x
 #define MFB_STR(x) MFB_STR_IMPL(x)
 
-void init_keycodes();
-
 #define WAYLAND_MAX_OUTPUTS 16
 #define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
 
+//-------------------------------------
+void init_keycodes();
+
+//-------------------------------------
 static void
-update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_way)
-{
-    if (window_data == 0x0 || window_data_way == 0x0 || window_data_way->xkb_state == 0x0) {
+update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_way) {
+    if (window_data == NULL || window_data_way == NULL || window_data_way->xkb_state == NULL) {
         return;
     }
 
@@ -58,46 +60,53 @@ update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= KB_MOD_SHIFT;
     }
+
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= KB_MOD_CONTROL;
     }
+
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= KB_MOD_ALT;
     }
+
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= KB_MOD_SUPER;
     }
 }
 
+//-------------------------------------
 static void
-destroy_window_data(SWindowData *window_data)
-{
-    if(window_data == 0x0) {
+destroy_window_data(SWindowData *window_data) {
+    if(window_data == NULL) {
         fprintf(stderr, "WaylandMiniFB error: destroy_window_data called with a null window pointer.\n");
         return;
     }
 
     if(window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
-        window_data->draw_buffer = 0x0;
+        window_data->draw_buffer = NULL;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if(window_data_way != 0x0) {
+    if(window_data_way != NULL) {
         if (window_data_way->shm_ptr && window_data_way->shm_ptr != MAP_FAILED && window_data_way->shm_length > 0) {
             munmap(window_data_way->shm_ptr, window_data_way->shm_length);
-            window_data_way->shm_ptr = 0x0;
+            window_data_way->shm_ptr = NULL;
             window_data_way->shm_length = 0;
         }
+
         if (window_data_way->xkb_state) {
             xkb_state_unref(window_data_way->xkb_state);
         }
+
         if (window_data_way->xkb_keymap) {
             xkb_keymap_unref(window_data_way->xkb_keymap);
         }
+
         if (window_data_way->xkb_context) {
             xkb_context_unref(window_data_way->xkb_context);
         }
+
         mfb_timer_destroy(window_data_way->timer);
         memset(window_data_way, 0, sizeof(SWindowData_Way));
         free(window_data_way);
@@ -106,100 +115,120 @@ destroy_window_data(SWindowData *window_data)
     free(window_data);
 }
 
+//-------------------------------------
 static void
-destroy(SWindowData *window_data)
-{
-    if(window_data == 0x0) {
+destroy(SWindowData *window_data) {
+    if(window_data == NULL) {
         fprintf(stderr, "WaylandMiniFB error: destroy called with a null window pointer.\n");
         return;
     }
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == 0x0 || window_data_way->display == 0x0) {
+    if (window_data_way == NULL || window_data_way->display == NULL) {
         fprintf(stderr, "WaylandMiniFB error: missing Wayland display state during destroy, forcing local cleanup.\n");
         if (window_data_way) {
             if (window_data_way->toplevel_decoration) {
                 zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
-                window_data_way->toplevel_decoration = 0x0;
+                window_data_way->toplevel_decoration = NULL;
             }
+
             if (window_data_way->toplevel) {
                 xdg_toplevel_destroy(window_data_way->toplevel);
-                window_data_way->toplevel = 0x0;
+                window_data_way->toplevel = NULL;
             }
+
             if (window_data_way->shell_surface) {
                 xdg_surface_destroy(window_data_way->shell_surface);
-                window_data_way->shell_surface = 0x0;
+                window_data_way->shell_surface = NULL;
             }
+
             if (window_data_way->shell) {
                 xdg_wm_base_destroy(window_data_way->shell);
-                window_data_way->shell = 0x0;
+                window_data_way->shell = NULL;
             }
+
             if (window_data_way->decoration_manager) {
                 zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
-                window_data_way->decoration_manager = 0x0;
+                window_data_way->decoration_manager = NULL;
             }
+
             if (window_data_way->fractional_scale) {
                 wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
-                window_data_way->fractional_scale = 0x0;
+                window_data_way->fractional_scale = NULL;
             }
+
             if (window_data_way->fractional_scale_manager) {
                 wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
-                window_data_way->fractional_scale_manager = 0x0;
+                window_data_way->fractional_scale_manager = NULL;
             }
+
             if (window_data_way->surface) {
                 wl_surface_destroy(window_data_way->surface);
-                window_data_way->surface = 0x0;
+                window_data_way->surface = NULL;
             }
+
             if (window_data_way->cursor_surface) {
                 wl_surface_destroy(window_data_way->cursor_surface);
-                window_data_way->cursor_surface = 0x0;
+                window_data_way->cursor_surface = NULL;
             }
+
             if (window_data_way->cursor_theme) {
                 wl_cursor_theme_destroy(window_data_way->cursor_theme);
-                window_data_way->cursor_theme = 0x0;
+                window_data_way->cursor_theme = NULL;
             }
+
             if (window_data_way->shm_pool) {
                 wl_shm_pool_destroy(window_data_way->shm_pool);
-                window_data_way->shm_pool = 0x0;
+                window_data_way->shm_pool = NULL;
             }
-        if (window_data_way->shm) {
-            wl_shm_destroy(window_data_way->shm);
-            window_data_way->shm = 0x0;
-        }
-        for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
-            if (window_data_way->outputs[i]) {
-                wl_output_destroy(window_data_way->outputs[i]);
-                window_data_way->outputs[i] = 0x0;
+
+            if (window_data_way->shm) {
+                wl_shm_destroy(window_data_way->shm);
+                window_data_way->shm = NULL;
             }
-        }
-        window_data_way->output_count = 0;
-        window_data_way->current_output = 0x0;
-        window_data_way->current_output_scale = 1;
-        if (window_data_way->compositor) {
-            wl_compositor_destroy(window_data_way->compositor);
-            window_data_way->compositor = 0x0;
+
+            for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
+                if (window_data_way->outputs[i]) {
+                    wl_output_destroy(window_data_way->outputs[i]);
+                    window_data_way->outputs[i] = NULL;
+                }
             }
+
+            window_data_way->output_count = 0;
+            window_data_way->current_output = NULL;
+            window_data_way->current_output_scale = 1;
+
+            if (window_data_way->compositor) {
+                wl_compositor_destroy(window_data_way->compositor);
+                window_data_way->compositor = NULL;
+            }
+
             if (window_data_way->keyboard) {
                 wl_keyboard_destroy(window_data_way->keyboard);
-                window_data_way->keyboard = 0x0;
+                window_data_way->keyboard = NULL;
             }
+
             if (window_data_way->pointer) {
                 wl_pointer_destroy(window_data_way->pointer);
-                window_data_way->pointer = 0x0;
+                window_data_way->pointer = NULL;
             }
+
             if (window_data_way->seat) {
                 wl_seat_destroy(window_data_way->seat);
-                window_data_way->seat = 0x0;
+                window_data_way->seat = NULL;
             }
+
             if (window_data_way->registry) {
                 wl_registry_destroy(window_data_way->registry);
-                window_data_way->registry = 0x0;
+                window_data_way->registry = NULL;
+            }
+
+            if (window_data_way->fd >= 0) {
+                close(window_data_way->fd);
+                window_data_way->fd = -1;
             }
         }
-        if (window_data_way && window_data_way->fd >= 0) {
-            close(window_data_way->fd);
-            window_data_way->fd = -1;
-        }
+
         destroy_window_data(window_data);
         return;
     }
@@ -207,35 +236,42 @@ destroy(SWindowData *window_data)
     // Destroy XDG objects with correct functions
     if (window_data_way->toplevel_decoration) {
         zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
-        window_data_way->toplevel_decoration = 0x0;
+        window_data_way->toplevel_decoration = NULL;
     }
+
     if (window_data_way->toplevel) {
         xdg_toplevel_destroy(window_data_way->toplevel);
-        window_data_way->toplevel = 0x0;
+        window_data_way->toplevel = NULL;
     }
+
     if (window_data_way->shell_surface) {
         xdg_surface_destroy(window_data_way->shell_surface);
-        window_data_way->shell_surface = 0x0;
+        window_data_way->shell_surface = NULL;
     }
+
     if (window_data_way->shell) {
         xdg_wm_base_destroy(window_data_way->shell);
-        window_data_way->shell = 0x0;
+        window_data_way->shell = NULL;
     }
+
     if (window_data_way->decoration_manager) {
         zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
-        window_data_way->decoration_manager = 0x0;
+        window_data_way->decoration_manager = NULL;
     }
+
     if (window_data_way->fractional_scale) {
         wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
-        window_data_way->fractional_scale = 0x0;
+        window_data_way->fractional_scale = NULL;
     }
+
     if (window_data_way->fractional_scale_manager) {
         wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
-        window_data_way->fractional_scale_manager = 0x0;
+        window_data_way->fractional_scale_manager = NULL;
     }
+
     if (window_data_way->surface) {
         wl_surface_destroy(window_data_way->surface);
-        window_data_way->surface = 0x0;
+        window_data_way->surface = NULL;
     }
 
     // Restore KILL macro for remaining Wayland objects
@@ -244,22 +280,24 @@ destroy(SWindowData *window_data)
     {                                                   \
         if (window_data_way->NAME)                      \
             wl_##NAME##_destroy(window_data_way->NAME); \
-        window_data_way->NAME = 0x0;                    \
+        window_data_way->NAME = NULL;                   \
     } while (0)
 
     //KILL(buffer);
     if(window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
-        window_data->draw_buffer = 0x0;
+        window_data->draw_buffer = NULL;
     }
+
     // Clean up cursor objects
     if (window_data_way->cursor_surface) {
         wl_surface_destroy(window_data_way->cursor_surface);
-        window_data_way->cursor_surface = 0x0;
+        window_data_way->cursor_surface = NULL;
     }
+
     if (window_data_way->cursor_theme) {
         wl_cursor_theme_destroy(window_data_way->cursor_theme);
-        window_data_way->cursor_theme = 0x0;
+        window_data_way->cursor_theme = NULL;
     }
 
     KILL(shm_pool);
@@ -267,54 +305,59 @@ destroy(SWindowData *window_data)
     for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
         if (window_data_way->outputs[i]) {
             wl_output_destroy(window_data_way->outputs[i]);
-            window_data_way->outputs[i] = 0x0;
+            window_data_way->outputs[i] = NULL;
         }
     }
+
     window_data_way->output_count = 0;
-    window_data_way->current_output = 0x0;
+    window_data_way->current_output = NULL;
     window_data_way->current_output_scale = 1;
     KILL(compositor);
     KILL(keyboard);
     if (window_data_way->pointer) {
         wl_pointer_destroy(window_data_way->pointer);
-        window_data_way->pointer = 0x0;
+        window_data_way->pointer = NULL;
     }
     KILL(seat);
     KILL(registry);
-#undef KILL
     wl_display_disconnect(window_data_way->display);
 
     if (window_data_way->fd >= 0) {
         close(window_data_way->fd);
         window_data_way->fd = -1;
     }
+
     destroy_window_data(window_data);
 }
 
+#undef KILL
+
+//-------------------------------------
 static void
-handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial)
-{
+handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
     kUnused(data);
     xdg_wm_base_pong(xdg_wm_base, serial);
 }
 
+//-------------------------------------
 static struct xdg_wm_base_listener shell_listener = {
     handle_ping
 };
 
+//-------------------------------------
 // This event provides a file descriptor to the client which can be memory-mapped
 // to provide a keyboard mapping description.
 // format: keymap format
 // fd:     keymap file descriptor
 // size:   keymap size, in bytes
+//-------------------------------------
 static void
-keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size)
-{
+keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size) {
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     kUnused(keyboard);
 
-    if (window_data_way == 0x0) {
+    if (window_data_way == NULL) {
         if (fd >= 0) {
             close(fd);
         }
@@ -337,9 +380,9 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         return;
     }
 
-    if (window_data_way->xkb_context == 0x0) {
+    if (window_data_way->xkb_context == NULL) {
         window_data_way->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-        if (window_data_way->xkb_context == 0x0) {
+        if (window_data_way->xkb_context == NULL) {
             munmap(keymap_data, size);
             fprintf(stderr, "WaylandMiniFB error: xkb_context_new failed.\n");
             return;
@@ -351,13 +394,13 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
                                                             XKB_KEYMAP_FORMAT_TEXT_V1,
                                                             XKB_KEYMAP_COMPILE_NO_FLAGS);
     munmap(keymap_data, size);
-    if (keymap == 0x0) {
+    if (keymap == NULL) {
         fprintf(stderr, "WaylandMiniFB error: xkb_keymap_new_from_string failed.\n");
         return;
     }
 
     struct xkb_state *state = xkb_state_new(keymap);
-    if (state == 0x0) {
+    if (state == NULL) {
         xkb_keymap_unref(keymap);
         fprintf(stderr, "WaylandMiniFB error: xkb_state_new failed.\n");
         return;
@@ -374,13 +417,14 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
     window_data_way->xkb_state = state;
 }
 
+//-------------------------------------
 // Notification that this seat's keyboard focus is on a certain surface.
 // serial:  serial number of the enter event
 // surface: surface gaining keyboard focus
 // keys:    the currently pressed keys
+//-------------------------------------
 static void
-keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys)
-{
+keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {
     kUnused(keyboard);
     kUnused(serial);
     kUnused(surface);
@@ -391,12 +435,13 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kCall(active_func, true);
 }
 
+//-------------------------------------
 // The leave notification is sent before the enter notification for the new focus.
 // serial:  serial number of the leave event
 // surface: surface that lost keyboard focus
+//-------------------------------------
 static void
-keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface)
-{
+keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface) {
     kUnused(keyboard);
     kUnused(serial);
     kUnused(surface);
@@ -406,15 +451,16 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kCall(active_func, false);
 }
 
+//-------------------------------------
 // A key was pressed or released. The time argument is a timestamp with
 // millisecond granularity, with an undefined base.
 // serial: serial number of the key event
 // time:   timestamp with millisecond granularity
 // key:    key that produced the event
 // state:  physical state of the key
+//-------------------------------------
 static void
-keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state)
-{
+keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
     kUnused(keyboard);
     kUnused(serial);
     kUnused(time);
@@ -435,9 +481,9 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 }
             }
         }
+
         else {
-            switch (key_code)
-            {
+            switch (key_code) {
                 case KB_KEY_LEFT_SHIFT:
                 case KB_KEY_RIGHT_SHIFT:
                     if(is_pressed)
@@ -477,6 +523,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     }
 }
 
+//-------------------------------------
 // Notifies clients that the modifier and/or group state has changed,
 // and it should update its local state.
 // serial:         serial number of the modifiers event
@@ -484,14 +531,14 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 // mods_latched:   latched modifiers
 // mods_locked:    locked modifiers
 // group:          keyboard layout
+//-------------------------------------
 static void
-keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
-{
+keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
     kUnused(keyboard);
     kUnused(serial);
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_way && window_data_way->xkb_state) {
         xkb_state_update_mask(window_data_way->xkb_state,
                               mods_depressed,
@@ -503,18 +550,20 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
     }
 }
 
+//-------------------------------------
 // Informs the client about the keyboard's repeat rate and delay.
 // rate:  the rate of repeating keys in characters per second
 // delay: delay in milliseconds since key down until repeating starts
+//-------------------------------------
 static void
-keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay)
-{
+keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay) {
     kUnused(data);
     kUnused(keyboard);
     kUnused(rate);
     kUnused(delay);
 }
 
+//-------------------------------------
 static const struct
 wl_keyboard_listener keyboard_listener = {
     .keymap      = keyboard_keymap,
@@ -522,11 +571,10 @@ wl_keyboard_listener keyboard_listener = {
     .leave       = keyboard_leave,
     .key         = keyboard_key,
     .modifiers   = keyboard_modifiers,
-    .repeat_info = 0x0,
+    .repeat_info = NULL,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 // Notification that this seat's pointer is focused on a certain surface.
 //
 // When a seat's focus enters a surface, the pointer image is
@@ -537,9 +585,9 @@ wl_keyboard_listener keyboard_listener = {
 // surface: surface entered by the pointer
 // sx:      surface-local x coordinate
 // sy:      surface-local y coordinate
+//-------------------------------------
 static void
-pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy)
-{
+pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy) {
     //kUnused(pointer);
     //kUnused(serial);
     kUnused(surface);
@@ -554,14 +602,14 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     window_data_way->pointer_serial_valid = 1;
 
     if (window_data->is_cursor_visible) {
-        if (window_data_way->default_cursor == 0x0 ||
+        if (window_data_way->default_cursor == NULL ||
             window_data_way->default_cursor->image_count == 0 ||
-            window_data_way->cursor_surface == 0x0) {
+            window_data_way->cursor_surface == NULL) {
             return;
         }
         image  = window_data_way->default_cursor->images[0];
         buffer = wl_cursor_image_get_buffer(image);
-        if (buffer == 0x0) {
+        if (buffer == NULL) {
             return;
         }
 
@@ -577,21 +625,22 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     //fprintf(stderr, "Pointer entered surface %p at %d %d (serial: %d)\n", surface, sx, sy, serial);
 }
 
+//-------------------------------------
 // Notification that this seat's pointer is no longer focused on a certain surface.
 //
 // The leave notification is sent before the enter notification for the new focus.
 //
 // serial:  serial number of the leave event
 // surface: surface left by the pointer
+//-------------------------------------
 static void
-pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface)
-{
+pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface) {
     kUnused(pointer);
     kUnused(serial);
     kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_way) {
         window_data_way->pointer_serial_valid = 0;
     }
@@ -599,6 +648,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     //fprintf(stderr, "Pointer left surface %p (serial: %d)\n", surface, serial);
 }
 
+//-------------------------------------
 // Notification of pointer location change.
 //
 // The arguments sx and sy are the location relative to the focused surface.
@@ -606,9 +656,9 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 // time:  timestamp with millisecond granularity
 // sx:    surface-local x coordinate
 // sy:    surface-local y coordinate
+//-------------------------------------
 static void
-pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy)
-{
+pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
     kUnused(pointer);
     kUnused(time);
 
@@ -621,6 +671,7 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
     //printf("Pointer moved at %f %f\n", sx / 256.0f, sy / 256.0f);
 }
 
+//-------------------------------------
 // Mouse button click and release notifications.
 //
 // The location of the click is given by the last motion or enter
@@ -639,15 +690,15 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
 // time:   timestamp with millisecond granularity
 // button: button that produced the event
 // state:  physical state of the button
+//-------------------------------------
 static void
-pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
-{
+pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
     kUnused(pointer);
     kUnused(time);
 
     //printf("Pointer button '%d'(%d)\n", button, state);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_way) {
         window_data_way->pointer_serial = serial;
         window_data_way->pointer_serial_valid = 1;
@@ -660,6 +711,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 #endif
 }
 
+//-------------------------------------
 //  Scroll and other axis notifications.
 //
 //  For scroll events (vertical and horizontal scroll axes), the
@@ -680,9 +732,9 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 //  time:  timestamp with millisecond granularity
 //  axis:  axis type
 //  value: length of vector in surface-local coordinate space
+//-------------------------------------
 static void
-pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value)
-{
+pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {
     kUnused(pointer);
     kUnused(time);
     kUnused(axis);
@@ -699,12 +751,14 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     }
 }
 
+//-------------------------------------
 static void
 frame(void *data, struct wl_pointer *pointer) {
     kUnused(data);
     kUnused(pointer);
 }
 
+//-------------------------------------
 static void
 axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
     kUnused(data);
@@ -712,6 +766,7 @@ axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
     kUnused(axis_source);
 }
 
+//-------------------------------------
 static void
 axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) {
     kUnused(data);
@@ -720,6 +775,7 @@ axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) 
     kUnused(axis);
 }
 
+//-------------------------------------
 static void
 axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
     kUnused(data);
@@ -728,6 +784,7 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
     kUnused(discrete);
 }
 
+//-------------------------------------
 static const struct
 wl_pointer_listener pointer_listener = {
     .enter         = pointer_enter,
@@ -735,44 +792,40 @@ wl_pointer_listener pointer_listener = {
     .motion        = pointer_motion,
     .button        = pointer_button,
     .axis          = pointer_axis,
-    .frame         = 0x0,
-    .axis_source   = 0x0,
-    .axis_stop     = 0x0,
-    .axis_discrete = 0x0,
+    .frame         = NULL,
+    .axis_source   = NULL,
+    .axis_stop     = NULL,
+    .axis_discrete = NULL,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static void
-seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps)
-{
+seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps) {
     kUnused(data);
 
-    SWindowData         *window_data = (SWindowData *) data;
+    SWindowData       *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_way->keyboard)
-    {
+    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_way->keyboard) {
         window_data_way->keyboard = wl_seat_get_keyboard(seat);
         wl_keyboard_add_listener(window_data_way->keyboard, &keyboard_listener, window_data);
     }
-    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_way->keyboard)
-    {
+
+    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_way->keyboard) {
         wl_keyboard_destroy(window_data_way->keyboard);
-        window_data_way->keyboard = 0x0;
+        window_data_way->keyboard = NULL;
     }
 
-    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer)
-    {
+    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer) {
         window_data_way->pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(window_data_way->pointer, &pointer_listener, window_data);
     }
-    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer)
-    {
+    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer) {
         wl_pointer_destroy(window_data_way->pointer);
-        window_data_way->pointer = 0x0;
+        window_data_way->pointer = NULL;
     }
 }
 
+//-------------------------------------
 static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
     kUnused(data);
@@ -784,31 +837,29 @@ seat_name(void *data, struct wl_seat *seat, const char *name) {
 #endif
 }
 
+//-------------------------------------
 static const struct
 wl_seat_listener seat_listener = {
     .capabilities = seat_capabilities,
-    .name         = 0x0,
+    .name         = NULL,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 // pixel format description
 //
 // Informs the client about a valid pixel format that can be used
 // for buffers. Known formats include argb8888 and xrgb8888.
 //
 // format: buffer pixel format
+//-------------------------------------
 static void
-shm_format(void *data, struct wl_shm *shm, uint32_t format)
-{
+shm_format(void *data, struct wl_shm *shm, uint32_t format) {
     kUnused(shm);
 
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way->shm_format == -1u)
-    {
-        switch (format)
-        {
+    if (window_data_way->shm_format == -1u) {
+        switch (format) {
             // We could do RGBA, but that would not be what is expected from minifb...
             // case WL_SHM_FORMAT_ARGB8888:
             case WL_SHM_FORMAT_XRGB8888:
@@ -821,37 +872,36 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
     }
 }
 
+//-------------------------------------
 static const struct
 wl_shm_listener shm_listener = {
     .format = shm_format
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static void
-fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale)
-{
+fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale) {
     kUnused(fractional_scale);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
-    if (window_data_way == 0x0) {
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_way == NULL) {
         return;
     }
     window_data_way->preferred_scale_120 = scale;
 }
 
+//-------------------------------------
 static const struct wp_fractional_scale_v1_listener fractional_scale_listener = {
     .preferred_scale = fractional_scale_preferred_scale,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static int
-find_output_index(SWindowData_Way *window_data_way, struct wl_output *output)
-{
-    if (window_data_way == 0x0 || output == 0x0) {
+find_output_index(SWindowData_Way *window_data_way, struct wl_output *output) {
+    if (window_data_way == NULL || output == NULL) {
         return -1;
     }
+
     for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
         if (window_data_way->outputs[i] == output) {
             return (int) i;
@@ -860,10 +910,10 @@ find_output_index(SWindowData_Way *window_data_way, struct wl_output *output)
     return -1;
 }
 
+//-------------------------------------
 static void
 output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
-                int32_t subpixel, const char *make, const char *model, int32_t transform)
-{
+                int32_t subpixel, const char *make, const char *model, int32_t transform) {
     kUnused(data);
     kUnused(output);
     kUnused(x);
@@ -876,9 +926,9 @@ output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int3
     kUnused(transform);
 }
 
+//-------------------------------------
 static void
-output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width, int32_t height, int32_t refresh)
-{
+output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
     kUnused(data);
     kUnused(output);
     kUnused(flags);
@@ -887,19 +937,19 @@ output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width,
     kUnused(refresh);
 }
 
+//-------------------------------------
 static void
-output_done(void *data, struct wl_output *output)
-{
+output_done(void *data, struct wl_output *output) {
     kUnused(data);
     kUnused(output);
 }
 
+//-------------------------------------
 static void
-output_scale(void *data, struct wl_output *output, int32_t factor)
-{
+output_scale(void *data, struct wl_output *output, int32_t factor) {
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
-    if (window_data_way == 0x0 || output == 0x0) {
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_way == NULL || output == NULL) {
         return;
     }
 
@@ -916,25 +966,30 @@ output_scale(void *data, struct wl_output *output, int32_t factor)
 }
 
 #if defined(WL_OUTPUT_NAME_SINCE_VERSION)
+
+//-------------------------------------
 static void
-output_name(void *data, struct wl_output *output, const char *name)
-{
+output_name(void *data, struct wl_output *output, const char *name) {
     kUnused(data);
     kUnused(output);
     kUnused(name);
 }
+
 #endif
 
 #if defined(WL_OUTPUT_DESCRIPTION_SINCE_VERSION)
+
+//-------------------------------------
 static void
-output_description(void *data, struct wl_output *output, const char *description)
-{
+output_description(void *data, struct wl_output *output, const char *description) {
     kUnused(data);
     kUnused(output);
     kUnused(description);
 }
+
 #endif
 
+//-------------------------------------
 static const struct wl_output_listener output_listener = {
     .geometry = output_geometry,
     .mode = output_mode,
@@ -948,13 +1003,13 @@ static const struct wl_output_listener output_listener = {
 #endif
 };
 
+//-------------------------------------
 static void
-surface_enter(void *data, struct wl_surface *surface, struct wl_output *output)
-{
+surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
-    if (window_data_way == 0x0 || output == 0x0) {
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_way == NULL || output == NULL) {
         return;
     }
 
@@ -968,67 +1023,64 @@ surface_enter(void *data, struct wl_surface *surface, struct wl_output *output)
     }
 }
 
+//-------------------------------------
 static void
-surface_leave(void *data, struct wl_surface *surface, struct wl_output *output)
-{
+surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
-    if (window_data_way == 0x0 || output == 0x0) {
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_way == NULL || output == NULL) {
         return;
     }
 
     if (window_data_way->current_output == output) {
-        window_data_way->current_output = 0x0;
+        window_data_way->current_output = NULL;
         window_data_way->current_output_scale = 1;
     }
 }
 
+//-------------------------------------
 static const struct wl_surface_listener surface_listener = {
     .enter = surface_enter,
     .leave = surface_leave,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static void
-toplevel_decoration_configure(void *data, struct zxdg_toplevel_decoration_v1 *decoration, uint32_t mode)
-{
+toplevel_decoration_configure(void *data, struct zxdg_toplevel_decoration_v1 *decoration, uint32_t mode) {
     kUnused(data);
     kUnused(decoration);
     kUnused(mode);
 }
 
+//-------------------------------------
 static const struct zxdg_toplevel_decoration_v1_listener toplevel_decoration_listener = {
     .configure = toplevel_decoration_configure
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 static void
-registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version)
-{
+registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version) {
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (strcmp(iface, "wl_compositor") == 0)
-    {
+    if (strcmp(iface, "wl_compositor") == 0) {
         // Use version 1 for compositor (stable)
         window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
     }
-    else if (strcmp(iface, "wl_shm") == 0)
-    {
+
+    else if (strcmp(iface, "wl_shm") == 0) {
         // Use version 1 for shm (stable)
         window_data_way->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
         if (window_data_way->shm) {
             wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
-            window_data_way->cursor_theme = wl_cursor_theme_load(0x0, 32, window_data_way->shm);
+            window_data_way->cursor_theme = wl_cursor_theme_load(NULL, 32, window_data_way->shm);
             if (window_data_way->cursor_theme) {
                 window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
             }
         }
     }
-    else if (strcmp(iface, "xdg_wm_base") == 0)
-    {
+
+    else if (strcmp(iface, "xdg_wm_base") == 0) {
         // Bind to the maximum version supported by BOTH server and client stubs.
         // This keeps compatibility with old compositors and avoids receiving
         // events newer than the generated protocol code can decode.
@@ -1036,20 +1088,19 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
         if (window_data_way->shell) {
-            xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, 0x0);
+            xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, NULL);
         }
     }
-    else if (strcmp(iface, "wl_seat") == 0)
-    {
+
+    else if (strcmp(iface, "wl_seat") == 0) {
         // Use version 1 for seat (stable)
         window_data_way->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
-        if (window_data_way->seat)
-        {
+        if (window_data_way->seat) {
             wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
         }
     }
-    else if (strcmp(iface, "wl_output") == 0)
-    {
+
+    else if (strcmp(iface, "wl_output") == 0) {
         uint32_t client_version = (uint32_t) wl_output_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
         struct wl_output *output = (struct wl_output *) wl_registry_bind(registry, id, &wl_output_interface, use_version);
@@ -1065,15 +1116,15 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
             }
         }
     }
-    else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0)
-    {
+
+    else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0) {
         uint32_t client_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_way->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
             wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
     }
-    else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0)
-    {
+
+    else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
         uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_way->decoration_manager = (struct zxdg_decoration_manager_v1 *)
@@ -1081,15 +1132,16 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 }
 
+//-------------------------------------
 static const struct
 wl_registry_listener registry_listener = {
     .global        = registry_global,
-    .global_remove = 0x0,
+    .global_remove = NULL,
 };
 
+//-------------------------------------
 static void
-handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial)
-{
+handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial) {
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
 
@@ -1099,7 +1151,7 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
     // when requested after the first configure handshake.
     if (!window_data_way->startup_state_applied) {
         if (window_data_way->request_fullscreen) {
-            xdg_toplevel_set_fullscreen(window_data_way->toplevel, 0x0);
+            xdg_toplevel_set_fullscreen(window_data_way->toplevel, NULL);
         }
         else if (window_data_way->request_maximized) {
             xdg_toplevel_set_maximized(window_data_way->toplevel);
@@ -1111,20 +1163,23 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
     if (!window_data->is_initialized) {
         wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer,
                          window_data->dst_offset_x, window_data->dst_offset_y);
+
         wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y,
                          window_data->dst_width, window_data->dst_height);
+
         wl_surface_commit(window_data_way->surface);
         window_data->is_initialized = true;
     }
 }
 
+//-------------------------------------
 static const struct xdg_surface_listener shell_surface_listener = {
     handle_shell_surface_configure
 };
 
+//-------------------------------------
 static void
-handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states)
-{
+handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states) {
     kUnused(xdg_toplevel);
     kUnused(states);
 
@@ -1142,9 +1197,9 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
 #endif
 }
 
+//-------------------------------------
 static void
-handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
-{
+handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
     kUnused(xdg_toplevel);
 
     SWindowData *window_data = (SWindowData *) data;
@@ -1166,9 +1221,9 @@ handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel)
 #endif
 }
 
+//-------------------------------------
 static void
-handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height)
-{
+handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height) {
     kUnused(data);
     kUnused(xdg_toplevel);
     kUnused(width);
@@ -1178,9 +1233,9 @@ handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, 
 #endif
 }
 
+//-------------------------------------
 static void
-handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities)
-{
+handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities) {
     kUnused(data);
     kUnused(xdg_toplevel);
     kUnused(capabilities);
@@ -1189,6 +1244,7 @@ handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, s
 #endif
 }
 
+//-------------------------------------
 static const struct xdg_toplevel_listener toplevel_listener = {
     .configure        = handle_toplevel_configure,
     .close            = handle_toplevel_close,
@@ -1201,28 +1257,26 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 #endif
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 struct mfb_window *
-mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
-{
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     if (width == 0 || height == 0) {
         fprintf(stderr, "WaylandMiniFB error: invalid window size %ux%u.\n", width, height);
-        return 0x0;
+        return NULL;
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
-    if(window_data == 0x0) {
+    if(window_data == NULL) {
         fprintf(stderr, "WaylandMiniFB error: failed to allocate SWindowData.\n");
-        return 0x0;
+        return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
-    if(window_data_way == 0x0) {
+    if(window_data_way == NULL) {
         fprintf(stderr, "WaylandMiniFB error: failed to allocate SWindowData_Way.\n");
         free(window_data);
-        return 0x0;
+        return NULL;
     }
     memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data_way->fd = -1;
@@ -1231,12 +1285,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
     window_data_way->shm_format = -1u;
 
-    window_data_way->display = wl_display_connect(0x0);
+    window_data_way->display = wl_display_connect(NULL);
     if (!window_data_way->display) {
         fprintf(stderr, "WaylandMiniFB error: failed to connect to Wayland display.\n");
         free(window_data);
         free(window_data_way);
-        return 0x0;
+        return NULL;
     }
     window_data_way->registry = wl_display_get_registry(window_data_way->display);
     if (!window_data_way->registry) {
@@ -1256,12 +1310,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     if (!window_data_way->decoration_manager) {
         fprintf(stderr, "WaylandMiniFB warning: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.\n");
     }
+
     if (!window_data_way->fractional_scale_manager) {
         fprintf(stderr, "WaylandMiniFB warning: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.\n");
     }
+
     if (!window_data_way->seat) {
         fprintf(stderr, "WaylandMiniFB warning: wl_seat is unavailable; keyboard and pointer input will not be available.\n");
     }
+
     if (window_data_way->output_count == 0) {
         fprintf(stderr, "WaylandMiniFB warning: wl_output is unavailable; monitor scale tracking will use fallback values.\n");
     }
@@ -1272,6 +1329,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         fprintf(stderr, "WaylandMiniFB error: compositor does not expose a supported shared memory format.\n");
         goto out;
     }
+
     if (!window_data_way->compositor)
     {
         fprintf(stderr, "WaylandMiniFB error: Wayland compositor interface is unavailable.\n");
@@ -1279,10 +1337,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
 
     char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
-    if (xdg_rt_dir == 0x0) {
+    if (xdg_rt_dir == NULL) {
         fprintf(stderr, "WaylandMiniFB error: XDG_RUNTIME_DIR is not set.\n");
         goto out;
     }
+
     char shmfile[PATH_MAX];
     uint32_t ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX", xdg_rt_dir);
     if (ret >= sizeof(shmfile))
@@ -1309,6 +1368,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         fprintf(stderr, "WaylandMiniFB error: requested window buffer size exceeds Wayland pool limits.\n");
         goto out;
     }
+
     int length = (int) length_sz;
 
     if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1)
@@ -1317,12 +1377,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         goto out;
     }
 
-    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+    window_data_way->shm_ptr = (uint32_t *) mmap(NULL, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
     if (window_data_way->shm_ptr == MAP_FAILED)
     {
         fprintf(stderr, "WaylandMiniFB error: mmap failed for shared memory buffer (%s).\n", strerror(errno));
         goto out;
     }
+
     window_data_way->shm_length = length_sz;
     window_data_way->shm_pool_size = length_sz;
 
@@ -1336,21 +1397,20 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     window_data->is_cursor_visible = true;
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
-    if (window_data_way->shm_pool == 0x0) {
+    if (window_data_way->shm_pool == NULL) {
         fprintf(stderr, "WaylandMiniFB error: wl_shm_create_pool failed.\n");
         goto out;
     }
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
-    if (window_data->draw_buffer == 0x0) {
+    if (window_data->draw_buffer == NULL) {
         fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed.\n");
         goto out;
     }
 
     window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
-    if (!window_data_way->surface)
-    {
+    if (!window_data_way->surface) {
         fprintf(stderr, "WaylandMiniFB error: failed to create Wayland surface.\n");
         goto out;
     }
@@ -1367,8 +1427,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
 
     window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
-    if (!window_data_way->cursor_surface)
-    {
+    if (!window_data_way->cursor_surface) {
         fprintf(stderr, "WaylandMiniFB error: failed to create Wayland cursor surface.\n");
         goto out;
     }
@@ -1377,8 +1436,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     if (window_data_way->shell)
     {
         window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
-        if (!window_data_way->shell_surface)
-        {
+        if (!window_data_way->shell_surface) {
             fprintf(stderr, "WaylandMiniFB error: failed to create xdg_surface.\n");
             goto out;
         }
@@ -1386,8 +1444,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, window_data);
 
         window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
-        if (!window_data_way->toplevel)
-        {
+        if (!window_data_way->toplevel) {
             fprintf(stderr, "WaylandMiniFB error: failed to create xdg_toplevel.\n");
             goto out;
         }
@@ -1455,7 +1512,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
 
     window_data_way->timer = mfb_timer_create();
-    if (window_data_way->timer == 0x0) {
+    if (window_data_way->timer == NULL) {
         fprintf(stderr, "WaylandMiniFB error: failed to create frame timer.\n");
         goto out;
     }
@@ -1471,36 +1528,36 @@ out:
     fprintf(stderr, "WaylandMiniFB error: mfb_open_ex failed and is cleaning up partially initialized resources.\n");
     destroy(window_data);
 
-    return 0x0;
+    return NULL;
 }
 
+//-------------------------------------
 // done event
 //
 // Notify the client when the related request is done.
 //
 // callback_data: request-specific data for the callback
+//-------------------------------------
 static void
-frame_done(void *data, struct wl_callback *callback, uint32_t cookie)
-{
+frame_done(void *data, struct wl_callback *callback, uint32_t cookie) {
     kUnused(cookie);
     wl_callback_destroy(callback);
 
     *(uint32_t *)data = 1;
 }
 
+//-------------------------------------
 static const struct
 wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 mfb_update_state
-mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height)
-{
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     uint32_t done = 0;
 
-    if(window == 0x0) {
+    if(window == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_update_ex called with a null window pointer.\n");
         return STATE_INVALID_WINDOW;
     }
@@ -1512,20 +1569,22 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return STATE_EXIT;
     }
 
-    if(buffer == 0x0) {
+    if(buffer == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_update_ex called with a null buffer.\n");
         return STATE_INVALID_BUFFER;
     }
+
     if (width == 0 || height == 0) {
         fprintf(stderr, "WaylandMiniFB error: mfb_update_ex called with invalid buffer size %ux%u.\n", width, height);
         return STATE_INVALID_BUFFER;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == 0x0) {
+    if (window_data_way == NULL) {
         fprintf(stderr, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_ex.\n");
         return STATE_INVALID_WINDOW;
     }
+
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
         fprintf(stderr, "WaylandMiniFB error: invalid Wayland display state during mfb_update_ex.\n");
@@ -1558,7 +1617,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
             uint32_t *old_shm_ptr = window_data_way->shm_ptr;
             size_t old_shm_length = window_data_way->shm_length;
-            uint32_t *new_shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+            uint32_t *new_shm_ptr = (uint32_t *) mmap(NULL, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
             if (new_shm_ptr == MAP_FAILED)
             {
                 fprintf(stderr, "WaylandMiniFB error: mmap failed while resizing shared memory buffer (%s).\n", strerror(errno));
@@ -1578,7 +1637,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         struct wl_buffer *new_draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                         width, height,
                                         new_buffer_stride, window_data_way->shm_format);
-        if (new_draw_buffer == 0x0) {
+        if (new_draw_buffer == NULL) {
             fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed while resizing buffer.\n");
             window_data->buffer_width  = old_buffer_width;
             window_data->buffer_height = old_buffer_height;
@@ -1598,7 +1657,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     // update shm buffer
-    if (window_data_way->shm_ptr == 0x0 || window_data_way->shm_ptr == MAP_FAILED) {
+    if (window_data_way->shm_ptr == NULL || window_data_way->shm_ptr == MAP_FAILED) {
         fprintf(stderr, "WaylandMiniFB error: shared memory buffer is not mapped.\n");
         return STATE_INTERNAL_ERROR;
     }
@@ -1635,12 +1694,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 mfb_update_state
-mfb_update_events(struct mfb_window *window)
-{
-    if(window == 0x0) {
+mfb_update_events(struct mfb_window *window) {
+    if(window == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_update_events called with a null window pointer.\n");
         return STATE_INVALID_WINDOW;
     }
@@ -1653,7 +1710,7 @@ mfb_update_events(struct mfb_window *window)
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == 0x0) {
+    if (window_data_way == NULL) {
         fprintf(stderr, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_events.\n");
         return STATE_INVALID_WINDOW;
     }
@@ -1720,10 +1777,10 @@ mfb_update_events(struct mfb_window *window)
     return STATE_OK;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern double   g_time_for_frame;
 
+//-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
     if (window == NULL) {
@@ -1749,7 +1806,7 @@ mfb_wait_sync(struct mfb_window *window) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync has a null Wayland display handle.\n");
         return false;
     }
-    if (window_data_specific->timer == 0x0) {
+    if (window_data_specific->timer == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync missing frame timer state.\n");
         return false;
     }
@@ -1833,9 +1890,10 @@ mfb_wait_sync(struct mfb_window *window) {
     return true;
 }
 
+//-------------------------------------
 bool
 mfb_wait_sync2(struct mfb_window *window) {
-    if(window == 0x0) {
+    if(window == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync2 called with a null window pointer.\n");
         return false;
     }
@@ -1848,10 +1906,11 @@ mfb_wait_sync2(struct mfb_window *window) {
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == 0x0 || window_data_way->display == 0x0 || window_data_way->timer == 0x0) {
+    if (window_data_way == NULL || window_data_way->display == NULL || window_data_way->timer == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync2 missing Wayland display or timer state.\n");
         return false;
     }
+
     double      current;
     uint32_t    millis = 1;
     while(1) {
@@ -1884,13 +1943,12 @@ mfb_wait_sync2(struct mfb_window *window) {
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 extern short int g_keycodes[512];
 
+//-------------------------------------
 void
-init_keycodes(void)
-{
+init_keycodes(void) {
     // Clear keys
     for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
         g_keycodes[i] = 0;
@@ -2014,13 +2072,11 @@ init_keycodes(void)
     g_keycodes[KEY_KPENTER]    = KB_KEY_KP_ENTER;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-
     SWindowData *window_data = (SWindowData *) window;
-    if (window_data == 0x0) {
+    if (window_data == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_set_viewport called with a null window pointer.\n");
         return false;
     }
@@ -2030,6 +2086,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
                 offset_x, width, window_data->window_width);
         return false;
     }
+
     if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
         fprintf(stderr, "WaylandMiniFB error: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).\n",
                 offset_y, height, window_data->window_height);
@@ -2045,13 +2102,12 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     return true;
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 1.0f, y = 1.0f;
 
-    if(window != 0x0) {
+    if(window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
         SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
         if (window_data_way) {
@@ -2084,8 +2140,7 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
