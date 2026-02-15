@@ -95,4 +95,4 @@ if [ -f "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" ]; then
       "$OUTPUT_DIR/fractional-scale-v1-protocol.c"
 fi
 
-echo "Protocolos generados exitosamente en $OUTPUT_DIR"
+echo "Protocols successfully generated in $OUTPUT_DIR"
