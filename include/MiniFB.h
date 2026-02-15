@@ -113,8 +113,8 @@ unsigned            mfb_get_drawable_height(struct mfb_window *window);
 void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
-float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel X as a sum. When you call this function it resets.
-float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel Y as a sum. When you call this function it resets.
+float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Last mouse wheel delta X.
+float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Last mouse wheel delta Y.
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
 

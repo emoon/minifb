@@ -50,7 +50,7 @@ See <https://github.com/emoon/minifb/blob/master/tests/noise.c> for a complete e
 |----------|----------|--------|
 | **Windows** | GDI, OpenGL | Fully supported |
 | **macOS** | Cocoa, Metal | Fully supported |
-| **Linux/Unix** | X11, Wayland | Fully supported (X11), Some issues (Wayland) |
+| **Linux/Unix** | X11, Wayland | Fully supported (X11, Wayland) |
 | **iOS** | Metal | Beta |
 | **Android** | Native | Beta |
 | **Web** | WASM | Beta |
@@ -363,6 +363,7 @@ cmake .. -DUSE_OPENGL_API=OFF -DUSE_WAYLAND_API=OFF
 ### Wayland (Linux)
 
 Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
+The Wayland backend supports the same core MiniFB API surface as the other primary desktop backends (Windows, macOS, X11).
 
 #### Dependencies for Wayland on Ubuntu/Debian
 
@@ -795,7 +796,7 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Multi-window | ✓ | ✓ | ✓ | ✓ | - | - | - | ✗ |
 | Viewport | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
 | Cursor hiding | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
-| Monitor DPI | ✓ | ✓ | Limited | Limited | ✓ | ✓ | Fixed | Fixed |
+| Monitor DPI | ✓ | ✓ | Limited | ✓ | ✓ | ✓ | Fixed | Fixed |
 | Target FPS | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
 

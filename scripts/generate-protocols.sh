@@ -83,4 +83,16 @@ if [ -f "$PROTOCOL_DIR/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml" ]
       "$OUTPUT_DIR/xdg-decoration-protocol.c"
 fi
 
-echo "Protocolos generados exitosamente en $OUTPUT_DIR"
+# Fractional scale (staging)
+if [ -f "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" ]; then
+    echo "Generando fractional-scale-v1..."
+    wayland-scanner client-header \
+      "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" \
+      "$OUTPUT_DIR/fractional-scale-v1-client-protocol.h"
+
+    wayland-scanner private-code \
+      "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" \
+      "$OUTPUT_DIR/fractional-scale-v1-protocol.c"
+fi
+
+echo "Protocols successfully generated in $OUTPUT_DIR"

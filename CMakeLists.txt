@@ -69,6 +69,8 @@ set(SrcIOS
 #--
 set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
+    src/wayland/generated/xdg-decoration-protocol.c
+    src/wayland/generated/fractional-scale-v1-protocol.c
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
@@ -323,7 +325,7 @@ elseif (UNIX)
         if (NOT PKG_CONFIG_FOUND)
             message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
         endif()
-        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor)
+        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
 
         target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
         target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
