@@ -9,6 +9,7 @@
 #include <MiniFB.h>
 #include "generated/xdg-shell-client-protocol.h"
 #include "generated/xdg-decoration-client-protocol.h"
+#include "generated/fractional-scale-v1-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
@@ -43,6 +44,31 @@
 
 void init_keycodes();
 
+#define WAYLAND_MAX_OUTPUTS 16
+#define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
+
+static void
+update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_way)
+{
+    if (window_data == 0x0 || window_data_way == 0x0 || window_data_way->xkb_state == 0x0) {
+        return;
+    }
+
+    window_data->mod_keys = 0;
+    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+        window_data->mod_keys |= KB_MOD_SHIFT;
+    }
+    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
+        window_data->mod_keys |= KB_MOD_CONTROL;
+    }
+    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+        window_data->mod_keys |= KB_MOD_ALT;
+    }
+    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
+        window_data->mod_keys |= KB_MOD_SUPER;
+    }
+}
+
 static void
 destroy_window_data(SWindowData *window_data)
 {
@@ -51,8 +77,18 @@ destroy_window_data(SWindowData *window_data)
         return;
     }
 
+    if(window_data->draw_buffer) {
+        wl_buffer_destroy(window_data->draw_buffer);
+        window_data->draw_buffer = 0x0;
+    }
+
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if(window_data_way != 0x0) {
+        if (window_data_way->shm_ptr && window_data_way->shm_ptr != MAP_FAILED && window_data_way->shm_length > 0) {
+            munmap(window_data_way->shm_ptr, window_data_way->shm_length);
+            window_data_way->shm_ptr = 0x0;
+            window_data_way->shm_length = 0;
+        }
         if (window_data_way->xkb_state) {
             xkb_state_unref(window_data_way->xkb_state);
         }
@@ -81,6 +117,85 @@ destroy(SWindowData *window_data)
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == 0x0 || window_data_way->display == 0x0) {
         fprintf(stderr, "WaylandMiniFB error: missing Wayland display state during destroy, forcing local cleanup.\n");
+        if (window_data_way) {
+            if (window_data_way->toplevel_decoration) {
+                zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
+                window_data_way->toplevel_decoration = 0x0;
+            }
+            if (window_data_way->toplevel) {
+                xdg_toplevel_destroy(window_data_way->toplevel);
+                window_data_way->toplevel = 0x0;
+            }
+            if (window_data_way->shell_surface) {
+                xdg_surface_destroy(window_data_way->shell_surface);
+                window_data_way->shell_surface = 0x0;
+            }
+            if (window_data_way->shell) {
+                xdg_wm_base_destroy(window_data_way->shell);
+                window_data_way->shell = 0x0;
+            }
+            if (window_data_way->decoration_manager) {
+                zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
+                window_data_way->decoration_manager = 0x0;
+            }
+            if (window_data_way->fractional_scale) {
+                wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
+                window_data_way->fractional_scale = 0x0;
+            }
+            if (window_data_way->fractional_scale_manager) {
+                wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
+                window_data_way->fractional_scale_manager = 0x0;
+            }
+            if (window_data_way->surface) {
+                wl_surface_destroy(window_data_way->surface);
+                window_data_way->surface = 0x0;
+            }
+            if (window_data_way->cursor_surface) {
+                wl_surface_destroy(window_data_way->cursor_surface);
+                window_data_way->cursor_surface = 0x0;
+            }
+            if (window_data_way->cursor_theme) {
+                wl_cursor_theme_destroy(window_data_way->cursor_theme);
+                window_data_way->cursor_theme = 0x0;
+            }
+            if (window_data_way->shm_pool) {
+                wl_shm_pool_destroy(window_data_way->shm_pool);
+                window_data_way->shm_pool = 0x0;
+            }
+        if (window_data_way->shm) {
+            wl_shm_destroy(window_data_way->shm);
+            window_data_way->shm = 0x0;
+        }
+        for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
+            if (window_data_way->outputs[i]) {
+                wl_output_destroy(window_data_way->outputs[i]);
+                window_data_way->outputs[i] = 0x0;
+            }
+        }
+        window_data_way->output_count = 0;
+        window_data_way->current_output = 0x0;
+        window_data_way->current_output_scale = 1;
+        if (window_data_way->compositor) {
+            wl_compositor_destroy(window_data_way->compositor);
+            window_data_way->compositor = 0x0;
+            }
+            if (window_data_way->keyboard) {
+                wl_keyboard_destroy(window_data_way->keyboard);
+                window_data_way->keyboard = 0x0;
+            }
+            if (window_data_way->pointer) {
+                wl_pointer_destroy(window_data_way->pointer);
+                window_data_way->pointer = 0x0;
+            }
+            if (window_data_way->seat) {
+                wl_seat_destroy(window_data_way->seat);
+                window_data_way->seat = 0x0;
+            }
+            if (window_data_way->registry) {
+                wl_registry_destroy(window_data_way->registry);
+                window_data_way->registry = 0x0;
+            }
+        }
         if (window_data_way && window_data_way->fd >= 0) {
             close(window_data_way->fd);
             window_data_way->fd = -1;
@@ -109,6 +224,14 @@ destroy(SWindowData *window_data)
     if (window_data_way->decoration_manager) {
         zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
         window_data_way->decoration_manager = 0x0;
+    }
+    if (window_data_way->fractional_scale) {
+        wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
+        window_data_way->fractional_scale = 0x0;
+    }
+    if (window_data_way->fractional_scale_manager) {
+        wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
+        window_data_way->fractional_scale_manager = 0x0;
     }
     if (window_data_way->surface) {
         wl_surface_destroy(window_data_way->surface);
@@ -141,6 +264,15 @@ destroy(SWindowData *window_data)
 
     KILL(shm_pool);
     KILL(shm);
+    for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
+        if (window_data_way->outputs[i]) {
+            wl_output_destroy(window_data_way->outputs[i]);
+            window_data_way->outputs[i] = 0x0;
+        }
+    }
+    window_data_way->output_count = 0;
+    window_data_way->current_output = 0x0;
+    window_data_way->current_output_scale = 1;
     KILL(compositor);
     KILL(keyboard);
     if (window_data_way->pointer) {
@@ -292,47 +424,10 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     if(key < 512) {
         mfb_key key_code = (mfb_key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        switch (key_code)
-        {
-            case KB_KEY_LEFT_SHIFT:
-            case KB_KEY_RIGHT_SHIFT:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_SHIFT;
-                else
-                    window_data->mod_keys &= ~KB_MOD_SHIFT;
-                break;
-
-            case KB_KEY_LEFT_CONTROL:
-            case KB_KEY_RIGHT_CONTROL:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_CONTROL;
-                else
-                    window_data->mod_keys &= ~KB_MOD_CONTROL;
-                break;
-
-            case KB_KEY_LEFT_ALT:
-            case KB_KEY_RIGHT_ALT:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_ALT;
-                else
-                    window_data->mod_keys &= ~KB_MOD_ALT;
-                break;
-
-            case KB_KEY_LEFT_SUPER:
-            case KB_KEY_RIGHT_SUPER:
-                if(is_pressed)
-                    window_data->mod_keys |= KB_MOD_SUPER;
-                else
-                    window_data->mod_keys &= ~KB_MOD_SUPER;
-                break;
-        }
-
-        window_data->key_status[key_code] = is_pressed;
-        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
-
         if (window_data_way && window_data_way->xkb_state) {
             xkb_keycode_t xkb_keycode = (xkb_keycode_t) key + 8;
             xkb_state_update_key(window_data_way->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+            update_mod_keys_from_xkb(window_data, window_data_way);
             if (is_pressed) {
                 uint32_t codepoint = xkb_state_key_get_utf32(window_data_way->xkb_state, xkb_keycode);
                 if (codepoint != 0) {
@@ -340,6 +435,45 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 }
             }
         }
+        else {
+            switch (key_code)
+            {
+                case KB_KEY_LEFT_SHIFT:
+                case KB_KEY_RIGHT_SHIFT:
+                    if(is_pressed)
+                        window_data->mod_keys |= KB_MOD_SHIFT;
+                    else
+                        window_data->mod_keys &= ~KB_MOD_SHIFT;
+                    break;
+
+                case KB_KEY_LEFT_CONTROL:
+                case KB_KEY_RIGHT_CONTROL:
+                    if(is_pressed)
+                        window_data->mod_keys |= KB_MOD_CONTROL;
+                    else
+                        window_data->mod_keys &= ~KB_MOD_CONTROL;
+                    break;
+
+                case KB_KEY_LEFT_ALT:
+                case KB_KEY_RIGHT_ALT:
+                    if(is_pressed)
+                        window_data->mod_keys |= KB_MOD_ALT;
+                    else
+                        window_data->mod_keys &= ~KB_MOD_ALT;
+                    break;
+
+                case KB_KEY_LEFT_SUPER:
+                case KB_KEY_RIGHT_SUPER:
+                    if(is_pressed)
+                        window_data->mod_keys |= KB_MOD_SUPER;
+                    else
+                        window_data->mod_keys &= ~KB_MOD_SUPER;
+                    break;
+            }
+        }
+
+        window_data->key_status[key_code] = is_pressed;
+        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
     }
 }
 
@@ -365,20 +499,7 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
                               mods_locked,
                               0, 0,
                               group);
-
-        window_data->mod_keys = 0;
-        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
-            window_data->mod_keys |= KB_MOD_SHIFT;
-        }
-        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
-            window_data->mod_keys |= KB_MOD_CONTROL;
-        }
-        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
-            window_data->mod_keys |= KB_MOD_ALT;
-        }
-        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
-            window_data->mod_keys |= KB_MOD_SUPER;
-        }
+        update_mod_keys_from_xkb(window_data, window_data_way);
     }
 }
 
@@ -429,6 +550,8 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+    window_data_way->pointer_serial = serial;
+    window_data_way->pointer_serial_valid = 1;
 
     if (window_data->is_cursor_visible) {
         if (window_data_way->default_cursor == 0x0 ||
@@ -463,10 +586,15 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 static void
 pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface)
 {
-    kUnused(data);
     kUnused(pointer);
     kUnused(serial);
     kUnused(surface);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way) {
+        window_data_way->pointer_serial_valid = 0;
+    }
 
     //fprintf(stderr, "Pointer left surface %p (serial: %d)\n", surface, serial);
 }
@@ -515,11 +643,15 @@ static void
 pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state)
 {
     kUnused(pointer);
-    kUnused(serial);
     kUnused(time);
 
     //printf("Pointer button '%d'(%d)\n", button, state);
     SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way) {
+        window_data_way->pointer_serial = serial;
+        window_data_way->pointer_serial_valid = 1;
+    }
     window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 
@@ -645,7 +777,11 @@ static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
     kUnused(data);
     kUnused(seat);
+#if defined(_DEBUG)
     printf("Seat '%s'\n", name);
+#else
+    kUnused(name);
+#endif
 }
 
 static const struct
@@ -688,6 +824,169 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format)
 static const struct
 wl_shm_listener shm_listener = {
     .format = shm_format
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void
+fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale)
+{
+    kUnused(fractional_scale);
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way == 0x0) {
+        return;
+    }
+    window_data_way->preferred_scale_120 = scale;
+}
+
+static const struct wp_fractional_scale_v1_listener fractional_scale_listener = {
+    .preferred_scale = fractional_scale_preferred_scale,
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static int
+find_output_index(SWindowData_Way *window_data_way, struct wl_output *output)
+{
+    if (window_data_way == 0x0 || output == 0x0) {
+        return -1;
+    }
+    for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
+        if (window_data_way->outputs[i] == output) {
+            return (int) i;
+        }
+    }
+    return -1;
+}
+
+static void
+output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
+                int32_t subpixel, const char *make, const char *model, int32_t transform)
+{
+    kUnused(data);
+    kUnused(output);
+    kUnused(x);
+    kUnused(y);
+    kUnused(phys_width);
+    kUnused(phys_height);
+    kUnused(subpixel);
+    kUnused(make);
+    kUnused(model);
+    kUnused(transform);
+}
+
+static void
+output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width, int32_t height, int32_t refresh)
+{
+    kUnused(data);
+    kUnused(output);
+    kUnused(flags);
+    kUnused(width);
+    kUnused(height);
+    kUnused(refresh);
+}
+
+static void
+output_done(void *data, struct wl_output *output)
+{
+    kUnused(data);
+    kUnused(output);
+}
+
+static void
+output_scale(void *data, struct wl_output *output, int32_t factor)
+{
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way == 0x0 || output == 0x0) {
+        return;
+    }
+
+    int idx = find_output_index(window_data_way, output);
+    if (idx < 0) {
+        return;
+    }
+
+    uint32_t scale = (factor > 0) ? (uint32_t) factor : 1;
+    window_data_way->output_scales[idx] = scale;
+    if (window_data_way->current_output == output) {
+        window_data_way->current_output_scale = scale;
+    }
+}
+
+#if defined(WL_OUTPUT_NAME_SINCE_VERSION)
+static void
+output_name(void *data, struct wl_output *output, const char *name)
+{
+    kUnused(data);
+    kUnused(output);
+    kUnused(name);
+}
+#endif
+
+#if defined(WL_OUTPUT_DESCRIPTION_SINCE_VERSION)
+static void
+output_description(void *data, struct wl_output *output, const char *description)
+{
+    kUnused(data);
+    kUnused(output);
+    kUnused(description);
+}
+#endif
+
+static const struct wl_output_listener output_listener = {
+    .geometry = output_geometry,
+    .mode = output_mode,
+    .done = output_done,
+    .scale = output_scale,
+#if defined(WL_OUTPUT_NAME_SINCE_VERSION)
+    .name = output_name,
+#endif
+#if defined(WL_OUTPUT_DESCRIPTION_SINCE_VERSION)
+    .description = output_description,
+#endif
+};
+
+static void
+surface_enter(void *data, struct wl_surface *surface, struct wl_output *output)
+{
+    kUnused(surface);
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way == 0x0 || output == 0x0) {
+        return;
+    }
+
+    window_data_way->current_output = output;
+    int idx = find_output_index(window_data_way, output);
+    if (idx >= 0 && window_data_way->output_scales[idx] > 0) {
+        window_data_way->current_output_scale = window_data_way->output_scales[idx];
+    }
+    else {
+        window_data_way->current_output_scale = 1;
+    }
+}
+
+static void
+surface_leave(void *data, struct wl_surface *surface, struct wl_output *output)
+{
+    kUnused(surface);
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way == 0x0 || output == 0x0) {
+        return;
+    }
+
+    if (window_data_way->current_output == output) {
+        window_data_way->current_output = 0x0;
+        window_data_way->current_output_scale = 1;
+    }
+}
+
+static const struct wl_surface_listener surface_listener = {
+    .enter = surface_enter,
+    .leave = surface_leave,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -749,6 +1048,30 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
             wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
         }
     }
+    else if (strcmp(iface, "wl_output") == 0)
+    {
+        uint32_t client_version = (uint32_t) wl_output_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        struct wl_output *output = (struct wl_output *) wl_registry_bind(registry, id, &wl_output_interface, use_version);
+        if (output) {
+            wl_output_add_listener(output, &output_listener, window_data);
+            if (window_data_way->output_count < WAYLAND_MAX_OUTPUTS) {
+                uint32_t idx = window_data_way->output_count++;
+                window_data_way->outputs[idx] = output;
+                window_data_way->output_scales[idx] = 1;
+            }
+            else {
+                wl_output_destroy(output);
+            }
+        }
+    }
+    else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0)
+    {
+        uint32_t client_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_way->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
+            wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
+    }
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0)
     {
         uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
@@ -771,6 +1094,18 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
 
     xdg_surface_ack_configure(shell_surface, serial);
+
+    // Some compositors apply startup states (fullscreen/maximized) more reliably
+    // when requested after the first configure handshake.
+    if (!window_data_way->startup_state_applied) {
+        if (window_data_way->request_fullscreen) {
+            xdg_toplevel_set_fullscreen(window_data_way->toplevel, 0x0);
+        }
+        else if (window_data_way->request_maximized) {
+            xdg_toplevel_set_maximized(window_data_way->toplevel);
+        }
+        window_data_way->startup_state_applied = 1;
+    }
 
     // On first configure, attach buffer and commit
     if (!window_data->is_initialized) {
@@ -871,6 +1206,11 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 {
+    if (width == 0 || height == 0) {
+        fprintf(stderr, "WaylandMiniFB error: invalid window size %ux%u.\n", width, height);
+        return 0x0;
+    }
+
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     if(window_data == 0x0) {
         fprintf(stderr, "WaylandMiniFB error: failed to allocate SWindowData.\n");
@@ -886,6 +1226,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
     memset(window_data_way, 0, sizeof(SWindowData_Way));
     window_data_way->fd = -1;
+    window_data_way->current_output_scale = 1;
     window_data->specific = window_data_way;
 
     window_data_way->shm_format = -1u;
@@ -898,6 +1239,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         return 0x0;
     }
     window_data_way->registry = wl_display_get_registry(window_data_way->display);
+    if (!window_data_way->registry) {
+        fprintf(stderr, "WaylandMiniFB error: wl_display_get_registry returned NULL.\n");
+        goto out;
+    }
     wl_registry_add_listener(window_data_way->registry, &registry_listener, window_data);
 
     init_keycodes();
@@ -941,20 +1286,32 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
     unlink(shmfile);
 
-    uint32_t length = sizeof(uint32_t) * width * height;
+    if ((size_t) width > SIZE_MAX / (size_t) height ||
+        (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
+        fprintf(stderr, "WaylandMiniFB error: requested window buffer size overflows size_t.\n");
+        goto out;
+    }
+    size_t length_sz = sizeof(uint32_t) * (size_t) width * (size_t) height;
+    if (length_sz > (size_t) INT_MAX) {
+        fprintf(stderr, "WaylandMiniFB error: requested window buffer size exceeds Wayland pool limits.\n");
+        goto out;
+    }
+    int length = (int) length_sz;
 
-    if (ftruncate(window_data_way->fd, length) == -1)
+    if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1)
     {
         fprintf(stderr, "WaylandMiniFB error: ftruncate failed for shared memory buffer (%s).\n", strerror(errno));
         goto out;
     }
 
-    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+    window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
     if (window_data_way->shm_ptr == MAP_FAILED)
     {
         fprintf(stderr, "WaylandMiniFB error: mmap failed for shared memory buffer (%s).\n", strerror(errno));
         goto out;
     }
+    window_data_way->shm_length = length_sz;
+    window_data_way->shm_pool_size = length_sz;
 
     window_data->window_width  = width;
     window_data->window_height = height;
@@ -983,6 +1340,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     {
         fprintf(stderr, "WaylandMiniFB error: failed to create Wayland surface.\n");
         goto out;
+    }
+    wl_surface_add_listener(window_data_way->surface, &surface_listener, window_data);
+    if (window_data_way->fractional_scale_manager) {
+        window_data_way->fractional_scale =
+            wp_fractional_scale_manager_v1_get_fractional_scale(window_data_way->fractional_scale_manager,
+                                                                window_data_way->surface);
+        if (window_data_way->fractional_scale) {
+            wp_fractional_scale_v1_add_listener(window_data_way->fractional_scale,
+                                                &fractional_scale_listener,
+                                                window_data);
+        }
     }
 
     window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
@@ -1028,22 +1396,22 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
             }
         }
 
-        if (flags & WF_FULLSCREEN) {
+        window_data_way->request_fullscreen = (flags & WF_FULLSCREEN) ? 1 : 0;
+        window_data_way->request_maximized =
+            (!window_data_way->request_fullscreen && (flags & WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+        window_data_way->startup_state_applied = 0;
+
+        if (window_data_way->request_fullscreen || window_data_way->request_maximized) {
             xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
             xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
-            xdg_toplevel_set_fullscreen(window_data_way->toplevel, 0x0);
-        }
-        else if (flags & WF_FULLSCREEN_DESKTOP) {
-            xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
-            xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
-            xdg_toplevel_set_maximized(window_data_way->toplevel);
         }
         else {
-            xdg_toplevel_set_min_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
             if (flags & WF_RESIZABLE) {
+                xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
                 xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
             }
             else {
+                xdg_toplevel_set_min_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
                 xdg_toplevel_set_max_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
             }
         }
@@ -1054,7 +1422,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
         xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
 
-        xdg_toplevel_set_title(window_data_way->toplevel, title);
+        xdg_toplevel_set_title(window_data_way->toplevel, title ? title : "minifb");
         xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
 
         // Commit without a buffer to trigger initial configure event
@@ -1074,6 +1442,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
 
     window_data_way->timer = mfb_timer_create();
+    if (window_data_way->timer == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: failed to create frame timer.\n");
+        goto out;
+    }
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
@@ -1131,8 +1503,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         fprintf(stderr, "WaylandMiniFB error: mfb_update_ex called with a null buffer.\n");
         return STATE_INVALID_BUFFER;
     }
+    if (width == 0 || height == 0) {
+        fprintf(stderr, "WaylandMiniFB error: mfb_update_ex called with invalid buffer size %ux%u.\n", width, height);
+        return STATE_INVALID_BUFFER;
+    }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    if (window_data_way == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_ex.\n");
+        return STATE_INVALID_WINDOW;
+    }
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
         fprintf(stderr, "WaylandMiniFB error: invalid Wayland display state during mfb_update_ex.\n");
@@ -1140,48 +1520,75 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
-        uint32_t oldLength = sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height;
-        uint32_t length    = sizeof(uint32_t) * width * height;
+        unsigned old_buffer_width = window_data->buffer_width;
+        unsigned old_buffer_height = window_data->buffer_height;
+        unsigned old_buffer_stride = window_data->buffer_stride;
+        if ((size_t) width > SIZE_MAX / (size_t) height ||
+            (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
+            fprintf(stderr, "WaylandMiniFB error: resize buffer size overflows size_t.\n");
+            return STATE_INTERNAL_ERROR;
+        }
+        size_t length = sizeof(uint32_t) * (size_t) width * (size_t) height;
+        if (length > (size_t) INT_MAX) {
+            fprintf(stderr, "WaylandMiniFB error: resize buffer size exceeds Wayland pool limits.\n");
+            return STATE_INTERNAL_ERROR;
+        }
+        int length_i = (int) length;
 
-        // For some reason it crash when you make it smaller
-        if(oldLength < length) {
-            if (ftruncate(window_data_way->fd, length) == -1)
+        // Wayland pools are grow-only: never call wl_shm_pool_resize with a smaller size.
+        if (length > window_data_way->shm_pool_size) {
+            if (ftruncate(window_data_way->fd, (off_t) length) == -1)
             {
                 fprintf(stderr, "WaylandMiniFB error: ftruncate failed while resizing shared memory buffer (%s).\n", strerror(errno));
                 return STATE_INTERNAL_ERROR;
             }
 
-            //munmap(window_data_way->shm_ptr, sizeof(uint32_t) * window_data->buffer_width * window_data->buffer_height);
-            window_data_way->shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
-            if (window_data_way->shm_ptr == MAP_FAILED)
+            uint32_t *old_shm_ptr = window_data_way->shm_ptr;
+            size_t old_shm_length = window_data_way->shm_length;
+            uint32_t *new_shm_ptr = (uint32_t *) mmap(0x0, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+            if (new_shm_ptr == MAP_FAILED)
             {
                 fprintf(stderr, "WaylandMiniFB error: mmap failed while resizing shared memory buffer (%s).\n", strerror(errno));
                 return STATE_INTERNAL_ERROR;
             }
+            if (old_shm_ptr && old_shm_ptr != MAP_FAILED && old_shm_length > 0) {
+                munmap(old_shm_ptr, old_shm_length);
+            }
+            window_data_way->shm_ptr = new_shm_ptr;
+            window_data_way->shm_length = length;
 
-            wl_shm_pool_resize(window_data_way->shm_pool, length);
+            wl_shm_pool_resize(window_data_way->shm_pool, length_i);
+            window_data_way->shm_pool_size = length;
         }
 
-        window_data->buffer_width  = width;
-        window_data->buffer_height = height;
-        window_data->buffer_stride = width * sizeof(uint32_t);
-
-        // This must be in the resize event but we don't have it for Wayland :(
-        resize_dst(window_data, width, height);
-
+        unsigned new_buffer_stride = width * sizeof(uint32_t);
+        struct wl_buffer *new_draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
+                                        width, height,
+                                        new_buffer_stride, window_data_way->shm_format);
+        if (new_draw_buffer == 0x0) {
+            fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed while resizing buffer.\n");
+            window_data->buffer_width  = old_buffer_width;
+            window_data->buffer_height = old_buffer_height;
+            window_data->buffer_stride = old_buffer_stride;
+            return STATE_INTERNAL_ERROR;
+        }
         if (window_data->draw_buffer) {
             wl_buffer_destroy(window_data->draw_buffer);
         }
-        window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
-                                        window_data->buffer_width, window_data->buffer_height,
-                                        window_data->buffer_stride, window_data_way->shm_format);
-        if (window_data->draw_buffer == 0x0) {
-            fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed while resizing buffer.\n");
-            return STATE_INTERNAL_ERROR;
-        }
+        window_data->draw_buffer = new_draw_buffer;
+        window_data->buffer_width  = width;
+        window_data->buffer_height = height;
+        window_data->buffer_stride = new_buffer_stride;
+
+        // Keep destination rectangle in window space. Changing input buffer size
+        // should not recompute dst from buffer dimensions.
     }
 
     // update shm buffer
+    if (window_data_way->shm_ptr == 0x0 || window_data_way->shm_ptr == MAP_FAILED) {
+        fprintf(stderr, "WaylandMiniFB error: shared memory buffer is not mapped.\n");
+        return STATE_INTERNAL_ERROR;
+    }
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
     wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
@@ -1197,9 +1604,19 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     while (!done && window_data->close == false) {
         if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
             fprintf(stderr, "WaylandMiniFB error: display dispatch/roundtrip failed during frame wait.\n");
-            wl_callback_destroy(frame_callback);
+            if (!done) {
+                wl_callback_destroy(frame_callback);
+            }
             return STATE_INTERNAL_ERROR;
         }
+    }
+
+    if (window_data->close) {
+        if (!done) {
+            wl_callback_destroy(frame_callback);
+        }
+        destroy(window_data);
+        return STATE_EXIT;
     }
 
     return STATE_OK;
@@ -1223,15 +1640,68 @@ mfb_update_events(struct mfb_window *window)
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    if (window_data_way == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_events.\n");
+        return STATE_INVALID_WINDOW;
+    }
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
         fprintf(stderr, "WaylandMiniFB error: invalid Wayland display state during mfb_update_events.\n");
         return STATE_INTERNAL_ERROR;
     }
 
+    // Process already queued events first.
     if (wl_display_dispatch_pending(window_data_way->display) == -1) {
         fprintf(stderr, "WaylandMiniFB error: wl_display_dispatch_pending failed in mfb_update_events.\n");
         return STATE_INTERNAL_ERROR;
+    }
+
+    // Non-blocking read/dispatch so mfb_update_events keeps X11-like behavior.
+    while (wl_display_prepare_read(window_data_way->display) != 0) {
+        if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+            fprintf(stderr, "WaylandMiniFB error: wl_display_dispatch_pending failed while preparing read in mfb_update_events.\n");
+            return STATE_INTERNAL_ERROR;
+        }
+    }
+
+    if (wl_display_flush(window_data_way->display) == -1 && errno != EAGAIN) {
+        wl_display_cancel_read(window_data_way->display);
+        fprintf(stderr, "WaylandMiniFB error: wl_display_flush failed in mfb_update_events.\n");
+        return STATE_INTERNAL_ERROR;
+    }
+
+    struct pollfd pfd;
+    pfd.fd = wl_display_get_fd(window_data_way->display);
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    int rc;
+    do {
+        rc = poll(&pfd, 1, 0);
+    } while (rc < 0 && errno == EINTR);
+
+    if (rc > 0) {
+        if (wl_display_read_events(window_data_way->display) == -1) {
+            fprintf(stderr, "WaylandMiniFB error: wl_display_read_events failed in mfb_update_events.\n");
+            return STATE_INTERNAL_ERROR;
+        }
+        if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+            fprintf(stderr, "WaylandMiniFB error: wl_display_dispatch_pending failed after read in mfb_update_events.\n");
+            return STATE_INTERNAL_ERROR;
+        }
+    }
+    else {
+        wl_display_cancel_read(window_data_way->display);
+        if (rc < 0) {
+            fprintf(stderr, "WaylandMiniFB error: poll failed in mfb_update_events (%s).\n", strerror(errno));
+            return STATE_INTERNAL_ERROR;
+        }
+    }
+
+    if (window_data->close) {
+        fprintf(stderr, "WaylandMiniFB error: mfb_update_events detected close request after event dispatch.\n");
+        destroy(window_data);
+        return STATE_EXIT;
     }
 
     return STATE_OK;
@@ -1264,6 +1734,10 @@ mfb_wait_sync(struct mfb_window *window) {
     struct wl_display *display = window_data_specific->display;
     if (display == NULL) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync has a null Wayland display handle.\n");
+        return false;
+    }
+    if (window_data_specific->timer == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync missing frame timer state.\n");
         return false;
     }
     const int fd = wl_display_get_fd(display);
@@ -1538,23 +2012,22 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    if(offset_x + width > window_data->window_width) {
+    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
         fprintf(stderr, "WaylandMiniFB error: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).\n",
                 offset_x, width, window_data->window_width);
         return false;
     }
-    if(offset_y + height > window_data->window_height) {
+    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
         fprintf(stderr, "WaylandMiniFB error: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).\n",
                 offset_y, height, window_data->window_height);
         return false;
     }
 
-    // TODO: Not yet
     window_data->dst_offset_x = offset_x;
     window_data->dst_offset_y = offset_y;
     window_data->dst_width    = width;
     window_data->dst_height   = height;
-    resize_dst(window_data, width, height);
+    calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
     return true;
 }
@@ -1563,24 +2036,35 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float x = 96.0, y = 96.0;
+    float x = 1.0f, y = 1.0f;
 
     if(window != 0x0) {
-        //SWindowData     *window_data     = (SWindowData *) window;
-        //SWindowData_X11 *window_data_x11 = (SWindowData_X11 *) window_data->specific;
-
-        // I cannot find a way to get dpi under VirtualBox
+        SWindowData *window_data = (SWindowData *) window;
+        SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+        if (window_data_way) {
+            if (window_data_way->preferred_scale_120 > 0) {
+                float scale = (float) window_data_way->preferred_scale_120 / WAYLAND_FRACTIONAL_SCALE_DENOMINATOR;
+                if (scale > 0.0f) {
+                    x = scale;
+                    y = scale;
+                }
+            }
+            else if (window_data_way->current_output_scale > 0) {
+                x = (float) window_data_way->current_output_scale;
+                y = (float) window_data_way->current_output_scale;
+            }
+        }
     }
 
     if (scale_x) {
-        *scale_x = x / 96.0f;
+        *scale_x = x;
         if(*scale_x == 0) {
             *scale_x = 1.0f;
         }
     }
 
     if (scale_y) {
-        *scale_y = y / 96.0f;
+        *scale_y = y;
         if (*scale_y == 0) {
             *scale_y = 1.0f;
         }
@@ -1603,6 +2087,9 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
     }
 
+    // Keep requested visibility state even if we can't apply it immediately.
+    window_data->is_cursor_visible = show;
+
     struct wl_pointer *pointer = window_data_way->pointer;
     struct wl_surface *cursor_surface = window_data_way->cursor_surface;
     if (pointer == NULL) {
@@ -1610,7 +2097,11 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
     }
 
-    uint32_t serial = 0;
+    if (!window_data_way->pointer_serial_valid) {
+        return;
+    }
+
+    uint32_t serial = window_data_way->pointer_serial;
     if (show) {
         struct wl_cursor *cursor = window_data_way->default_cursor;
         if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
@@ -1634,6 +2125,4 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     else {
         wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
     }
-
-    window_data->is_cursor_visible = show;
 }
