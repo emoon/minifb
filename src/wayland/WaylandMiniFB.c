@@ -1253,6 +1253,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         goto out;
     }
 
+    if (!window_data_way->decoration_manager) {
+        fprintf(stderr, "WaylandMiniFB warning: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.\n");
+    }
+    if (!window_data_way->fractional_scale_manager) {
+        fprintf(stderr, "WaylandMiniFB warning: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.\n");
+    }
+    if (!window_data_way->seat) {
+        fprintf(stderr, "WaylandMiniFB warning: wl_seat is unavailable; keyboard and pointer input will not be available.\n");
+    }
+    if (window_data_way->output_count == 0) {
+        fprintf(stderr, "WaylandMiniFB warning: wl_output is unavailable; monitor scale tracking will use fallback values.\n");
+    }
+
     // did not get a format we want... meh
     if (window_data_way->shm_format == -1u)
     {
