@@ -81,6 +81,10 @@ destroy(SWindowData *window_data)
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == 0x0 || window_data_way->display == 0x0) {
         fprintf(stderr, "WaylandMiniFB error: missing Wayland display state during destroy, forcing local cleanup.\n");
+        if (window_data_way && window_data_way->fd >= 0) {
+            close(window_data_way->fd);
+            window_data_way->fd = -1;
+        }
         destroy_window_data(window_data);
         return;
     }
@@ -148,8 +152,11 @@ destroy(SWindowData *window_data)
 #undef KILL
     wl_display_disconnect(window_data_way->display);
 
+    if (window_data_way->fd >= 0) {
+        close(window_data_way->fd);
+        window_data_way->fd = -1;
+    }
     destroy_window_data(window_data);
-    close(window_data_way->fd);
 }
 
 static void
@@ -346,14 +353,33 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 static void
 keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group)
 {
-    kUnused(data);
     kUnused(keyboard);
     kUnused(serial);
-    kUnused(mods_depressed);
-    kUnused(mods_latched);
-    kUnused(mods_locked);
-    kUnused(group);
-    // it is not easy to identify them here :(
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : 0x0;
+    if (window_data_way && window_data_way->xkb_state) {
+        xkb_state_update_mask(window_data_way->xkb_state,
+                              mods_depressed,
+                              mods_latched,
+                              mods_locked,
+                              0, 0,
+                              group);
+
+        window_data->mod_keys = 0;
+        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+            window_data->mod_keys |= KB_MOD_SHIFT;
+        }
+        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
+            window_data->mod_keys |= KB_MOD_CONTROL;
+        }
+        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+            window_data->mod_keys |= KB_MOD_ALT;
+        }
+        if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
+            window_data->mod_keys |= KB_MOD_SUPER;
+        }
+    }
 }
 
 // Informs the client about the keyboard's repeat rate and delay.
@@ -405,8 +431,16 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
 
     if (window_data->is_cursor_visible) {
+        if (window_data_way->default_cursor == 0x0 ||
+            window_data_way->default_cursor->image_count == 0 ||
+            window_data_way->cursor_surface == 0x0) {
+            return;
+        }
         image  = window_data_way->default_cursor->images[0];
         buffer = wl_cursor_image_get_buffer(image);
+        if (buffer == 0x0) {
+            return;
+        }
 
         wl_pointer_set_cursor(pointer, serial, window_data_way->cursor_surface, image->hotspot_x, image->hotspot_y);
         wl_surface_attach(window_data_way->cursor_surface, buffer, 0, 0);
@@ -489,7 +523,9 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
     window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 
+#if defined(_DEBUG)
     fprintf(stderr, "Pointer button %x, state %x (serial: %d)\n", button, state, serial);
+#endif
 }
 
 //  Scroll and other axis notifications.
@@ -609,7 +645,7 @@ static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
     kUnused(data);
     kUnused(seat);
-    printf("Seat '%s'n", name);
+    printf("Seat '%s'\n", name);
 }
 
 static const struct
@@ -687,7 +723,9 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         if (window_data_way->shm) {
             wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
             window_data_way->cursor_theme = wl_cursor_theme_load(0x0, 32, window_data_way->shm);
-            window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
+            if (window_data_way->cursor_theme) {
+                window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
+            }
         }
     }
     else if (strcmp(iface, "xdg_wm_base") == 0)
@@ -847,6 +885,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
         return 0x0;
     }
     memset(window_data_way, 0, sizeof(SWindowData_Way));
+    window_data_way->fd = -1;
     window_data->specific = window_data_way;
 
     window_data_way->shm_format = -1u;
@@ -866,7 +905,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     if (wl_display_dispatch(window_data_way->display) == -1 ||
         wl_display_roundtrip(window_data_way->display) == -1) {
         fprintf(stderr, "WaylandMiniFB error: failed to initialize Wayland globals (dispatch/roundtrip).\n");
-        return 0x0;
+        goto out;
     }
 
     // did not get a format we want... meh
@@ -927,9 +966,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     window_data->is_cursor_visible = true;
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
+    if (window_data_way->shm_pool == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: wl_shm_create_pool failed.\n");
+        goto out;
+    }
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
+    if (window_data->draw_buffer == 0x0) {
+        fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed.\n");
+        goto out;
+    }
 
     window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
     if (!window_data_way->surface)
@@ -939,6 +986,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
     }
 
     window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
+    if (!window_data_way->cursor_surface)
+    {
+        fprintf(stderr, "WaylandMiniFB error: failed to create Wayland cursor surface.\n");
+        goto out;
+    }
 
     // There should always be a shell, right?
     if (window_data_way->shell)
@@ -1016,6 +1068,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
             }
         }
     }
+    else {
+        fprintf(stderr, "WaylandMiniFB error: xdg_wm_base is unavailable; cannot create a toplevel surface.\n");
+        goto out;
+    }
 
     window_data_way->timer = mfb_timer_create();
 
@@ -1028,7 +1084,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags)
 
 out:
     fprintf(stderr, "WaylandMiniFB error: mfb_open_ex failed and is cleaning up partially initialized resources.\n");
-    close(window_data_way->fd);
     destroy(window_data);
 
     return 0x0;
@@ -1114,10 +1169,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         // This must be in the resize event but we don't have it for Wayland :(
         resize_dst(window_data, width, height);
 
-        wl_buffer_destroy(window_data->draw_buffer);
+        if (window_data->draw_buffer) {
+            wl_buffer_destroy(window_data->draw_buffer);
+        }
         window_data->draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                         window_data->buffer_width, window_data->buffer_height,
                                         window_data->buffer_stride, window_data_way->shm_format);
+        if (window_data->draw_buffer == 0x0) {
+            fprintf(stderr, "WaylandMiniFB error: wl_shm_pool_create_buffer failed while resizing buffer.\n");
+            return STATE_INTERNAL_ERROR;
+        }
     }
 
     // update shm buffer
@@ -1216,7 +1277,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     if (window_data->close) {
         fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync aborted after dispatch because the window is marked for close.\n");
-        destroy_window_data(window_data);
+        destroy(window_data);
         return false;
     }
 
@@ -1276,7 +1337,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
         if (window_data->close) {
             fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync aborted during sync loop because the window is marked for close.\n");
-            destroy_window_data(window_data);
+            destroy(window_data);
             return false;
         }
     }
@@ -1327,7 +1388,7 @@ mfb_wait_sync2(struct mfb_window *window) {
 
             if(window_data->close) {
                 fprintf(stderr, "WaylandMiniFB error: mfb_wait_sync2 aborted during sync loop because the window is marked for close.\n");
-                destroy_window_data(window_data);
+                destroy(window_data);
                 return false;
             }
         }
@@ -1495,7 +1556,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_height   = height;
     resize_dst(window_data, width, height);
 
-    return false;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
