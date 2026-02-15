@@ -502,7 +502,8 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *bu
     if (width <= 0) {
         width = canvas.width;
         height = canvas.height;
-    } else {
+    }
+    else {
         if (canvas.width != width) canvas.width = width;
         if (canvas.height != height) canvas.height = height;
     }

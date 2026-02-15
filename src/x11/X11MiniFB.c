@@ -968,7 +968,7 @@ create_blank_cursor(Display *display, Window window) {
     XColor dummy;
     Cursor invis_cursor =  XCreatePixmapCursor(display, pixmap, pixmap, &dummy, &dummy, 0, 0);
     XFreePixmap(display, pixmap);
-    
+
     return invis_cursor;
 }
 
@@ -986,13 +986,14 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
 
     window_data->is_cursor_visible = show;
-    
+
     // stupid. very stupid. really stupid.
     // could be way better if i wasn't too stubborn to use xfixes
 
     if (show) {
         XDefineCursor(window_data_specific->display, window_data_specific->window, None);
-    } else {
+    }
+    else {
         XDefineCursor(window_data_specific->display, window_data_specific->window, window_data_specific->invis_cursor);
     }
 }

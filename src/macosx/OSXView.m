@@ -27,41 +27,41 @@
 
 //-------------------------------------
 - (NSRect)resizeRect {
-	const CGFloat resizeBoxSize = 16.0;
-	const CGFloat contentViewPadding = 5.5;
+    const CGFloat resizeBoxSize = 16.0;
+    const CGFloat contentViewPadding = 5.5;
 
-	NSRect contentViewRect = [[self window] contentRectForFrameRect:[[self window] frame]];
-	NSRect resizeRect = NSMakeRect(
-		NSMaxX(contentViewRect) + contentViewPadding,
-		NSMinY(contentViewRect) - resizeBoxSize - contentViewPadding,
-		resizeBoxSize,
-		resizeBoxSize
+    NSRect contentViewRect = [[self window] contentRectForFrameRect:[[self window] frame]];
+    NSRect resizeRect = NSMakeRect(
+        NSMaxX(contentViewRect) + contentViewPadding,
+        NSMinY(contentViewRect) - resizeBoxSize - contentViewPadding,
+        resizeBoxSize,
+        resizeBoxSize
     );
 
-	return resizeRect;
+    return resizeRect;
 }
 
 //-------------------------------------
 - (void)drawRect:(NSRect)rect {
-	(void)rect;
+    (void)rect;
 
     if(window_data == 0x0)
         return;
 
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-	if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
-		return;
+    if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
+        return;
 
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
 
-	CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-	CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
                                                               window_data->draw_buffer,
                                                               window_data->buffer_width * window_data->buffer_height * 4,
                                                               0x0
     );
 
-	CGImageRef img = CGImageCreate(window_data->buffer_width
+    CGImageRef img = CGImageCreate(window_data->buffer_width
                                  , window_data->buffer_height
                                  , 8
                                  , 32
@@ -77,8 +77,8 @@
     const CGFloat components[] = {0.0f, 0.0f, 0.0f, 1.0f};
     const CGColorRef black = CGColorCreate(space, components);
 
-	CGColorSpaceRelease(space);
-	CGDataProviderRelease(provider);
+    CGColorSpaceRelease(space);
+    CGDataProviderRelease(provider);
 
     if(window_data->dst_offset_x != 0 || window_data->dst_offset_y != 0 || window_data->dst_width != window_data->window_width || window_data->dst_height != window_data->window_height) {
         CGContextSetFillColorWithColor(context, black);
@@ -86,12 +86,12 @@
     }
 
     // TODO: Sometimes there is a crash here
-	CGContextDrawImage(context,
+    CGContextDrawImage(context,
                        CGRectMake(window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height),
                        img
     );
 
-	CGImageRelease(img);
+    CGImageRelease(img);
 }
 
 #endif
@@ -241,7 +241,8 @@
 
     if (window_data != 0x0 && window_data->is_cursor_visible == false) {
         [self addCursorRect:[self bounds] cursor:invisibleCursor];
-    } else {
+    }
+    else {
         [self addCursorRect:[self bounds] cursor:[NSCursor arrowCursor]];
     }
 }

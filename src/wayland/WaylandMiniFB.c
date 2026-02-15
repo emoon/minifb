@@ -1324,14 +1324,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     // did not get a format we want... meh
-    if (window_data_way->shm_format == -1u)
-    {
+    if (window_data_way->shm_format == -1u) {
         fprintf(stderr, "WaylandMiniFB error: compositor does not expose a supported shared memory format.\n");
         goto out;
     }
 
-    if (!window_data_way->compositor)
-    {
+    if (!window_data_way->compositor) {
         fprintf(stderr, "WaylandMiniFB error: Wayland compositor interface is unavailable.\n");
         goto out;
     }
@@ -1344,15 +1342,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     char shmfile[PATH_MAX];
     uint32_t ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX", xdg_rt_dir);
-    if (ret >= sizeof(shmfile))
-    {
+    if (ret >= sizeof(shmfile)) {
         fprintf(stderr, "WaylandMiniFB error: shared memory path exceeds PATH_MAX.\n");
         goto out;
     }
 
     window_data_way->fd = mkstemp(shmfile);
-    if (window_data_way->fd == -1)
-    {
+    if (window_data_way->fd == -1) {
         fprintf(stderr, "WaylandMiniFB error: mkstemp failed for shared memory file (%s).\n", strerror(errno));
         goto out;
     }
@@ -1363,6 +1359,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         fprintf(stderr, "WaylandMiniFB error: requested window buffer size overflows size_t.\n");
         goto out;
     }
+
     size_t length_sz = sizeof(uint32_t) * (size_t) width * (size_t) height;
     if (length_sz > (size_t) INT_MAX) {
         fprintf(stderr, "WaylandMiniFB error: requested window buffer size exceeds Wayland pool limits.\n");
@@ -1371,15 +1368,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     int length = (int) length_sz;
 
-    if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1)
-    {
+    if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1) {
         fprintf(stderr, "WaylandMiniFB error: ftruncate failed for shared memory buffer (%s).\n", strerror(errno));
         goto out;
     }
 
     window_data_way->shm_ptr = (uint32_t *) mmap(NULL, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
-    if (window_data_way->shm_ptr == MAP_FAILED)
-    {
+    if (window_data_way->shm_ptr == MAP_FAILED) {
         fprintf(stderr, "WaylandMiniFB error: mmap failed for shared memory buffer (%s).\n", strerror(errno));
         goto out;
     }
@@ -1414,6 +1409,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         fprintf(stderr, "WaylandMiniFB error: failed to create Wayland surface.\n");
         goto out;
     }
+
     wl_surface_add_listener(window_data_way->surface, &surface_listener, window_data);
     if (window_data_way->fractional_scale_manager) {
         window_data_way->fractional_scale =
@@ -1433,8 +1429,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     // There should always be a shell, right?
-    if (window_data_way->shell)
-    {
+    if (window_data_way->shell) {
         window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
         if (!window_data_way->shell_surface) {
             fprintf(stderr, "WaylandMiniFB error: failed to create xdg_surface.\n");
@@ -1859,10 +1854,12 @@ mfb_wait_sync(struct mfb_window *window) {
                         fprintf(stderr, "WaylandMiniFB error: wl_display_read_events failed while waiting for frame sync.\n");
                         return false;
                     }
-                } else {
+                }
+                else {
                     wl_display_cancel_read(display);
                 }
-            } else {
+            }
+            else {
                 // Could not prepare read because there are pending events
                 if (wl_display_dispatch_pending(display) == -1) {
                     fprintf(stderr, "WaylandMiniFB error: wl_display_dispatch_pending failed after prepare_read.\n");

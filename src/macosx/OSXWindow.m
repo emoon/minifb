@@ -76,7 +76,7 @@
         return;
 
     const uint32_t flags = [event modifierFlags];
-    uint32_t	mod_keys = 0, mod_keys_aux = 0;
+    uint32_t    mod_keys = 0, mod_keys_aux = 0;
 
     //NSEventModifierFlagHelp = 1 << 22,
     //NSEventModifierFlagFunction = 1 << 23,
@@ -243,7 +243,8 @@
     bool destroy = false;
     if (!window_data) {
         destroy = true;
-    } else {
+    }
+    else {
         // Obtain a confirmation of close
         if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
             destroy = true;

@@ -7,11 +7,11 @@
 
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
-static uint32_t *g_buffer = 0x0;
+static uint32_t *g_buffer = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void 
+void
 resize(struct mfb_window *window, int width, int height) {
     (void) window;
     g_width  = width;
@@ -36,7 +36,7 @@ keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isP
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int 
+int
 main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
@@ -68,7 +68,7 @@ main() {
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != STATE_OK) {
-            window = 0x0;
+            window = NULL;
             break;
         }
     } while(mfb_wait_sync(window));

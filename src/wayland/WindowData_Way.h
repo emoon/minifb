@@ -29,8 +29,7 @@ struct xkb_context;
 struct xkb_keymap;
 struct xkb_state;
 
-typedef struct
-{
+typedef struct {
     struct wl_display       *display;
     struct wl_registry      *registry;
     struct wl_compositor    *compositor;

@@ -239,7 +239,8 @@ static mfb_update_state check_window_closed(SWindowData *window_data) {
       free(window_data->specific);
       window_data->specific = NULL;
       return STATE_EXIT;
-    } else {
+    }
+    else {
       return STATE_INVALID_WINDOW;
     }
   }
@@ -355,7 +356,8 @@ static void update_keyboard(SWindowData *window_data) {
       if ((window_data->mod_keys & KB_MOD_SHIFT) ||
           (window_data->mod_keys & KB_MOD_CAPS_LOCK)) {
         ascii = scancode_to_ascii_shift[scancode];
-      } else {
+      }
+      else {
         ascii = scancode_to_ascii[scancode];
       }
     }
@@ -457,7 +459,8 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
     stretch_image(buffer, 0, 0, width, height, width, scale_buffer, 0, 0,
                   a_width, a_height, a_width);
     frame = (uint8_t *)scale_buffer;
-  } else {
+  }
+  else {
     frame = (uint8_t *)buffer;
   }
 
@@ -479,7 +482,8 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
     movedata(_my_ds(), (unsigned int)scanline_buffer,
              vesa_get_frame_buffer_selector(), 0,
              a_height * a_bytes_per_scanline);
-  } else {
+  }
+  else {
     if (a_bytes_per_scanline != a_width * 4) {
       // bpp matched, but pitch didn't. very unlikely to happen...
       uint8_t *source = (uint8_t *)frame;
@@ -492,7 +496,8 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
       movedata(_my_ds(), (unsigned int)scanline_buffer,
                vesa_get_frame_buffer_selector(), 0,
                a_height * a_bytes_per_scanline);
-    } else {
+    }
+    else {
       // Only stretched
       movedata(_my_ds(), (unsigned int)frame, vesa_get_frame_buffer_selector(),
                0, a_height * a_width * sizeof(uint32_t));

@@ -357,7 +357,8 @@ static unsigned char *gdb_read_packet() {
       if (checksum != xmitcsum) {
         if (!ctx.no_ack_mode)
           serial_port_putc('-');
-      } else {
+      }
+      else {
         if (!ctx.no_ack_mode)
           serial_port_putc('+');
         if (buffer[2] == ':') {
@@ -473,7 +474,8 @@ void gdb_loop(int exception_number) {
       } else if (!strcmp(ptr, "Offsets")) {
         gdb_debug("qOffsets");
         strcpy(ctx.output_buffer, "Text=0;Data=0;Bss=0;");
-      } else {
+      }
+      else {
         gdb_debug("Unhandled: %c%s\n", cmd, ptr);
       }
       break;
@@ -482,7 +484,8 @@ void gdb_loop(int exception_number) {
         gdb_debug("QStartNoAckMode");
         strcpy(ctx.output_buffer, "OK");
         ctx.no_ack_mode = 1;
-      } else {
+      }
+      else {
         gdb_debug("Unhandled: %c%s\n", cmd, ptr);
       }
       break;
@@ -554,7 +557,8 @@ void gdb_loop(int exception_number) {
 
               if (ctx.mem_error) {
                 strcpy(ctx.output_buffer, "E03");
-              } else {
+              }
+              else {
                 strcpy(ctx.output_buffer, "OK");
               }
 
