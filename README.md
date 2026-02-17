@@ -1,6 +1,6 @@
-# MiniFB
+﻿# MiniFB
 
-MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy to render (32-bit) pixels in a window.
+MiniFB (Mini FrameBuffer) is a small cross-platform library that makes it easy to render (32-bit) pixels in a window.
 
 ## Quick Start
 
@@ -36,8 +36,8 @@ int main() {
 ### How it works
 
 1. First the application creates a **window** calling **mfb_open** or **mfb_open_ex**.
-2. Next it's the application responsibility to allocate a buffer to work with.
-3. Next calling **mfb_update** or **mfb_update_ex** the buffer will be copied over to the window and displayed. If this function return a value lower than 0 the window will have been destroyed internally and cannot be used anymore.
+2. Next, it's the application's responsibility to allocate a buffer to work with.
+3. Next, call **mfb_update** or **mfb_update_ex** to copy the buffer to the window and display it. If this function returns a value lower than 0, the window has been destroyed internally and cannot be used anymore.
 4. Last the code waits to synchronize with the monitor calling **mfb_wait_sync**.
 
 **Note:** By default, if ESC key is pressed, **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
@@ -290,7 +290,7 @@ Furthermore you can also use **MinGW** instead of Visual Studio.
 
 #### OpenGL API backend (Windows)
 
-Now, by default, OpenGL backend is used, instead of Windows GDI, because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
+By default, the OpenGL backend is used instead of Windows GDI because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
@@ -334,7 +334,7 @@ Equivalent packages for other distros:
 
 #### Building with CMake
 
-If you use **CMake** just disable the flag:
+If you use **CMake**, just disable the flag:
 
 ```sh
 mkdir build
@@ -344,7 +344,7 @@ cmake .. -DUSE_WAYLAND_API=OFF
 
 #### OpenGL API backend (X11)
 
-Now, by default, OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
+By default, the OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
@@ -400,7 +400,7 @@ chmod +x ./scripts/generate-protocols.sh
 
 This script will generate protocol headers and code that are specifically compatible with your installed Wayland version, potentially resolving any version mismatch issues.
 
-If you use **CMake** just enable the flag:
+If you use **CMake**, just enable the flag:
 
 ```sh
 mkdir build
@@ -408,14 +408,14 @@ cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
 
-### MacOS X
+### macOS
 
-Cocoa and clang is assumed to be installed on the system (downloading latest XCode + installing the command line tools should do the trick).
+Cocoa and clang are assumed to be installed on the system (downloading the latest Xcode and installing the command line tools should do the trick).
 
-Note that MacOS X Mojave+ does not support Cocoa framework as expected. For that reason you can switch to Metal API.
+Note that macOS Mojave+ does not support the Cocoa framework as expected. For that reason, you can switch to the Metal API.
 To enable it just compile defining the preprocessor macro USE_METAL_API.
 
-If you use **CMake** just enable the flag:
+If you use **CMake**, just enable the flag:
 
 ```sh
 mkdir build
@@ -423,7 +423,7 @@ cd build
 cmake .. -DUSE_METAL_API=ON
 ```
 
-or if you don't want to use Metal API:
+Or, if you don't want to use the Metal API:
 
 ```sh
 mkdir build
@@ -433,7 +433,7 @@ cmake .. -DUSE_METAL_API=OFF
 
 #### Coordinate system
 
-On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
+On macOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) -> (left, top), like on the other platforms.
 
 In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
 
@@ -447,8 +447,8 @@ cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
 
 ### iOS (beta)
 
-It works with and without an UIWindow created.
-If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
+It works with and without a UIWindow.
+If you want to create the UIWindow through a Storyboard, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
 
 **Issues**:
 
@@ -652,7 +652,7 @@ mfb_open("my_app", 320, 240);
 <canvas id="my_app" style="width: 640px; height: 480px">
 ````
 
-If not already set, the backend will also set a handfull of CSS styles on the canvas that are good defaults for pixel graphics.
+If not already set, the backend will also set a handful of CSS styles on the canvas that are good defaults for pixel graphics.
 
 - `image-rendering: pixelated`
 - `user-select: none`
@@ -686,7 +686,7 @@ This will generate DOS 32-bit `.exe` files in the `build/` folder which you can 
 ./tests/dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tests/dos/tools/dosbox-x.conf build/<executable-file>
 ```
 
-Note that the DOS backend can not support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
+Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
 
 #### Compiling your own MiniFB app for DOS
 
@@ -700,7 +700,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=./dos/tools/toolchain-djgpp.cmake ... rest of your 
 
 The build will then generate DOS 32-bit protected mode executables and use the MiniFB DOS backend. You can run the executables as is in DOSBox-x or FreeDOS, or a Windows version that can run DOS applications.
 
-Running the executbales in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
+Running the executables in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
 
 #### Debugging your MiniFB app in DOSBox-x
 
