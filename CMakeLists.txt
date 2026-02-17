@@ -1,13 +1,28 @@
 cmake_minimum_required(VERSION 3.10)
-project(MiniFB)
+project(MiniFB VERSION 0.9.0 LANGUAGES C CXX OBJC)
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioning.cmake")
 if (POLICY CMP0072)
     cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
 endif()
 set(OpenGL_GL_PREFERENCE "GLVND")
+
+minifb_compute_git_metadata(
+    MINIFB_COMMITS_SINCE_TAG
+    MINIFB_COMMIT_COUNT
+    MINIFB_GIT_SHA
+    MINIFB_GIT_DIRTY
+)
+
+set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+minifb_configure_version_header(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/minifb_version.h.in"
+    "${MINIFB_GENERATED_INCLUDE_DIR}"
+    "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
+)
 
 # Detect iOS (it was added in CMake 3.14 but we require CMake 3.10)
 #--------------------------------------
@@ -125,6 +140,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
+option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
 if (APPLE AND NOT IOS)
@@ -391,11 +407,16 @@ endif()
 # For all projects
 #--------------------------------------
 target_include_directories(minifb PUBLIC
+    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(minifb PRIVATE src)
 
-link_libraries(minifb)
+if (MINIFB_BUILD_VERSION_INFO)
+    add_executable(minifb_version_info tests/version_info.c)
+    target_include_directories(minifb_version_info PRIVATE "${MINIFB_GENERATED_INCLUDE_DIR}")
+    target_link_libraries(minifb_version_info PRIVATE minifb)
+endif()
 
 # Examples
 #--------------------------------------
@@ -411,6 +432,14 @@ if (MINIFB_BUILD_EXAMPLES)
         add_executable(fullscreen tests/fullscreen.c)
         add_executable(timer tests/timer.c)
         add_executable(hide_cursor tests/hide_cursor.c)
+        target_link_libraries(noise PRIVATE minifb)
+        target_link_libraries(input_events PRIVATE minifb)
+        target_link_libraries(input_events_cpp PRIVATE minifb)
+        target_link_libraries(multiple_windows PRIVATE minifb)
+        target_link_libraries(hidpi PRIVATE minifb)
+        target_link_libraries(fullscreen PRIVATE minifb)
+        target_link_libraries(timer PRIVATE minifb)
+        target_link_libraries(hide_cursor PRIVATE minifb)
 
         if (EMSCRIPTEN)
 
@@ -437,6 +466,7 @@ if (MINIFB_BUILD_EXAMPLES)
             add_executable(dos
                 tests/dos/dos.c
             )
+            target_link_libraries(dos PRIVATE minifb)
 
         endif()
 
@@ -447,6 +477,7 @@ if (MINIFB_BUILD_EXAMPLES)
             tests/ios/AppDelegate.h
             tests/ios/AppDelegate.m
         )
+        target_link_libraries(noise PRIVATE minifb)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
@@ -475,14 +506,25 @@ if (MINIFB_BUILD_EXAMPLES)
     set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
 endif()
 
+if (MINIFB_BUILD_VERSION_INFO)
+    set_property(TARGET minifb_version_info PROPERTY FOLDER "Tests")
+endif()
+
 #--------------------------------------
 install(TARGETS minifb EXPORT minifb)
 file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
 install(FILES ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+minifb_write_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
+)
+
 install(EXPORT minifb FILE minifb-config.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/minifb" NAMESPACE minifb::)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
 
 message(STATUS "Done " ${PROJECT_NAME})
 
-if (MSVC)
+if (MSVC AND MINIFB_BUILD_EXAMPLES)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()

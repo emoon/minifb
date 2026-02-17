@@ -60,13 +60,13 @@ MiniFB has been tested on Windows, macOS, Linux, iOS, Android, web, and DOSBox-x
 
 ## Features
 
-- ✓ Window creation and management
-- ✓ Event callbacks (keyboard, mouse, window lifecycle)
-- ✓ Direct window state queries
-- ✓ Per-window custom data
-- ✓ Built-in timers and FPS control
-- ✓ C and C++ interfaces
-- ✓ Cursor control
+- Window creation and management
+- Event callbacks (keyboard, mouse, window lifecycle)
+- Direct window state queries
+- Per-window custom data
+- Built-in timers and FPS control
+- C and C++ interfaces
+- Cursor control
 
 ## API Reference
 
@@ -266,23 +266,27 @@ target_link_libraries(${PROJECT_NAME} minifb)
 
 ## Build Instructions
 
-The build system is **CMake**. MiniFB supports the legacy **tundra** build system, though it's no longer actively maintained.
+The build system is **CMake**.
+
+## Versioning
+
+MiniFB existed for many years without an official release version. Starting from this codebase, the project now uses SemVer and declares **v0.9.0** as the official baseline version.
+
+Builds expose public version/build metadata for C/C++ consumers via `minifb_version.h` (generated at configure time and installed with the public headers). This includes:
+
+- `MINIFB_VERSION_STRING` / major-minor-patch macros
+- packed `MINIFB_VERSION_NUMERIC` and extraction helpers
+- optional Git-derived metadata (`MINIFB_COMMIT_COUNT`, `MINIFB_COMMITS_SINCE_TAG`, `MINIFB_GIT_SHA`, `MINIFB_GIT_DIRTY`)
+
+When building from a source archive without `.git` metadata, defaults are used (`unknown` SHA, counters `0`) and the build still succeeds.
+
+Some projects use date-based versions when retrofitting versioning. MiniFB now uses SemVer to keep compatibility expectations clearer for users and downstream integrations.
 
 ### Windows
 
-If you use **CMake** the Visual Studio project will be generated (2015, 2017 and 2019 have been tested).
+If you use **CMake**, a Visual Studio project will be generated.
 
 Furthermore you can also use **MinGW** instead of Visual Studio.
-
-if you use **tundra**:
-
-Visual Studio (ver 2012 express has been tested) tools needed (using the vcvars32.bat (for 32-bit) will set up the enviroment) to build run:
-
-```sh
-tundra2 win32-msvc-debug
-```
-
-and you should be able to run noise in t2-output/win32-msvc-debug-default/noise.exe
 
 #### OpenGL API backend (Windows)
 
@@ -337,16 +341,6 @@ mkdir build
 cd build
 cmake .. -DUSE_WAYLAND_API=OFF
 ```
-
-If you use **tundra**:
-
-To build the code run:
-
-```sh
-tundra2 x11-gcc-debug
-```
-
-and you should be able to run t2-output/x11-gcc-debug-default/noise
 
 #### OpenGL API backend (X11)
 
@@ -450,14 +444,6 @@ cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
 ```
 
 **Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
-
-if you use **tundra**:
-
-```sh
-tundra2 macosx-clang-debug
-```
-
-and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
 
 ### iOS (beta)
 
@@ -762,25 +748,6 @@ Alternatively, you can use VS Code to debug via a graphical user interface. Run 
 
 You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
 
-## How to add it to your project
-
-First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
-
-```sh
-git submodule add https://github.com/emoon/minifb.git dependencies/minifb
-```
-
-Then in your `CMakeLists.txt` file, include the following:
-
-```cmake
-add_subdirectory(dependencies/minifb)
-
-# Link MiniFB to your project:
-target_link_libraries(${PROJECT_NAME} minifb)
-```
-
-Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
-
 ## Platform-Specific Limitations
 
 Some MiniFB features are not available on all platforms. Here's a summary of what's supported:
@@ -789,63 +756,15 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 
 | Feature | Windows | macOS | Linux X11 | Wayland | iOS | Android | Web | DOS |
 |---------|---------|-------|-----------|---------|-----|---------|-----|-----|
-| Window creation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| mfb_update | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Keyboard input | ✓ | ✓ | ✓ | ✓ | - | Limited | ✓ | Limited |
-| Mouse input | ✓ | ✓ | ✓ | ✓ | Touch | Touch | ✓ | - |
-| Multi-window | ✓ | ✓ | ✓ | ✓ | - | - | - | ✗ |
-| Viewport | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
-| Cursor hiding | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
-| Monitor DPI | ✓ | ✓ | Limited | ✓ | ✓ | ✓ | Fixed | Fixed |
-| Target FPS | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
+| Window creation | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| mfb_update | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Keyboard input | Yes | Yes | Yes | Yes | No | Limited | Yes | Limited |
+| Mouse input | Yes | Yes | Yes | Yes | Touch | Touch | Yes | No |
+| Multi-window | Yes | Yes | Yes | Yes | No | No | No | No |
+| Viewport | Yes | Yes | Yes | Yes | Yes | Yes | No-op | No-op |
+| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
+| Monitor DPI | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
+| Target FPS | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
 
-### iOS Limitations
-
-- No keyboard input callbacks (iOS handles touch events instead)
-- Mouse events represent touch events (last touch position)
-- Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced to display refresh rate)
-- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support yet
-
-### Android Limitations
-
-- No keyboard input callbacks (use char input callbacks instead)
-- Mouse events represent touch events (last touch position)
-- Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
-- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support
-
-### Web (WASM) Limitations
-
-Browser limitations are significant:
-
-- Flags to `mfb_open_ex()` are ignored
-- `mfb_set_viewport()` is a no-op
-- `mfb_set_viewport_best_fit()` is a no-op
-- `mfb_get_monitor_dpi()` reports a fixed value
-- `mfb_get_monitor_scale()` reports a fixed value
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
-- `mfb_show_cursor()` is a no-op
-- Window title must match a `<canvas>` element ID in the DOM
-- No multitouch support
-
-### DOS (DJGPP) Limitations
-
-The DOS backend currently does not support the following MiniFB features:
-
-- The flags to `mfb_open_ex()` are ignored
-- `mfb_set_viewport()` (no-op)
-- `mfb_set_viewport_best_fit()` (no-op)
-- `mfb_get_monitor_dpi()` (reports a fixed value)
-- `mfb_get_monitor_scale()` (reports a fixed value)
-- `mfb_set_target_fps()` (no-op)
-- `mfb_get_target_fps()` (no-op)
-- `mfb_show_cursor()` (no-op)
-- Multiple windows are not support
-- A window is always full-screen
-- The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
-- Keyboard handling is limited to the keys found in [DOSMiniFB.c line 24](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
-- Character input is limited to ASCII based on a US keyboard layout.
+For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).
