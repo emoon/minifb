@@ -1,6 +1,6 @@
-# MiniFB
+﻿# MiniFB
 
-MiniFB (Mini FrameBuffer) is a small cross platform library that makes it easy to render (32-bit) pixels in a window.
+MiniFB (Mini FrameBuffer) is a small cross-platform library that makes it easy to render (32-bit) pixels in a window.
 
 ## Quick Start
 
@@ -36,8 +36,8 @@ int main() {
 ### How it works
 
 1. First the application creates a **window** calling **mfb_open** or **mfb_open_ex**.
-2. Next it's the application responsibility to allocate a buffer to work with.
-3. Next calling **mfb_update** or **mfb_update_ex** the buffer will be copied over to the window and displayed. If this function return a value lower than 0 the window will have been destroyed internally and cannot be used anymore.
+2. Next, it's the application's responsibility to allocate a buffer to work with.
+3. Next, call **mfb_update** or **mfb_update_ex** to copy the buffer to the window and display it. If this function returns a value lower than 0, the window has been destroyed internally and cannot be used anymore.
 4. Last the code waits to synchronize with the monitor calling **mfb_wait_sync**.
 
 **Note:** By default, if ESC key is pressed, **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
@@ -60,13 +60,13 @@ MiniFB has been tested on Windows, macOS, Linux, iOS, Android, web, and DOSBox-x
 
 ## Features
 
-- ✓ Window creation and management
-- ✓ Event callbacks (keyboard, mouse, window lifecycle)
-- ✓ Direct window state queries
-- ✓ Per-window custom data
-- ✓ Built-in timers and FPS control
-- ✓ C and C++ interfaces
-- ✓ Cursor control
+- Window creation and management
+- Event callbacks (keyboard, mouse, window lifecycle)
+- Direct window state queries
+- Per-window custom data
+- Built-in timers and FPS control
+- C and C++ interfaces
+- Cursor control
 
 ## API Reference
 
@@ -283,27 +283,31 @@ target_link_libraries(${PROJECT_NAME} minifb)
 
 ## Build Instructions
 
-The build system is **CMake**. MiniFB supports the legacy **tundra** build system, though it's no longer actively maintained.
+The build system is **CMake**.
+
+## Versioning
+
+MiniFB existed for many years without an official release version. Starting from this codebase, the project now uses SemVer and declares **v0.9.0** as the official baseline version.
+
+Builds expose public version/build metadata for C/C++ consumers via `minifb_version.h` (generated at configure time and installed with the public headers). This includes:
+
+- `MINIFB_VERSION_STRING` / major-minor-patch macros
+- packed `MINIFB_VERSION_NUMERIC` and extraction helpers
+- optional Git-derived metadata (`MINIFB_COMMIT_COUNT`, `MINIFB_COMMITS_SINCE_TAG`, `MINIFB_GIT_SHA`, `MINIFB_GIT_DIRTY`)
+
+When building from a source archive without `.git` metadata, defaults are used (`unknown` SHA, counters `0`) and the build still succeeds.
+
+Some projects use date-based versions when retrofitting versioning. MiniFB now uses SemVer to keep compatibility expectations clearer for users and downstream integrations.
 
 ### Windows
 
-If you use **CMake** the Visual Studio project will be generated (2015, 2017 and 2019 have been tested).
+If you use **CMake**, a Visual Studio project will be generated.
 
 Furthermore you can also use **MinGW** instead of Visual Studio.
 
-if you use **tundra**:
-
-Visual Studio (ver 2012 express has been tested) tools needed (using the vcvars32.bat (for 32-bit) will set up the enviroment) to build run:
-
-```sh
-tundra2 win32-msvc-debug
-```
-
-and you should be able to run noise in t2-output/win32-msvc-debug-default/noise.exe
-
 #### OpenGL API backend (Windows)
 
-Now, by default, OpenGL backend is used, instead of Windows GDI, because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
+By default, the OpenGL backend is used instead of Windows GDI because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
@@ -347,7 +351,7 @@ Equivalent packages for other distros:
 
 #### Building with CMake
 
-If you use **CMake** just disable the flag:
+If you use **CMake**, just disable the flag:
 
 ```sh
 mkdir build
@@ -355,19 +359,9 @@ cd build
 cmake .. -DUSE_WAYLAND_API=OFF
 ```
 
-If you use **tundra**:
-
-To build the code run:
-
-```sh
-tundra2 x11-gcc-debug
-```
-
-and you should be able to run t2-output/x11-gcc-debug-default/noise
-
 #### OpenGL API backend (X11)
 
-Now, by default, OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with old computers an OpenGL 1.5 context is created (no shaders needed).
+By default, the OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
 
 To enable or disable OpenGL just use a CMake flag:
 
@@ -423,7 +417,7 @@ chmod +x ./scripts/generate-protocols.sh
 
 This script will generate protocol headers and code that are specifically compatible with your installed Wayland version, potentially resolving any version mismatch issues.
 
-If you use **CMake** just enable the flag:
+If you use **CMake**, just enable the flag:
 
 ```sh
 mkdir build
@@ -431,14 +425,14 @@ cd build
 cmake .. -DUSE_WAYLAND_API=ON
 ```
 
-### MacOS X
+### macOS
 
-Cocoa and clang is assumed to be installed on the system (downloading latest XCode + installing the command line tools should do the trick).
+Cocoa and clang are assumed to be installed on the system (downloading the latest Xcode and installing the command line tools should do the trick).
 
-Note that MacOS X Mojave+ does not support Cocoa framework as expected. For that reason you can switch to Metal API.
+Note that macOS Mojave+ does not support the Cocoa framework as expected. For that reason, you can switch to the Metal API.
 To enable it just compile defining the preprocessor macro USE_METAL_API.
 
-If you use **CMake** just enable the flag:
+If you use **CMake**, just enable the flag:
 
 ```sh
 mkdir build
@@ -446,7 +440,7 @@ cd build
 cmake .. -DUSE_METAL_API=ON
 ```
 
-or if you don't want to use Metal API:
+Or, if you don't want to use the Metal API:
 
 ```sh
 mkdir build
@@ -456,7 +450,7 @@ cmake .. -DUSE_METAL_API=OFF
 
 #### Coordinate system
 
-On MacOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But as we want to create a multiplatform library we inverted the coordinates in such a way that now (0, 0) -> (left, top), like in the other platforms.
+On macOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) -> (left, top), like on the other platforms.
 
 In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
 
@@ -468,18 +462,10 @@ cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
 
 **Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
 
-if you use **tundra**:
-
-```sh
-tundra2 macosx-clang-debug
-```
-
-and you should be able to run the noise example (t2-output/macosx-clang-debug-default/noise).
-
 ### iOS (beta)
 
-It works with and without an UIWindow created.
-If you want to create the UIWindow through an Story Board, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
+It works with and without a UIWindow.
+If you want to create the UIWindow through a Storyboard, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
 
 **Issues**:
 
@@ -683,7 +669,7 @@ mfb_open("my_app", 320, 240);
 <canvas id="my_app" style="width: 640px; height: 480px">
 ````
 
-If not already set, the backend will also set a handfull of CSS styles on the canvas that are good defaults for pixel graphics.
+If not already set, the backend will also set a handful of CSS styles on the canvas that are good defaults for pixel graphics.
 
 - `image-rendering: pixelated`
 - `user-select: none`
@@ -717,7 +703,7 @@ This will generate DOS 32-bit `.exe` files in the `build/` folder which you can 
 ./tests/dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tests/dos/tools/dosbox-x.conf build/<executable-file>
 ```
 
-Note that the DOS backend can not support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
+Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
 
 #### Compiling your own MiniFB app for DOS
 
@@ -731,7 +717,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=./dos/tools/toolchain-djgpp.cmake ... rest of your 
 
 The build will then generate DOS 32-bit protected mode executables and use the MiniFB DOS backend. You can run the executables as is in DOSBox-x or FreeDOS, or a Windows version that can run DOS applications.
 
-Running the executbales in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
+Running the executables in vanilla MS-DOS requires a DPMI server. Download [CWSDPMI](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/distributions/1.2/repos/pkg-html/cwsdpmi.html), extract the ZIP file, and place the `CWSDPMI.EXE` file found in the `BIN/` folder next to your application's executable.
 
 #### Debugging your MiniFB app in DOSBox-x
 
@@ -779,25 +765,6 @@ Alternatively, you can use VS Code to debug via a graphical user interface. Run 
 
 You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
 
-## How to add it to your project
-
-First add this **repository as a submodule** in your dependencies folder. Something like `dependencies/`:
-
-```sh
-git submodule add https://github.com/emoon/minifb.git dependencies/minifb
-```
-
-Then in your `CMakeLists.txt` file, include the following:
-
-```cmake
-add_subdirectory(dependencies/minifb)
-
-# Link MiniFB to your project:
-target_link_libraries(${PROJECT_NAME} minifb)
-```
-
-Fill out the rest of your `CMakeLists.txt` file with your source files and dependencies.
-
 ## Platform-Specific Limitations
 
 Some MiniFB features are not available on all platforms. Here's a summary of what's supported:
@@ -806,63 +773,15 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 
 | Feature | Windows | macOS | Linux X11 | Wayland | iOS | Android | Web | DOS |
 |---------|---------|-------|-----------|---------|-----|---------|-----|-----|
-| Window creation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| mfb_update | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Keyboard input | ✓ | ✓ | ✓ | ✓ | - | Limited | ✓ | Limited |
-| Mouse input | ✓ | ✓ | ✓ | ✓ | Touch | Touch | ✓ | - |
-| Multi-window | ✓ | ✓ | ✓ | ✓ | - | - | - | ✗ |
-| Viewport | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) |
-| Cursor hiding | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
-| Monitor DPI | ✓ | ✓ | Limited | ✓ | ✓ | ✓ | Fixed | Fixed |
-| Target FPS | ✓ | ✓ | ✓ | ✓ | (no-op) | (no-op) | (no-op) | (no-op) |
+| Window creation | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| mfb_update | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Keyboard input | Yes | Yes | Yes | Yes | No | Limited | Yes | Limited |
+| Mouse input | Yes | Yes | Yes | Yes | Touch | Touch | Yes | No |
+| Multi-window | Yes | Yes | Yes | Yes | No | No | No | No |
+| Viewport | Yes | Yes | Yes | Yes | Yes | Yes | No-op | No-op |
+| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
+| Monitor DPI | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
+| Target FPS | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
 
-### iOS Limitations
-
-- No keyboard input callbacks (iOS handles touch events instead)
-- Mouse events represent touch events (last touch position)
-- Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced to display refresh rate)
-- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support yet
-
-### Android Limitations
-
-- No keyboard input callbacks (use char input callbacks instead)
-- Mouse events represent touch events (last touch position)
-- Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
-- `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support
-
-### Web (WASM) Limitations
-
-Browser limitations are significant:
-
-- Flags to `mfb_open_ex()` are ignored
-- `mfb_set_viewport()` is a no-op
-- `mfb_set_viewport_best_fit()` is a no-op
-- `mfb_get_monitor_dpi()` reports a fixed value
-- `mfb_get_monitor_scale()` reports a fixed value
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
-- `mfb_show_cursor()` is a no-op
-- Window title must match a `<canvas>` element ID in the DOM
-- No multitouch support
-
-### DOS (DJGPP) Limitations
-
-The DOS backend currently does not support the following MiniFB features:
-
-- The flags to `mfb_open_ex()` are ignored
-- `mfb_set_viewport()` (no-op)
-- `mfb_set_viewport_best_fit()` (no-op)
-- `mfb_get_monitor_dpi()` (reports a fixed value)
-- `mfb_get_monitor_scale()` (reports a fixed value)
-- `mfb_set_target_fps()` (no-op)
-- `mfb_get_target_fps()` (no-op)
-- `mfb_show_cursor()` (no-op)
-- Multiple windows are not support
-- A window is always full-screen
-- The window dimensions are limited to supported VESA modes, e.g. 320x240, 640x480, 800x600, etc. VESA mode support may vary across environments and hardware. The 3 listed here are very well supported. The VESA code will try to get the closest match to the requested window dimensions, and also check if 32-bit color encodings are possible. On many machines, only 24-bit color encodings are possible. The DOS backend will transparently convert the 32-bit buffers provided to `mfb_update_ex()` to 24-bit internally.
-- Keyboard handling is limited to the keys found in [DOSMiniFB.c line 24](src/dos/DOSMiniFB.c#L24). No other keys will be reported.
-- Character input is limited to ASCII based on a US keyboard layout.
+For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).
