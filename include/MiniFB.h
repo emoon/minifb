@@ -133,6 +133,10 @@ double              mfb_timer_delta(struct mfb_timer *tmr);
 double              mfb_timer_get_frequency(void);
 double              mfb_timer_get_resolution(void);
 
+// Logger
+void                mfb_set_logger(mfb_log_func user_logger);
+void                mfb_set_log_level(mfb_log_level level);
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus

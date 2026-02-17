@@ -15,6 +15,8 @@ typedef struct mfb_timer {
 #if defined(__cplusplus)
 extern "C" {
 #endif
+    extern mfb_log_func mfb_log;
+
     extern short int g_keycodes[512];
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed);
 

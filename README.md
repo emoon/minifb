@@ -230,6 +230,23 @@ bool                mfb_wait_sync(struct mfb_window *window); // Frame sync poin
 
 **Note:** Hardware-accelerated syncing (OpenGL, iOS) will use vertical sync. Other platforms use software pacing.
 
+### Logging
+
+MiniFB ships with a simple logger that you can redirect or disable:
+
+```c
+// Set a custom logger; pass NULL to restore the built-in logger
+void mfb_set_logger(mfb_log_func user_logger);
+
+// Control verbosity threshold (inclusive)
+void mfb_set_log_level(mfb_log_level level);
+```
+
+- Levels (low → high): `MFB_LOG_TRACE`, `MFB_LOG_DEBUG`, `MFB_LOG_INFO`, `MFB_LOG_WARNING`, `MFB_LOG_ERROR`.
+- Defaults: in `_DEBUG` builds the threshold is `MFB_LOG_DEBUG`; in release builds `MFB_LOG_INFO`.
+- Messages with a level **below** the threshold are discarded; equal or higher are emitted.
+- The built-in logger writes to `stderr` as `[MiniFB][LEVEL] message`.
+
 ### Cursor Control
 
 ```c

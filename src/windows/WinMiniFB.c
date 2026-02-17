@@ -5,7 +5,6 @@
 #if defined(USE_OPENGL_API)
     #include "gl/MiniFB_GL.h"
 #endif
-#include <stdio.h>
 #include <stdlib.h>
 
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
@@ -114,18 +113,18 @@ dpi_aware() {
                 }
             }
             if (error != NO_ERROR) {
-                fprintf(stderr, "Error (SetProcessDpiAwarenessContext): %s\n", GetErrorMessage());
+                mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwarenessContext failed: %s", GetErrorMessage());
             }
         }
     }
     else if (mfb_SetProcessDpiAwareness != NULL) {
         if (mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE) != S_OK) {
-            fprintf(stderr, "Error (SetProcessDpiAwareness): %s\n", GetErrorMessage());
+            mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwareness failed: %s", GetErrorMessage());
         }
     }
     else if (mfb_SetProcessDPIAware != NULL) {
         if (mfb_SetProcessDPIAware() == false) {
-            fprintf(stderr, "Error (SetProcessDPIAware): %s\n", GetErrorMessage());
+            mfb_log(MFB_LOG_WARNING, "SetProcessDPIAware failed: %s", GetErrorMessage());
         }
     }
 }
@@ -133,17 +132,24 @@ dpi_aware() {
 //-------------------------------------
 void
 get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
-    UINT    x, y;
+    UINT    x = USER_DEFAULT_SCREEN_DPI;
+    UINT    y = USER_DEFAULT_SCREEN_DPI;
+    bool    got_dpi = false;
 
     if (mfb_GetDpiForMonitor != NULL) {
         HMONITOR monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-        mfb_GetDpiForMonitor(monitor, mfb_MDT_EFFECTIVE_DPI, &x, &y);
+        if (monitor != NULL && SUCCEEDED(mfb_GetDpiForMonitor(monitor, mfb_MDT_EFFECTIVE_DPI, &x, &y))) {
+            got_dpi = true;
+        }
     }
-    else {
+
+    if (!got_dpi) {
         const HDC dc = GetDC(hWnd);
-        x = GetDeviceCaps(dc, LOGPIXELSX);
-        y = GetDeviceCaps(dc, LOGPIXELSY);
-        ReleaseDC(NULL, dc);
+        if (dc != NULL) {
+            x = GetDeviceCaps(dc, LOGPIXELSX);
+            y = GetDeviceCaps(dc, LOGPIXELSY);
+            ReleaseDC(hWnd, dc);
+        }
     }
 
     if (scale_x) {
@@ -234,6 +240,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 const RECT *   pRect  = (RECT *) (lParam);
                 const uint32_t width  = pRect->right  - pRect->left;
                 const uint32_t height = pRect->bottom - pRect->top;
+
+                mfb_log(MFB_LOG_DEBUG, "WM_DPICHANGED: applying suggested bounds %ux%u at (%ld,%ld)",
+                        width, height, pRect->left, pRect->top);
 
                 SetWindowPos(hWnd,
                             NULL,
@@ -417,14 +426,13 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_MOUSELEAVE:
-            if (window_data) {
+            if (window_data_specific) {
                 window_data_specific->mouse_inside = false;
             }
 
-            if (window_data->is_cursor_visible == false) {
+            if (window_data && window_data->is_cursor_visible == false) {
                 ShowCursor(TRUE);
             }
-
             break;
 
         case WM_SIZE:
@@ -449,6 +457,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 if (window_data->window_width != 0 && window_data->window_height != 0) {
                     width  = (uint32_t) (window_data->window_width  / scale_x);
                     height = (uint32_t) (window_data->window_height / scale_y);
+                    mfb_log(MFB_LOG_DEBUG, "WM_SIZE: window=%ux%u framebuffer=%ux%u scale=(%.2f, %.2f)",
+                            window_data->window_width, window_data->window_height, width, height, scale_x, scale_y);
                     kCall(resize_func, width, height);
                 }
             }
@@ -490,10 +500,23 @@ update_events(HWND window) {
 static unsigned g_window_counter = 0;   // (not thread safe)
 
 //-------------------------------------
+static void
+release_window_counter(void) {
+    if (g_window_counter > 0) {
+        --g_window_counter;
+        if (g_window_counter == 0) {
+            timeEndPeriod(1);
+        }
+    }
+}
+
+//-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
+    SWindowData *window_data = NULL;
+    SWindowData_Win *window_data_specific = NULL;
 
     if (g_window_counter == 0) {
         timeBeginPeriod(1); // To be able to sleep 1 ms on Windows
@@ -503,15 +526,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     ++g_window_counter;
 
-    SWindowData *window_data = malloc(sizeof(SWindowData));
+    window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
+        mfb_log(MFB_LOG_ERROR, "Cannot allocate SWindowData");
+        release_window_counter();
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Win *window_data_specific = malloc(sizeof(SWindowData_Win));
+    window_data_specific = malloc(sizeof(SWindowData_Win));
     if (window_data_specific == NULL) {
+        mfb_log(MFB_LOG_ERROR, "Cannot allocate SWindowData_Win");
         free(window_data);
+        release_window_counter();
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Win));
@@ -538,6 +565,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         settings.dmFields     = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
 
         if (ChangeDisplaySettings(&settings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) {
+            mfb_log(MFB_LOG_WARNING, "ChangeDisplaySettings fullscreen failed, falling back to fullscreen desktop");
             flags = WF_FULLSCREEN_DESKTOP;
         }
     }
@@ -591,7 +619,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->wc.lpfnWndProc   = WndProc;
     window_data_specific->wc.hCursor       = LoadCursor(0, IDC_ARROW);
     window_data_specific->wc.lpszClassName = title;
-    RegisterClass(&window_data_specific->wc);
+    if (RegisterClass(&window_data_specific->wc) == 0) {
+        uint32_t error = GetLastError();
+        if (error != ERROR_CLASS_ALREADY_EXISTS) {
+            mfb_log(MFB_LOG_ERROR, "RegisterClass failed: %s", GetErrorMessage());
+            free(window_data);
+            free(window_data_specific);
+            release_window_counter();
+            return NULL;
+        }
+    }
 
     calc_dst_factor(window_data, width, height);
 
@@ -607,8 +644,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         0, 0, 0, 0);
 
     if (!window_data_specific->window) {
+        mfb_log(MFB_LOG_ERROR, "CreateWindowEx failed: %s", GetErrorMessage());
         free(window_data);
         free(window_data_specific);
+        release_window_counter();
         return NULL;
     }
 
@@ -620,13 +659,25 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     ShowWindow(window_data_specific->window, SW_NORMAL);
 
     window_data_specific->hdc = GetDC(window_data_specific->window);
+    if (window_data_specific->hdc == NULL) {
+        mfb_log(MFB_LOG_ERROR, "GetDC failed: %s", GetErrorMessage());
+        DestroyWindow(window_data_specific->window);
+        free(window_data);
+        free(window_data_specific);
+        release_window_counter();
+        return NULL;
+    }
 
 #if !defined(USE_OPENGL_API)
 
     window_data_specific->bitmap_info = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
     if (window_data_specific->bitmap_info == NULL) {
+        mfb_log(MFB_LOG_ERROR, "Cannot allocate BITMAPINFO");
+        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        DestroyWindow(window_data_specific->window);
         free(window_data);
         free(window_data_specific);
+        release_window_counter();
         return NULL;
     }
 
@@ -642,19 +693,42 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #else
 
-    create_GL_context(window_data);
+    if (!create_GL_context(window_data)) {
+        mfb_log(MFB_LOG_ERROR, "create_GL_context failed");
+        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        DestroyWindow(window_data_specific->window);
+        free(window_data);
+        free(window_data_specific);
+        release_window_counter();
+        return NULL;
+    }
 
 #endif
 
     window_data_specific->timer = mfb_timer_create();
+    if (window_data_specific->timer == NULL) {
+        mfb_log(MFB_LOG_ERROR, "mfb_timer_create failed");
+#if !defined(USE_OPENGL_API)
+        free(window_data_specific->bitmap_info);
+        window_data_specific->bitmap_info = NULL;
+#else
+        destroy_GL_context(window_data);
+#endif
+        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        DestroyWindow(window_data_specific->window);
+        free(window_data);
+        free(window_data_specific);
+        release_window_counter();
+        return NULL;
+    }
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
 #if defined(_DEBUG)
     #if defined(USE_OPENGL_API)
-        printf("Window created using OpenGL API\n");
+        mfb_log(MFB_LOG_DEBUG, "Window created using OpenGL API");
     #else
-        printf("Window created using GDI API\n");
+        mfb_log(MFB_LOG_DEBUG, "Window created using GDI API");
     #endif
 #endif
 
@@ -667,21 +741,25 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
         return STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window requested close");
         destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
     if (buffer == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
         return STATE_INVALID_BUFFER;
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific ==  NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
         return STATE_INVALID_WINDOW;
     }
 
@@ -705,6 +783,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     update_events(window_data_specific->window);
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window closed after event processing");
         destroy_window_data(window_data);
         return STATE_EXIT;
     }
@@ -717,22 +796,26 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
         return STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window requested close");
         destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window specific data");
         return STATE_INVALID_WINDOW;
     }
 
     update_events(window_data_specific->window);
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window closed after event processing");
         destroy_window_data(window_data);
         return STATE_EXIT;
     }
@@ -749,20 +832,24 @@ bool
 mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
         return false;
     }
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window requested close");
         destroy_window_data(window_data);
         return false;
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window specific data");
         return false;
     }
 
     update_events(NULL);
     if (window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while polling events");
         destroy_window_data(window_data);
         return false;
     }
@@ -800,6 +887,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
         update_events(NULL);
         if (window_data->close) {
+            mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while waiting for frame sync");
             destroy_window_data(window_data);
             return false;
         }
@@ -817,6 +905,11 @@ destroy_window_data(SWindowData *window_data) {
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL) {
+        release_window_counter();
+        free(window_data);
+        return;
+    }
 
 #if !defined(USE_OPENGL_API)
     if (window_data_specific->bitmap_info != NULL) {
@@ -829,6 +922,8 @@ destroy_window_data(SWindowData *window_data) {
 
     if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
         ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+    }
+    if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
         DestroyWindow(window_data_specific->window);
     }
 
@@ -842,10 +937,11 @@ destroy_window_data(SWindowData *window_data) {
     window_data->close       = true;
 
     // To be able to sleep 1 ms on Windows (not thread safe)
-    --g_window_counter;
-    if (g_window_counter == 0) {
-        timeEndPeriod(1);
-    }
+    release_window_counter();
+
+    free(window_data_specific);
+    window_data->specific = NULL;
+    free(window_data);
 }
 
 //-------------------------------------
@@ -1038,14 +1134,17 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    if (offset_x + width > window_data->window_width) {
+    if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
         return false;
     }
-    if (offset_y + height > window_data->window_height) {
+    if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
         return false;
     }
 
     window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL) {
+        return false;
+    }
 
     get_monitor_scale(window_data_specific->window, &scale_x, &scale_y);
     window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);

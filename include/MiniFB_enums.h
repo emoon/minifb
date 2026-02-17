@@ -29,9 +29,9 @@ typedef enum {
 #define MOUSE_MIDDLE MOUSE_BTN_3
 
 typedef enum {
-	#define KEY_VALUE(NAME, VALUE, _) NAME = VALUE,
+    #define KEY_VALUE(NAME, VALUE, _) NAME = VALUE,
 KEY_LIST(KEY_VALUE)
-	#undef KEY_VALUE
+    #undef KEY_VALUE
 }  mfb_key;
 #define KB_KEY_LAST     KB_KEY_MENU
 
@@ -52,6 +52,14 @@ typedef enum {
     WF_ALWAYS_ON_TOP      = 0x10,
 } mfb_window_flags;
 
+typedef enum {
+    MFB_LOG_TRACE = 0,
+    MFB_LOG_DEBUG,
+    MFB_LOG_INFO,
+    MFB_LOG_WARNING,
+    MFB_LOG_ERROR,
+} mfb_log_level;
+
 // Opaque pointer
 struct mfb_window;
 struct mfb_timer;
@@ -66,3 +74,5 @@ typedef void(*mfb_mouse_button_func)(struct mfb_window *window, mfb_mouse_button
 typedef void(*mfb_mouse_move_func)(struct mfb_window *window, int x, int y);
 typedef void(*mfb_mouse_scroll_func)(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY);
 
+// Log
+typedef void (*mfb_log_func)(mfb_log_level level, const char *message, ...);

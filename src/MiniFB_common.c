@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #include <MiniFB.h>
 #include "WindowData.h"
@@ -365,4 +367,61 @@ mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned 
     if (offset_y != NULL) *offset_y = 0;
     if (width    != NULL) *width    = 0;
     if (height   != NULL) *height   = 0;
+}
+
+//-------------------------------------
+// LOGGER
+//-------------------------------------
+
+#if defined(_DEBUG)
+    static mfb_log_level g_mfb_log_level = MFB_LOG_DEBUG;
+#else
+    static mfb_log_level g_mfb_log_level = MFB_LOG_INFO;
+#endif
+
+//-------------------------------------
+void
+mfb_log_default(mfb_log_level level, const char *message, ...) {
+    static const char *level_str[] = { "TRACE", "DEBUG", "INFO", "WARNING", "ERROR" };
+    char buffer[1024];
+
+    if (level < g_mfb_log_level) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, message);
+    vsnprintf(buffer, sizeof(buffer), message, args);
+    va_end(args);
+
+    const char *lvl = (level >= 0 && level < (int)(sizeof(level_str) / sizeof(level_str[0])))
+                        ? level_str[level]
+                        : "UNKNOWN";
+
+    if (level < MFB_LOG_WARNING) {
+        fprintf(stdout, "[MiniFB][%s] %s\n", lvl, buffer);
+    }
+    else {
+        fprintf(stderr, "[MiniFB][%s] %s\n", lvl, buffer);
+    }
+}
+
+//-------------------------------------
+mfb_log_func mfb_log = &mfb_log_default;
+
+//-------------------------------------
+void
+mfb_set_logger(mfb_log_func user_logger) {
+    if (user_logger == NULL) {
+        mfb_log = mfb_log_default;
+    }
+    else {
+        mfb_log = user_logger;
+    }
+}
+
+//-------------------------------------
+void
+mfb_set_log_level(mfb_log_level level) {
+    g_mfb_log_level = level;
 }
