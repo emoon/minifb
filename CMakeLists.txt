@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
-project(MiniFB VERSION 0.9.0 LANGUAGES C CXX OBJC)
+project(MiniFB VERSION 0.9.1 LANGUAGES C CXX)
+
+include(CheckLanguage)
+check_language(OBJC)
+if(CMAKE_OBJC_COMPILER)
+  enable_language(OBJC)
+endif()
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
