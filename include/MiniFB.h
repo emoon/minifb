@@ -142,7 +142,7 @@ double              mfb_timer_get_resolution(void);
     #include "MiniFB_cpp.h"
 #endif
 
+#endif
+
 // don't want to bleed our deprecation macro
 #undef __MFB_DEPRECATED
-
-#endif
