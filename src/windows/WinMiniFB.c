@@ -1073,6 +1073,7 @@ init_keycodes() {
     g_keycodes[0x053] = KB_KEY_KP_DECIMAL;
     g_keycodes[0x135] = KB_KEY_KP_DIVIDE;
     g_keycodes[0x11C] = KB_KEY_KP_ENTER;
+    g_keycodes[0x059] = KB_KEY_KP_EQUAL;
     g_keycodes[0x037] = KB_KEY_KP_MULTIPLY;
     g_keycodes[0x04A] = KB_KEY_KP_SUBTRACT;
 }
@@ -1080,6 +1081,9 @@ init_keycodes() {
 //-------------------------------------
 mfb_key
 translate_key(unsigned int wParam, unsigned long lParam) {
+    if (wParam == 0x92) // VK_OEM_NEC_EQUAL
+        return KB_KEY_KP_EQUAL;
+
     if (wParam == VK_CONTROL) {
         MSG   next;
         DWORD time;

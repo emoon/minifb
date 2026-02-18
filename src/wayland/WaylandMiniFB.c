@@ -78,7 +78,7 @@ update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_
 static void
 destroy_window_data(SWindowData *window_data) {
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: destroy_window_data called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: destroy_window_data called with a null window pointer.");
         return;
     }
 
@@ -119,13 +119,13 @@ destroy_window_data(SWindowData *window_data) {
 static void
 destroy(SWindowData *window_data) {
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: destroy called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: destroy called with a null window pointer.");
         return;
     }
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL || window_data_way->display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: missing Wayland display state during destroy, forcing local cleanup.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland display state during destroy, forcing local cleanup.");
         if (window_data_way) {
             if (window_data_way->toplevel_decoration) {
                 zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
@@ -361,7 +361,7 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         if (fd >= 0) {
             close(fd);
         }
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: keyboard_keymap received without valid window state.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: keyboard_keymap received without valid window state.");
         return;
     }
 
@@ -369,14 +369,14 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         if (fd >= 0) {
             close(fd);
         }
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: unsupported or invalid keymap payload.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: unsupported or invalid keymap payload.");
         return;
     }
 
     char *keymap_data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (keymap_data == MAP_FAILED) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to map Wayland keymap (%s).", strerror(errno));
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to map Wayland keymap (%s).", strerror(errno));
         return;
     }
 
@@ -384,7 +384,7 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         window_data_way->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
         if (window_data_way->xkb_context == NULL) {
             munmap(keymap_data, size);
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: xkb_context_new failed.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: xkb_context_new failed.");
             return;
         }
     }
@@ -395,14 +395,14 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
                                                             XKB_KEYMAP_COMPILE_NO_FLAGS);
     munmap(keymap_data, size);
     if (keymap == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: xkb_keymap_new_from_string failed.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: xkb_keymap_new_from_string failed.");
         return;
     }
 
     struct xkb_state *state = xkb_state_new(keymap);
     if (state == NULL) {
         xkb_keymap_unref(keymap);
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: xkb_state_new failed.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: xkb_state_new failed.");
         return;
     }
 
@@ -1251,20 +1251,20 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: invalid window size %ux%u.", width, height);
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to allocate SWindowData.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
     if(window_data_way == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to allocate SWindowData_Way.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData_Way.");
         free(window_data);
         return NULL;
     }
@@ -1277,14 +1277,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_way->display = wl_display_connect(NULL);
     if (!window_data_way->display) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to connect to Wayland display.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to connect to Wayland display.");
         free(window_data);
         free(window_data_way);
         return NULL;
     }
     window_data_way->registry = wl_display_get_registry(window_data_way->display);
     if (!window_data_way->registry) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_get_registry returned NULL.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_get_registry returned NULL.");
         goto out;
     }
     wl_registry_add_listener(window_data_way->registry, &registry_listener, window_data);
@@ -1293,79 +1293,79 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     if (wl_display_dispatch(window_data_way->display) == -1 ||
         wl_display_roundtrip(window_data_way->display) == -1) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to initialize Wayland globals (dispatch/roundtrip).");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to initialize Wayland globals (dispatch/roundtrip).");
         goto out;
     }
 
     if (!window_data_way->decoration_manager) {
-        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB warning: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.");
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.");
     }
 
     if (!window_data_way->fractional_scale_manager) {
-        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB warning: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.");
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.");
     }
 
     if (!window_data_way->seat) {
-        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB warning: wl_seat is unavailable; keyboard and pointer input will not be available.");
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: wl_seat is unavailable; keyboard and pointer input will not be available.");
     }
 
     if (window_data_way->output_count == 0) {
-        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB warning: wl_output is unavailable; monitor scale tracking will use fallback values.");
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: wl_output is unavailable; monitor scale tracking will use fallback values.");
     }
 
     // did not get a format we want... meh
     if (window_data_way->shm_format == -1u) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: compositor does not expose a supported shared memory format.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: compositor does not expose a supported shared memory format.");
         goto out;
     }
 
     if (!window_data_way->compositor) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: Wayland compositor interface is unavailable.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: Wayland compositor interface is unavailable.");
         goto out;
     }
 
     char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
     if (xdg_rt_dir == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: XDG_RUNTIME_DIR is not set.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: XDG_RUNTIME_DIR is not set.");
         goto out;
     }
 
     char shmfile[PATH_MAX];
     uint32_t ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX", xdg_rt_dir);
     if (ret >= sizeof(shmfile)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: shared memory path exceeds PATH_MAX.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: shared memory path exceeds PATH_MAX.");
         goto out;
     }
 
     window_data_way->fd = mkstemp(shmfile);
     if (window_data_way->fd == -1) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mkstemp failed for shared memory file (%s).", strerror(errno));
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mkstemp failed for shared memory file (%s).", strerror(errno));
         goto out;
     }
     unlink(shmfile);
 
     if ((size_t) width > SIZE_MAX / (size_t) height ||
         (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: requested window buffer size overflows size_t.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: requested window buffer size overflows size_t.");
         goto out;
     }
 
     size_t length_sz = sizeof(uint32_t) * (size_t) width * (size_t) height;
     if (length_sz > (size_t) INT_MAX) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: requested window buffer size exceeds Wayland pool limits.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: requested window buffer size exceeds Wayland pool limits.");
         goto out;
     }
 
     int length = (int) length_sz;
 
     if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: ftruncate failed for shared memory buffer (%s).", strerror(errno));
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed for shared memory buffer (%s).", strerror(errno));
         goto out;
     }
 
     window_data_way->shm_ptr = (uint32_t *) mmap(NULL, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
     if (window_data_way->shm_ptr == MAP_FAILED) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mmap failed for shared memory buffer (%s).", strerror(errno));
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed for shared memory buffer (%s).", strerror(errno));
         goto out;
     }
 
@@ -1383,20 +1383,20 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
     if (window_data_way->shm_pool == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_shm_create_pool failed.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_create_pool failed.");
         goto out;
     }
     window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
                                     window_data->buffer_stride, window_data_way->shm_format);
     if (window_data->draw_buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_shm_pool_create_buffer failed.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer failed.");
         goto out;
     }
 
     window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
     if (!window_data_way->surface) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to create Wayland surface.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to create Wayland surface.");
         goto out;
     }
 
@@ -1414,7 +1414,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
     if (!window_data_way->cursor_surface) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to create Wayland cursor surface.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to create Wayland cursor surface.");
         goto out;
     }
 
@@ -1422,7 +1422,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (window_data_way->shell) {
         window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
         if (!window_data_way->shell_surface) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to create xdg_surface.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to create xdg_surface.");
             goto out;
         }
 
@@ -1430,7 +1430,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
         if (!window_data_way->toplevel) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to create xdg_toplevel.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to create xdg_toplevel.");
             goto out;
         }
 
@@ -1472,7 +1472,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
 
         if (flags & WF_ALWAYS_ON_TOP) {
-            mfb_log(MFB_LOG_WARNING, "WaylandMiniFB warning: WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
+            mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
         }
 
         xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
@@ -1486,19 +1486,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         // Process events until we get the configure event and the surface is mapped
         while (!window_data->is_initialized) {
             if (wl_display_dispatch(window_data_way->display) == -1) {
-                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch failed while waiting for initial configure event.");
+                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch failed while waiting for initial configure event.");
                 goto out;
             }
         }
     }
     else {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: xdg_wm_base is unavailable; cannot create a toplevel surface.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: xdg_wm_base is unavailable; cannot create a toplevel surface.");
         goto out;
     }
 
     window_data_way->timer = mfb_timer_create();
     if (window_data_way->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: failed to create frame timer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to create frame timer.");
         goto out;
     }
 
@@ -1509,7 +1509,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     return (struct mfb_window *) window_data;
 
 out:
-    mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_open_ex failed and is cleaning up partially initialized resources.");
+    mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_open_ex failed and is cleaning up partially initialized resources.");
     destroy(window_data);
 
     return NULL;
@@ -1542,36 +1542,36 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     uint32_t done = 0;
 
     if(window == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_ex called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
         return STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_ex aborted because the window is marked for close.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy(window_data);
         return STATE_EXIT;
     }
 
     if(buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_ex called with a null buffer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null buffer.");
         return STATE_INVALID_BUFFER;
     }
 
     if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return STATE_INVALID_BUFFER;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_ex.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_ex.");
         return STATE_INVALID_WINDOW;
     }
 
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: invalid Wayland display state during mfb_update_ex.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_ex.");
         return STATE_INTERNAL_ERROR;
     }
 
@@ -1581,12 +1581,12 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         unsigned old_buffer_stride = window_data->buffer_stride;
         if ((size_t) width > SIZE_MAX / (size_t) height ||
             (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: resize buffer size overflows size_t.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size overflows size_t.");
             return STATE_INTERNAL_ERROR;
         }
         size_t length = sizeof(uint32_t) * (size_t) width * (size_t) height;
         if (length > (size_t) INT_MAX) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: resize buffer size exceeds Wayland pool limits.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size exceeds Wayland pool limits.");
             return STATE_INTERNAL_ERROR;
         }
         int length_i = (int) length;
@@ -1595,7 +1595,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         if (length > window_data_way->shm_pool_size) {
             if (ftruncate(window_data_way->fd, (off_t) length) == -1)
             {
-                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: ftruncate failed while resizing shared memory buffer (%s).", strerror(errno));
+                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed while resizing shared memory buffer (%s).", strerror(errno));
                 return STATE_INTERNAL_ERROR;
             }
 
@@ -1604,7 +1604,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             uint32_t *new_shm_ptr = (uint32_t *) mmap(NULL, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
             if (new_shm_ptr == MAP_FAILED)
             {
-                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mmap failed while resizing shared memory buffer (%s).", strerror(errno));
+                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed while resizing shared memory buffer (%s).", strerror(errno));
                 return STATE_INTERNAL_ERROR;
             }
             if (old_shm_ptr && old_shm_ptr != MAP_FAILED && old_shm_length > 0) {
@@ -1622,7 +1622,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
                                         width, height,
                                         new_buffer_stride, window_data_way->shm_format);
         if (new_draw_buffer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_shm_pool_create_buffer failed while resizing buffer.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer failed while resizing buffer.");
             window_data->buffer_width  = old_buffer_width;
             window_data->buffer_height = old_buffer_height;
             window_data->buffer_stride = old_buffer_stride;
@@ -1642,7 +1642,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     // update shm buffer
     if (window_data_way->shm_ptr == NULL || window_data_way->shm_ptr == MAP_FAILED) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: shared memory buffer is not mapped.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: shared memory buffer is not mapped.");
         return STATE_INTERNAL_ERROR;
     }
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
@@ -1651,7 +1651,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     struct wl_callback *frame_callback = wl_surface_frame(window_data_way->surface);
     if (!frame_callback) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_surface_frame returned NULL.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
         return STATE_INTERNAL_ERROR;
     }
     wl_callback_add_listener(frame_callback, &frame_listener, &done);
@@ -1659,7 +1659,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     while (!done && window_data->close == false) {
         if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: display dispatch/roundtrip failed during frame wait.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: display dispatch/roundtrip failed during frame wait.");
             if (!done) {
                 wl_callback_destroy(frame_callback);
             }
@@ -1682,45 +1682,45 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     if(window == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_events called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events called with a null window pointer.");
         return STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_events aborted because the window is marked for close.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy(window_data);
         return STATE_EXIT;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: missing Wayland-specific window data during mfb_update_events.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_events.");
         return STATE_INVALID_WINDOW;
     }
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: invalid Wayland display state during mfb_update_events.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_events.");
         return STATE_INTERNAL_ERROR;
     }
 
     // Process already queued events first.
     if (wl_display_dispatch_pending(window_data_way->display) == -1) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed in mfb_update_events.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_update_events.");
         return STATE_INTERNAL_ERROR;
     }
 
     // Non-blocking read/dispatch so mfb_update_events keeps X11-like behavior.
     while (wl_display_prepare_read(window_data_way->display) != 0) {
         if (wl_display_dispatch_pending(window_data_way->display) == -1) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed while preparing read in mfb_update_events.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed while preparing read in mfb_update_events.");
             return STATE_INTERNAL_ERROR;
         }
     }
 
     if (wl_display_flush(window_data_way->display) == -1 && errno != EAGAIN) {
         wl_display_cancel_read(window_data_way->display);
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_flush failed in mfb_update_events.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_flush failed in mfb_update_events.");
         return STATE_INTERNAL_ERROR;
     }
 
@@ -1736,24 +1736,24 @@ mfb_update_events(struct mfb_window *window) {
 
     if (rc > 0) {
         if (wl_display_read_events(window_data_way->display) == -1) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_read_events failed in mfb_update_events.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_read_events failed in mfb_update_events.");
             return STATE_INTERNAL_ERROR;
         }
         if (wl_display_dispatch_pending(window_data_way->display) == -1) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed after read in mfb_update_events.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed after read in mfb_update_events.");
             return STATE_INTERNAL_ERROR;
         }
     }
     else {
         wl_display_cancel_read(window_data_way->display);
         if (rc < 0) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: poll failed in mfb_update_events (%s).", strerror(errno));
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: poll failed in mfb_update_events (%s).", strerror(errno));
             return STATE_INTERNAL_ERROR;
         }
     }
 
     if (window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_update_events detected close request after event dispatch.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events detected close request after event dispatch.");
         destroy(window_data);
         return STATE_EXIT;
     }
@@ -1768,30 +1768,30 @@ extern double   g_time_for_frame;
 bool
 mfb_wait_sync(struct mfb_window *window) {
     if (window == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync called with a null window pointer.");
         return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync aborted because the window is marked for close.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted because the window is marked for close.");
         destroy(window_data);
         return false;
     }
 
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (window_data_specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync missing Wayland-specific window data.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync missing Wayland-specific window data.");
         return false;
     }
 
     struct wl_display *display = window_data_specific->display;
     if (display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync has a null Wayland display handle.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync has a null Wayland display handle.");
         return false;
     }
     if (window_data_specific->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync missing frame timer state.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
     const int fd = wl_display_get_fd(display);
@@ -1799,12 +1799,12 @@ mfb_wait_sync(struct mfb_window *window) {
     // Flush outgoing requests and dispatch pending events once before pacing
     wl_display_flush(display);
     if (wl_display_dispatch_pending(display) == -1) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed before sync pacing.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed before sync pacing.");
         return false;
     }
 
     if (window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync aborted after dispatch because the window is marked for close.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted after dispatch because the window is marked for close.");
         destroy(window_data);
         return false;
     }
@@ -1840,7 +1840,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
                 if (rc > 0) {
                     if (wl_display_read_events(display) == -1) {
-                        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_read_events failed while waiting for frame sync.");
+                        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_read_events failed while waiting for frame sync.");
                         return false;
                     }
                 }
@@ -1851,7 +1851,7 @@ mfb_wait_sync(struct mfb_window *window) {
             else {
                 // Could not prepare read because there are pending events
                 if (wl_display_dispatch_pending(display) == -1) {
-                    mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed after prepare_read.");
+                    mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed after prepare_read.");
                     return false;
                 }
             }
@@ -1861,12 +1861,12 @@ mfb_wait_sync(struct mfb_window *window) {
         }
 
         if (wl_display_dispatch_pending(display) == -1) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed during sync loop.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed during sync loop.");
             return false;
         }
 
         if (window_data->close) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync aborted during sync loop because the window is marked for close.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
             destroy(window_data);
             return false;
         }
@@ -1880,20 +1880,20 @@ mfb_wait_sync(struct mfb_window *window) {
 bool
 mfb_wait_sync2(struct mfb_window *window) {
     if(window == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync2 called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 called with a null window pointer.");
         return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync2 aborted because the window is marked for close.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 aborted because the window is marked for close.");
         destroy(window_data);
         return false;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL || window_data_way->display == NULL || window_data_way->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync2 missing Wayland display or timer state.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 missing Wayland display or timer state.");
         return false;
     }
 
@@ -1914,12 +1914,12 @@ mfb_wait_sync2(struct mfb_window *window) {
 
         if(millis == 1) {
             if (wl_display_dispatch_pending(window_data_way->display) == -1) {
-                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_display_dispatch_pending failed in mfb_wait_sync2.");
+                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_wait_sync2.");
                 return false;
             }
 
             if(window_data->close) {
-                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_wait_sync2 aborted during sync loop because the window is marked for close.");
+                mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 aborted during sync loop because the window is marked for close.");
                 destroy(window_data);
                 return false;
             }
@@ -2063,18 +2063,18 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_set_viewport called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_set_viewport called with a null window pointer.");
         return false;
     }
 
     if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
                 offset_x, width, window_data->window_width);
         return false;
     }
 
     if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
                 offset_y, height, window_data->window_height);
         return false;
     }
@@ -2131,13 +2131,13 @@ void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_show_cursor called with a null window pointer.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor called with a null window pointer.");
         return;
     }
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_show_cursor missing Wayland-specific window data.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor missing Wayland-specific window data.");
         return;
     }
 
@@ -2147,7 +2147,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     struct wl_pointer *pointer = window_data_way->pointer;
     struct wl_surface *cursor_surface = window_data_way->cursor_surface;
     if (pointer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: mfb_show_cursor cannot update cursor because wl_pointer is null.");
+        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor cannot update cursor because wl_pointer is null.");
         return;
     }
 
@@ -2159,7 +2159,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     if (show) {
         struct wl_cursor *cursor = window_data_way->default_cursor;
         if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: default cursor data is incomplete (cursor=%p, image_count=%u, cursor_surface=%p).",
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: default cursor data is incomplete (cursor=%p, image_count=%u, cursor_surface=%p).",
                     (void *) cursor, cursor ? cursor->image_count : 0, (void *) cursor_surface);
             return;
         }
@@ -2167,7 +2167,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         struct wl_cursor_image *cursor_image = cursor->images[0];
         struct wl_buffer *cursor_image_buffer = wl_cursor_image_get_buffer(cursor_image);
         if (cursor_image_buffer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB error: wl_cursor_image_get_buffer returned NULL.");
+            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_cursor_image_get_buffer returned NULL.");
             return;
         }
 
@@ -2180,3 +2180,4 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
     }
 }
+
