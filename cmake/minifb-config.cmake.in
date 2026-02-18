@@ -1,0 +1,15 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(@MINIFB_PACKAGE_FIND_OPENGL@)
+    find_dependency(OpenGL)
+endif()
+
+if(@MINIFB_PACKAGE_FIND_X11@)
+    find_dependency(X11)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/minifb-targets.cmake")
+
+check_required_components(minifb)
