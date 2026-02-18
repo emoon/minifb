@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 project(MiniFB VERSION 0.9.1 LANGUAGES C CXX)
 
 include(CheckLanguage)
@@ -11,6 +11,7 @@ message(STATUS "Processing " ${PROJECT_NAME})
 
 include(GNUInstallDirs)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioning.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
 if (POLICY CMP0072)
     cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
 endif()
@@ -120,43 +121,40 @@ set(SrcDOS
     src/dos/vesa.c
 )
 
-# Avoid RelWithDebInfo and MinSizeRel
-#--------------------------------------
-if (CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
-endif()
-
-# Define Release by default
-#--------------------------------------
-if (NOT CMAKE_GENERATOR MATCHES "Multi" AND NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-    message(STATUS "Build type not specified: Use Release by default")
-endif()
-
 # Set features
 #--------------------------------------
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+set(MINIFB_C_STANDARD 11)
+set(MINIFB_CXX_STANDARD 11)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(MINIFB_COMPILE_OPTIONS)
+set(MINIFB_COMPILE_DEFINITIONS)
+set(MINIFB_LINK_OPTIONS_LIB)
+set(MINIFB_LINK_OPTIONS_EXE)
 
 # Options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
-option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
+if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
+    option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
+else()
+    set(MINIFB_BUILD_VERSION_INFO OFF)
+endif()
+
 if (APPLE AND NOT IOS)
-    option(USE_METAL_API "Build the project using metal API code" ON)
-    option(USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
+    option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using metal API code")
+    minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
 elseif (UNIX AND NOT EMSCRIPTEN)
-    option(USE_WAYLAND_API "Build the project using wayland API code" OFF)
-    option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
+    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using wayland API code")
+    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 elseif (WIN32)
-    option(USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
 # Set compile flags depending on the compiler
@@ -165,38 +163,18 @@ if (NOT MSVC)
 
     # GCC/Clang
 
-    # Avoid default flag values
-    #--------------------------------------
-    if (NOT DJGPP)
-        set(CMAKE_C_FLAGS "")
-        set(CMAKE_C_FLAGS_DEBUG "" )
-        set(CMAKE_C_FLAGS_RELEASE "")
-
-        set(CMAKE_CXX_FLAGS "")
-        set(CMAKE_CXX_FLAGS_DEBUG "")
-        set(CMAKE_CXX_FLAGS_RELEASE "")
-    endif()
-
-    set(CMAKE_OBJC_FLAGS "")
-    set(CMAKE_OBJC_FLAGS_DEBUG "")
-    set(CMAKE_OBJC_FLAGS_RELEASE "")
-
-    set(CMAKE_OBJCXX_FLAGS "")
-    set(CMAKE_OBJCXX_FLAGS_DEBUG "")
-    set(CMAKE_OBJCXX_FLAGS_RELEASE "")
-
     if (DJGPP)
-        add_compile_options(
+        list(APPEND MINIFB_COMPILE_OPTIONS
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
         )
     else()
-        add_compile_options(
+        list(APPEND MINIFB_COMPILE_OPTIONS
             "$<$<CONFIG:Debug>:-g>"
         )
     endif()
 
-    add_compile_options(
+    list(APPEND MINIFB_COMPILE_OPTIONS
         -Wall
         -Wextra
         -Wno-switch
@@ -207,7 +185,7 @@ if (NOT MSVC)
     )
 
     if (NOT APPLE)
-        add_compile_options(
+        list(APPEND MINIFB_COMPILE_OPTIONS
             -Wno-cast-function-type
         )
     endif()
@@ -217,7 +195,7 @@ else()
     # MSVC
     #--------------------------------------
 
-    add_compile_options(
+    list(APPEND MINIFB_COMPILE_OPTIONS
         # Security check
         /GS
         # Function level linking
@@ -241,22 +219,25 @@ else()
 
     if (MSVC_VERSION GREATER_EQUAL 1900)
         # SDL checks 2015+
-        add_compile_options(/sdl)
+        list(APPEND MINIFB_COMPILE_OPTIONS /sdl)
     endif()
 
     if (MSVC_VERSION LESS_EQUAL 1920)
         # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
-        add_compile_options(/Gm)
+        list(APPEND MINIFB_COMPILE_OPTIONS /Gm)
     endif()
 
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-D_DEBUG)
-    add_definitions(-DDEBUG)
-    if (EMSCRIPTEN)
-        add_link_options(-g)
-    endif()
+list(APPEND MINIFB_COMPILE_DEFINITIONS
+    "$<$<CONFIG:Debug>:_DEBUG>"
+    "$<$<CONFIG:Debug>:DEBUG>"
+)
+
+if (EMSCRIPTEN)
+    list(APPEND MINIFB_LINK_OPTIONS_EXE
+        "$<$<CONFIG:Debug>:-g>"
+    )
 endif()
 
 # Set compiler/platform specific flags and dependencies
@@ -264,14 +245,14 @@ endif()
 if (WIN32)
 
     if (MSVC)
-        add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+        list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
     endif()
-    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
+    list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
 
     if (USE_OPENGL_API)
         list(APPEND SrcLib ${SrcGL})
 
-        add_definitions(-DUSE_OPENGL_API)
+        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
     endif()
 
     list(APPEND SrcLib ${SrcWindows})
@@ -283,11 +264,11 @@ elseif (IOS)
 elseif (APPLE)
 
     if (USE_METAL_API)
-        add_definitions(-DUSE_METAL_API)
+        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
     endif()
 
     if (USE_INVERTED_Y_ON_MACOS)
-        add_definitions(-DUSE_INVERTED_Y_ON_MACOS)
+        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
     endif()
 
     list(APPEND SrcLib ${SrcMacOSX})
@@ -302,7 +283,7 @@ elseif (UNIX)
         if (USE_OPENGL_API)
             list(APPEND SrcLib ${SrcGL})
 
-            add_definitions(-DUSE_OPENGL_API)
+            list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
         endif()
         list(APPEND SrcLib ${SrcX11})
     endif()
@@ -355,7 +336,7 @@ elseif (UNIX)
             ${WAYLAND_LIBRARIES}
         )
     elseif (EMSCRIPTEN)
-        add_link_options(
+        list(APPEND MINIFB_LINK_OPTIONS_EXE
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
             "-sMODULARIZE=1"
@@ -411,22 +392,45 @@ endif()
 
 # For all projects
 #--------------------------------------
+set_target_properties(minifb PROPERTIES
+    C_STANDARD ${MINIFB_C_STANDARD}
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+    CXX_STANDARD ${MINIFB_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+if (MINIFB_COMPILE_OPTIONS)
+    target_compile_options(minifb PRIVATE ${MINIFB_COMPILE_OPTIONS})
+endif()
+
+if (MINIFB_COMPILE_DEFINITIONS)
+    target_compile_definitions(minifb PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
+endif()
+
+if (MINIFB_LINK_OPTIONS_LIB)
+    target_link_options(minifb PRIVATE ${MINIFB_LINK_OPTIONS_LIB})
+endif()
+
 target_include_directories(minifb PUBLIC
     $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(minifb PRIVATE src)
 
+# Other targets
+#--------------------------------------
+set(MINIFB_TEST_TARGETS)
+
 if (MINIFB_BUILD_VERSION_INFO)
     add_executable(minifb_version_info tests/version_info.c)
-    target_include_directories(minifb_version_info PRIVATE "${MINIFB_GENERATED_INCLUDE_DIR}")
-    target_link_libraries(minifb_version_info PRIVATE minifb)
+    list(APPEND MINIFB_TEST_TARGETS minifb_version_info)
 endif()
 
 # Examples
 #--------------------------------------
 if (MINIFB_BUILD_EXAMPLES)
-
     if (NOT IOS)
 
         add_executable(noise tests/noise.c)
@@ -437,14 +441,17 @@ if (MINIFB_BUILD_EXAMPLES)
         add_executable(fullscreen tests/fullscreen.c)
         add_executable(timer tests/timer.c)
         add_executable(hide_cursor tests/hide_cursor.c)
-        target_link_libraries(noise PRIVATE minifb)
-        target_link_libraries(input_events PRIVATE minifb)
-        target_link_libraries(input_events_cpp PRIVATE minifb)
-        target_link_libraries(multiple_windows PRIVATE minifb)
-        target_link_libraries(hidpi PRIVATE minifb)
-        target_link_libraries(fullscreen PRIVATE minifb)
-        target_link_libraries(timer PRIVATE minifb)
-        target_link_libraries(hide_cursor PRIVATE minifb)
+
+        list(APPEND MINIFB_TEST_TARGETS
+            noise
+            input_events
+            input_events_cpp
+            multiple_windows
+            hidpi
+            fullscreen
+            timer
+            hide_cursor
+        )
 
         if (EMSCRIPTEN)
 
@@ -453,15 +460,17 @@ if (MINIFB_BUILD_EXAMPLES)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/web
                     ${CMAKE_CURRENT_BINARY_DIR}
             )
+
             add_dependencies(noise web_assets)
-            target_link_options(noise PRIVATE "-sEXPORT_NAME=noise")
             add_dependencies(input_events web_assets)
-            target_link_options(input_events PRIVATE "-sEXPORT_NAME=input_events")
             add_dependencies(hidpi web_assets)
-            target_link_options(hidpi PRIVATE "-sEXPORT_NAME=hidpi")
             add_dependencies(multiple_windows web_assets)
-            target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
             add_dependencies(timer web_assets)
+
+            target_link_options(noise PRIVATE "-sEXPORT_NAME=noise")
+            target_link_options(input_events PRIVATE "-sEXPORT_NAME=input_events")
+            target_link_options(hidpi PRIVATE "-sEXPORT_NAME=hidpi")
+            target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
             target_link_options(timer PRIVATE "-sEXPORT_NAME=timer")
 
         endif()
@@ -471,29 +480,56 @@ if (MINIFB_BUILD_EXAMPLES)
             add_executable(dos
                 tests/dos/dos.c
             )
-            target_link_libraries(dos PRIVATE minifb)
+            list(APPEND MINIFB_TEST_TARGETS dos)
 
         endif()
 
-    else()
+    else() # iOS
 
         add_executable(noise
             tests/ios/main.m
             tests/ios/AppDelegate.h
             tests/ios/AppDelegate.m
         )
-        target_link_libraries(noise PRIVATE minifb)
+        list(APPEND MINIFB_TEST_TARGETS noise)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
         target_include_directories(noise PRIVATE src)
         target_include_directories(noise PRIVATE src/ios)
 
-        add_definitions(-DTVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+        target_compile_definitions(noise PRIVATE TVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
 
     endif()
 
 endif()
+
+# Add options to targets
+#--------------------------------------
+foreach(minifb_test_target IN LISTS MINIFB_TEST_TARGETS)
+    target_link_libraries(${minifb_test_target} PRIVATE minifb)
+
+    set_target_properties(${minifb_test_target} PROPERTIES
+        C_STANDARD ${MINIFB_C_STANDARD}
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS OFF
+        CXX_STANDARD ${MINIFB_CXX_STANDARD}
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+    )
+
+    if (MINIFB_COMPILE_OPTIONS)
+        target_compile_options(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_OPTIONS})
+    endif()
+
+    if (MINIFB_COMPILE_DEFINITIONS)
+        target_compile_definitions(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
+    endif()
+
+    if (MINIFB_LINK_OPTIONS_EXE)
+        target_link_options(${minifb_test_target} PRIVATE ${MINIFB_LINK_OPTIONS_EXE})
+    endif()
+endforeach()
 
 # Organize IDE Folders
 #--------------------------------------
@@ -517,16 +553,45 @@ endif()
 
 #--------------------------------------
 install(TARGETS minifb EXPORT minifb)
-file(GLOB_RECURSE HEADERS "${CMAKE_CURRENT_LIST_DIR}/include/*.h")
-install(FILES ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    FILES_MATCHING
+    PATTERN "*.h"
+    PATTERN "*.hpp"
+)
 install(FILES "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+set(MINIFB_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
+set(MINIFB_PACKAGE_FIND_OPENGL FALSE)
+set(MINIFB_PACKAGE_FIND_X11 FALSE)
+
+if (WIN32 AND USE_OPENGL_API)
+    set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
+elseif (UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+    if (NOT USE_WAYLAND_API)
+        set(MINIFB_PACKAGE_FIND_X11 TRUE)
+        if (USE_OPENGL_API)
+            set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
+        endif()
+    endif()
+endif()
+
+minifb_configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb-config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
+    "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+)
 
 minifb_write_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
 )
 
-install(EXPORT minifb FILE minifb-config.cmake DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/minifb" NAMESPACE minifb::)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake" DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
+install(EXPORT minifb FILE minifb-targets.cmake DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}" NAMESPACE minifb::)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
+    DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+)
 
 message(STATUS "Done " ${PROJECT_NAME})
 

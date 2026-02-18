@@ -313,10 +313,11 @@ By default, the OpenGL backend is used instead of Windows GDI because it is fast
 To enable or disable OpenGL just use a CMake flag:
 
 ```sh
-cmake .. -DUSE_OPENGL_API=ON
+cmake .. -DMINIFB_USE_OPENGL_API=ON
 # or
-cmake .. -DUSE_OPENGL_API=OFF
+cmake .. -DMINIFB_USE_OPENGL_API=OFF
 ```
+`USE_OPENGL_API` is still accepted for compatibility, but deprecated.
 
 ### X11 (FreeBSD, Linux, *nix)
 
@@ -357,8 +358,9 @@ If you use **CMake**, just disable the flag:
 ```sh
 mkdir build
 cd build
-cmake .. -DUSE_WAYLAND_API=OFF
+cmake .. -DMINIFB_USE_WAYLAND_API=OFF
 ```
+`USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
 
 #### OpenGL API backend (X11)
 
@@ -367,10 +369,11 @@ By default, the OpenGL backend is used instead of X11 XImages because it is fast
 To enable or disable OpenGL just use a CMake flag:
 
 ```sh
-cmake .. -DUSE_OPENGL_API=ON -DUSE_WAYLAND_API=OFF
+cmake .. -DMINIFB_USE_OPENGL_API=ON -DMINIFB_USE_WAYLAND_API=OFF
 # or
-cmake .. -DUSE_OPENGL_API=OFF -DUSE_WAYLAND_API=OFF
+cmake .. -DMINIFB_USE_OPENGL_API=OFF -DMINIFB_USE_WAYLAND_API=OFF
 ```
+`USE_OPENGL_API` and `USE_WAYLAND_API` are still accepted for compatibility, but deprecated.
 
 ### Wayland (Linux)
 
@@ -423,43 +426,46 @@ If you use **CMake**, just enable the flag:
 ```sh
 mkdir build
 cd build
-cmake .. -DUSE_WAYLAND_API=ON
+cmake .. -DMINIFB_USE_WAYLAND_API=ON
 ```
+`USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
 
 ### macOS
 
 Cocoa and clang are assumed to be installed on the system (downloading the latest Xcode and installing the command line tools should do the trick).
 
 Note that macOS Mojave+ does not support the Cocoa framework as expected. For that reason, you can switch to the Metal API.
-To enable it just compile defining the preprocessor macro USE_METAL_API.
+To enable it with CMake, use the `MINIFB_USE_METAL_API` option.
 
 If you use **CMake**, just enable the flag:
 
 ```sh
 mkdir build
 cd build
-cmake .. -DUSE_METAL_API=ON
+cmake .. -DMINIFB_USE_METAL_API=ON
 ```
+`USE_METAL_API` is still accepted for compatibility, but deprecated.
 
 Or, if you don't want to use the Metal API:
 
 ```sh
 mkdir build
 cd build
-cmake .. -DUSE_METAL_API=OFF
+cmake .. -DMINIFB_USE_METAL_API=OFF
 ```
 
 #### Coordinate system
 
 On macOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) -> (left, top), like on the other platforms.
 
-In any case, if you want to get the default coordinate system you can use the CMake flag: USE_INVERTED_Y_ON_MACOS=ON
+In any case, if you want to get the default coordinate system you can use the CMake flag: `MINIFB_USE_INVERTED_Y_ON_MACOS=ON`
 
 ```sh
 mkdir build
 cd build
-cmake .. -DUSE_INVERTED_Y_ON_MACOS=ON
+cmake .. -DMINIFB_USE_INVERTED_Y_ON_MACOS=ON
 ```
+`USE_INVERTED_Y_ON_MACOS` is still accepted for compatibility, but deprecated.
 
 **Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
 

@@ -58,3 +58,12 @@ function(minifb_write_package_version_file output_path)
         COMPATIBILITY SameMajorVersion
     )
 endfunction()
+
+function(minifb_configure_package_config_file input_path output_path install_destination)
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+        "${input_path}"
+        "${output_path}"
+        INSTALL_DESTINATION "${install_destination}"
+    )
+endfunction()

@@ -19,6 +19,7 @@ t2-output
 .idea
 .cxx
 build
+/build_*
 kk
 vc
 cmake-build-debug

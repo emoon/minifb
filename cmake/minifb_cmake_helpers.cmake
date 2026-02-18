@@ -1,0 +1,10 @@
+function(minifb_apply_deprecated_option legacy_var new_var new_help)
+    # Keep legacy -D flags working while steering users to MINIFB_* names.
+    get_property(_legacy_is_set CACHE ${legacy_var} PROPERTY TYPE SET)
+    if (_legacy_is_set)
+        get_property(_legacy_value CACHE ${legacy_var} PROPERTY VALUE)
+        message(DEPRECATION "${legacy_var} is deprecated; use ${new_var} instead.")
+        set(${new_var} "${_legacy_value}" CACHE BOOL "${new_help}" FORCE)
+    endif()
+    set(${legacy_var} "${${new_var}}" PARENT_SCOPE)
+endfunction()
