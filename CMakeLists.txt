@@ -358,7 +358,6 @@ elseif (UNIX)
         add_link_options(
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
-            "-sLLD_REPORT_UNDEFINED"
             "-sMODULARIZE=1"
             "-sALLOW_MEMORY_GROWTH=1"
             "-sALLOW_TABLE_GROWTH"
