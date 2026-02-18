@@ -20,6 +20,7 @@ t2-output
 .cxx
 build
 /build_*
+/build-*
 kk
 vc
 cmake-build-debug

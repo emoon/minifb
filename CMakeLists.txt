@@ -113,6 +113,7 @@ set(SrcGL
 #--
 set(SrcWeb
     src/web/WebMiniFB.c
+    src/web/WindowData_Web.h
 )
 
 #--
