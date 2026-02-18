@@ -245,7 +245,8 @@ void mfb_set_log_level(mfb_log_level level);
 - Levels (low → high): `MFB_LOG_TRACE`, `MFB_LOG_DEBUG`, `MFB_LOG_INFO`, `MFB_LOG_WARNING`, `MFB_LOG_ERROR`.
 - Defaults: in `_DEBUG` builds the threshold is `MFB_LOG_DEBUG`; in release builds `MFB_LOG_INFO`.
 - Messages with a level **below** the threshold are discarded; equal or higher are emitted.
-- The built-in logger writes to `stderr` as `[MiniFB][LEVEL] message`.
+- Custom loggers receive the message already formatted (`level` + `message`).
+- The built-in logger writes `TRACE`/`DEBUG`/`INFO` to `stdout` and `WARNING`/`ERROR` to `stderr` as `[MiniFB (LEVEL)] message`.
 
 ### Cursor Control
 

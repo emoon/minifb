@@ -75,4 +75,4 @@ typedef void(*mfb_mouse_move_func)(struct mfb_window *window, int x, int y);
 typedef void(*mfb_mouse_scroll_func)(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY);
 
 // Log
-typedef void (*mfb_log_func)(mfb_log_level level, const char *message, ...);
+typedef void (*mfb_log_func)(mfb_log_level level, const char *message);

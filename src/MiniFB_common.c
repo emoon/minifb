@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 
 #include <MiniFB.h>
@@ -373,6 +374,7 @@ mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned 
 // LOGGER
 //-------------------------------------
 
+//-------------------------------------
 #if defined(_DEBUG)
     static mfb_log_level g_mfb_log_level = MFB_LOG_DEBUG;
 #else
@@ -381,8 +383,28 @@ mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned 
 
 //-------------------------------------
 void
-mfb_log_default(mfb_log_level level, const char *message, ...) {
+mfb_log_default(mfb_log_level level, const char *message) {
     static const char *level_str[] = { "TRACE", "DEBUG", "INFO", "WARNING", "ERROR" };
+
+    const char *level_aux = (level >= 0 && level < (int)(sizeof(level_str) / sizeof(level_str[0])))
+                          ? level_str[level]
+                          : "UNKNOWN";
+
+    if (level < MFB_LOG_WARNING) {
+        fprintf(stdout, "[MiniFB (%s)] %s\n", level_aux, message);
+    }
+    else {
+        fprintf(stderr, "[MiniFB (%s)] %s\n", level_aux, message);
+    }
+}
+
+//-------------------------------------
+static mfb_log_func mfb_log_sink = &mfb_log_default;
+
+
+//-------------------------------------
+void
+mfb_log(mfb_log_level level, const char *message, ...) {
     char buffer[1024];
 
     if (level < g_mfb_log_level) {
@@ -394,29 +416,17 @@ mfb_log_default(mfb_log_level level, const char *message, ...) {
     vsnprintf(buffer, sizeof(buffer), message, args);
     va_end(args);
 
-    const char *lvl = (level >= 0 && level < (int)(sizeof(level_str) / sizeof(level_str[0])))
-                        ? level_str[level]
-                        : "UNKNOWN";
-
-    if (level < MFB_LOG_WARNING) {
-        fprintf(stdout, "[MiniFB][%s] %s\n", lvl, buffer);
-    }
-    else {
-        fprintf(stderr, "[MiniFB][%s] %s\n", lvl, buffer);
-    }
+    mfb_log_sink(level, buffer);
 }
-
-//-------------------------------------
-mfb_log_func mfb_log = &mfb_log_default;
 
 //-------------------------------------
 void
 mfb_set_logger(mfb_log_func user_logger) {
     if (user_logger == NULL) {
-        mfb_log = mfb_log_default;
+        mfb_log_sink = mfb_log_default;
     }
     else {
-        mfb_log = user_logger;
+        mfb_log_sink = user_logger;
     }
 }
 
