@@ -4,10 +4,8 @@
 
 @interface OSXView : NSView<NSTextInputClient>
 {
-    @public SWindowData     *window_data;
-#if defined(USE_METAL_API)
-    @private NSTrackingArea *tracking_area;
-#endif
+    @public  SWindowData     *window_data;
+    @private NSTrackingArea  *tracking_area;
 }
 
 @end

@@ -3,6 +3,7 @@
 #if defined(USE_METAL_API)
 
 #import <MetalKit/MetalKit.h>
+#include <MiniFB_internal.h>
 
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
@@ -64,22 +65,39 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (id) initWithWindowData:(SWindowData *) windowData {
+    if (windowData == NULL || windowData->specific == NULL) {
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: initWithWindowData called with invalid window data.");
+        return nil;
+    }
+
     self = [super init];
     if (self) {
         window_data     = windowData;
         window_data_osx = (SWindowData_OSX *) windowData->specific;
+        current_buffer  = -1;
 
         metal_device = MTLCreateSystemDefaultDevice();
         if (!metal_device) {
-            NSLog(@"Metal is not supported on this device");
-            return 0x0;
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: Metal is not supported on this device.");
+            [self release];
+            return nil;
         }
 
         // Used for syncing the CPU and GPU
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
+        if (!semaphore) {
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal frame semaphore.");
+            [self release];
+            return nil;
+        }
 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
+        if (!command_queue) {
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal command queue.");
+            [self release];
+            return nil;
+        }
 
         // MacOS Mojave is ignoring view.preferredFramesPerSecond
         // MacOS Big Sur is ignoring commandBuffer:presentDrawable:afterMinimumDuration:
@@ -88,8 +106,14 @@ NSString *g_shader_src = kShader(
         //    g_use_hardware_sync  = true;
         //}
 
-        [self _createShaders];
-        [self _createAssets];
+        if (![self _createShaders]) {
+            [self release];
+            return nil;
+        }
+        if (![self _createAssets]) {
+            [self release];
+            return nil;
+        }
     }
     return self;
 }
@@ -97,26 +121,29 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (bool) _createShaders {
     NSError *error = 0x0;
+    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
 
     metal_library = [metal_device newLibraryWithSource:g_shader_src
-                                               options:[[MTLCompileOptions alloc] init]
+                                               options:options
                                                  error:&error
     ];
+    [options release];
     if (error || !metal_library) {
-        NSLog(@"Unable to create shaders %@", error);
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create shaders (%s).",
+                (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
         return false;
     }
 
-    id<MTLFunction> vertex_shader_func   = [metal_library newFunctionWithName:@"vertFunc"];
-    id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
-
+    id<MTLFunction> vertex_shader_func = [metal_library newFunctionWithName:@"vertFunc"];
     if (!vertex_shader_func) {
-        NSLog(@"Unable to get vertFunc!\n");
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to get vertex shader function 'vertFunc'.");
         return false;
     }
 
+    id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
     if (!fragment_shader_func) {
-        NSLog(@"Unable to get fragFunc!\n");
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to get fragment shader function 'fragFunc'.");
+        [vertex_shader_func release];
         return false;
     }
 
@@ -125,11 +152,15 @@ NSString *g_shader_src = kShader(
     pipelineStateDescriptor.label = @"MiniFB_pipeline";
     pipelineStateDescriptor.vertexFunction = vertex_shader_func;
     pipelineStateDescriptor.fragmentFunction = fragment_shader_func;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = 80; //bgra8Unorm;
+    pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
 
     pipeline_state = [metal_device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+    [pipelineStateDescriptor release];
+    [vertex_shader_func release];
+    [fragment_shader_func release];
     if (!pipeline_state) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: failed to create pipeline state (%s).",
+                (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
         return false;
     }
 
@@ -137,7 +168,12 @@ NSString *g_shader_src = kShader(
 }
 
 //-------------------------------------
-- (void) _createAssets {
+- (bool) _createAssets {
+    if (window_data == NULL || window_data_osx == NULL) {
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: invalid window state while creating assets.");
+        return false;
+    }
+
     static Vertex s_vertices[4] = {
         {-1.0, -1.0, 0, 1},
         {-1.0,  1.0, 0, 1},
@@ -155,26 +191,62 @@ NSString *g_shader_src = kShader(
     // Create the texture from the device by using the descriptor
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
         texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
+        if (texture_buffers[i] == nil) {
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal texture buffer %zu.", i);
+            for (size_t j = 0; j < i; ++j) {
+                [texture_buffers[j] release];
+                texture_buffers[j] = nil;
+            }
+            return false;
+        }
     }
+
+    return true;
 }
 
 //-------------------------------------
-- (void) resizeTextures {
+- (bool) resizeTextures {
+    if (window_data == NULL || metal_device == nil) {
+        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: resizeTextures called with invalid window state.");
+        return false;
+    }
+
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                             width:window_data->buffer_width
                                                            height:window_data->buffer_height
                                                         mipmapped:false];
 
-    // Create the texture from the device by using the descriptor
+    id<MTLTexture> new_textures[MaxBuffersInFlight] = { nil };
+
+    // Create replacement textures first, then swap atomically to avoid partial state.
+    for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
+        new_textures[i] = [metal_device newTextureWithDescriptor:td];
+        if (new_textures[i] == nil) {
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to resize Metal texture buffer %zu.", i);
+            for (size_t j = 0; j < i; ++j) {
+                [new_textures[j] release];
+                new_textures[j] = nil;
+            }
+            return false;
+        }
+    }
+
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
         [texture_buffers[i] release];
-        texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
+        texture_buffers[i] = new_textures[i];
     }
+
+    return true;
 }
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
+    if (window_data == NULL || window_data_osx == NULL ||
+        window_data->draw_buffer == NULL || window_data->buffer_width == 0 || window_data->buffer_height == 0) {
+        return;
+    }
+
     if (g_target_fps_changed) {
         // MacOS is ignoring this :(
         if (g_time_for_frame == 0) {
@@ -188,14 +260,21 @@ NSString *g_shader_src = kShader(
         g_target_fps_changed = false;
     }
 
-    // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
-    // by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    // Avoid blocking the main thread during live resize when GPU presents can stall.
+    // If no in-flight slot is available, skip this frame and keep the UI responsive.
+    if (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW) != 0) {
+        return;
+    }
 
     current_buffer = (current_buffer + 1) % MaxBuffersInFlight;
 
     // Create a new command buffer for each render pass to the current drawable
     id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
+    if (commandBuffer == nil || texture_buffers[current_buffer] == nil) {
+        mfb_log(MFB_LOG_WARNING, "OSXViewDelegate: skipping frame because command buffer or texture is unavailable.");
+        dispatch_semaphore_signal(semaphore);
+        return;
+    }
     commandBuffer.label = @"minifb_command_buffer";
 
     // Add completion hander which signals semaphore when Metal and the GPU has fully
@@ -221,6 +300,11 @@ NSString *g_shader_src = kShader(
 
         // Create a render command encoder so we can render into something
         id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+        if (renderEncoder == nil) {
+            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: failed to create Metal render encoder.");
+            [commandBuffer commit];
+            return;
+        }
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
@@ -241,7 +325,13 @@ NSString *g_shader_src = kShader(
         //    [commandBuffer presentDrawable:view.currentDrawable afterMinimumDuration:g_time_for_frame];
         //}
         //else {
-            [commandBuffer presentDrawable:view.currentDrawable];
+            id<CAMetalDrawable> drawable = view.currentDrawable;
+            if (drawable == nil) {
+                mfb_log(MFB_LOG_WARNING, "OSXViewDelegate: skipping present because currentDrawable is nil.");
+            }
+            else {
+                [commandBuffer presentDrawable:drawable];
+            }
         //}
     }
 
@@ -254,6 +344,35 @@ NSString *g_shader_src = kShader(
 	(void)view;
 	(void)size;
     // resize
+}
+
+//-------------------------------------
+- (void)dealloc {
+    for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
+        [texture_buffers[i] release];
+        texture_buffers[i] = nil;
+    }
+
+    [pipeline_state release];
+    pipeline_state = nil;
+
+    [command_queue release];
+    command_queue = nil;
+
+    [metal_library release];
+    metal_library = nil;
+
+    [metal_device release];
+    metal_device = nil;
+
+#if !OS_OBJECT_USE_OBJC
+    if (semaphore) {
+        dispatch_release(semaphore);
+    }
+#endif
+    semaphore = nil;
+
+    [super dealloc];
 }
 
 @end

@@ -6,13 +6,13 @@
 //-------------------------------------
 @implementation OSXView
 
-#if defined(USE_METAL_API)
-
 //-------------------------------------
+// Tracking area: keeps mouseEntered:/mouseExited: events alive in both Metal and non-Metal paths.
 - (void)updateTrackingAreas {
     if(tracking_area != nil) {
         [self removeTrackingArea:tracking_area];
         [tracking_area release];
+        tracking_area = nil;
     }
 
     int opts = (NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways);
@@ -23,23 +23,25 @@
     [self addTrackingArea:tracking_area];
 }
 
-#else
+#if !defined(USE_METAL_API)
 
-//-------------------------------------
-- (NSRect)resizeRect {
-    const CGFloat resizeBoxSize = 16.0;
-    const CGFloat contentViewPadding = 5.5;
-
-    NSRect contentViewRect = [[self window] contentRectForFrameRect:[[self window] frame]];
-    NSRect resizeRect = NSMakeRect(
-        NSMaxX(contentViewRect) + contentViewPadding,
-        NSMinY(contentViewRect) - resizeBoxSize - contentViewPadding,
-        resizeBoxSize,
-        resizeBoxSize
-    );
-
-    return resizeRect;
-}
+// DEAD CODE: resizeRect was intended for custom resize handle drawing.
+// macOS provides the resize handle automatically for NSWindowStyleMaskResizable windows.
+// Kept for reference in case a custom resize affordance is needed in the future.
+//- (NSRect)resizeRect {
+//    const CGFloat resizeBoxSize = 16.0;
+//    const CGFloat contentViewPadding = 5.5;
+//
+//    NSRect contentViewRect = [[self window] contentRectForFrameRect:[[self window] frame]];
+//    NSRect resizeRect = NSMakeRect(
+//        NSMaxX(contentViewRect) + contentViewPadding,
+//        NSMinY(contentViewRect) - resizeBoxSize - contentViewPadding,
+//        resizeBoxSize,
+//        resizeBoxSize
+//    );
+//
+//    return resizeRect;
+//}
 
 //-------------------------------------
 - (void)drawRect:(NSRect)rect {
@@ -49,23 +51,33 @@
         return;
 
     SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-    if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer)
+    if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer || window_data->buffer_stride == 0 || window_data->buffer_height == 0)
         return;
 
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
+    size_t image_size = (size_t) window_data->buffer_stride * (size_t) window_data->buffer_height;
 
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    if (space == NULL) {
+        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create RGB color space for drawRect.");
+        return;
+    }
     CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
                                                               window_data->draw_buffer,
-                                                              window_data->buffer_width * window_data->buffer_height * 4,
+                                                              image_size,
                                                               0x0
     );
+    if (provider == NULL) {
+        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create CGDataProvider for drawRect.");
+        CGColorSpaceRelease(space);
+        return;
+    }
 
     CGImageRef img = CGImageCreate(window_data->buffer_width
                                  , window_data->buffer_height
                                  , 8
                                  , 32
-                                 , window_data->buffer_width * 4
+                                 , window_data->buffer_stride
                                  , space
                                  , kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
                                  , provider
@@ -73,6 +85,12 @@
                                  , false
                                  , kCGRenderingIntentDefault
     );
+    if (img == NULL) {
+        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create CGImage for drawRect.");
+        CGDataProviderRelease(provider);
+        CGColorSpaceRelease(space);
+        return;
+    }
 
     const CGFloat components[] = {0.0f, 0.0f, 0.0f, 1.0f};
     const CGColorRef black = CGColorCreate(space, components);
@@ -81,16 +99,20 @@
     CGDataProviderRelease(provider);
 
     if(window_data->dst_offset_x != 0 || window_data->dst_offset_y != 0 || window_data->dst_width != window_data->window_width || window_data->dst_height != window_data->window_height) {
-        CGContextSetFillColorWithColor(context, black);
-        CGContextFillRect(context, rect);
+        if (black != NULL) {
+            CGContextSetFillColorWithColor(context, black);
+            CGContextFillRect(context, [self bounds]);
+        }
     }
 
-    // TODO: Sometimes there is a crash here
     CGContextDrawImage(context,
                        CGRectMake(window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height),
                        img
     );
 
+    if (black != NULL) {
+        CGColorRelease(black);
+    }
     CGImageRelease(img);
 }
 
@@ -104,8 +126,8 @@
 
 //-------------------------------------
 - (void)mouseDown:(NSEvent*)event {
-    (void)event;
     if(window_data != 0x0) {
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MOUSE_BTN_1] = true;
         kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
     }
@@ -113,8 +135,8 @@
 
 //-------------------------------------
 - (void)mouseUp:(NSEvent*)event {
-    (void)event;
     if(window_data != 0x0) {
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MOUSE_BTN_1] = false;
         kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
     }
@@ -122,8 +144,8 @@
 
 //-------------------------------------
 - (void)rightMouseDown:(NSEvent*)event {
-    (void)event;
     if(window_data != 0x0) {
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MOUSE_BTN_2] = true;
         kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
     }
@@ -131,8 +153,8 @@
 
 //-------------------------------------
 - (void)rightMouseUp:(NSEvent*)event {
-    (void)event;
     if(window_data != 0x0) {
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MOUSE_BTN_2] = false;
         kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, false);
     }
@@ -140,25 +162,40 @@
 
 //-------------------------------------
 - (void)otherMouseDown:(NSEvent *)event {
-    (void)event;
     if(window_data != 0x0) {
-        window_data->mouse_button_status[[event buttonNumber] & 0x07] = true;
-        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, true);
+        uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
+        if (mapped_button > (uint32_t) MOUSE_BTN_7) {
+            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MOUSE_BTN_7.",
+                    (unsigned) [event buttonNumber]);
+            mapped_button = (uint32_t) MOUSE_BTN_7;
+        }
+        mfb_mouse_button button = (mfb_mouse_button) mapped_button;
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        window_data->mouse_button_status[mapped_button] = true;
+        kCall(mouse_btn_func, button, window_data->mod_keys, true);
     }
 }
 
 //-------------------------------------
 - (void)otherMouseUp:(NSEvent *)event {
-    (void)event;
     if(window_data != 0x0) {
-        window_data->mouse_button_status[[event buttonNumber] & 0x07] = false;
-        kCall(mouse_btn_func, [event buttonNumber], window_data->mod_keys, false);
+        uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
+        if (mapped_button > (uint32_t) MOUSE_BTN_7) {
+            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MOUSE_BTN_7.",
+                    (unsigned) [event buttonNumber]);
+            mapped_button = (uint32_t) MOUSE_BTN_7;
+        }
+        mfb_mouse_button button = (mfb_mouse_button) mapped_button;
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        window_data->mouse_button_status[mapped_button] = false;
+        kCall(mouse_btn_func, button, window_data->mod_keys, false);
     }
 }
 
 //-------------------------------------
 - (void)scrollWheel:(NSEvent *)event {
     if(window_data != 0x0) {
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_wheel_x = [event deltaX];
         window_data->mouse_wheel_y = [event deltaY];
         kCall(mouse_wheel_func, window_data->mod_keys, window_data->mouse_wheel_x, window_data->mouse_wheel_y);
@@ -184,6 +221,7 @@
 - (void)mouseMoved:(NSEvent *)event {
     if(window_data != 0x0) {
         NSPoint point = [event locationInWindow];
+        window_data->mod_keys = translate_modifiers([event modifierFlags]);
         //NSPoint localPoint = [self convertPoint:point fromView:nil];
         window_data->mouse_pos_x = point.x;
 #if defined(USE_INVERTED_Y_ON_MACOS)
@@ -273,6 +311,11 @@
 
 //-------------------------------------
 - (void)dealloc {
+    if (tracking_area != nil) {
+        [self removeTrackingArea:tracking_area];
+        [tracking_area release];
+        tracking_area = nil;
+    }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [super dealloc];
 }
