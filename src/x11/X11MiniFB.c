@@ -591,6 +591,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     int posX, posY;
     int windowWidth, windowHeight;
+    bool request_maximized_desktop = (flags & WF_FULLSCREEN_DESKTOP) != 0;
 
     window_data->window_width  = width;
     window_data->window_height = height;
@@ -702,17 +703,37 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char*)&sf_p, 1);
         }
     }
+    if (request_maximized_desktop) {
+        Atom state_atom = XInternAtom(window_data_specific->display, "_NET_WM_STATE", True);
+        Atom max_horz = XInternAtom(window_data_specific->display, "_NET_WM_STATE_MAXIMIZED_HORZ", True);
+        Atom max_vert = XInternAtom(window_data_specific->display, "_NET_WM_STATE_MAXIMIZED_VERT", True);
+        if (state_atom == None || max_horz == None || max_vert == None) {
+            mfb_log(MFB_LOG_WARNING, "X11MiniFB: maximized WM atoms are unavailable; fullscreen-desktop may not behave like a maximized window.");
+        }
+        else {
+            Atom maximized_atoms[2] = { max_horz, max_vert };
+            XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char *) maximized_atoms, 2);
+        }
+    }
 
     sizeHints.flags      = PPosition | PMinSize | PMaxSize;
     sizeHints.x          = 0;
     sizeHints.y          = 0;
-    sizeHints.min_width  = width;
-    sizeHints.min_height = height;
-    if (flags & WF_RESIZABLE) {
+    if (request_maximized_desktop) {
+        sizeHints.min_width  = 1;
+        sizeHints.min_height = 1;
         sizeHints.max_width  = screenWidth;
         sizeHints.max_height = screenHeight;
     }
     else {
+        sizeHints.min_width  = width;
+        sizeHints.min_height = height;
+    }
+    if (!request_maximized_desktop && (flags & WF_RESIZABLE)) {
+        sizeHints.max_width  = screenWidth;
+        sizeHints.max_height = screenHeight;
+    }
+    else if (!request_maximized_desktop) {
         sizeHints.max_width  = width;
         sizeHints.max_height = height;
     }
@@ -1461,4 +1482,3 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         XDefineCursor(window_data_specific->display, window_data_specific->window, window_data_specific->invis_cursor);
     }
 }
-

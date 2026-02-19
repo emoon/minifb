@@ -515,6 +515,7 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     RECT rect = { 0 };
     int  x = 0, y = 0;
+    int  show_window_cmd = SW_NORMAL;
     SWindowData *window_data = NULL;
     SWindowData_Win *window_data_specific = NULL;
 
@@ -580,6 +581,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     if (flags & WF_FULLSCREEN_DESKTOP) {
         g_window_style = WS_OVERLAPPEDWINDOW;
+        show_window_cmd = SW_MAXIMIZE;
 
         width  = GetSystemMetrics(SM_CXFULLSCREEN);
         height = GetSystemMetrics(SM_CYFULLSCREEN);
@@ -656,7 +658,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (flags & WF_ALWAYS_ON_TOP)
         SetWindowPos(window_data_specific->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-    ShowWindow(window_data_specific->window, SW_NORMAL);
+    ShowWindow(window_data_specific->window, show_window_cmd);
 
     window_data_specific->hdc = GetDC(window_data_specific->window);
     if (window_data_specific->hdc == NULL) {
