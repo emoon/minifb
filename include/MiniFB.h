@@ -146,7 +146,7 @@ void                mfb_set_log_level(mfb_log_level level);
     #include "MiniFB_cpp.h"
 #endif
 
+#endif
+
 // don't want to bleed our deprecation macro
 #undef __MFB_DEPRECATED
-
-#endif
