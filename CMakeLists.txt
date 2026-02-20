@@ -31,17 +31,6 @@ minifb_configure_version_header(
     "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
 )
 
-# Detect iOS (it was added in CMake 3.14 but we require CMake 3.10)
-#--------------------------------------
-if(NOT DEFINED IOS)
-    if(DEFINED CMAKE_SYSTEM_NAME)
-        string(TOLOWER CMAKE_SYSTEM_NAME CMAKE_SYSTEM_NAME_LOWER)
-        if(CMAKE_SYSTEM_NAME_LOWER STREQUAL "ios")
-            set(IOS true)
-        endif()
-    endif()
-endif()
-
 # Sources
 #--------------------------------------
 set(SrcLib
