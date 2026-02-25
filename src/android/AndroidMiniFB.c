@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 //--
 #include <MiniFB.h>
 #include <WindowData.h>
@@ -17,10 +18,6 @@
 #define  LOGW(...)  __android_log_print(ANDROID_LOG_WARN,    LOG_TAG, __VA_ARGS__)
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,   LOG_TAG, __VA_ARGS__)
 #define  LOGF(...)  __android_log_print(ANDROID_LOG_FATAL,   LOG_TAG, __VA_ARGS__)
-
-#define kCall(func, ...)    if (window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
-
-#define kUnused(var)        (void) var;
 
 struct android_app  *gApplication;
 
@@ -58,6 +55,30 @@ main(int argc, char *argv[]);
 
 //-------------------------------------
 static void
+destroy_window_data(SWindowData *window_data) {
+    if (window_data == NULL) {
+        return;
+    }
+
+    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+    if (window_data_android != NULL) {
+        if (window_data_android->timer != NULL) {
+            mfb_timer_destroy(window_data_android->timer);
+            window_data_android->timer = NULL;
+        }
+        free(window_data_android);
+        window_data->specific = NULL;
+    }
+
+    if (gApplication != NULL && gApplication->userData == window_data) {
+        gApplication->userData = NULL;
+    }
+
+    free(window_data);
+}
+
+//-------------------------------------
+static void
 draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
     if (window_data == NULL || window_data->draw_buffer == NULL || window_buffer == NULL)
         return;
@@ -69,7 +90,7 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
         else {
             uint8_t  *src = window_data->draw_buffer;
             uint32_t *dst = window_buffer->bits;
-            for(uint32_t y=0; y<window_data->window_height; ++y) {
+            for(uint32_t y=0; y<window_data->buffer_height; ++y) {
                 memcpy(dst, src, window_data->buffer_width * 4);
                 src += window_data->buffer_stride;
                 dst += window_buffer->stride;
@@ -90,12 +111,14 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
 static int32_t
 handle_input(struct android_app* app, AInputEvent* event) {
     SWindowData *window_data = (SWindowData *) app->userData;
+    if (window_data == NULL) {
+        return 0;
+    }
+
     if (window_data->close) {
         //destroy_window_data(window_data);
         return 0;
     }
-
-    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
 
     int t = AInputEvent_getType(event);
     int s = AInputEvent_getSource(event);
@@ -108,29 +131,31 @@ handle_input(struct android_app* app, AInputEvent* event) {
             case AMOTION_EVENT_ACTION_POINTER_DOWN:
             case AMOTION_EVENT_ACTION_POINTER_UP:
                 {
+                    bool is_pressed = (type == AMOTION_EVENT_ACTION_POINTER_DOWN);
                     int idx = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
                     int id  = AMotionEvent_getPointerId(event, idx);
                     int x   = AMotionEvent_getX(event, idx);
                     int y   = AMotionEvent_getY(event, idx);
-                    window_data->mouse_pos_x = x | (id << 28);
-                    window_data->mouse_pos_y = y | (id << 28);
-                    window_data->mouse_button_status[id & 0x07] = (action == AMOTION_EVENT_ACTION_POINTER_DOWN);
-                    kCall(mouse_btn_func, id, 0, action == AMOTION_EVENT_ACTION_POINTER_DOWN);
+                    window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
+                    window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                    window_data->mouse_button_status[id & 0x07] = is_pressed;
+                    kCall(mouse_btn_func, id, 0, is_pressed);
                 }
                 break;
 
             case AMOTION_EVENT_ACTION_DOWN:
             case AMOTION_EVENT_ACTION_UP:
                 {
+                    bool is_pressed = (type == AMOTION_EVENT_ACTION_DOWN);
                     int count = AMotionEvent_getPointerCount(event);
                     for(int i=0; i < count; ++i) {
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = x | (id << 28);
-                        window_data->mouse_pos_y = y | (id << 28);
-                        window_data->mouse_button_status[id & 0x07] = (action == AMOTION_EVENT_ACTION_POINTER_DOWN);
-                        kCall(mouse_btn_func, id, 0, action == AMOTION_EVENT_ACTION_DOWN);
+                        window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
+                        window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                        window_data->mouse_button_status[id & 0x07] = is_pressed;
+                        kCall(mouse_btn_func, id, 0, is_pressed);
                     }
                 }
                 break;
@@ -142,8 +167,10 @@ handle_input(struct android_app* app, AInputEvent* event) {
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = x | (id << 28);
-                        window_data->mouse_pos_y = y | (id << 28);
+                        window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
+                        window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                        // MOVE events are only delivered while the pointer is down,
+                        // so the pressed state is always true by definition.
                         window_data->mouse_button_status[id & 0x07] = true;
                         kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
                     }
@@ -155,17 +182,30 @@ handle_input(struct android_app* app, AInputEvent* event) {
                 break;
         }
 
-        if (window_data != NULL) {
-            window_data->is_active = true;
-        }
+        window_data->is_active = true;
         return 1;
     }
-    else
-    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+    else if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+        int action   = AKeyEvent_getAction(event);
+        int key_code = AKeyEvent_getKeyCode(event);
+
         LOGV("Key event: action=%d keyCode=%d metaState=0x%x",
-                AKeyEvent_getAction(event),
-                AKeyEvent_getKeyCode(event),
+                action,
+                key_code,
                 AKeyEvent_getMetaState(event));
+
+#if defined(MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC)
+        // On emulator, right mouse button is often mapped to BACK.
+        // Consume it to avoid Android finishing the activity, and expose it as ESC.
+        if (key_code == AKEYCODE_BACK) {
+            if (action == AKEY_EVENT_ACTION_DOWN || action == AKEY_EVENT_ACTION_UP) {
+                bool is_pressed = (action == AKEY_EVENT_ACTION_DOWN);
+                window_data->key_status[KB_KEY_ESCAPE] = is_pressed;
+                kCall(keyboard_func, KB_KEY_ESCAPE, 0, is_pressed);
+            }
+            return 1;
+        }
+#endif
     }
 
     return 0;
@@ -175,12 +215,9 @@ handle_input(struct android_app* app, AInputEvent* event) {
 static void
 handle_cmd(struct android_app* app, int32_t cmd) {
     static int32_t  format = WINDOW_FORMAT_RGBX_8888;
-    static int      sCurrentState = -1;
-
-    sCurrentState = cmd;
 
     SWindowData         *window_data;
-    SWindowData_Android *window_data_android;
+    SWindowData_Android *window_data_android = NULL;
 
     window_data = (SWindowData *) app->userData;
     if (window_data != NULL) {
@@ -272,7 +309,7 @@ handle_cmd(struct android_app* app, int32_t cmd) {
             // The app's activity window has lost input focus.
         case APP_CMD_LOST_FOCUS:
             if (window_data != NULL) {
-                window_data->is_active = true;
+                window_data->is_active = false;
                 //engine_draw_frame(window_data_android);
             }
             kCall(active_func, false);
@@ -321,6 +358,62 @@ handle_cmd(struct android_app* app, int32_t cmd) {
 }
 
 //-------------------------------------
+static mfb_update_state
+process_events(SWindowData *window_data, int timeout_ms) {
+    if (window_data == NULL) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    if (window_data->close) {
+        return STATE_EXIT;
+    }
+
+    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+    if (window_data_android == NULL || window_data_android->app == NULL) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    int ident;
+    int events;
+    struct android_poll_source *source = NULL;
+
+    // First poll may block (timeout_ms), subsequent polls are non-blocking to drain the queue.
+    int poll_timeout_ms = timeout_ms;
+    while ((ident = ALooper_pollOnce(poll_timeout_ms, NULL, &events, (void **) &source)) >= 0) {
+        if (source != NULL) {
+            source->process(window_data_android->app, source);
+        }
+
+        if (window_data_android->app->destroyRequested != 0) {
+            LOGD("Engine thread destroy requested!");
+            window_data->is_active = false;
+            window_data->close = true;
+            return STATE_EXIT;
+        }
+
+        poll_timeout_ms = 0;
+    }
+
+    return window_data->close ? STATE_EXIT : STATE_OK;
+}
+
+//-------------------------------------
+static int
+timeout_ms_from_remaining_seconds(double remaining_seconds) {
+    if (remaining_seconds <= 0.0) {
+        return 0;
+    }
+
+    double timeout_ms = remaining_seconds * 1000.0;
+    if (timeout_ms >= (double) INT_MAX) {
+        return INT_MAX;
+    }
+
+    int timeout = (int) timeout_ms;
+    return timeout > 0 ? timeout : 1;
+}
+
+//-------------------------------------
 void
 android_main(struct android_app* app) {
     app->onAppCmd     = handle_cmd;
@@ -334,22 +427,20 @@ android_main(struct android_app* app) {
     mfb_set_log_level(MFB_LOG_INFO);
 #endif
 
-    // Read all pending events.
+    // Wait for the first window without busy-polling.
     int ident;
     int events;
-    struct android_poll_source* source;
-    while(app->window == NULL) {
-        while ((ident = ALooper_pollOnce(0, NULL, &events, (void **) &source)) >= 0) {
-            // Process this event.
-            if (source != NULL) {
-                source->process(app, source);
-            }
+    struct android_poll_source *source = NULL;
+    while (app->window == NULL) {
+        ident = ALooper_pollOnce(-1, NULL, &events, (void **) &source);
 
-            // Check if we are exiting.
-            if (app->destroyRequested != 0) {
-                LOGD("Engine thread destroy requested!");
-                return;
-            }
+        if (ident >= 0 && source != NULL) {
+            source->process(app, source);
+        }
+
+        if (app->destroyRequested != 0) {
+            LOGD("Engine thread destroy requested!");
+            return;
         }
     }
 
@@ -367,6 +458,10 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     kUnused(title);
     kUnused(flags);
+
+    if (gApplication == NULL) {
+        return NULL;
+    }
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
@@ -387,6 +482,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_android->app       = gApplication;
     window_data_android->timer     = mfb_timer_create();
+    if (window_data_android->timer == NULL) {
+        free(window_data_android);
+        free(window_data);
+        return NULL;
+    }
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
@@ -414,7 +514,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
-        //destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return STATE_EXIT;
     }
 
@@ -428,6 +528,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     window_data->buffer_height = height;
 
     SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+    if (window_data_android == NULL || window_data_android->app == NULL) {
+        LOGE("Invalid Android window state");
+        return STATE_INVALID_WINDOW;
+    }
+
+    // During Android lifecycle transitions (pause/term window), the native window
+    // can be temporarily NULL. This is not a terminal window error: skip rendering
+    // and let mfb_wait_sync block until the app becomes drawable again.
+    if (window_data_android->app->window == NULL) {
+        return STATE_OK;
+    }
 
     ANativeWindow_Buffer native_buffer;
     if (ANativeWindow_lock(window_data_android->app->window, &native_buffer, NULL) < 0) {
@@ -443,6 +554,27 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 }
 
 //-------------------------------------
+mfb_update_state
+mfb_update_events(struct mfb_window *window) {
+    if (window == NULL) {
+        return STATE_INVALID_WINDOW;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    if (window_data->close) {
+        destroy_window_data(window_data);
+        return STATE_EXIT;
+    }
+
+    mfb_update_state event_state = process_events(window_data, 0);
+    if (event_state == STATE_EXIT) {
+        destroy_window_data(window_data);
+    }
+
+    return event_state;
+}
+
+//-------------------------------------
 extern double   g_time_for_frame;
 
 bool
@@ -453,35 +585,40 @@ mfb_wait_sync(struct mfb_window *window) {
 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data->close) {
-        //destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return false;
     }
 
     SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+    if (window_data_android == NULL || window_data_android->app == NULL || window_data_android->timer == NULL) {
+        return false;
+    }
 
-    // Read all pending events.
-    int                         ident;
-    int                         events;
-    struct android_poll_source  *source;
-    double                      current;
+    double current;
 
     while(1) {
-        // If not animating, we will block forever waiting for events.
-        // If animating, we loop until all events are read, then continue
-        // to draw the next frame of animation.
-        while ((ident = ALooper_pollOnce(window_data->is_active ? 0 : -1, NULL, &events, (void **) &source)) >= 0) {
-            // Process this event.
-            if (source != NULL) {
-                source->process(window_data_android->app, source);
-            }
+        int timeout_ms;
+        if (window_data->is_active && window_data_android->app->window != NULL) {
+            current = mfb_timer_now(window_data_android->timer);
+            timeout_ms = timeout_ms_from_remaining_seconds(g_time_for_frame - current);
+        }
+        else {
+            timeout_ms = -1;
+        }
 
-            // Check if we are exiting.
-            if (window_data_android->app->destroyRequested != 0) {
-                LOGD("Engine thread destroy requested!");
-                window_data->is_active = false;
-                window_data->close = true;
-                return false;
-            }
+        mfb_update_state event_state = process_events(window_data, timeout_ms);
+        if (event_state == STATE_EXIT) {
+            destroy_window_data(window_data);
+            return false;
+        }
+        if (event_state == STATE_INVALID_WINDOW) {
+            return false;
+        }
+
+        // While paused or without a surface, keep waiting for lifecycle events and
+        // do not advance frame timing.
+        if (!window_data->is_active || window_data_android->app->window == NULL) {
+            continue;
         }
 
         current = mfb_timer_now(window_data_android->timer);
@@ -535,5 +672,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
-    // window_data->is_cursor_visible is always false on android
+    kUnused(window);
+    kUnused(show);
+    // Cursors are not applicable on Android.
 }

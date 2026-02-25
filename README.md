@@ -557,6 +557,8 @@ Take a look at the example in tests/android. You need **Android Studio** to buil
 - No multitouch support
 - Mouse events represent touch events (last touch position)
 
+**Note**: On Android, pressing `BACK` should close the app by default. In some emulators, right-click may be mapped to `BACK`. For debugging this case, the Android example CMake option `MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC` can be enabled to map `BACK` to `ESC` instead (default: `OFF`).
+
 All other MiniFB functions work normally, including timers, viewports, and user data management.
 
 ### Web (WASM)

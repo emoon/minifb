@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.18.1)
 project(noise)
 
+if (ANDROID)
+    option(MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC "On Android, capture right-click/BACK and map it to ESC in MiniFB" OFF)
+endif()
+
 # Set our flags
 #--------------------------------------
 #add_compile_options("$<$<CONFIG:Debug>:-g>")
@@ -42,10 +46,22 @@ target_include_directories(minifb PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src
 )
 
+if (ANDROID)
+    if (MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC)
+        target_compile_definitions(minifb PRIVATE MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC)
+    endif()
+endif()
+
 # now build app's shared lib
 add_library(noise SHARED
     noise.c
 )
+
+# Required for Android 15+ 16 KB page-size compatibility (not tested for old projects, for that reason is commented)
+#target_link_options(noise PRIVATE
+#    "-Wl,-z,max-page-size=16384"
+#    "-Wl,-z,common-page-size=16384"
+#)
 
 target_include_directories(noise PRIVATE
     ${ANDROID_NDK}/sources/android/native_app_glue
