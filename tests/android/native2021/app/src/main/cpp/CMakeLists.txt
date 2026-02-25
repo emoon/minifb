@@ -20,26 +20,26 @@ add_library(native_app_glue STATIC
 )
 
 add_library(minifb STATIC
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../include/MiniFB.h
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../include/MiniFB_cpp.h
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../include/MiniFB_enums.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include/MiniFB.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include/MiniFB_cpp.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include/MiniFB_enums.h
 
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_common.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_cpp.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_internal.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_internal.h
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_timer.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/MiniFB_linux.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/WindowData.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_common.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_cpp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_internal.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_internal.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_timer.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_linux.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/WindowData.h
 
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/android/AndroidMiniFB.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src/android/WindowData_Android.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/android/AndroidMiniFB.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/android/WindowData_Android.h
 )
 
 target_include_directories(minifb PRIVATE
     ${ANDROID_NDK}/sources/android/native_app_glue
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../include
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../src
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src
 )
 
 # now build app's shared lib
@@ -49,7 +49,7 @@ add_library(noise SHARED
 
 target_include_directories(noise PRIVATE
     ${ANDROID_NDK}/sources/android/native_app_glue
-    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../include
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include
 )
 
 # Export ANativeActivity_onCreate(),
