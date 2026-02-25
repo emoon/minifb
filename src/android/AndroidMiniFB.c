@@ -25,6 +25,29 @@
 struct android_app  *gApplication;
 
 //-------------------------------------
+static int
+mfb_log_level_to_android_priority(mfb_log_level level) {
+    switch (level) {
+        case MFB_LOG_TRACE:   return ANDROID_LOG_VERBOSE;
+        case MFB_LOG_DEBUG:   return ANDROID_LOG_DEBUG;
+        case MFB_LOG_INFO:    return ANDROID_LOG_INFO;
+        case MFB_LOG_WARNING: return ANDROID_LOG_WARN;
+        case MFB_LOG_ERROR:   return ANDROID_LOG_ERROR;
+        default:              return ANDROID_LOG_DEFAULT;
+    }
+}
+
+//-------------------------------------
+static void
+android_mfb_log_sink(mfb_log_level level, const char *message) {
+    if (message == NULL) {
+        return;
+    }
+
+    __android_log_write(mfb_log_level_to_android_priority(level), LOG_TAG, message);
+}
+
+//-------------------------------------
 extern void
 stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
               uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
@@ -303,6 +326,13 @@ android_main(struct android_app* app) {
     app->onAppCmd     = handle_cmd;
     app->onInputEvent = handle_input;
     gApplication = app;
+
+    mfb_set_logger(android_mfb_log_sink);
+#if !defined(NDEBUG) || defined(DEBUG) || defined(_DEBUG)
+    mfb_set_log_level(MFB_LOG_TRACE);
+#else
+    mfb_set_log_level(MFB_LOG_INFO);
+#endif
 
     // Read all pending events.
     int ident;
