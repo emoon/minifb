@@ -7,9 +7,9 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name">
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="com.example.noise.MiniFBActivity"
             android:exported="true"
-            android:label="@string/app_name">
+            android:theme="@style/FullscreenNative">
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="noise" />

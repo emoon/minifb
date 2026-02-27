@@ -561,6 +561,101 @@ Take a look at the example in tests/android. You need **Android Studio** to buil
 
 All other MiniFB functions work normally, including timers, viewports, and user data management.
 
+#### Display cutout / Notch (API 32-34)
+
+Android's handling of the display cutout (notch, punch-hole camera) changed across API levels
+and can cause a framebuffer-size mismatch if not handled explicitly:
+
+| API level | Default behaviour                               | Result                        |
+|-----------|-------------------------------------------------|-------------------------------|
+| ≤ 31      | Legacy fullscreen flags handle everything       | Works out of the box          |
+| 32–34     | System reserves space for the cutout by default | **Content shifted / clipped** |
+| ≥ 35      | Edge-to-edge is forced by the OS                | Works out of the box          |
+
+Two approaches are provided in the example (`tests/android/native2026`); pick whichever fits
+your project.
+
+##### Option A — Manifest + theme (no Java code)
+
+Add a theme to `res/values/styles.xml`:
+
+```xml
+<resources>
+    <style name="FullscreenNative" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <!-- Allows the window to draw into the cutout area (API 31+). -->
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+    </style>
+</resources>
+```
+
+Then reference it in `AndroidManifest.xml`:
+
+```xml
+<activity
+    android:name="android.app.NativeActivity"
+    android:theme="@style/FullscreenNative"
+    ...>
+```
+
+**Pros**: zero Java code, takes effect before the native thread starts.
+**Cons**: limited runtime control; no way to query inset values from C.
+
+##### Option B — Java subclass (recommended)
+
+Subclass `NativeActivity` in `MiniFBActivity.java` and override `onCreate` /
+`onWindowFocusChanged` to call `setupFullscreen()`, which:
+
+- Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 31+) or `SHORT_EDGES` (API 28–30).
+- Hides system bars via `WindowInsetsController` (API 30+) or the legacy
+  `setSystemUiVisibility` flags (API 24–29).
+- Re-applies on focus changes (bars can reappear after an edge-swipe gesture).
+
+In `AndroidManifest.xml` replace the activity class name:
+
+```xml
+<activity
+    android:name="com.example.noise.MiniFBActivity"
+    android:theme="@style/FullscreenNative"
+    ...>
+```
+
+The theme is kept as an early fallback; the Java code overrides it once the Activity starts.
+
+**Pros**: robust, handles all API levels, re-applies after gesture-triggered bar visibility.
+**Cons**: requires one Java source file.
+
+Both options can coexist (the theme fires first, the Java code reinforces it).
+
+#### Display cutout API (Android-only)
+
+Two C functions let you query the cutout/safe-area dimensions from native code:
+
+```c
+// Physical notch/punch-hole area only. Requires API 28+.
+// Returns false (all zeros) on devices without a cutout or on API < 28.
+bool mfb_get_display_cutout_insets(struct mfb_window *window,
+                                   int *left, int *top, int *right, int *bottom);
+
+// Full safe-area: cutout + system bars (status bar, nav bar).
+// API 30+: uses the modern WindowInsets API.
+// API 24-29: falls back to the deprecated getSystemWindowInsets().
+bool mfb_get_display_safe_insets(struct mfb_window *window,
+                                 int *left, int *top, int *right, int *bottom);
+```
+
+Example usage in a resize callback:
+
+```c
+void on_resize(struct mfb_window *window, int width, int height) {
+    int left = 0, top = 0, right = 0, bottom = 0;
+    mfb_get_display_cutout_insets(window, &left, &top, &right, &bottom);
+    // Place HUD elements at least 'top' pixels from the top edge, etc.
+}
+```
+
+Both functions are declared only when `__ANDROID__` is defined, so they do not pollute the
+API on other platforms.
+
 ### Web (WASM)
 
 Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.

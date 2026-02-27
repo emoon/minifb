@@ -33,16 +33,16 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef __ANDROID__
-    #define MFB_RGB(r, g, b)        (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+#if !defined(__ANDROID__)
+    #define MFB_RGB(r, g, b)                                 (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
     #define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
 #else
-    #ifdef HOST_WORDS_BIGENDIAN
-    #define MFB_RGB(r, g, b)     (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
-    #define MFB_ARGB(a, r, g, b) (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+    #if defined(HOST_WORDS_BIGENDIAN)
+        #define MFB_RGB(r, g, b)                                 (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
+        #define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) r) << 16) | (((uint32_t) g) << 8) | ((uint32_t) b)
     #else
-    #define MFB_ARGB(r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
-    #define MFB_RGB(r, g, b)     (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
+        #define MFB_RGB(r, g, b)                                 (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
+        #define MFB_ARGB(a, r, g, b)    (((uint32_t) a) << 24) | (((uint32_t) b) << 16) | (((uint32_t) g) << 8) | ((uint32_t) r)
     #endif
 #endif
 
@@ -136,6 +136,27 @@ double              mfb_timer_get_resolution(void);
 // Logger
 void                mfb_set_logger(mfb_log_func user_logger);
 void                mfb_set_log_level(mfb_log_level level);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if defined(__ANDROID__)
+
+// Returns the display cutout (notch) safe insets in pixels — the physical area of the
+// screen that the notch/punch-hole occupies.  Values are 0 when the device has no cutout
+// or the cutout is not in that direction.
+// Requires Android API 28+; returns false with all values set to 0 on older APIs.
+// All output parameters are optional (may be NULL).
+bool                mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom);
+
+// Returns the full safe-area insets in pixels — the union of the display cutout area
+// AND the system bars (status bar, navigation bar).  Useful to know how much of the
+// screen edges are occupied by the OS UI, even when those bars are hidden/transparent.
+// API 30+: queries WindowInsets.Type.systemBars()|displayCutout().
+// API 24-29: falls back to the deprecated getSystemWindowInset{Top,Right,Bottom,Left}().
+// All output parameters are optional (may be NULL).
+bool                mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom);
+
+#endif // __ANDROID__
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

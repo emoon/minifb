@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Fullscreen theme for NativeActivity.
+        - Inherits Theme.NoTitleBar.Fullscreen to hide the status bar and action bar.
+        - windowLayoutInDisplayCutoutMode="always" (API 31+) lets the window draw into
+          the display cutout (notch) area on API 33-34, which would otherwise reserve that
+          space and cause a size/offset mismatch with the native framebuffer.
+        - On API 35+ Android forces edge-to-edge regardless, so this attribute is redundant
+          there but harmless.
+    -->
+    <style name="FullscreenNative" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+    </style>
+</resources>
