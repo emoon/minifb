@@ -803,12 +803,12 @@ mfb_timer_tick() {
     //return (time * s_timebase_info.numer) / s_timebase_info.denom;
 
     // Perform the arithmetic at 128-bit precision to avoid the overflow!
-    uint64_t high    = (time >> 32) * timebase.numer;
-    uint64_t highRem = ((high % timebase.denom) << 32) / timebase.denom;
-    uint64_t low     = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
+    uint64_t high     = (time >> 32) * timebase.numer;
+    uint64_t high_rem = ((high % timebase.denom) << 32) / timebase.denom;
+    uint64_t low      = (time & 0xFFFFFFFFull) * timebase.numer / timebase.denom;
     high /= timebase.denom;
 
-    return (high << 32) + highRem + low;
+    return (high << 32) + high_rem + low;
 }
 
 //-------------------------------------

@@ -190,8 +190,8 @@ EM_ASYNC_JS(void, setup_web_mfb, (), {
 })
 
 EM_EXPORT void reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
-    int32_t numPixels = (width * height) << 2;
-    for (int i = 0; i < numPixels; i += 4) {
+    int32_t num_pixels = (width * height) << 2;
+    for (int i = 0; i < num_pixels; i += 4) {
         uint8_t b = src[i];
         uint8_t g = src[i + 1];
         uint8_t r = src[i + 2];
@@ -203,153 +203,153 @@ EM_EXPORT void reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int
     }
 }
 
-EM_EXPORT void window_data_set_mouse_pos(SWindowData *windowData, int x, int y) {
-    if (!windowData) return;
-    windowData->mouse_pos_x = x;
-    windowData->mouse_pos_y = y;
+EM_EXPORT void window_data_set_mouse_pos(SWindowData *window_data, int x, int y) {
+    if (!window_data) return;
+    window_data->mouse_pos_x = x;
+    window_data->mouse_pos_y = y;
 }
 
-EM_EXPORT void window_data_set_mouse_wheel(SWindowData *windowData, float x, float y) {
-    if (!windowData) return;
-    windowData->mouse_wheel_x = x;
-    windowData->mouse_wheel_y = y;
+EM_EXPORT void window_data_set_mouse_wheel(SWindowData *window_data, float x, float y) {
+    if (!window_data) return;
+    window_data->mouse_wheel_x = x;
+    window_data->mouse_wheel_y = y;
 }
 
-EM_EXPORT void window_data_set_mouse_button(SWindowData *windowData, uint8_t button, bool is_pressed) {
-    if (!windowData) return;
+EM_EXPORT void window_data_set_mouse_button(SWindowData *window_data, uint8_t button, bool is_pressed) {
+    if (!window_data) return;
     if (button > 7) return;
-    windowData->mouse_button_status[button] = is_pressed;
+    window_data->mouse_button_status[button] = is_pressed;
 }
 
-EM_EXPORT void window_data_set_key(SWindowData *windowData, unsigned key, bool is_pressed) {
-    if (!windowData) return;
+EM_EXPORT void window_data_set_key(SWindowData *window_data, unsigned key, bool is_pressed) {
+    if (!window_data) return;
     if (key >= 512) return;
-    windowData->key_status[key] = is_pressed;
+    window_data->key_status[key] = is_pressed;
 }
 
-EM_EXPORT void window_data_set_mod_keys(SWindowData *windowData, uint32_t mod) {
-    if (!windowData) return;
-    windowData->mod_keys = mod;
+EM_EXPORT void window_data_set_mod_keys(SWindowData *window_data, uint32_t mod) {
+    if (!window_data) return;
+    window_data->mod_keys = mod;
 }
 
-EM_EXPORT void window_data_set_active(SWindowData *windowData, bool is_active) {
-    if (!windowData) return;
-    windowData->is_active = is_active;
+EM_EXPORT void window_data_set_active(SWindowData *window_data, bool is_active) {
+    if (!window_data) return;
+    window_data->is_active = is_active;
 }
 
-EM_EXPORT void window_data_set_buffer_size(SWindowData *windowData, unsigned width, unsigned height) {
-    if (!windowData) return;
+EM_EXPORT void window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned height) {
+    if (!window_data) return;
     if (width > (UINT32_MAX / 4)) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: buffer stride overflow for width=%u.", width);
-        windowData->buffer_width = 0;
-        windowData->buffer_height = 0;
-        windowData->buffer_stride = 0;
+        window_data->buffer_width = 0;
+        window_data->buffer_height = 0;
+        window_data->buffer_stride = 0;
         return;
     }
-    windowData->buffer_width = width;
-    windowData->buffer_height = height;
-    windowData->buffer_stride = width * 4;
+    window_data->buffer_width = width;
+    window_data->buffer_height = height;
+    window_data->buffer_stride = width * 4;
 }
 
-EM_EXPORT void window_data_update_window_size(SWindowData *windowData, unsigned width, unsigned height) {
-    if (!windowData || width == 0 || height == 0) return;
+EM_EXPORT void window_data_update_window_size(SWindowData *window_data, unsigned width, unsigned height) {
+    if (!window_data || width == 0 || height == 0) return;
 
-    bool changed = (windowData->window_width != width) || (windowData->window_height != height);
-    windowData->window_width = width;
-    windowData->window_height = height;
+    bool changed = (window_data->window_width != width) || (window_data->window_height != height);
+    window_data->window_width = width;
+    window_data->window_height = height;
 
-    if (windowData->dst_width == 0 || windowData->dst_height == 0) {
-        windowData->dst_offset_x = 0;
-        windowData->dst_offset_y = 0;
-        windowData->dst_width = width;
-        windowData->dst_height = height;
-        calc_dst_factor(windowData, width, height);
+    if (window_data->dst_width == 0 || window_data->dst_height == 0) {
+        window_data->dst_offset_x = 0;
+        window_data->dst_offset_y = 0;
+        window_data->dst_width = width;
+        window_data->dst_height = height;
+        calc_dst_factor(window_data, width, height);
     }
     else if (changed) {
-        resize_dst(windowData, width, height);
+        resize_dst(window_data, width, height);
     }
 
-    if (changed && windowData->resize_func) {
-        windowData->resize_func((struct mfb_window *) windowData, (int) width, (int) height);
+    if (changed && window_data->resize_func) {
+        window_data->resize_func((struct mfb_window *) window_data, (int) width, (int) height);
     }
 }
 
-EM_EXPORT void *window_data_get_specific(SWindowData *windowData) {
-    SWindowData_Web *window_data_web = mfb_web_get_data(windowData);
+EM_EXPORT void *window_data_get_specific(SWindowData *window_data) {
+    SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
     if (window_data_web == NULL) return 0;
     return (void *) window_data_web->window_id;
 }
 
-EM_EXPORT uint8_t *window_data_get_swizzle_buffer(SWindowData *windowData, unsigned width, unsigned height) {
-    return mfb_web_ensure_swizzle_buffer(windowData, width, height);
+EM_EXPORT uint8_t *window_data_get_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned height) {
+    return mfb_web_ensure_swizzle_buffer(window_data, width, height);
 }
 
-EM_EXPORT unsigned window_data_get_dst_offset_x(SWindowData *windowData) {
-    if (!windowData) return 0;
-    return windowData->dst_offset_x;
+EM_EXPORT unsigned window_data_get_dst_offset_x(SWindowData *window_data) {
+    if (!window_data) return 0;
+    return window_data->dst_offset_x;
 }
 
-EM_EXPORT unsigned window_data_get_dst_offset_y(SWindowData *windowData) {
-    if (!windowData) return 0;
-    return windowData->dst_offset_y;
+EM_EXPORT unsigned window_data_get_dst_offset_y(SWindowData *window_data) {
+    if (!window_data) return 0;
+    return window_data->dst_offset_y;
 }
 
-EM_EXPORT unsigned window_data_get_dst_width(SWindowData *windowData) {
-    if (!windowData) return 0;
-    return windowData->dst_width;
+EM_EXPORT unsigned window_data_get_dst_width(SWindowData *window_data) {
+    if (!window_data) return 0;
+    return window_data->dst_width;
 }
 
-EM_EXPORT unsigned window_data_get_dst_height(SWindowData *windowData) {
-    if (!windowData) return 0;
-    return windowData->dst_height;
+EM_EXPORT unsigned window_data_get_dst_height(SWindowData *window_data) {
+    if (!window_data) return 0;
+    return window_data->dst_height;
 }
 
-EM_EXPORT void window_data_call_active_func(SWindowData *windowData, bool is_active) {
-    if (windowData == NULL) return;
-    if (windowData->active_func) windowData->active_func((struct mfb_window*)windowData, is_active);
+EM_EXPORT void window_data_call_active_func(SWindowData *window_data, bool is_active) {
+    if (window_data == NULL) return;
+    if (window_data->active_func) window_data->active_func((struct mfb_window*)window_data, is_active);
 }
 
-EM_EXPORT void window_data_call_resize_func(SWindowData *windowData, int width, int height) {
-    if (windowData == NULL) return;
-    if (windowData->resize_func) windowData->resize_func((struct mfb_window*)windowData, width, height);
+EM_EXPORT void window_data_call_resize_func(SWindowData *window_data, int width, int height) {
+    if (window_data == NULL) return;
+    if (window_data->resize_func) window_data->resize_func((struct mfb_window*)window_data, width, height);
 }
 
-EM_EXPORT void window_data_call_close_func(SWindowData *windowData) {
-    if (windowData == NULL) return;
-    if (windowData->close_func) windowData->close_func((struct mfb_window*)windowData);
+EM_EXPORT void window_data_call_close_func(SWindowData *window_data) {
+    if (window_data == NULL) return;
+    if (window_data->close_func) window_data->close_func((struct mfb_window*)window_data);
 }
 
-EM_EXPORT void window_data_call_keyboard_func(SWindowData *windowData, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    if (windowData == NULL) return;
-    if (windowData->keyboard_func) windowData->keyboard_func((struct mfb_window*)windowData, key, mod, is_pressed);
+EM_EXPORT void window_data_call_keyboard_func(SWindowData *window_data, mfb_key key, mfb_key_mod mod, bool is_pressed) {
+    if (window_data == NULL) return;
+    if (window_data->keyboard_func) window_data->keyboard_func((struct mfb_window*)window_data, key, mod, is_pressed);
 }
 
-EM_EXPORT void window_data_call_char_input_func(SWindowData *windowData, unsigned int code) {
-    if (windowData == NULL) return;
-    if (windowData->char_input_func) windowData->char_input_func((struct mfb_window*)windowData, code);
+EM_EXPORT void window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
+    if (window_data == NULL) return;
+    if (window_data->char_input_func) window_data->char_input_func((struct mfb_window*)window_data, code);
 }
 
-EM_EXPORT void window_data_call_mouse_btn_func(SWindowData *windowData, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
-    if (windowData == NULL) return;
-    if (windowData->mouse_btn_func) windowData->mouse_btn_func((struct mfb_window*)windowData, button, mod, is_pressed);
+EM_EXPORT void window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
+    if (window_data == NULL) return;
+    if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window*)window_data, button, mod, is_pressed);
 }
 
-EM_EXPORT void window_data_call_mouse_move_func(SWindowData *windowData, int x, int y) {
-    if (windowData == NULL) return;
-    if (windowData->mouse_move_func) windowData->mouse_move_func((struct mfb_window*)windowData, x, y);
+EM_EXPORT void window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
+    if (window_data == NULL) return;
+    if (window_data->mouse_move_func) window_data->mouse_move_func((struct mfb_window*)window_data, x, y);
 }
 
-EM_EXPORT void window_data_call_mouse_wheel_func(SWindowData *windowData, mfb_key_mod mod, float x, float y) {
-    if (windowData == NULL) return;
-    if (windowData->mouse_wheel_func) windowData->mouse_wheel_func((struct mfb_window*)windowData, mod, x, y);
+EM_EXPORT void window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
+    if (window_data == NULL) return;
+    if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window*)window_data, mod, x, y);
 }
 
-EM_EXPORT bool window_data_get_close(SWindowData *windowData) {
-    if (!windowData) return true;
-    return windowData->close;
+EM_EXPORT bool window_data_get_close(SWindowData *window_data) {
+    if (!window_data) return true;
+    return window_data->close;
 }
 
-EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigned width, unsigned height, int wantsFullscreen), {
+EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
     let canvas = document.getElementById(UTF8ToString(title));
     if (!canvas) return 0;
 
@@ -386,17 +386,17 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
         ctx: ctx,
         backCanvas: null,
         backCtx: null,
-        windowData: windowData,
-        wantsFullscreen: wantsFullscreen !== 0,
+        window_data: window_data,
+        wants_full_screen: wants_full_screen !== 0,
         activeTouchId: null,
-        isActive: true,
+        is_active: true,
         handlers: {},
         events: [
-            { type: "active", isActive: true }
+            { type: "active", is_active: true }
         ]
     };
 
-    Module._window_data_update_window_size(windowData, canvas.width, canvas.height);
+    Module._window_data_update_window_size(window_data, canvas.width, canvas.height);
 
     function toMfbCode(code) {
         return window._minifb.keyMap[code] ? window._minifb.keyMap[code] : -1;
@@ -411,8 +411,8 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
     }
 
     function requestFullscreenIfNeeded() {
-        if (!w.wantsFullscreen) return;
-        w.wantsFullscreen = false;
+        if (!w.wants_full_screen) return;
+        w.wants_full_screen = false;
         if (canvas.requestFullscreen) {
             canvas.requestFullscreen().catch(() => {});
         }
@@ -430,11 +430,11 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                code === "Space";
     }
 
-    function setActive(isActive) {
-        if (w.isActive === isActive) return;
-        w.isActive = isActive;
-        Module._window_data_set_active(windowData, isActive ? 1 : 0);
-        enqueueEvent({ type: "active", isActive: isActive });
+    function setActive(is_active) {
+        if (w.is_active === is_active) return;
+        w.is_active = is_active;
+        Module._window_data_set_active(window_data, is_active ? 1 : 0);
+        enqueueEvent({ type: "active", is_active: is_active });
     }
 
     function getMousePos(event) {
@@ -449,7 +449,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
 
     function getMfbKeyModFromEvent(event) {
         // FIXME can we make these global somehow? --pre-js maybe?
-        // FIXME need to lookup caps and num lock keystates in windowData->key_status
+        // FIXME need to lookup caps and num lock keystates in window_data->key_status
         const KB_MOD_SHIFT        = 0x0001;
         const KB_MOD_CONTROL      = 0x0002;
         const KB_MOD_ALT          = 0x0004;
@@ -468,9 +468,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             event.preventDefault();
         }
         let code = toMfbCode(event.code);
-        Module._window_data_set_key(windowData, code, 1);
+        Module._window_data_set_key(window_data, code, 1);
         let mod = getMfbKeyModFromEvent(event);
-        Module._window_data_set_mod_keys(windowData, mod);
+        Module._window_data_set_mod_keys(window_data, mod);
         enqueueEvent({ type: "keydown", code: code, mod: mod });
     };
     canvas.addEventListener("keydown", w.handlers.keydown);
@@ -480,9 +480,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             event.preventDefault();
         }
         let code = toMfbCode(event.code);
-        Module._window_data_set_key(windowData, code, 0);
+        Module._window_data_set_key(window_data, code, 0);
         let mod = getMfbKeyModFromEvent(event);
-        Module._window_data_set_mod_keys(windowData, mod);
+        Module._window_data_set_mod_keys(window_data, mod);
         enqueueEvent({ type: "keyup", code: code, mod: mod });
     };
     canvas.addEventListener("keyup", w.handlers.keyup);
@@ -527,16 +527,16 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             requestFullscreenIfNeeded();
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
-            Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button + 1, 1);
-            Module._window_data_set_mod_keys(windowData, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: true});
+            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+            Module._window_data_set_mouse_button(window_data, event.button + 1, 1);
+            Module._window_data_set_mod_keys(window_data, mod);
+            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: true});
     };
     canvas.addEventListener("mousedown", w.handlers.mousedown, false);
 
     w.handlers.mousemove = (event) => {
             let pos = getMousePos(event);
-            Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
+            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
             enqueueEvent({ type: "mousemove", x: pos.x, y: pos.y});
     };
     canvas.addEventListener("mousemove", w.handlers.mousemove, false);
@@ -545,10 +545,10 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             if (event.button > 6) return;
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
-            Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button + 1, 0);
-            Module._window_data_set_mod_keys(windowData, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: false});
+            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+            Module._window_data_set_mouse_button(window_data, event.button + 1, 0);
+            Module._window_data_set_mod_keys(window_data, mod);
+            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: false});
     };
     canvas.addEventListener("mouseup", w.handlers.mouseup, false);
 
@@ -556,18 +556,18 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
             if (event.button > 6) return;
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
-            Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-            Module._window_data_set_mouse_button(windowData, event.button + 1, 0);
-            Module._window_data_set_mod_keys(windowData, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, isPressed: false});
+            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+            Module._window_data_set_mouse_button(window_data, event.button + 1, 0);
+            Module._window_data_set_mod_keys(window_data, mod);
+            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: false});
     };
     document.body.addEventListener("mouseup", w.handlers.bodyMouseup, false);
 
     w.handlers.wheel = (event) => {
             event.preventDefault();
             let mod = getMfbKeyModFromEvent(event);
-            Module._window_data_set_mouse_wheel(windowData, event.deltaX, event.deltaY);
-            Module._window_data_set_mod_keys(windowData, mod);
+            Module._window_data_set_mouse_wheel(window_data, event.deltaX, event.deltaY);
+            Module._window_data_set_mod_keys(window_data, mod);
             enqueueEvent({ type: "mousescroll", mod: mod, x: event.deltaX, y: event.deltaY});
     };
     canvas.addEventListener('wheel', w.handlers.wheel, NON_PASSIVE);
@@ -578,10 +578,10 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                 requestFullscreenIfNeeded();
                 let touch = event.changedTouches[0];
                 let pos = getMousePos(touch);
-                Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-                Module._window_data_set_mouse_button(windowData, 1, 1);
+                Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+                Module._window_data_set_mouse_button(window_data, 1, 1);
                 w.activeTouchId = touch.identifier;
-                enqueueEvent({ type: "mousebutton", button: 1, mod: 0, isPressed: true});
+                enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: true});
             }
             event.preventDefault();
     };
@@ -593,7 +593,7 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                     let touch = event.changedTouches[i];
                     if (w.activeTouchId === touch.identifier) {
                         let pos = getMousePos(touch);
-                        Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
+                        Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
                         enqueueEvent({ type: "mousemove", x: pos.x, y: pos.y});
                         break;
                     }
@@ -609,10 +609,10 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
                 let touch = event.changedTouches[i];
                 if (w.activeTouchId === touch.identifier) {
                     let pos = getMousePos(touch);
-                    Module._window_data_set_mouse_pos(windowData, pos.x, pos.y);
-                    Module._window_data_set_mouse_button(windowData, 1, 0);
+                    Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+                    Module._window_data_set_mouse_button(window_data, 1, 0);
                     w.activeTouchId = null;
-                    enqueueEvent({ type: "mousebutton", button: 1, mod: 0, isPressed: false});
+                    enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: false});
                     break;
                 }
             }
@@ -626,9 +626,9 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *windowData, const char *title, unsigne
     return id;
 });
 
-EM_JS(void, mfb_close_js, (uintptr_t windowId), {
-    if (!window._minifb || !window._minifb.windows[windowId]) return;
-    let w = window._minifb.windows[windowId];
+EM_JS(void, mfb_close_js, (uintptr_t window_id), {
+    if (!window._minifb || !window._minifb.windows[window_id]) return;
+    let w = window._minifb.windows[window_id];
     if (w.handlers) {
         w.canvas.removeEventListener("keydown", w.handlers.keydown);
         w.canvas.removeEventListener("keyup", w.handlers.keyup);
@@ -648,7 +648,7 @@ EM_JS(void, mfb_close_js, (uintptr_t windowId), {
         w.canvas.removeEventListener("touchend", w.handlers.touchEndOrCancel, false);
         w.canvas.removeEventListener("touchcancel", w.handlers.touchEndOrCancel, false);
     }
-    delete window._minifb.windows[windowId];
+    delete window._minifb.windows[window_id];
 });
 
 static void
@@ -758,39 +758,39 @@ bool mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned off
     return true;
 }
 
-EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * windowData), {
+EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     // FIXME can we make these global somehow? --pre-js maybe?
     const STATE_OK = 0;
     const STATE_EXIT = -1;
     const STATE_INVALID_WINDOW = -2;
     const STATE_INVALID_BUFFER = -3;
     const STATE_INTERNAL_ERROR = -4;
-    if (windowData == 0) return STATE_INVALID_WINDOW;
-    let windowId = Module._window_data_get_specific(windowData);
+    if (window_data == 0) return STATE_INVALID_WINDOW;
+    let window_id = Module._window_data_get_specific(window_data);
     if (!window._minifb) return STATE_INTERNAL_ERROR;
-    if (!window._minifb.windows[windowId]) return STATE_INVALID_WINDOW;
-    let w = window._minifb.windows[windowId];
+    if (!window._minifb.windows[window_id]) return STATE_INVALID_WINDOW;
+    let w = window._minifb.windows[window_id];
     let events = w.events;
     w.events = [];
     for (let i = 0; i < events.length; i++) {
         let event = events[i];
         if (event.type == "active") {
-            Module._window_data_call_active_func(windowData, event.isActive ? 1 : 0);
+            Module._window_data_call_active_func(window_data, event.is_active ? 1 : 0);
         } else if (event.type == "mousebutton") {
-            Module._window_data_call_mouse_btn_func(windowData, event.button, event.mod, event.isPressed ? 1 : 0);
+            Module._window_data_call_mouse_btn_func(window_data, event.button, event.mod, event.is_pressed ? 1 : 0);
         } else if (event.type == "mousemove") {
-            Module._window_data_call_mouse_move_func(windowData, event.x, event.y);
+            Module._window_data_call_mouse_move_func(window_data, event.x, event.y);
         } else if (event.type == "mousescroll") {
-            Module._window_data_call_mouse_wheel_func(windowData, event.mod, event.x, event.y);
+            Module._window_data_call_mouse_wheel_func(window_data, event.mod, event.x, event.y);
         } else if (event.type == "keydown") {
-            Module._window_data_call_keyboard_func(windowData, event.code, event.mod, 1);
+            Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 1);
         } else if (event.type == "keyup") {
-            Module._window_data_call_keyboard_func(windowData, event.code, event.mod, 0);
+            Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 0);
         } else if (event.type == "char") {
-            Module._window_data_call_char_input_func(windowData, event.code);
+            Module._window_data_call_char_input_func(window_data, event.code);
         }
     }
-    return Module._window_data_get_close(windowData) ? STATE_EXIT : STATE_OK;
+    return Module._window_data_get_close(window_data) ? STATE_EXIT : STATE_OK;
 });
 
 mfb_update_state mfb_update_events(struct mfb_window *window) {
@@ -821,19 +821,19 @@ mfb_update_state mfb_update_events(struct mfb_window *window) {
     return state;
 }
 
-EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *buffer, int width, int height), {
+EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *buffer, int width, int height), {
     // FIXME can we make these global somehow? preamble.js maybe?
     const STATE_OK = 0;
     const STATE_EXIT = -1;
     const STATE_INVALID_WINDOW = -2;
     const STATE_INVALID_BUFFER = -3;
     const STATE_INTERNAL_ERROR = -4;
-    if (windowData == 0) return STATE_INVALID_WINDOW;
-    let windowId = Module._window_data_get_specific(windowData);
+    if (window_data == 0) return STATE_INVALID_WINDOW;
+    let window_id = Module._window_data_get_specific(window_data);
     if (!window._minifb) return STATE_INTERNAL_ERROR;
-    if (!window._minifb.windows[windowId]) return STATE_INVALID_WINDOW;
+    if (!window._minifb.windows[window_id]) return STATE_INVALID_WINDOW;
     if (buffer == 0) return STATE_INVALID_BUFFER;
-    let w = window._minifb.windows[windowId];
+    let w = window._minifb.windows[window_id];
     let canvas = w.canvas;
     if (width <= 0) {
         width = canvas.width;
@@ -843,19 +843,19 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *bu
         if (canvas.width != width) canvas.width = width;
         if (canvas.height != height) canvas.height = height;
     }
-    Module._window_data_update_window_size(windowData, canvas.width, canvas.height);
-    Module._window_data_set_buffer_size(windowData, width, height);
+    Module._window_data_update_window_size(window_data, canvas.width, canvas.height);
+    Module._window_data_set_buffer_size(window_data, width, height);
 
-    let swizzleBuffer = Module._window_data_get_swizzle_buffer(windowData, width, height);
+    let swizzleBuffer = Module._window_data_get_swizzle_buffer(window_data, width, height);
     if (swizzleBuffer == 0) return STATE_INTERNAL_ERROR;
 
     Module._reverse_color_channels(buffer, swizzleBuffer, width, height);
     let framePixels = new Uint8ClampedArray(HEAPU8.buffer, swizzleBuffer, width * height * 4);
     let imageData = new ImageData(framePixels, width, height);
-    let dstOffsetX = Module._window_data_get_dst_offset_x(windowData);
-    let dstOffsetY = Module._window_data_get_dst_offset_y(windowData);
-    let dstWidth = Module._window_data_get_dst_width(windowData);
-    let dstHeight = Module._window_data_get_dst_height(windowData);
+    let dstOffsetX = Module._window_data_get_dst_offset_x(window_data);
+    let dstOffsetY = Module._window_data_get_dst_offset_y(window_data);
+    let dstWidth = Module._window_data_get_dst_width(window_data);
+    let dstHeight = Module._window_data_get_dst_height(window_data);
     let ctx = w.ctx;
     if (!ctx) return STATE_INTERNAL_ERROR;
     ctx.imageSmoothingEnabled = false;
@@ -878,7 +878,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *bu
         w.backCtx.putImageData(imageData, 0, 0);
         ctx.drawImage(w.backCanvas, 0, 0, width, height, dstOffsetX, dstOffsetY, dstWidth, dstHeight);
     }
-    return Module._window_data_get_close(windowData) ? STATE_EXIT : STATE_OK;
+    return Module._window_data_get_close(window_data) ? STATE_EXIT : STATE_OK;
 });
 
 mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {

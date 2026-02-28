@@ -2,6 +2,7 @@
 
 #include "WindowData.h"
 
+//-------------------------------------
 @interface OSXView : NSView<NSTextInputClient>
 {
     @public  SWindowData     *window_data;
@@ -9,4 +10,3 @@
 }
 
 @end
-

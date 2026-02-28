@@ -26,9 +26,9 @@ float               g_scale   = 1;
 
 //-------------------------------------
 void
-mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
-    NSLog(@"Touch: %d at %d, %d is %d", (int)button - MOUSE_BTN_0, mfb_get_mouse_x(window), mfb_get_mouse_y(window), (int) isPressed);
+    NSLog(@"Touch: %d at %d, %d is %d", (int)button - MOUSE_BTN_0, mfb_get_mouse_x(window), mfb_get_mouse_y(window), (int) is_pressed);
 }
 
 //-------------------------------------

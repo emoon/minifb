@@ -158,7 +158,7 @@ mfb_set_active_callback(window, &myObject, &MyClass::onActive);
 mfb_set_active_callback(std::bind(&MyClass::onActive, &myObject, _1, _2), window);
 
 // Using lambda
-mfb_set_active_callback([](struct mfb_window *window, bool isActive) {
+mfb_set_active_callback([](struct mfb_window *window, bool is_active) {
     // Handle event
 }, window);
 ```

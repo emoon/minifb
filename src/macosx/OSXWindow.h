@@ -29,12 +29,14 @@ translate_modifiers(NSEventModifierFlags flags) {
     return mod_keys;
 }
 
+//-------------------------------------
 @interface OSXWindow : NSWindow<NSWindowDelegate>
 {
     NSView              *childContentView;
     @public SWindowData *window_data;
 }
 
+//-------------------------------------
 - (id)initWithContentRect:(NSRect)contentRect
                 styleMask:(NSWindowStyleMask)windowStyle
                   backing:(NSBackingStoreType)bufferingType

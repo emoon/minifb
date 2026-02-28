@@ -22,11 +22,11 @@ typedef enum mfb_MONITOR_DPI_TYPE {
     mfb_MDT_DEFAULT                   = mfb_MDT_EFFECTIVE_DPI
 } mfb_MONITOR_DPI_TYPE;
 
-#define mfb_DPI_AWARENESS_CONTEXT_UNAWARE               ((HANDLE) -1)
-#define mfb_DPI_AWARENESS_CONTEXT_SYSTEM_AWARE          ((HANDLE) -2)
-#define mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE     ((HANDLE) -3)
-#define mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2  ((HANDLE) -4)
-#define mfb_DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((HANDLE) -5)
+#define MFB_DPI_AWARENESS_CONTEXT_UNAWARE               ((HANDLE) -1)
+#define MFB_DPI_AWARENESS_CONTEXT_SYSTEM_AWARE          ((HANDLE) -2)
+#define MFB_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE     ((HANDLE) -3)
+#define MFB_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2  ((HANDLE) -4)
+#define MFB_DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED     ((HANDLE) -5)
 
 // Windows message constants (not available in older Windows SDK versions)
 #if !defined(WM_GETDPISCALEDSIZE)
@@ -85,7 +85,7 @@ load_functions() {
 // NOT Thread safe. Just convenient (Don't do this at home guys)
 //-------------------------------------
 char *
-GetErrorMessage() {
+get_error_message() {
     static char buffer[256];
 
     buffer[0] = 0;
@@ -104,27 +104,27 @@ GetErrorMessage() {
 void
 dpi_aware() {
     if (mfb_SetProcessDpiAwarenessContext != NULL) {
-        if (mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
+        if (mfb_SetProcessDpiAwarenessContext(MFB_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
             uint32_t error = GetLastError();
             if (error == ERROR_INVALID_PARAMETER) {
                 error = NO_ERROR;
-                if (mfb_SetProcessDpiAwarenessContext(mfb_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE) == false) {
+                if (mfb_SetProcessDpiAwarenessContext(MFB_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE) == false) {
                     error = GetLastError();
                 }
             }
             if (error != NO_ERROR) {
-                mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwarenessContext failed: %s", GetErrorMessage());
+                mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwarenessContext failed: %s", get_error_message());
             }
         }
     }
     else if (mfb_SetProcessDpiAwareness != NULL) {
         if (mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE) != S_OK) {
-            mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwareness failed: %s", GetErrorMessage());
+            mfb_log(MFB_LOG_WARNING, "SetProcessDpiAwareness failed: %s", get_error_message());
         }
     }
     else if (mfb_SetProcessDPIAware != NULL) {
         if (mfb_SetProcessDPIAware() == false) {
-            mfb_log(MFB_LOG_WARNING, "SetProcessDPIAware failed: %s", GetErrorMessage());
+            mfb_log(MFB_LOG_WARNING, "SetProcessDPIAware failed: %s", get_error_message());
         }
     }
 }
@@ -624,7 +624,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (RegisterClass(&window_data_specific->wc) == 0) {
         uint32_t error = GetLastError();
         if (error != ERROR_CLASS_ALREADY_EXISTS) {
-            mfb_log(MFB_LOG_ERROR, "RegisterClass failed: %s", GetErrorMessage());
+            mfb_log(MFB_LOG_ERROR, "RegisterClass failed: %s", get_error_message());
             free(window_data);
             free(window_data_specific);
             release_window_counter();
@@ -646,7 +646,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         0, 0, 0, 0);
 
     if (!window_data_specific->window) {
-        mfb_log(MFB_LOG_ERROR, "CreateWindowEx failed: %s", GetErrorMessage());
+        mfb_log(MFB_LOG_ERROR, "CreateWindowEx failed: %s", get_error_message());
         free(window_data);
         free(window_data_specific);
         release_window_counter();
@@ -662,7 +662,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->hdc = GetDC(window_data_specific->window);
     if (window_data_specific->hdc == NULL) {
-        mfb_log(MFB_LOG_ERROR, "GetDC failed: %s", GetErrorMessage());
+        mfb_log(MFB_LOG_ERROR, "GetDC failed: %s", get_error_message());
         DestroyWindow(window_data_specific->window);
         free(window_data);
         free(window_data_specific);

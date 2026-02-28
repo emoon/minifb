@@ -16,12 +16,12 @@ static unsigned int g_buffer[WIDTH * HEIGHT];
 //-------------------------------------
 class Events {
 public:
-    void active(struct mfb_window *window, bool isActive) {
+    void active(struct mfb_window *window, bool is_active) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > active: %d\n", window_title, isActive);
+        fprintf(stdout, "%s > active: %d\n", window_title, is_active);
     }
 
     void resize(struct mfb_window *window, int width, int height) {
@@ -54,26 +54,26 @@ public:
                         // false => don't close
     }
 
-    void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+    void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
+        fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
         if (key == KB_KEY_ESCAPE) {
             mfb_close(window);
         }
     }
 
-    void char_input(struct mfb_window *window, unsigned int charCode) {
+    void char_input(struct mfb_window *window, unsigned int char_code) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
+        fprintf(stdout, "%s > char_code: %d\n", window_title, char_code);
     }
 
-    void mouse_button(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+    void mouse_button(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
         const char  *window_title = "";
         int         x, y;
 
@@ -82,7 +82,7 @@ public:
         }
         x = mfb_get_mouse_x(window);
         y = mfb_get_mouse_y(window);
-        fprintf(stdout, "%s > mouse_button: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
+        fprintf(stdout, "%s > mouse_button: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, is_pressed, x, y, mod);
     }
 
     void mouse_move(struct mfb_window *window, int x, int y) {
@@ -96,12 +96,12 @@ public:
         //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
     }
 
-    void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+    void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, deltaX, deltaY, mod);
+        fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, delta_x, delta_y, mod);
     }
 };
 
@@ -129,12 +129,12 @@ main() {
 
 #elif defined(kUseLambdas)
 
-    mfb_set_active_callback([](struct mfb_window *window, bool isActive) {
+    mfb_set_active_callback([](struct mfb_window *window, bool is_active) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > active: %d (lambda)\n", window_title, isActive);
+        fprintf(stdout, "%s > active: %d (lambda)\n", window_title, is_active);
     }, window);
 
     mfb_set_resize_callback([](struct mfb_window *window, int width, int height) {
@@ -167,26 +167,26 @@ main() {
                         // false => don't close
     }, window);
 
-    mfb_set_keyboard_callback([](struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+    mfb_set_keyboard_callback([](struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
+        fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
         if (key == KB_KEY_ESCAPE) {
             mfb_close(window);
         }
     }, window);
 
-    mfb_set_char_input_callback([](struct mfb_window *window, unsigned int charCode) {
+    mfb_set_char_input_callback([](struct mfb_window *window, unsigned int char_code) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
+        fprintf(stdout, "%s > char_code: %d\n", window_title, char_code);
     }, window);
 
-    mfb_set_mouse_button_callback([](struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+    mfb_set_mouse_button_callback([](struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
         const char  *window_title = "";
         int         x, y;
 
@@ -195,7 +195,7 @@ main() {
         }
         x = mfb_get_mouse_x(window);
         y = mfb_get_mouse_y(window);
-        fprintf(stdout, "%s > mouse_button: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
+        fprintf(stdout, "%s > mouse_button: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, is_pressed, x, y, mod);
     }, window);
 
     mfb_set_mouse_move_callback([](struct mfb_window *window, int x, int y) {
@@ -209,12 +209,12 @@ main() {
         //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
     }, window);
 
-    mfb_set_mouse_scroll_callback([](struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+    mfb_set_mouse_scroll_callback([](struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
         const char *window_title = "";
         if (window) {
             window_title = (const char *) mfb_get_user_data(window);
         }
-        fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, deltaX, deltaY, mod);
+        fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, delta_x, delta_y, mod);
     }, window);
 
 #else

@@ -6,10 +6,10 @@
 #include "WindowData_OSX.h"
 
 // Number of textures in flight (tripple buffered)
+//-------------------------------------
 enum { MaxBuffersInFlight = 3 };
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 @interface OSXViewDelegate : NSViewController<MTKViewDelegate>
 {
     @public SWindowData         *window_data;
@@ -27,6 +27,7 @@ enum { MaxBuffersInFlight = 3 };
     int                         current_buffer;
 }
 
+//-------------------------------------
 - (id) initWithWindowData:(SWindowData *) windowData;
 - (bool) resizeTextures;
 

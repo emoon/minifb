@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(MiniFB VERSION 0.9.1 LANGUAGES C CXX)
 
-include(CheckLanguage)
-check_language(OBJC)
-if(CMAKE_OBJC_COMPILER)
-  enable_language(OBJC)
+if (APPLE)
+    include(CheckLanguage)
+    check_language(OBJC)
+    if (CMAKE_OBJC_COMPILER)
+        enable_language(OBJC)
+    endif()
 endif()
 
 message(STATUS "Processing " ${PROJECT_NAME})
@@ -370,7 +372,7 @@ elseif (WIN32)
             message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
         endif()
         target_link_libraries(minifb PRIVATE
-            OpenGL::GL
+            "opengl32.lib"
         )
     endif()
 

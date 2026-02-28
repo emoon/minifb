@@ -4,19 +4,18 @@
 
 //#define kUseBilinearInterpolation
 
-#if defined(kUseBilinearInterpolation)
 //-------------------------------------
 static uint32_t
-interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uint32_t srcOffsetY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch) {
-    uint32_t incX = x + 1 < srcWidth ? 1 : 0;
-    uint32_t incY = y + 1 < srcHeight ? srcPitch : 0;
-    uint8_t *p00 = (uint8_t *) &srcImage[(srcOffsetX >> 16)];
-    uint8_t *p01 = (uint8_t *) &srcImage[(srcOffsetX >> 16) + incX];
-    uint8_t *p10 = (uint8_t *) &srcImage[(srcOffsetX >> 16) + incY];
-    uint8_t *p11 = (uint8_t *) &srcImage[(srcOffsetX >> 16) + incY + incX];
+interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, uint32_t src_offset_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch) {
+    uint32_t inc_x = x + 1 < src_width ? 1 : 0;
+    uint32_t inc_y = y + 1 < src_height ? src_pitch : 0;
+    uint8_t *p00 = (uint8_t *) &src_image[(src_offset_x >> 16)];
+    uint8_t *p01 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_x];
+    uint8_t *p10 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_y];
+    uint8_t *p11 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_y + inc_x];
 
-    uint32_t wx2 = srcOffsetX & 0xffff;
-    uint32_t wy2 = srcOffsetY & 0xffff;
+    uint32_t wx2 = src_offset_x & 0xffff;
+    uint32_t wy2 = src_offset_y & 0xffff;
     uint32_t wx1 = 0x10000 - wx2;
     uint32_t wy1 = 0x10000 - wy2;
 
@@ -38,44 +37,43 @@ interpolate(uint32_t *srcImage, uint32_t x, uint32_t y, uint32_t srcOffsetX, uin
 
     return (a << 24) + (r << 16) + (g << 8) + b;
 }
-#endif
 
 // Only for 32 bits images
 //-------------------------------------
 void
-stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
-              uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch) {
+stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
+              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch) {
 
     uint32_t    x, y;
-    uint32_t    srcOffsetX, srcOffsetY;
+    uint32_t    src_offset_x, src_offset_y;
 
-    if (srcImage == NULL || dstImage == NULL)
+    if (src_image == NULL || dst_image == NULL)
         return;
 
-    srcImage += srcX + srcY * srcPitch;
-    dstImage += dstX + dstY * dstPitch;
+    src_image += src_x + src_y * src_pitch;
+    dst_image += dst_x + dst_y * dst_pitch;
 
-    const uint32_t deltaX = (srcWidth  << 16) / dstWidth;
-    const uint32_t deltaY = (srcHeight << 16) / dstHeight;
+    const uint32_t delta_x = (src_width  << 16) / dst_width;
+    const uint32_t delta_y = (src_height << 16) / dst_height;
 
-    srcOffsetY = 0;
-    for(y=0; y<dstHeight; ++y) {
-        srcOffsetX = 0;
-        for(x=0; x<dstWidth; ++x) {
+    src_offset_y = 0;
+    for(y=0; y<dst_height; ++y) {
+        src_offset_x = 0;
+        for(x=0; x<dst_width; ++x) {
 #if defined(kUseBilinearInterpolation)
-            dstImage[x] = interpolate(srcImage, x+srcX, y+srcY, srcOffsetX, srcOffsetY, srcWidth, srcHeight, srcPitch);
+            dst_image[x] = interpolate(src_image, x+src_x, y+src_y, src_offset_x, src_offset_y, src_width, src_height, src_pitch);
 #else
-            dstImage[x] = srcImage[srcOffsetX >> 16];
+            dst_image[x] = src_image[src_offset_x >> 16];
 #endif
-            srcOffsetX += deltaX;
+            src_offset_x += delta_x;
         }
 
-        srcOffsetY += deltaY;
-        if (srcOffsetY >= 0x10000) {
-            srcImage += (srcOffsetY >> 16) * srcPitch;
-            srcOffsetY &= 0xffff;
+        src_offset_y += delta_y;
+        if (src_offset_y >= 0x10000) {
+            src_image += (src_offset_y >> 16) * src_pitch;
+            src_offset_y &= 0xffff;
         }
-        dstImage += dstPitch;
+        dst_image += dst_pitch;
     }
 }
 

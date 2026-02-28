@@ -140,9 +140,9 @@ mfb_close(struct mfb_window *window) {
 
 //-------------------------------------
 void
-keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
-    kUnused(isPressed);
+    kUnused(is_pressed);
     if (key == KB_KEY_ESCAPE) {
         SWindowData *window_data = (SWindowData *) window;
         if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
@@ -167,18 +167,18 @@ mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigne
         else
             scale_y = scale_x;
 
-        unsigned finalWidth  = (unsigned) ((old_width  * scale_x) + 0.5f);
-        unsigned finalHeight = (unsigned) ((old_height * scale_y) + 0.5f);
+        unsigned final_width  = (unsigned) ((old_width  * scale_x) + 0.5f);
+        unsigned final_height = (unsigned) ((old_height * scale_y) + 0.5f);
 
-        unsigned offset_x = (new_width  - finalWidth)  >> 1;
-        unsigned offset_y = (new_height - finalHeight) >> 1;
+        unsigned offset_x = (new_width  - final_width)  >> 1;
+        unsigned offset_y = (new_height - final_height) >> 1;
 
         mfb_get_monitor_scale(window, &scale_x, &scale_y);
         return mfb_set_viewport(window,
-                                (unsigned) (offset_x / scale_x),
-                                (unsigned) (offset_y / scale_y),
-                                (unsigned) (finalWidth / scale_x),
-                                (unsigned) (finalHeight / scale_y));
+                                (unsigned) (offset_x     / scale_x),
+                                (unsigned) (offset_y     / scale_y),
+                                (unsigned) (final_width  / scale_x),
+                                (unsigned) (final_height / scale_y));
     }
 
     return false;

@@ -22,7 +22,7 @@ resize(struct mfb_window *window, int width, int height) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void
-keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     if (key == KB_KEY_H) {
         mfb_show_cursor(window, false);
     }

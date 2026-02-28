@@ -127,8 +127,8 @@ print_getters(struct mfb_window *window) {
 
 //-------------------------------------
 void
-active(struct mfb_window *window, bool isActive) {
-    LOGI("active: %d", isActive);
+active(struct mfb_window *window, bool is_active) {
+    LOGI("active: %d", is_active);
 }
 
 //-------------------------------------
@@ -142,25 +142,25 @@ resize(struct mfb_window *window, int width, int height) {
 
 //-------------------------------------
 void
-keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     LOGI("keyboard:");
 }
 
 //-------------------------------------
 void
-char_input(struct mfb_window *window, unsigned int charCode) {
+char_input(struct mfb_window *window, unsigned int char_code) {
     LOGI("char_input:");
 }
 
 //-------------------------------------
 void
-mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     int x = (mfb_get_mouse_x(window) & kTouchPosMask) >> 1;
     int y = (mfb_get_mouse_y(window) & kTouchPosMask) >> 1;
-    g_positions[button].enabled = isPressed;
+    g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) isPressed, x, y);
+    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) is_pressed, x, y);
 }
 
 //-------------------------------------
@@ -177,7 +177,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
 
 //-------------------------------------
 void
-mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     LOGI("mouse_scroll:");
 }
 

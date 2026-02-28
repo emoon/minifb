@@ -95,13 +95,13 @@ print_getters(struct mfb_window *window) {
 
 //-------------------------------------
 static void
-active(struct mfb_window *window, bool isActive) {
+active(struct mfb_window *window, bool is_active) {
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > active: %d\n", window_title, isActive);
-    g_active = isActive;
+    fprintf(stdout, "%s > active: %d\n", window_title, is_active);
+    g_active = is_active;
 }
 
 //-------------------------------------
@@ -142,12 +142,12 @@ close(struct mfb_window *window) {
 
 //-------------------------------------
 static void
-keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), isPressed, mod);
+    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
 
     if (key == KB_KEY_SPACE) {
         print_getters(window);
@@ -160,17 +160,17 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed
 
 //-------------------------------------
 static void
-char_input(struct mfb_window *window, unsigned int charCode) {
+char_input(struct mfb_window *window, unsigned int char_code) {
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > charCode: %d\n", window_title, charCode);
+    fprintf(stdout, "%s > char_code: %d\n", window_title, char_code);
 }
 
 //-------------------------------------
 static void
-mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     const char *window_title = "";
     int x, y;
     if (window) {
@@ -178,7 +178,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     }
     x = mfb_get_mouse_x(window);
     y = mfb_get_mouse_y(window);
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, isPressed, x, y, mod);
+    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, is_pressed, x, y, mod);
 }
 
 //-------------------------------------
@@ -192,12 +192,12 @@ mouse_move(struct mfb_window *window, int x, int y) {
 
 //-------------------------------------
 static void
-mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, deltaX, deltaY, mod);
+    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, delta_x, delta_y, mod);
 }
 
 //-------------------------------------

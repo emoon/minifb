@@ -66,8 +66,8 @@ void init_keycodes(SWindowData_X11 *window_data_specific);
 Cursor create_blank_cursor(Display *display, Window window);
 
 extern void
-stretch_image(uint32_t *srcImage, uint32_t srcX, uint32_t srcY, uint32_t srcWidth, uint32_t srcHeight, uint32_t srcPitch,
-              uint32_t *dstImage, uint32_t dstX, uint32_t dstY, uint32_t dstWidth, uint32_t dstHeight, uint32_t dstPitch);
+stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
+              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
 
 //-------------------------------------
 int translate_key(int scancode);
@@ -494,10 +494,10 @@ update_events(SWindowData *window_data, Display *display) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    int depth, i, formatCount, convDepth = -1;
+    int depth, i, format_count, conv_depth = -1;
     XPixmapFormatValues* formats;
-    XSetWindowAttributes windowAttributes;
-    XSizeHints sizeHints;
+    XSetWindowAttributes window_attributes;
+    XSizeHints size_hints;
     Visual* visual;
     uint32_t initial_stride = 0;
     size_t initial_total_bytes = 0;
@@ -552,9 +552,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->screen = DefaultScreen(window_data_specific->display);
 
     visual   = DefaultVisual(window_data_specific->display, window_data_specific->screen);
-    formats  = XListPixmapFormats(window_data_specific->display, &formatCount);
+    formats  = XListPixmapFormats(window_data_specific->display, &format_count);
     depth    = DefaultDepth(window_data_specific->display, window_data_specific->screen);
-    if (formats == NULL || formatCount <= 0) {
+    if (formats == NULL || format_count <= 0) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: XListPixmapFormats returned no formats.");
         XCloseDisplay(window_data_specific->display);
         free(window_data_specific);
@@ -562,11 +562,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
 
-    Window defaultRootWindow = DefaultRootWindow(window_data_specific->display);
+    Window default_root_window = DefaultRootWindow(window_data_specific->display);
 
-    for (i = 0; i < formatCount; ++i) {
+    for (i = 0; i < format_count; ++i) {
         if (depth == formats[i].depth) {
-            convDepth = formats[i].bits_per_pixel;
+            conv_depth = formats[i].bits_per_pixel;
             break;
         }
     }
@@ -574,23 +574,23 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     XFree(formats);
 
     // We only support 32-bit right now
-    if (convDepth != 32) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: unsupported visual depth conversion (%d bpp), expected 32 bpp.", convDepth);
+    if (conv_depth != 32) {
+        mfb_log(MFB_LOG_ERROR, "X11MiniFB: unsupported visual depth conversion (%d bpp), expected 32 bpp.", conv_depth);
         XCloseDisplay(window_data_specific->display);
         free(window_data_specific);
         free(window_data);
         return NULL;
     }
 
-    int screenWidth  = DisplayWidth(window_data_specific->display, window_data_specific->screen);
-    int screenHeight = DisplayHeight(window_data_specific->display, window_data_specific->screen);
+    int screen_width  = DisplayWidth(window_data_specific->display, window_data_specific->screen);
+    int screen_height = DisplayHeight(window_data_specific->display, window_data_specific->screen);
 
-    windowAttributes.border_pixel     = BlackPixel(window_data_specific->display, window_data_specific->screen);
-    windowAttributes.background_pixel = BlackPixel(window_data_specific->display, window_data_specific->screen);
-    windowAttributes.backing_store    = NotUseful;
+    window_attributes.border_pixel     = BlackPixel(window_data_specific->display, window_data_specific->screen);
+    window_attributes.background_pixel = BlackPixel(window_data_specific->display, window_data_specific->screen);
+    window_attributes.backing_store    = NotUseful;
 
-    int posX, posY;
-    int windowWidth, windowHeight;
+    int pos_x, pos_y;
+    int window_width, window_height;
     bool request_maximized_desktop = (flags & WF_FULLSCREEN_DESKTOP) != 0;
 
     window_data->window_width  = width;
@@ -601,29 +601,29 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     calc_dst_factor(window_data, width, height);
 
     if (flags & WF_FULLSCREEN_DESKTOP) {
-        posX         = 0;
-        posY         = 0;
-        windowWidth  = screenWidth;
-        windowHeight = screenHeight;
+        pos_x         = 0;
+        pos_y         = 0;
+        window_width  = screen_width;
+        window_height = screen_height;
     }
     else {
-        posX         = (screenWidth  - width)  / 2;
-        posY         = (screenHeight - height) / 2;
-        windowWidth  = width;
-        windowHeight = height;
+        pos_x         = (screen_width  - width)  / 2;
+        pos_y         = (screen_height - height) / 2;
+        window_width  = width;
+        window_height = height;
     }
 
     window_data_specific->window = XCreateWindow(
                     window_data_specific->display,
-                    defaultRootWindow,
-                    posX, posY,
-                    windowWidth, windowHeight,
+                    default_root_window,
+                    pos_x, pos_y,
+                    window_width, window_height,
                     0,
                     depth,
                     InputOutput,
                     visual,
                     CWBackPixel | CWBorderPixel | CWBackingStore,
-                    &windowAttributes);
+                    &window_attributes);
     if (!window_data_specific->window) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: XCreateWindow failed.");
         XCloseDisplay(window_data_specific->display);
@@ -716,26 +716,26 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
 
-    sizeHints.flags      = PPosition | PMinSize | PMaxSize;
-    sizeHints.x          = 0;
-    sizeHints.y          = 0;
+    size_hints.flags      = PPosition | PMinSize | PMaxSize;
+    size_hints.x          = 0;
+    size_hints.y          = 0;
     if (request_maximized_desktop) {
-        sizeHints.min_width  = 1;
-        sizeHints.min_height = 1;
-        sizeHints.max_width  = screenWidth;
-        sizeHints.max_height = screenHeight;
+        size_hints.min_width  = 1;
+        size_hints.min_height = 1;
+        size_hints.max_width  = screen_width;
+        size_hints.max_height = screen_height;
     }
     else {
-        sizeHints.min_width  = width;
-        sizeHints.min_height = height;
+        size_hints.min_width  = width;
+        size_hints.min_height = height;
     }
     if (!request_maximized_desktop && (flags & WF_RESIZABLE)) {
-        sizeHints.max_width  = screenWidth;
-        sizeHints.max_height = screenHeight;
+        size_hints.max_width  = screen_width;
+        size_hints.max_height = screen_height;
     }
     else if (!request_maximized_desktop) {
-        sizeHints.max_width  = width;
-        sizeHints.max_height = height;
+        size_hints.max_width  = width;
+        size_hints.max_height = height;
     }
 
     s_delete_window_atom = XInternAtom(window_data_specific->display, "WM_DELETE_WINDOW", False);
@@ -762,7 +762,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 #endif
 
-    XSetWMNormalHints(window_data_specific->display, window_data_specific->window, &sizeHints);
+    XSetWMNormalHints(window_data_specific->display, window_data_specific->window, &size_hints);
     XClearWindow(window_data_specific->display, window_data_specific->window);
     XMapRaised(window_data_specific->display, window_data_specific->window);
     XFlush(window_data_specific->display);
@@ -1110,9 +1110,9 @@ extern short int g_keycodes[512];
 
 //-------------------------------------
 static int
-translateKeyCodeB(int keySym) {
+translate_key_code_b(int key_sym) {
 
-    switch (keySym) {
+    switch (key_sym) {
         case XK_KP_0:           return KB_KEY_KP_0;
         case XK_KP_1:           return KB_KEY_KP_1;
         case XK_KP_2:           return KB_KEY_KP_2;
@@ -1134,8 +1134,8 @@ translateKeyCodeB(int keySym) {
 
 //-------------------------------------
 static int
-translateKeyCodeA(int keySym) {
-    switch (keySym) {
+translate_key_code_a(int key_sym) {
+    switch (key_sym) {
         case XK_Escape:         return KB_KEY_ESCAPE;
         case XK_Tab:            return KB_KEY_TAB;
         case XK_Shift_L:        return KB_KEY_LEFT_SHIFT;
@@ -1282,7 +1282,7 @@ translateKeyCodeA(int keySym) {
 void
 init_keycodes(SWindowData_X11 *window_data_specific) {
     size_t  i;
-    int     keySym;
+    int     key_sym;
 
     // Clear keys
     for (i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
@@ -1291,11 +1291,11 @@ init_keycodes(SWindowData_X11 *window_data_specific) {
     // Valid key code range is  [8,255], according to the Xlib manual
     for (i=8; i<=255; ++i) {
         // Try secondary keysym, for numeric keypad keys
-         keySym  = XkbKeycodeToKeysym(window_data_specific->display, i, 0, 1);
-         g_keycodes[i] = translateKeyCodeB(keySym);
+         key_sym  = XkbKeycodeToKeysym(window_data_specific->display, i, 0, 1);
+         g_keycodes[i] = translate_key_code_b(key_sym);
          if (g_keycodes[i] == KB_KEY_UNKNOWN) {
-            keySym = XkbKeycodeToKeysym(window_data_specific->display, i, 0, 0);
-            g_keycodes[i] = translateKeyCodeA(keySym);
+            key_sym = XkbKeycodeToKeysym(window_data_specific->display, i, 0, 0);
+            g_keycodes[i] = translate_key_code_a(key_sym);
          }
     }
 }

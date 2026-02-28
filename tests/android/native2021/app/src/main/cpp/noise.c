@@ -32,8 +32,8 @@ static uint32_t *g_buffer = NULL;
 static Pos      g_positions[16] = {};
 
 void
-active(struct mfb_window *window, bool isActive) {
-    LOGI("active: %d", isActive);
+active(struct mfb_window *window, bool is_active) {
+    LOGI("active: %d", is_active);
 }
 
 void
@@ -45,23 +45,23 @@ resize(struct mfb_window *window, int width, int height) {
 }
 
 void
-keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool isPressed) {
+keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     LOGI("keyboard:");
 }
 
 void
-char_input(struct mfb_window *window, unsigned int charCode) {
+char_input(struct mfb_window *window, unsigned int char_code) {
     LOGI("char_input:");
 }
 
 void
-mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool isPressed) {
+mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     int x = (mfb_get_mouse_x(window) & kTouchPosMask) >> 1;
     int y = (mfb_get_mouse_y(window) & kTouchPosMask) >> 1;
-    g_positions[button].enabled = isPressed;
+    g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) isPressed, x, y);
+    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) is_pressed, x, y);
 }
 
 void
@@ -76,7 +76,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
 }
 
 void
-mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float deltaX, float deltaY) {
+mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     LOGI("mouse_scroll:");
 }
 
@@ -104,11 +104,11 @@ main(int argc, char *argv[]) {
 
     mfb_update_state state;
     do {
-        bool isActive   = mfb_is_window_active(window);
+        bool is_active   = mfb_is_window_active(window);
         unsigned width  = mfb_get_window_width(window);
         unsigned height = mfb_get_window_height(window);
-        int mouseX      = mfb_get_mouse_x(window);
-        int mouseY      = mfb_get_mouse_y(window);
+        int mouse_x      = mfb_get_mouse_x(window);
+        int mouse_y      = mfb_get_mouse_y(window);
         float scrollX   = mfb_get_mouse_scroll_x(window);   // not working
         float scrollY   = mfb_get_mouse_scroll_y(window);   // not working
         const uint8_t *buttons = mfb_get_mouse_button_buffer(window);

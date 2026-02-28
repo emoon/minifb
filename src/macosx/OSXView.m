@@ -265,20 +265,20 @@
 - (void)resetCursorRects {
     [super resetCursorRects];
 
-    static NSCursor *invisibleCursor = nil;
-    if (invisibleCursor == nil) {
+    static NSCursor *invisible_cursor = nil;
+    if (invisible_cursor == nil) {
         NSImage *img = [[NSImage alloc] initWithSize:NSMakeSize(16, 16)];
         [img lockFocus];
         [[NSColor clearColor] set];
         NSRectFill(NSMakeRect(0, 0, 16, 16));
         [img unlockFocus];
 
-        invisibleCursor = [[NSCursor alloc] initWithImage:img hotSpot:NSMakePoint(0,0)];
+        invisible_cursor = [[NSCursor alloc] initWithImage:img hotSpot:NSMakePoint(0,0)];
         [img release];
     }
 
     if (window_data != 0x0 && window_data->is_cursor_visible == false) {
-        [self addCursorRect:[self bounds] cursor:invisibleCursor];
+        [self addCursorRect:[self bounds] cursor:invisible_cursor];
     }
     else {
         [self addCursorRect:[self bounds] cursor:[NSCursor arrowCursor]];
@@ -402,7 +402,7 @@
 //-------------------------------------
 
 //-------------------------------------
-static const NSRange kEmptyRange = { NSNotFound, 0 };
+static const NSRange g_empty_range = { NSNotFound, 0 };
 
 // Returns a Boolean value indicating whether the receiver has marked text.
 //-------------------------------------
@@ -413,13 +413,13 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 // Returns the range of the marked text.
 //-------------------------------------
 - (NSRange)markedRange {
-    return kEmptyRange;
+    return g_empty_range;
 }
 
 // Returns the range of selected text.
 //-------------------------------------
 - (NSRange)selectedRange {
-    return kEmptyRange;
+    return g_empty_range;
 }
 
 // Replaces a specified range in the receiver’s text storage with the given string and sets the selection.
