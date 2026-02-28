@@ -9,5 +9,5 @@
     void init_GL(SWindowData *window_data);
     void redraw_GL(SWindowData *window_data, const void *pixels);
     void resize_GL(SWindowData *window_data);
-    
+
 #endif

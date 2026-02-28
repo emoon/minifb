@@ -2,3 +2,9 @@
 
 *.sh text eol=lf
 *.bash text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.m text eol=lf
+*.mm text eol=lf
