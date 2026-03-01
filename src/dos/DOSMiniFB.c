@@ -195,7 +195,8 @@ typedef struct SWindowData_DOS {
 static SWindowData *g_window = NULL;
 
 //-------------------------------------
-__attribute__((destructor)) static void
+__attribute__((destructor))
+static void
 tear_down() {
   vesa_dispose();
   if (g_keyboard.initialized) {
@@ -235,6 +236,7 @@ static void
 init_keyboard(void) {
   if (g_keyboard.initialized)
     return;
+
   _go32_dpmi_lock_data(&g_keyboard, sizeof(g_keyboard));
   _go32_dpmi_lock_code(keyboard_handler, 4096);
 
@@ -305,6 +307,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   window_data->window_height = height;
   window_data->buffer_width = width;
   window_data->buffer_height = height;
+  window_data->dst_offset_x = 0;
+  window_data->dst_offset_y = 0;
+  window_data->dst_width = width;
+  window_data->dst_height = height;
+  calc_dst_factor(window_data, width, height);
 
   SWindowData_DOS *specific = malloc(sizeof(SWindowData_DOS));
   if (!specific) {
@@ -360,15 +367,33 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-  (void)window;
-  (void)offset_x;
-  (void)offset_y;
-  (void)width;
-  (void)height;
+  SWindowData *window_data = (SWindowData *)window;
+  if (window_data == NULL) {
+    mfb_log(MFB_LOG_ERROR, "DOSMiniFB: mfb_set_viewport called with null window");
+    return false;
+  }
 
-  mfb_log(MFB_LOG_WARNING, "mfb_set_viewport is not supported on DOS backend");
+  if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
+    mfb_log(MFB_LOG_ERROR,
+            "DOSMiniFB: viewport exceeds window width (offset_x=%u width=%u window_width=%u)",
+            offset_x, width, window_data->window_width);
+    return false;
+  }
 
-  return false;
+  if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
+    mfb_log(MFB_LOG_ERROR,
+            "DOSMiniFB: viewport exceeds window height (offset_y=%u height=%u window_height=%u)",
+            offset_y, height, window_data->window_height);
+    return false;
+  }
+
+  window_data->dst_offset_x = offset_x;
+  window_data->dst_offset_y = offset_y;
+  window_data->dst_width = width;
+  window_data->dst_height = height;
+  calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
+
+  return true;
 }
 
 //-------------------------------------
@@ -515,8 +540,8 @@ mfb_update_events(struct mfb_window *window) {
 }
 
 //-------------------------------------
-static void
-convert_to_24_bpp(uint32_t *source, uint32_t width, uint32_t height) {}
+//static void
+//convert_to_24_bpp(uint32_t *source, uint32_t width, uint32_t height) {}
 
 //-------------------------------------
 mfb_update_state
@@ -552,10 +577,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   uint32_t a_height             = dos_window_data->actual_height;
   uint32_t a_bpp                = dos_window_data->actual_bpp;
   uint32_t a_bytes_per_scanline = dos_window_data->bytes_per_scanline;
+  bool has_viewport             = window_data->dst_offset_x != 0 || window_data->dst_offset_y != 0 ||
+                                  window_data->dst_width != window_data->window_width ||
+                                  window_data->dst_height != window_data->window_height;
 
   // Exact match, copy directly. Unlikely to happen on a real device.
   // Happens in DOSBox.
-  if (a_width == width && a_height == height && a_bpp == 32 &&
+  if (!has_viewport &&
+      a_width == width && a_height == height && a_bpp == 32 &&
       a_bytes_per_scanline == a_width * sizeof(uint32_t)) {
     movedata(_my_ds(),
              (unsigned int)buffer,
@@ -570,11 +599,43 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   // Else we need to transfer to scale, convert to 24-bit, pad the scanlines,
   // or all of the above...
   uint8_t *frame = NULL;
-  if (a_width != width || a_height != height) {
+  if (has_viewport) {
+    memset(scale_buffer, 0, a_width * a_height * sizeof(uint32_t));
+
+    uint32_t vp_x = (uint32_t)(((uint64_t)window_data->dst_offset_x * a_width) /
+                               window_data->window_width);
+    uint32_t vp_y = (uint32_t)(((uint64_t)window_data->dst_offset_y * a_height) /
+                               window_data->window_height);
+    uint32_t vp_w = (uint32_t)(((uint64_t)window_data->dst_width * a_width) /
+                               window_data->window_width);
+    uint32_t vp_h = (uint32_t)(((uint64_t)window_data->dst_height * a_height) /
+                               window_data->window_height);
+
+    if (vp_w == 0)
+      vp_w = 1;
+
+    if (vp_h == 0)
+      vp_h = 1;
+
+    if (vp_x < a_width && vp_y < a_height) {
+      if (vp_x + vp_w > a_width)
+        vp_w = a_width - vp_x;
+      if (vp_y + vp_h > a_height)
+        vp_h = a_height - vp_y;
+
+      stretch_image(buffer, 0, 0, width, height, width, scale_buffer, vp_x,
+                    vp_y, vp_w, vp_h, a_width);
+    }
+
+    frame = (uint8_t *)scale_buffer;
+  }
+
+  else if (a_width != width || a_height != height) {
     stretch_image(buffer,       0, 0, width,   height,   width,
                   scale_buffer, 0, 0, a_width, a_height, a_width);
     frame = (uint8_t *) scale_buffer;
   }
+
   else {
     frame = (uint8_t *) buffer;
   }
