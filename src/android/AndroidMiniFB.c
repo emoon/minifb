@@ -179,7 +179,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                     int y   = AMotionEvent_getY(event, idx);
                     window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
                     window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
-                    window_data->mouse_button_status[id & 0x07] = is_pressed;
+                    window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, id, 0, is_pressed);
                 }
                 break;
@@ -195,7 +195,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                         int y  = AMotionEvent_getY(event, i);
                         window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
                         window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
-                        window_data->mouse_button_status[id & 0x07] = is_pressed;
+                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                         kCall(mouse_btn_func, id, 0, is_pressed);
                     }
                 }
@@ -212,7 +212,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                         window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
                         // MOVE events are only delivered while the pointer is down,
                         // so the pressed state is always true by definition.
-                        window_data->mouse_button_status[id & 0x07] = true;
+                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
                         kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
                     }
                 }
@@ -225,7 +225,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                     int count = AMotionEvent_getPointerCount(event);
                     for (int i = 0; i < count; ++i) {
                         int id = AMotionEvent_getPointerId(event, i);
-                        window_data->mouse_button_status[id & 0x07] = false;
+                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = false;
                         kCall(mouse_btn_func, id, 0, false);
                     }
                 }

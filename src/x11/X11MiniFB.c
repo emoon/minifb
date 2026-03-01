@@ -368,7 +368,7 @@ process_event(SWindowData *window_data, XEvent *event) {
                 case Button1:
                 case Button2:
                 case Button3:
-                    window_data->mouse_button_status[button & 0x07] = is_pressed;
+                    window_data->mouse_button_status[button & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
 
@@ -391,7 +391,7 @@ process_event(SWindowData *window_data, XEvent *event) {
                     break;
 
                 default:
-                    window_data->mouse_button_status[(button - 4) & 0x07] = is_pressed;
+                    window_data->mouse_button_status[(button - 4) & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
             }
@@ -1106,7 +1106,7 @@ destroy_window_data(SWindowData *window_data)  {
 }
 
 //-------------------------------------
-extern short int g_keycodes[512];
+extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
 static int

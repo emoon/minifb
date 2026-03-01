@@ -17,7 +17,7 @@ extern "C" {
 #endif
     extern void mfb_log(mfb_log_level level, const char *message, ...);
 
-    extern short int g_keycodes[512];
+    extern short int g_keycodes[MFB_MAX_KEYS];
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);
 
     void calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height);

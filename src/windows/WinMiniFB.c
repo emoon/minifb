@@ -383,7 +383,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                             is_pressed = 1;
                         }
                 }
-                window_data->mouse_button_status[button & 0x07] = is_pressed;
+                window_data->mouse_button_status[button & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                 kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
             }
             break;
@@ -947,7 +947,7 @@ destroy_window_data(SWindowData *window_data) {
 }
 
 //-------------------------------------
-extern short int g_keycodes[512];
+extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
 void

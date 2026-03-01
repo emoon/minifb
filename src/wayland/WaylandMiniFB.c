@@ -703,7 +703,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
         window_data_way->pointer_serial = serial;
         window_data_way->pointer_serial_valid = 1;
     }
-    window_data->mouse_button_status[(button - BTN_MOUSE + 1) & 0x07] = (state == 1);
+    window_data->mouse_button_status[(button - BTN_MOUSE + 1) & MFB_MAX_MOUSE_BUTTONS_MASK] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
 
     //mfb_log(MFB_LOG_DEBUG, "Pointer button %x, state %x (serial: %d)", button, state, serial);
@@ -1930,7 +1930,7 @@ mfb_wait_sync2(struct mfb_window *window) {
 }
 
 //-------------------------------------
-extern short int g_keycodes[512];
+extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
 void
@@ -2180,4 +2180,3 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
     }
 }
-
