@@ -14,49 +14,84 @@ djgpp_url=""
 dosbox_url=""
 os=$OSTYPE
 
-if [[ "$os" == "linux-gnu"* ]]; then
-    gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-linux.zip";
-    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-linux64-gcc1210.tar.bz2";
-    dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-0.84.5-linux.zip";
-elif [[ "$os" == "darwin"* ]]; then
-    gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-macos-x86_64.zip";
-    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-osx-gcc1210.tar.bz2";
-    dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-macosx-x86_64-20221223232510.zip";
-elif [[ "$os" == "cygwin" ]] || [[ "$os" == "msys" ]] || [[ $(uname -r) =~ WSL ]]; then
+#--------------------------------------
+if [[ "$os" == "cygwin" ]] || [[ "$os" == "msys" ]]; then
+
     gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-windows.zip";
     djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-mingw-gcc1210-standalone.zip";
     dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-mingw-win64-20221223232734.zip";
+
+elif [[ "$os" == "linux-gnu"* ]]; then
+
+    gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-linux.zip";
+    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-linux64-gcc1210.tar.bz2";
+    dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-0.84.5-linux.zip";
+
+elif [[ "$os" == "darwin"* ]]; then
+
+    gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-macos-x86_64.zip";
+    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-osx-gcc1210.tar.bz2";
+    dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-macosx-x86_64-20221223232510.zip";
+
 else
+
     echo "Sorry, this template doesn't support $os"
     exit
+
 fi
 
+#--------------------------------------
 echo "Installing GDB"
-echo "$gdb_url"
+echo " $gdb_url"
 mkdir -p gdb
 pushd gdb &> /dev/null
 curl -L $gdb_url --output gdb.zip &> /dev/null
 unzip -o gdb.zip > /dev/null
 rm gdb.zip > /dev/null
 popd &> /dev/null
+echo " [] Installed GDB"
 
+#--------------------------------------
 echo "Installing DJGPP"
-echo "$djgpp_url"
-if [[ "$os" == "cygwin" ]] || [[ "$os" == "msys" ]] || [[ $(uname -r) =~ WSL ]]; then
+echo " $djgpp_url"
+echo " OS: $os"
+echo " uname: $(uname -r) "
+
+if [[ "$djgpp_url" == *.zip ]]; then
+
     curl -L $djgpp_url --output djgpp.zip &> /dev/null
+    if [[ ! -f "djgpp.zip" ]]; then
+        echo "Error: Failed to download DJGPP (zip file not found)"
+        exit 1
+    fi
     unzip djgpp.zip &> /dev/null
     rm djgpp.zip
-else
+
+elif [[ "$djgpp_url" == *.tar.bz2 ]]; then
+
     curl -L $djgpp_url --output djgpp.tar.bz2 &> /dev/null
+    if [[ ! -f "djgpp.tar.bz2" ]]; then
+        echo "Error: Failed to download DJGPP (tar.bz2 file not found)"
+        exit 1
+    fi
     tar xf djgpp.tar.bz2
     rm djgpp.tar.bz2
-fi
 
+else
+
+    echo "Error: Unknown file extension for DJGPP URL: $djgpp_url"
+    exit 1
+
+fi
+echo " [] Installed DJGPP"
+
+#--------------------------------------
 echo "Installing DOSBox-x"
-echo "$dosbox_url"
+echo " $dosbox_url"
 curl -L $dosbox_url --output dosbox.zip &> /dev/null
 unzip -o dosbox.zip &> /dev/null
 rm dosbox.zip
+echo " [] Installed DOSBox-x"
 
 if [[ $1 = "--with-vs-code" ]]; then
     echo "Installing VS Code extensions"
@@ -70,7 +105,9 @@ if [[ $1 = "--with-vs-code" ]]; then
     fi
 fi
 
+#--------------------------------------
 if [[ "$os" == "linux-gnu"* ]]; then
+
     chmod a+x gdb/gdb > /dev/null
     chmod a+x djgpp/bin/*
     chmod a+x djgpp/i586-pc-msdosdjgpp/bin/*
@@ -82,19 +119,39 @@ if [[ "$os" == "linux-gnu"* ]]; then
     echo " Please install the following packages using your Linux distribution's "
     echo " package manager:"
     echo
-    echo " libncurses5 libfl-dev libslirp-dev libfluidsynth-dev"
+
+    # Detect Linux distribution and show appropriate install command
+    if command -v apt &> /dev/null; then
+        echo " sudo apt install libncurses5 libfl-dev libslirp-dev libfluidsynth-dev"
+    elif command -v dnf &> /dev/null; then
+        echo " sudo dnf install ncurses-libs flex-devel libslirp-devel fluidsynth-devel"
+    elif command -v pacman &> /dev/null; then
+        echo " sudo pacman -S ncurses flex libslirp fluidsynth"
+    elif command -v zypper &> /dev/null; then
+        echo " sudo zypper install ncurses-devel flex libslirp-devel fluidsynth-devel"
+    elif command -v apk &> /dev/null; then
+        echo " sudo apk add ncurses-dev flex libslirp-dev fluidsynth-dev"
+    else
+        echo " libncurses5 libfl-dev libslirp-dev libfluidsynth-dev"
+    fi
+
     echo
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+
 elif [[ "$os" == "darwin"* ]]; then
+
     chmod a+x gdb/gdb > /dev/null
     chmod a+x djgpp/bin/*
     chmod a+x djgpp/i586-pc-msdosdjgpp/bin/*
     chmod a+x dosbox-x/dosbox-x.app/Contents/MacOS/dosbox-x
     ln -s $(pwd)/dosbox-x/dosbox-x.app/Contents/MacOS/dosbox-x dosbox-x/dosbox-x
+
 elif [[ "$os" == "cygwin" ]] || [[ "$os" == "msys" ]] || [[ $(uname -r) =~ WSL ]]; then
+
     rm -rf "COPYING"
     mv mingw-build/mingw dosbox-x
     rm -rf mingw-build
+
 fi
 
 popd &> /dev/null

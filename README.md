@@ -795,8 +795,8 @@ You can optionally run the script with the argument `--with-vs-code`. If you hav
 #### Building and running the examples (DOS)
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=./tests/dos/tools/toolchain-djgpp.cmake -S . -B build
-cmake --build build
+cmake -DCMAKE_TOOLCHAIN_FILE=./tests/dos/tools/toolchain-djgpp.cmake -S . -B dos
+cmake --build dos
 ```
 
 > **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
@@ -808,6 +808,8 @@ This will generate DOS 32-bit `.exe` files in the `build/` folder which you can 
 ```
 
 Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
+
+The `dos` example target (`tests/dos/dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
 
 #### Compiling your own MiniFB app for DOS
 

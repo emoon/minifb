@@ -16,10 +16,12 @@
 
 #include "vesa.h"
 
+//-------------------------------------
 extern void
 stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
               uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
 
+//-------------------------------------
 static uint32_t scancode_to_mfb_key[] = {
     KB_KEY_UNKNOWN,
     KB_KEY_ESCAPE,
@@ -111,6 +113,7 @@ static uint32_t scancode_to_mfb_key[] = {
     KB_KEY_F12,
 };
 
+//-------------------------------------
 char scancode_to_ascii[] = {
     0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9',  '0', '-', '=',  0,
     0,   'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',  '[', ']', 0,    0,
@@ -118,6 +121,7 @@ char scancode_to_ascii[] = {
     'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 0,   0,    0,   ' ',
 };
 
+//-------------------------------------
 char scancode_to_ascii_shift[] = {
     0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
     0,   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0,   0,
@@ -125,14 +129,19 @@ char scancode_to_ascii_shift[] = {
     'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0,   0,   0,   ' ',
 };
 
+//-------------------------------------
 #define RING_BUFFER_SIZE 512
+
+//-------------------------------------
 typedef struct ring_buffer {
   uint32_t read_index;
   uint32_t write_index;
   uint8_t buffer[RING_BUFFER_SIZE];
 } ring_buffer;
 
-bool ring_buffer_push(ring_buffer *buffer, uint8_t value) {
+//-------------------------------------
+bool
+ring_buffer_push(ring_buffer *buffer, uint8_t value) {
   uint32_t next = buffer->write_index + 1;
   if (next >= RING_BUFFER_SIZE)
     next = 0;
@@ -142,10 +151,13 @@ bool ring_buffer_push(ring_buffer *buffer, uint8_t value) {
 
   buffer->buffer[buffer->write_index] = value;
   buffer->write_index = next;
+
   return true;
 }
 
-bool ring_buffer_pop(ring_buffer *buffer, uint8_t *value) {
+//-------------------------------------
+bool
+ring_buffer_pop(ring_buffer *buffer, uint8_t *value) {
   if (buffer->write_index == buffer->read_index)
     return false;
 
@@ -155,9 +167,11 @@ bool ring_buffer_pop(ring_buffer *buffer, uint8_t *value) {
 
   *value = buffer->buffer[buffer->read_index];
   buffer->read_index = next;
+
   return true;
 }
 
+//-------------------------------------
 typedef struct keyboard_state {
   bool initialized;
   ring_buffer buffer;
@@ -167,17 +181,22 @@ typedef struct keyboard_state {
   bool caps_lock;
 } keyboard_state;
 
+//-------------------------------------
 static keyboard_state g_keyboard = {0};
 
+//-------------------------------------
 typedef struct SWindowData_DOS {
   uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
   uint32_t *scale_buffer;
   uint8_t *scanline_buffer;
 } SWindowData_DOS;
 
+//-------------------------------------
 static SWindowData *g_window = NULL;
 
-__attribute__((destructor)) static void tear_down() {
+//-------------------------------------
+__attribute__((destructor)) static void
+tear_down() {
   vesa_dispose();
   if (g_keyboard.initialized) {
     _go32_dpmi_set_protected_mode_interrupt_vector(
@@ -186,7 +205,9 @@ __attribute__((destructor)) static void tear_down() {
   }
 }
 
-static void init_mouse(SWindowData *window_data) {
+//-------------------------------------
+static void
+init_mouse(SWindowData *window_data) {
   __dpmi_regs regs;
   regs.x.ax = 7;
   regs.x.cx = 0;
@@ -202,12 +223,16 @@ static void init_mouse(SWindowData *window_data) {
   __dpmi_int(0x33, &regs);
 }
 
-static void keyboard_handler() {
+//-------------------------------------
+static void
+keyboard_handler() {
   ring_buffer_push(&g_keyboard.buffer, inp(0x60));
   outportb(0x20, 0x20);
 }
 
-static void init_keyboard() {
+//-------------------------------------
+static void
+init_keyboard(void) {
   if (g_keyboard.initialized)
     return;
   _go32_dpmi_lock_data(&g_keyboard, sizeof(g_keyboard));
@@ -226,9 +251,12 @@ static void init_keyboard() {
   g_keyboard.initialized = true;
 }
 
-static mfb_update_state check_window_closed(SWindowData *window_data) {
+//-------------------------------------
+static mfb_update_state
+check_window_closed(SWindowData *window_data) {
   if (window_data->close) {
     if (window_data->specific) {
+      mfb_log(MFB_LOG_DEBUG, "mfb window requested close");
       g_window = NULL;
       vesa_dispose();
       SWindowData_DOS *dos_window_data = window_data->specific;
@@ -236,24 +264,32 @@ static mfb_update_state check_window_closed(SWindowData *window_data) {
       free(dos_window_data->scanline_buffer);
       free(window_data->specific);
       window_data->specific = NULL;
+      free(window_data);
       return STATE_EXIT;
     }
     else {
+      mfb_log(MFB_LOG_DEBUG, "mfb window close requested but specific data is NULL");
       return STATE_INVALID_WINDOW;
     }
   }
+
   return STATE_OK;
 }
 
-struct mfb_window *mfb_open_ex(const char *title, unsigned width,
-                               unsigned height, unsigned flags) {
-  if (g_window)
+//-------------------------------------
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+  (void)title;
+  (void)flags;
+
+  if (g_window) {
+    mfb_log(MFB_LOG_WARNING, "mfb_open_ex called while DOS backend window is already open");
     return NULL;
+  }
 
   uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
-  if (!vesa_init(width, height, &actual_width, &actual_height, &actual_bpp,
-                 &bytes_per_scanline)) {
-    printf("Couldn't set VESA mode %ix%i\n", width, height);
+  if (!vesa_init(width, height, &actual_width, &actual_height, &actual_bpp, &bytes_per_scanline)) {
+    mfb_log(MFB_LOG_ERROR, "Couldn't set VESA mode %ux%u", width, height);
     return NULL;
   }
 
@@ -261,7 +297,7 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
 
   window_data = malloc(sizeof(SWindowData));
   if (window_data == NULL) {
-    printf("Cannot allocate window data\n");
+    mfb_log(MFB_LOG_ERROR, "Cannot allocate window data");
     return NULL;
   }
   memset(window_data, 0, sizeof(SWindowData));
@@ -272,19 +308,35 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
 
   SWindowData_DOS *specific = malloc(sizeof(SWindowData_DOS));
   if (!specific) {
-    printf("Cannot allocate DOS window data\n");
+    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS window data");
+    free(window_data);
     return NULL;
   }
   specific->actual_width = actual_width;
   specific->actual_height = actual_height;
   specific->actual_bpp = actual_bpp;
   specific->bytes_per_scanline = bytes_per_scanline;
-  specific->scale_buffer =
-      (uint32_t *)malloc(actual_width * actual_height * sizeof(uint32_t));
+  specific->scale_buffer = (uint32_t *)malloc(actual_width * actual_height * sizeof(uint32_t));
   specific->scanline_buffer =
       actual_bpp != 32 || bytes_per_scanline != width << 2
           ? (uint8_t *)malloc(actual_height * bytes_per_scanline)
           : NULL;
+
+  if (!specific->scale_buffer) {
+    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
+    free(specific);
+    free(window_data);
+    return NULL;
+  }
+
+  if ((actual_bpp != 32 || bytes_per_scanline != width << 2) && !specific->scanline_buffer) {
+    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS scanline buffer");
+    free(specific->scale_buffer);
+    free(specific);
+    free(window_data);
+    return NULL;
+  }
+
   window_data->specific = specific;
 
   mfb_set_keyboard_callback((struct mfb_window *)window_data, keyboard_default);
@@ -296,17 +348,32 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width,
   g_window = window_data;
 
   init_mouse(window_data);
-  init_keyboard(specific);
+  init_keyboard();
 
-  return (struct mfb_window *)window_data;
+  mfb_log(MFB_LOG_DEBUG,
+          "DOS window created (%ux%u, actual %ux%u, bpp=%u, pitch=%u)", width,
+          height, actual_width, actual_height, actual_bpp, bytes_per_scanline);
+
+  return (struct mfb_window *) window_data;
 }
 
-bool mfb_set_viewport(struct mfb_window *window, unsigned offset_x,
-                      unsigned offset_y, unsigned width, unsigned height) {
+//-------------------------------------
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+  (void)window;
+  (void)offset_x;
+  (void)offset_y;
+  (void)width;
+  (void)height;
+
+  mfb_log(MFB_LOG_WARNING, "mfb_set_viewport is not supported on DOS backend");
+
   return false;
 }
 
-static void update_mouse(SWindowData *window_data) {
+//-------------------------------------
+static void
+update_mouse(SWindowData *window_data) {
   __dpmi_regs regs;
   regs.x.ax = 0x3;
   __dpmi_int(0x33, &regs);
@@ -322,21 +389,20 @@ static void update_mouse(SWindowData *window_data) {
   window_data->mouse_pos_y = regs.x.dx;
 
   if (old_left_pressed != left_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_LEFT, 0,
-                                left_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_LEFT,  0, left_pressed);
 
   if (old_right_pressed != right_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_RIGHT,
-                                0, right_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_RIGHT, 0, right_pressed);
 
-  if ((old_x != regs.x.cx || old_y != regs.x.dx) &&
-      window_data->mouse_move_func)
-    window_data->mouse_move_func((struct mfb_window *)window_data, regs.x.cx,
-                                 regs.x.dx);
+  if ((old_x != regs.x.cx || old_y != regs.x.dx) && window_data->mouse_move_func)
+    window_data->mouse_move_func((struct mfb_window *)window_data, regs.x.cx, regs.x.dx);
 }
 
-static void update_keyboard(SWindowData *window_data) {
+//-------------------------------------
+static void
+update_keyboard(SWindowData *window_data) {
   uint8_t raw_scancode;
+
   while (ring_buffer_pop(&g_keyboard.buffer, &raw_scancode)) {
     if (raw_scancode == 0xe0 || raw_scancode == 0xe1 || raw_scancode == 0xe2) {
       g_keyboard.last_scancode_was_extended = raw_scancode + 1 - 0xe0;
@@ -348,7 +414,28 @@ static void update_keyboard(SWindowData *window_data) {
       continue;
 
     bool pressed = raw_scancode & 0x80 ? false : true;
-    uint32_t mfb_key = scancode_to_mfb_key[scancode];
+    uint32_t key_code = scancode_to_mfb_key[scancode];
+    bool is_extended = g_keyboard.last_scancode_was_extended;
+
+    // Some DOS mouse drivers emulate wheel by injecting extended Up/Down keys.
+    // Translate those to mouse wheel callbacks to avoid spurious keyboard events.
+    if (is_extended && (key_code == KB_KEY_UP || key_code == KB_KEY_DOWN)) {
+      if (pressed) {
+        float delta_y = (key_code == KB_KEY_UP) ? 1.0f : -1.0f;
+        window_data->mouse_wheel_x = 0.0f;
+        window_data->mouse_wheel_y = delta_y;
+        if (window_data->mouse_wheel_func) {
+          window_data->mouse_wheel_func((struct mfb_window *) window_data,
+                                        (mfb_key_mod) window_data->mod_keys,
+                                        0.0f,
+                                        delta_y
+          );
+        }
+      }
+      g_keyboard.last_scancode_was_extended = false;
+      continue;
+    }
+
     char ascii = 0;
     if (scancode < sizeof(scancode_to_ascii) / sizeof(char)) {
       if ((window_data->mod_keys & KB_MOD_SHIFT) ||
@@ -360,30 +447,33 @@ static void update_keyboard(SWindowData *window_data) {
       }
     }
 
-    // printf("scancode %i, mfb key: %s, ascii: %c, pressed: %i\n", scancode,
-    //       mfb_get_key_name(mfb_key), ascii, pressed);
+    //mfb_log(MFB_LOG_TRACE, "scancode=%u key=%s ascii=%u pressed=%u",
+    //        (unsigned)scancode, mfb_get_key_name((mfb_key) key_code),
+    //        (unsigned)(uint8_t)ascii, (unsigned)pressed);
 
-    window_data->key_status[mfb_key] = pressed;
-    if (mfb_key == KB_KEY_LEFT_SHIFT || mfb_key == KB_KEY_RIGHT_SHIFT) {
+    window_data->key_status[key_code] = pressed;
+    if (key_code == KB_KEY_LEFT_SHIFT || key_code == KB_KEY_RIGHT_SHIFT) {
       if (pressed)
         window_data->mod_keys |= KB_MOD_SHIFT;
       else
         window_data->mod_keys &= ~KB_MOD_SHIFT;
     }
-    if (mfb_key == KB_KEY_LEFT_ALT || mfb_key == KB_KEY_RIGHT_ALT) {
+
+    if (key_code == KB_KEY_LEFT_ALT || key_code == KB_KEY_RIGHT_ALT) {
       if (pressed)
         window_data->mod_keys |= KB_MOD_ALT;
       else
         window_data->mod_keys &= ~KB_MOD_ALT;
     }
-    if (mfb_key == KB_KEY_LEFT_CONTROL || mfb_key == KB_KEY_RIGHT_CONTROL) {
+
+    if (key_code == KB_KEY_LEFT_CONTROL || key_code == KB_KEY_RIGHT_CONTROL) {
       if (pressed)
         window_data->mod_keys |= KB_MOD_CONTROL;
       else
         window_data->mod_keys &= ~KB_MOD_CONTROL;
     }
 
-    if (mfb_key == KB_KEY_CAPS_LOCK && !pressed) {
+    if (key_code == KB_KEY_CAPS_LOCK && !pressed) {
       g_keyboard.caps_lock = !g_keyboard.caps_lock;
       if (g_keyboard.caps_lock)
         window_data->mod_keys |= KB_MOD_CAPS_LOCK;
@@ -392,10 +482,12 @@ static void update_keyboard(SWindowData *window_data) {
     }
 
     if (window_data->keyboard_func)
-      window_data->keyboard_func((struct mfb_window *)window_data, mfb_key,
-                                 window_data->mod_keys, pressed);
+      window_data->keyboard_func((struct mfb_window *)window_data,
+                                 key_code,
+                                 window_data->mod_keys,
+                                 pressed);
 
-    if (window_data->char_input_func && !pressed && ascii != 0)
+    if (window_data->char_input_func && pressed && ascii != 0)
       window_data->char_input_func((struct mfb_window *)window_data, ascii);
 
     // FIXME we currently ignore extended keys
@@ -403,9 +495,14 @@ static void update_keyboard(SWindowData *window_data) {
   }
 }
 
-mfb_update_state mfb_update_events(struct mfb_window *window) {
-  if (!window)
+//-------------------------------------
+mfb_update_state
+mfb_update_events(struct mfb_window *window) {
+  if (!window) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
     return STATE_INVALID_WINDOW;
+  }
+
   SWindowData *window_data = (SWindowData *)window;
   mfb_update_state state = check_window_closed(window_data);
   if (state)
@@ -417,49 +514,69 @@ mfb_update_state mfb_update_events(struct mfb_window *window) {
   return STATE_OK;
 }
 
-static void convert_to_24_bpp(uint32_t *source, uint32_t width,
-                              uint32_t height) {}
+//-------------------------------------
+static void
+convert_to_24_bpp(uint32_t *source, uint32_t width, uint32_t height) {}
 
-mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
-                               unsigned width, unsigned height) {
-  if (!window)
+//-------------------------------------
+mfb_update_state
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+  if (!window) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
     return STATE_INVALID_WINDOW;
+  }
+
+  if (!buffer) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
+    return STATE_INVALID_BUFFER;
+  }
 
   SWindowData *window_data = (SWindowData *)window;
   mfb_update_state state = check_window_closed(window_data);
   if (state)
     return state;
 
-  mfb_update_events(window);
+  state = mfb_update_events(window);
+  if (state)
+    return state;
 
   SWindowData_DOS *dos_window_data = window_data->specific;
+  if (!dos_window_data) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
+    return STATE_INVALID_WINDOW;
+  }
 
-  uint32_t *scale_buffer = dos_window_data->scale_buffer;
-  uint8_t *scanline_buffer = dos_window_data->scanline_buffer;
-  uint32_t a_width = dos_window_data->actual_width;
-  uint32_t a_height = dos_window_data->actual_height;
-  uint32_t a_bpp = dos_window_data->actual_bpp;
+  uint32_t *scale_buffer        = dos_window_data->scale_buffer;
+  uint8_t  *scanline_buffer     = dos_window_data->scanline_buffer;
+  uint32_t a_width              = dos_window_data->actual_width;
+  uint32_t a_height             = dos_window_data->actual_height;
+  uint32_t a_bpp                = dos_window_data->actual_bpp;
   uint32_t a_bytes_per_scanline = dos_window_data->bytes_per_scanline;
 
   // Exact match, copy directly. Unlikely to happen on a real device.
   // Happens in DOSBox.
   if (a_width == width && a_height == height && a_bpp == 32 &&
       a_bytes_per_scanline == a_width * sizeof(uint32_t)) {
-    movedata(_my_ds(), (unsigned int)buffer, vesa_get_frame_buffer_selector(),
-             0, height * a_bytes_per_scanline);
+    movedata(_my_ds(),
+             (unsigned int)buffer,
+             vesa_get_frame_buffer_selector(),
+             0,
+             height * a_bytes_per_scanline
+    );
+
     return STATE_OK;
   }
 
   // Else we need to transfer to scale, convert to 24-bit, pad the scanlines,
   // or all of the above...
   uint8_t *frame = NULL;
-  if (a_width != width) {
-    stretch_image(buffer, 0, 0, width, height, width, scale_buffer, 0, 0,
-                  a_width, a_height, a_width);
-    frame = (uint8_t *)scale_buffer;
+  if (a_width != width || a_height != height) {
+    stretch_image(buffer,       0, 0, width,   height,   width,
+                  scale_buffer, 0, 0, a_width, a_height, a_width);
+    frame = (uint8_t *) scale_buffer;
   }
   else {
-    frame = (uint8_t *)buffer;
+    frame = (uint8_t *) buffer;
   }
 
   if (a_bpp == 24) {
@@ -477,65 +594,90 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer,
       dest += dest_skip;
     }
 
-    movedata(_my_ds(), (unsigned int)scanline_buffer,
-             vesa_get_frame_buffer_selector(), 0,
-             a_height * a_bytes_per_scanline);
+    movedata(_my_ds(),
+             (unsigned int)scanline_buffer,
+             vesa_get_frame_buffer_selector(),
+             0,
+             a_height * a_bytes_per_scanline
+    );
   }
+
   else {
     if (a_bytes_per_scanline != a_width * 4) {
       // bpp matched, but pitch didn't. very unlikely to happen...
       uint8_t *source = (uint8_t *)frame;
       uint8_t *dest = (uint8_t *)scanline_buffer;
-      uint32_t source_pitch = width << 2;
-      for (uint32_t y = 0; y < a_height;
-           y++, dest += a_bytes_per_scanline, source += source_pitch) {
+      uint32_t source_pitch = a_width << 2;
+      for (uint32_t y = 0; y < a_height; y++, dest += a_bytes_per_scanline, source += source_pitch) {
         memcpy(dest, source, source_pitch);
       }
-      movedata(_my_ds(), (unsigned int)scanline_buffer,
-               vesa_get_frame_buffer_selector(), 0,
-               a_height * a_bytes_per_scanline);
+
+      movedata(_my_ds(),
+               (unsigned int)scanline_buffer,
+               vesa_get_frame_buffer_selector(),
+               0,
+               a_height * a_bytes_per_scanline
+      );
     }
     else {
       // Only stretched
-      movedata(_my_ds(), (unsigned int)frame, vesa_get_frame_buffer_selector(),
-               0, a_height * a_width * sizeof(uint32_t));
+      movedata(_my_ds(),
+               (unsigned int)frame,
+               vesa_get_frame_buffer_selector(),
+               0,
+               a_height * a_width * sizeof(uint32_t)
+      );
     }
   }
+
   return STATE_OK;
 }
 
-bool mfb_wait_sync(struct mfb_window *window) {
-  if (!window)
-    return STATE_INVALID_WINDOW;
+//-------------------------------------
+bool
+mfb_wait_sync(struct mfb_window *window) {
+  if (!window) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
+    return false;
+  }
 
   SWindowData *window_data = (SWindowData *)window;
   mfb_update_state state = check_window_closed(window_data);
-  if (state)
-    return state;
 
-  return true;
+  return (state == STATE_OK);
 }
 
-void mfb_get_monitor_scale(struct mfb_window *window, float *scale_x,
-                           float *scale_y) {
+//-------------------------------------
+void
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
   if (!window)
     return;
+
   if (scale_x)
     *scale_x = 1.0f;
+
   if (scale_y)
     *scale_y = 1.0f;
 }
 
+//-------------------------------------
 extern double g_timer_frequency;
 extern double g_timer_resolution;
 
-void mfb_timer_init(void) {
+//-------------------------------------
+void
+mfb_timer_init(void) {
   g_timer_frequency = UCLOCKS_PER_SEC;
   g_timer_resolution = 1.0 / g_timer_frequency;
 }
 
-uint64_t mfb_timer_tick(void) { return uclock(); }
+//-------------------------------------
+uint64_t
+mfb_timer_tick(void) {
+  return uclock();
+}
 
+//-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     // window_data->is_cursor_visible is always false on dos
