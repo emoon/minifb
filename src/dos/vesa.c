@@ -8,6 +8,9 @@
 #include <sys/nearptr.h>
 
 //-------------------------------------
+#define MAX_NUM_VESA_MODES 256
+
+//-------------------------------------
 int vesa_mode = 0;
 
 __dpmi_meminfo vesa_frame_buffer_mapping;
@@ -127,7 +130,7 @@ set_vesa_mode(int mode_number) {
 }
 
 //-------------------------------------
-void
+static void
 set_vga_mode(int mode) {
   __dpmi_regs regs;
   regs.x.ax = mode;
@@ -136,9 +139,9 @@ set_vga_mode(int mode) {
 
 //-------------------------------------
 bool
-vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
-               uint32_t *actual_height, uint32_t *actual_bpp,
-               uint32_t *bytes_per_scanline) {
+vesa_init(uint32_t width, uint32_t height,
+          uint32_t *actual_width, uint32_t *actual_height,
+          uint32_t *actual_bpp, uint32_t *bytes_per_scanline) {
   if (vesa_mode != 0) {
     vesa_dispose();
   }
@@ -147,14 +150,16 @@ vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
   if (!get_info(&vesa_info))
     return false;
 
-  #define MAX_NUM_VESA_MODES 256
-
   int mode_list[MAX_NUM_VESA_MODES];
   int number_of_modes = 0;
   unsigned long mode_ptr = ((vesa_info.video_mode_ptr & 0xFFFF0000) >> 12) +
                             (vesa_info.video_mode_ptr & 0xFFFF);
 
-  while (_farpeekw(_dos_ds, mode_ptr) != 0xFFFF) {
+  while (true) {
+    int mode = (int)_farpeekw(_dos_ds, mode_ptr);
+    if (mode == 0xFFFF)
+      break;
+
     if (number_of_modes >= MAX_NUM_VESA_MODES) {
       mfb_log(MFB_LOG_WARNING,
               "VESA mode list truncated at %d entries. Additional modes exist "
@@ -162,8 +167,7 @@ vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
               number_of_modes);
       break;
     }
-    mode_list[number_of_modes] = _farpeekw(_dos_ds, mode_ptr);
-    number_of_modes++;
+    mode_list[number_of_modes++] = mode;
     mode_ptr += 2;
   }
 
@@ -221,7 +225,7 @@ vesa_init(uint32_t width, uint32_t height, uint32_t *actual_width,
           (unsigned)found_mode_info.bytes_per_scanline);
 
   vesa_frame_buffer_mapping.address = found_mode_info.physical_base_ptr;
-  vesa_frame_buffer_mapping.size = vesa_info.total_memory << 16;
+  vesa_frame_buffer_mapping.size = (uint32_t)vesa_info.total_memory << 16;
   if (__dpmi_physical_address_mapping(&vesa_frame_buffer_mapping) != 0) {
     mfb_log(MFB_LOG_ERROR, "Couldn't create VESA frame buffer address mapping");
     return false;
@@ -266,6 +270,7 @@ vesa_dispose() {
     return;
   __dpmi_free_physical_address_mapping(&vesa_frame_buffer_mapping);
   __dpmi_free_ldt_descriptor(vesa_frame_buffer_selector);
+  vesa_frame_buffer_selector = -1;
   vesa_mode = 0;
   set_vga_mode(0x3);
 }

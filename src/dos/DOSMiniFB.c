@@ -22,7 +22,7 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
               uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
 
 //-------------------------------------
-static uint32_t scancode_to_mfb_key[] = {
+static const uint32_t scancode_to_mfb_key[] = {
     KB_KEY_UNKNOWN,
     KB_KEY_ESCAPE,
     KB_KEY_1,
@@ -78,7 +78,7 @@ static uint32_t scancode_to_mfb_key[] = {
     KB_KEY_PERIOD,
     KB_KEY_SLASH,
     KB_KEY_RIGHT_SHIFT,
-    KB_KEY_PRINT_SCREEN,
+    KB_KEY_KP_MULTIPLY,   // 0x37 (numpad *); real Print Screen sends E0+0x37
     KB_KEY_LEFT_ALT,
     KB_KEY_SPACE,
     KB_KEY_CAPS_LOCK,
@@ -97,9 +97,9 @@ static uint32_t scancode_to_mfb_key[] = {
     KB_KEY_HOME,
     KB_KEY_UP,
     KB_KEY_PAGE_UP,
-    KB_KEY_MINUS, // ??
+    KB_KEY_KP_SUBTRACT,   // 0x4A (numpad -)
     KB_KEY_LEFT,
-    KB_KEY_UNKNOWN, // CENTER??
+    KB_KEY_KP_5,          // 0x4C (numpad 5, center)
     KB_KEY_RIGHT,
     KB_KEY_KP_ADD,
     KB_KEY_END,
@@ -107,14 +107,15 @@ static uint32_t scancode_to_mfb_key[] = {
     KB_KEY_PAGE_DOWN,
     KB_KEY_INSERT,
     KB_KEY_DELETE,
-    KB_KEY_KP_DIVIDE,
-    KB_KEY_KP_ENTER,
-    KB_KEY_F11,
-    KB_KEY_F12,
+    KB_KEY_UNKNOWN,       // 0x54 (SysRq / Alt+PrScr)
+    KB_KEY_UNKNOWN,       // 0x55 (undefined)
+    KB_KEY_UNKNOWN,       // 0x56 (ISO extra key between LShift and Z)
+    KB_KEY_F11,           // 0x57
+    KB_KEY_F12,           // 0x58
 };
 
 //-------------------------------------
-char scancode_to_ascii[] = {
+static const char scancode_to_ascii[] = {
     0,   0,   '1', '2', '3', '4', '5', '6', '7', '8', '9',  '0', '-', '=',  0,
     0,   'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',  '[', ']', 0,    0,
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0,   '\\', 'z',
@@ -122,7 +123,7 @@ char scancode_to_ascii[] = {
 };
 
 //-------------------------------------
-char scancode_to_ascii_shift[] = {
+static const char scancode_to_ascii_shift[] = {
     0,   0,   '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0,
     0,   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 0,   0,
     'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0,   '|', 'Z',
@@ -140,7 +141,7 @@ typedef struct ring_buffer {
 } ring_buffer;
 
 //-------------------------------------
-bool
+static bool
 ring_buffer_push(ring_buffer *buffer, uint8_t value) {
   uint32_t next = buffer->write_index + 1;
   if (next >= RING_BUFFER_SIZE)
@@ -156,7 +157,7 @@ ring_buffer_push(ring_buffer *buffer, uint8_t value) {
 }
 
 //-------------------------------------
-bool
+static bool
 ring_buffer_pop(ring_buffer *buffer, uint8_t *value) {
   if (buffer->write_index == buffer->read_index)
     return false;
@@ -177,7 +178,7 @@ typedef struct keyboard_state {
   ring_buffer buffer;
   _go32_dpmi_seginfo old_keyboard_handler;
   _go32_dpmi_seginfo new_keyboard_handler;
-  bool last_scancode_was_extended;
+  uint8_t last_scancode_was_extended; // 0=no, 1=E0, 2=E1, 3=E2
   bool caps_lock;
 } keyboard_state;
 
@@ -193,6 +194,7 @@ typedef struct SWindowData_DOS {
 
 //-------------------------------------
 static SWindowData *g_window = NULL;
+static bool g_mouse_present = false;
 
 //-------------------------------------
 __attribute__((destructor))
@@ -210,6 +212,16 @@ tear_down() {
 static void
 init_mouse(SWindowData *window_data) {
   __dpmi_regs regs;
+
+  // AX=0: reset driver and check presence; returns AX=0xFFFF if driver present
+  regs.x.ax = 0;
+  __dpmi_int(0x33, &regs);
+  if (regs.x.ax == 0) {
+    mfb_log(MFB_LOG_WARNING, "No mouse driver detected, mouse support disabled");
+    return;
+  }
+  g_mouse_present = true;
+
   regs.x.ax = 7;
   regs.x.cx = 0;
   regs.x.dx = window_data->window_width - 1;
@@ -300,6 +312,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   window_data = malloc(sizeof(SWindowData));
   if (window_data == NULL) {
     mfb_log(MFB_LOG_ERROR, "Cannot allocate window data");
+    vesa_dispose();
     return NULL;
   }
   memset(window_data, 0, sizeof(SWindowData));
@@ -317,6 +330,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   if (!specific) {
     mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS window data");
     free(window_data);
+    vesa_dispose();
     return NULL;
   }
   specific->actual_width = actual_width;
@@ -333,6 +347,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
     free(specific);
     free(window_data);
+    vesa_dispose();
     return NULL;
   }
 
@@ -341,6 +356,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     free(specific->scale_buffer);
     free(specific);
     free(window_data);
+    vesa_dispose();
     return NULL;
   }
 
@@ -356,6 +372,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   init_mouse(window_data);
   init_keyboard();
+
+  // Sync Caps Lock initial state from BIOS (INT 16h AH=02h: read shift flags, bit 6 = Caps Lock)
+  {
+    __dpmi_regs regs;
+    regs.x.ax = 0x0200;
+    __dpmi_int(0x16, &regs);
+    if (regs.h.al & 0x40) {
+      g_keyboard.caps_lock = true;
+      window_data->mod_keys |= KB_MOD_CAPS_LOCK;
+    }
+  }
 
   mfb_log(MFB_LOG_DEBUG,
           "DOS window created (%ux%u, actual %ux%u, bpp=%u, pitch=%u)", width,
@@ -399,25 +426,36 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 static void
 update_mouse(SWindowData *window_data) {
+  if (!g_mouse_present)
+    return;
+
   __dpmi_regs regs;
   regs.x.ax = 0x3;
   __dpmi_int(0x33, &regs);
   int32_t old_x = window_data->mouse_pos_x;
   int32_t old_y = window_data->mouse_pos_y;
-  uint8_t old_left_pressed = window_data->mouse_button_status[MOUSE_LEFT];
-  uint8_t old_right_pressed = window_data->mouse_button_status[MOUSE_RIGHT];
-  uint8_t left_pressed = regs.x.bx & 1;
-  uint8_t right_pressed = regs.x.bx & 2;
-  window_data->mouse_button_status[MOUSE_LEFT] = left_pressed;
-  window_data->mouse_button_status[MOUSE_RIGHT] = right_pressed;
+  uint8_t old_left_pressed   = window_data->mouse_button_status[MOUSE_LEFT];
+  uint8_t old_right_pressed  = window_data->mouse_button_status[MOUSE_RIGHT];
+  uint8_t old_middle_pressed = window_data->mouse_button_status[MOUSE_MIDDLE];
+  uint8_t left_pressed   = (regs.x.bx >> 0) & 1;
+  uint8_t right_pressed  = (regs.x.bx >> 1) & 1;
+  uint8_t middle_pressed = (regs.x.bx >> 2) & 1;
+  window_data->mouse_button_status[MOUSE_LEFT]   = left_pressed;
+  window_data->mouse_button_status[MOUSE_RIGHT]  = right_pressed;
+  window_data->mouse_button_status[MOUSE_MIDDLE] = middle_pressed;
   window_data->mouse_pos_x = regs.x.cx;
   window_data->mouse_pos_y = regs.x.dx;
 
+  mfb_key_mod mod = (mfb_key_mod)window_data->mod_keys;
+
   if (old_left_pressed != left_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_LEFT,  0, left_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_LEFT,   mod, left_pressed);
 
   if (old_right_pressed != right_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_RIGHT, 0, right_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_RIGHT,  mod, right_pressed);
+
+  if (old_middle_pressed != middle_pressed && window_data->mouse_btn_func)
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_MIDDLE, mod, middle_pressed);
 
   if ((old_x != regs.x.cx || old_y != regs.x.dx) && window_data->mouse_move_func)
     window_data->mouse_move_func((struct mfb_window *)window_data, regs.x.cx, regs.x.dx);
@@ -435,12 +473,12 @@ update_keyboard(SWindowData *window_data) {
     }
 
     uint8_t scancode = raw_scancode & 0x7f;
-    if (scancode >= sizeof(scancode_to_mfb_key) / sizeof(uint32_t))
+    if (scancode >= sizeof(scancode_to_mfb_key) / sizeof(scancode_to_mfb_key[0]))
       continue;
 
-    bool pressed = raw_scancode & 0x80 ? false : true;
+    bool pressed = !(raw_scancode & 0x80);
     uint32_t key_code = scancode_to_mfb_key[scancode];
-    bool is_extended = g_keyboard.last_scancode_was_extended;
+    bool is_extended = g_keyboard.last_scancode_was_extended != 0;
 
     // Some DOS mouse drivers emulate wheel by injecting extended Up/Down keys.
     // Translate those to mouse wheel callbacks to avoid spurious keyboard events.
@@ -457,26 +495,30 @@ update_keyboard(SWindowData *window_data) {
           );
         }
       }
-      g_keyboard.last_scancode_was_extended = false;
+      g_keyboard.last_scancode_was_extended = 0;
       continue;
     }
 
     char ascii = 0;
-    if (scancode < sizeof(scancode_to_ascii) / sizeof(char)) {
-      if ((window_data->mod_keys & KB_MOD_SHIFT) ||
-          (window_data->mod_keys & KB_MOD_CAPS_LOCK)) {
-        ascii = scancode_to_ascii_shift[scancode];
-      }
-      else {
-        ascii = scancode_to_ascii[scancode];
-      }
+    if (scancode < sizeof(scancode_to_ascii)) {
+      char base_ascii = scancode_to_ascii[scancode];
+      bool is_letter  = (base_ascii >= 'a' && base_ascii <= 'z');
+      // Caps Lock toggles shift only for letter keys; Shift always applies to all keys
+      bool use_shift  = (window_data->mod_keys & KB_MOD_SHIFT) != 0;
+      if ((window_data->mod_keys & KB_MOD_CAPS_LOCK) && is_letter)
+        use_shift = !use_shift;
+      ascii = use_shift ? scancode_to_ascii_shift[scancode] : base_ascii;
     }
 
     //mfb_log(MFB_LOG_TRACE, "scancode=%u key=%s ascii=%u pressed=%u",
     //        (unsigned)scancode, mfb_get_key_name((mfb_key) key_code),
     //        (unsigned)(uint8_t)ascii, (unsigned)pressed);
 
-    window_data->key_status[key_code] = pressed;
+    // KB_KEY_UNKNOWN == -1 -> as uint32_t it becomes 0xFFFFFFFF, which would
+    // overflow key_status[MFB_MAX_KEYS]. Guard the write with a bounds check.
+    if (key_code < MFB_MAX_KEYS)
+      window_data->key_status[key_code] = pressed;
+
     if (key_code == KB_KEY_LEFT_SHIFT || key_code == KB_KEY_RIGHT_SHIFT) {
       if (pressed)
         window_data->mod_keys |= KB_MOD_SHIFT;
@@ -516,7 +558,7 @@ update_keyboard(SWindowData *window_data) {
       window_data->char_input_func((struct mfb_window *)window_data, ascii);
 
     // FIXME we currently ignore extended keys
-    g_keyboard.last_scancode_was_extended = false;
+    g_keyboard.last_scancode_was_extended = 0;
   }
 }
 
@@ -557,11 +599,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   }
 
   SWindowData *window_data = (SWindowData *)window;
-  mfb_update_state state = check_window_closed(window_data);
-  if (state)
-    return state;
-
-  state = mfb_update_events(window);
+  mfb_update_state state = mfb_update_events(window);
   if (state)
     return state;
 
@@ -741,5 +779,7 @@ mfb_timer_tick(void) {
 //-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
-    // window_data->is_cursor_visible is always false on dos
+    (void)window;
+    (void)show;
+    // Hardware cursor not supported in VESA mode; is_cursor_visible is always false
 }

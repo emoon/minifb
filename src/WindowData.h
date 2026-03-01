@@ -5,6 +5,11 @@
 #include <MiniFB_enums.h>
 
 //-------------------------------------
+#define MFB_MAX_KEYS                512
+#define MFB_MAX_MOUSE_BUTTONS         8
+#define MFB_MAX_MOUSE_BUTTONS_MASK  (MFB_MAX_MOUSE_BUTTONS - 1)
+
+//-------------------------------------
 typedef struct {
     void                    *specific;
     void                    *user_data;
@@ -39,8 +44,8 @@ typedef struct {
     int32_t                 mouse_pos_y;
     float                   mouse_wheel_x;
     float                   mouse_wheel_y;
-    uint8_t                 mouse_button_status[8];
-    uint8_t                 key_status[512];
+    uint8_t                 mouse_button_status[MFB_MAX_MOUSE_BUTTONS];
+    uint8_t                 key_status[MFB_MAX_KEYS];
     uint32_t                mod_keys;
 
     bool                    is_cursor_visible;
