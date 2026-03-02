@@ -5,7 +5,7 @@
 # 2. Place this file into the root folder of DJGPP
 # 3. When configuring your CMake project, specify the toolchain file like this:
 #
-#   cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/djgpp/toolchain-djgpp.cmake -B build
+#   cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/djgpp/toolchain-djgpp.cmake -B build-dos
 #
 set (CMAKE_SYSTEM_NAME linux-djgpp)
 

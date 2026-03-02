@@ -30,7 +30,7 @@ cmake-build-release-emscripten
 .cache
 tests/.DS_Store
 **/.DS_Store
-tests/dos/tools/djgpp
-tests/dos/tools/dosbox-x
-tests/dos/tools/gdb
+tools/dos/djgpp
+tools/dos/dosbox-x
+tools/dos/gdb
 *.bak

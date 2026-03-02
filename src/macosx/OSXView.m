@@ -422,7 +422,7 @@ static const NSRange g_empty_range = { NSNotFound, 0 };
     return g_empty_range;
 }
 
-// Replaces a specified range in the receiver’s text storage with the given string and sets the selection.
+// Replaces a specified range in the receiver's text storage with the given string and sets the selection.
 //-------------------------------------
 - (void)setMarkedText:(nonnull id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
     kUnused(string);

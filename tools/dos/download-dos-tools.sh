@@ -18,19 +18,19 @@ os=$OSTYPE
 if [[ "$os" == "cygwin" ]] || [[ "$os" == "msys" ]]; then
 
     gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-windows.zip";
-    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-mingw-gcc1210-standalone.zip";
+    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.4/djgpp-mingw-gcc1220-standalone.zip";
     dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-mingw-win64-20221223232734.zip";
 
 elif [[ "$os" == "linux-gnu"* ]]; then
 
     gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-linux.zip";
-    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-linux64-gcc1210.tar.bz2";
+    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.4/djgpp-linux64-gcc1220.tar.bz2";
     dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-0.84.5-linux.zip";
 
 elif [[ "$os" == "darwin"* ]]; then
 
     gdb_url="https://github.com/badlogic/gdb-7.1a-djgpp/releases/download/gdb-7.1a-djgpp/gdb-7.1a-djgpp-macos-x86_64.zip";
-    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.3/djgpp-osx-gcc1210.tar.bz2";
+    djgpp_url="https://github.com/andrewwutw/build-djgpp/releases/download/v3.4/djgpp-osx-gcc1220.tar.bz2";
     dosbox_url="https://github.com/badlogic/dosbox-x/releases/download/dosbox-x-gdb-v0.84.5/dosbox-x-macosx-x86_64-20221223232510.zip";
 
 else
@@ -49,13 +49,11 @@ curl -L $gdb_url --output gdb.zip &> /dev/null
 unzip -o gdb.zip > /dev/null
 rm gdb.zip > /dev/null
 popd &> /dev/null
-echo " [] Installed GDB"
+echo " [] Installed GDB at ${dir}/gdb"
 
 #--------------------------------------
 echo "Installing DJGPP"
 echo " $djgpp_url"
-echo " OS: $os"
-echo " uname: $(uname -r) "
 
 if [[ "$djgpp_url" == *.zip ]]; then
 
@@ -83,7 +81,7 @@ else
     exit 1
 
 fi
-echo " [] Installed DJGPP"
+echo " [] Installed DJGPP at ${dir}/djgpp"
 
 #--------------------------------------
 echo "Installing DOSBox-x"
@@ -91,16 +89,17 @@ echo " $dosbox_url"
 curl -L $dosbox_url --output dosbox.zip &> /dev/null
 unzip -o dosbox.zip &> /dev/null
 rm dosbox.zip
-echo " [] Installed DOSBox-x"
+echo " [] Installed DOSBox-x at ${dir}/dosbox-x"
 
 if [[ $1 = "--with-vs-code" ]]; then
     echo "Installing VS Code extensions"
     if [[ $(code --version) ]]; then
         code --install-extension llvm-vs-code-extensions.vscode-clangd --install-extension ms-vscode.cmake-tools --install-extension ms-vscode.cpptools --install-extension webfreak.debug
-        cp -r .vscode ../../../.vscode
+        mkdir -p ../../.vscode
+        cp -r .vscode/. ../../.vscode/
     else
         echo "WARNING: could not find 'code' on path. Could not install VS Code extensions!"
-        echo "         Ensure 'code' is on your PATH and re-run 'download-tools.sh' to install"
+        echo "         Ensure 'code' is on your PATH and re-run 'download-dos-tools.sh' to install"
         echo "         the VS Code extensions."
     fi
 fi

@@ -478,10 +478,10 @@ if (MINIFB_BUILD_EXAMPLES)
 
         if (DJGPP)
 
-            add_executable(dos
-                tests/dos/dos.c
+            add_executable(debug_dos
+                tests/dos/debug_dos.c
             )
-            list(APPEND MINIFB_TEST_TARGETS dos)
+            list(APPEND MINIFB_TEST_TARGETS debug_dos)
 
         endif()
 

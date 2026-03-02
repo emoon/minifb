@@ -39,8 +39,8 @@ jobs:
         - USE_WINDOWS=ON
 
 script:
-  - mkdir build
-  - cd build
+  - mkdir build-$TRAVIS_OS_NAME
+  - cd build-$TRAVIS_OS_NAME
   - echo off
   - echo "---------"
   - echo "Config..."

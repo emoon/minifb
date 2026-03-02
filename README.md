@@ -356,8 +356,8 @@ Equivalent packages for other distros:
 If you use **CMake**, just disable the flag:
 
 ```sh
-mkdir build
-cd build
+mkdir build-x11
+cd build-x11
 cmake .. -DMINIFB_USE_WAYLAND_API=OFF
 ```
 `USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
@@ -415,8 +415,8 @@ Different Linux distributions and versions may ship with different versions of W
 To regenerate Wayland protocol files for your system you must run first the protocol generation script:
 
 ```sh
-chmod +x ./scripts/generate-protocols.sh
-./scripts/generate-protocols.sh
+chmod +x ./tools/wayland/generate-protocols.sh
+./tools/wayland/generate-protocols.sh
 ```
 
 This script will generate protocol headers and code that are specifically compatible with your installed Wayland version, potentially resolving any version mismatch issues.
@@ -424,8 +424,8 @@ This script will generate protocol headers and code that are specifically compat
 If you use **CMake**, just enable the flag:
 
 ```sh
-mkdir build
-cd build
+mkdir build-wayland
+cd build-wayland
 cmake .. -DMINIFB_USE_WAYLAND_API=ON
 ```
 `USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
@@ -440,8 +440,8 @@ To enable it with CMake, use the `MINIFB_USE_METAL_API` option.
 If you use **CMake**, just enable the flag:
 
 ```sh
-mkdir build
-cd build
+mkdir build-macos-metal
+cd build-macos-metal
 cmake .. -DMINIFB_USE_METAL_API=ON
 ```
 `USE_METAL_API` is still accepted for compatibility, but deprecated.
@@ -449,8 +449,8 @@ cmake .. -DMINIFB_USE_METAL_API=ON
 Or, if you don't want to use the Metal API:
 
 ```sh
-mkdir build
-cd build
+mkdir build-macos-cocoa
+cd build-macos-cocoa
 cmake .. -DMINIFB_USE_METAL_API=OFF
 ```
 
@@ -461,8 +461,8 @@ On macOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But s
 In any case, if you want to get the default coordinate system you can use the CMake flag: `MINIFB_USE_INVERTED_Y_ON_MACOS=ON`
 
 ```sh
-mkdir build
-cd build
+mkdir build-macos-inverted-y
+cd build-macos-inverted-y
 cmake .. -DMINIFB_USE_INVERTED_Y_ON_MACOS=ON
 ```
 `USE_INVERTED_Y_ON_MACOS` is still accepted for compatibility, but deprecated.
@@ -539,8 +539,8 @@ All other MiniFB functions work normally, including timers and user data managem
 **CMake**:
 
 ```sh
-mkdir build
-cd build
+mkdir build-ios
+cd build-ios
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
 ```
 
@@ -663,18 +663,18 @@ Download and install [Emscripten](https://emscripten.org/). When configuring you
 #### Building and running the examples (WASM)
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build
-cmake --build build
+cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build-web
+cmake --build build-web
 ```
 
 > **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere in your path, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
 
-Then open the file `build/index.html` in your browser to view the example index.
+Then open the file `build-web/index.html` in your browser to view the example index.
 
 The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
 
 ```sh
-python3 -m http.server build/
+python3 -m http.server build-web/
 ```
 
 You can then open the index at [http://localhost:8000](http://localhost:8000) in your browser.
@@ -780,45 +780,45 @@ If not already set, the backend will also set a handful of CSS styles on the can
 - `border: none`
 - `outline-style: none`;
 
-### DOS (DJGPP)
+### MS-DOS (DJGPP)
 
-Use the `tests/dos/tools/download-dos-tools.sh` file to download all the tools needed to compile, run and debug MiniFB DOS applications. The Bash script will download the following tools:
+Use the `tools/dos/download-dos-tools.sh` file to download all the tools needed to compile, run and debug MiniFB DOS applications. The Bash script will download the following tools:
 
 - [DJGPP](https://www.delorie.com/djgpp/), a GCC fork targeting 32-bit protected mode DOS.
 - [GDB 7.1a](https://github.com/badlogic/gdb-7.1a), a GDB fork that can remotely debug 32-bit COFF executables via TCP, running in e.g. DOSBox-x, VirtualBox, or a real machine.
 - [DOSBox-x](https://github.com/badlogic/dosbox-x/), a fork of the popular DOS emulator with some modifications to enable remote debugging via GDB.
 
-The tools are downloaded to the `tests/dos/tools/` folder. The folder also contains a DOSBox-x configuration file `dosbox-x.conf` preconfigured for debugging. The `toolchain-djgpp.cmake` file is a CMake toolchain file for DJGPP.
+The tools are downloaded to the `tools/dos/` folder. The folder also contains a DOSBox-x configuration file `dosbox-x.conf` preconfigured for debugging. The `toolchain-djgpp.cmake` file is a CMake toolchain file for DJGPP.
 
 You can optionally run the script with the argument `--with-vs-code`. If you have [Visual Studio Code](https://code.visualstudio.com/) installed, the script will install extensions needed for C/C++ development and debugging, and create a `.vscode` folder in the repository root containing launch configurations, tasks, and various other settings for DOS development in VS Code.
 
 #### Building and running the examples (DOS)
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=./tests/dos/tools/toolchain-djgpp.cmake -S . -B dos
-cmake --build dos
+cmake -DCMAKE_TOOLCHAIN_FILE=./tools/dos/toolchain-djgpp.cmake -S . -B build-dos
+cmake --build build-dos
 ```
 
 > **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.
 
-This will generate DOS 32-bit `.exe` files in the `build/` folder which you can run with DOSBox-x like this:
+This will generate DOS 32-bit `.exe` files in the `build-dos/` folder which you can run with DOSBox-x like this:
 
 ```sh
-./tests/dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tests/dos/tools/dosbox-x.conf build/<executable-file>
+./tools/dos/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tools/dos/dosbox-x.conf build-dos/<executable-file>
 ```
 
 Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
 
-The `dos` example target (`tests/dos/dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
+The `dos` example target (`tests/dos/debug_dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
 
 #### Compiling your own MiniFB app for DOS
 
-Copy the folder `tests/dos/` from the MiniFB repository to your project and run the `dos/tools/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
+Copy the folder `tests/dos/` from the MiniFB repository to your project and run the `tools/dos/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
 
 Then, when configuring your CMake build, specify the DJGPP toolchain file:
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=./dos/tools/toolchain-djgpp.cmake ... rest of your configure parameters ...
+cmake -DCMAKE_TOOLCHAIN_FILE=./tools/dos/toolchain-djgpp.cmake ... rest of your configure parameters ...
 ```
 
 The build will then generate DOS 32-bit protected mode executables and use the MiniFB DOS backend. You can run the executables as is in DOSBox-x or FreeDOS, or a Windows version that can run DOS applications.
@@ -827,7 +827,7 @@ Running the executables in vanilla MS-DOS requires a DPMI server. Download [CWSD
 
 #### Debugging your MiniFB app in DOSBox-x
 
-The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`tests/dos/gdbstub.h`](tests/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `dos/tools/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
+The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`tests/dos/gdbstub.h`](tests/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `tools/dos/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
 
 ```c
 #define GDB_IMPLEMENTATION
@@ -850,7 +850,7 @@ Configure your CMake build with `-DCMAKE_BUILD_TYPE=Debug` to generate debug bin
 Run your application with the downloaded DOSBox-x:
 
 ```sh
-./dos/tools/dosbox-x/dosbox-x -fastlaunch -exit -conf ./dos/tools/dosbox-x.conf path/to/your/executable.exe
+./tools/dos/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tools/dos/dosbox-x.conf path/to/your/executable.exe
 ```
 
 DOSBox-x will start up, your application will wait for GDB to connect (`gdb_start()`).
@@ -858,7 +858,7 @@ DOSBox-x will start up, your application will wait for GDB to connect (`gdb_star
 Run GDB, load the debugging information from the executable and connect to your app running and waiting in DOSBox-x:
 
 ```sh
-./dos/tools/gdb/gdb
+./tools/dos/gdb/gdb
 (gdb) file path/to/your/executable.exe
 (gdb) target remote localhost:5123
 ```
@@ -867,9 +867,9 @@ GDB will show your app being halted on the `gdb_start()` line. You can now set b
 
 If your app is executing and you press `CTRL+C` to interrupt it, you will end up inside `gdb_checkpoint()`. You can then set breakpoints, or step out to inspect your program state.
 
-Alternatively, you can use VS Code to debug via a graphical user interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag. This will install C/C++/CMake VS Code extensions and copy the `dos/.vscode` to the project root folder. Open the project root folder in VS Code, select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html), select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant), and the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target), then run the `DOS debug target` launch configuration.
+Alternatively, you can use VS Code to debug via a graphical user interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag. This will install C/C++/CMake VS Code extensions and copy the `tools/dos/.vscode` folder to the project root. Open the project root folder in VS Code, select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html), select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant), and the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target), then run the `DOS debug target` launch configuration.
 
-You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/dos.c](tests/dos/dos.c) for usage of the GDB stub.
+You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/debug_dos.c](tests/dos/debug_dos.c) for usage of the GDB stub.
 
 ## Platform-Specific Limitations
 

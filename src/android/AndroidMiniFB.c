@@ -981,7 +981,7 @@ mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, in
     if (!insets_setup(window, &env, &insets, &attached)) goto done;
 
     {
-        // windowInsets.getDisplayCutout() — API 28+
+        // windowInsets.getDisplayCutout() - API 28+
         jclass    insets_class = (*env)->GetObjectClass(env, insets);
         jmethodID get_cutout   = (*env)->GetMethodID(env, insets_class, "getDisplayCutout", "()Landroid/view/DisplayCutout;");
         if (!get_cutout) {
@@ -996,7 +996,7 @@ mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, in
         }
 
         if (!display_cutout) {
-            // Device has no cutout — return true with zeros (valid answer).
+            // Device has no cutout - return true with zeros (valid answer).
             if (attached) {
                 SWindowData         *wd  = (SWindowData *) window;
                 SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
@@ -1066,7 +1066,7 @@ mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int 
         // Type constants (android.view.WindowInsets.Type, API 30+):
         //   statusBars()    = 1  (0x01)
         //   navigationBars()= 2  (0x02)
-        //   captionBar()    = 4  (0x04)   → systemBars() = 1|2|4 = 7
+        //   captionBar()    = 4  (0x04)   -> systemBars() = 1|2|4 = 7
         //   displayCutout() = 128 (0x80)
         //   combined        = 7 | 128     = 135 (0x87)
         // ----------------------------------------------------------------
