@@ -62,7 +62,7 @@ int
 main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window) {
         return -1;
     }
@@ -85,7 +85,7 @@ main() {
         }
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

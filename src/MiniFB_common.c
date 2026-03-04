@@ -22,7 +22,7 @@ mfb_open(const char *title, unsigned width, unsigned height) {
 mfb_update_state
 mfb_update(struct mfb_window *window, void *buffer) {
     if (window == NULL) {
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
@@ -143,7 +143,7 @@ void
 keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
     kUnused(is_pressed);
-    if (key == KB_KEY_ESCAPE) {
+    if (key == MFB_KB_KEY_ESCAPE) {
         SWindowData *window_data = (SWindowData *) window;
         if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
             window_data->close = true;
@@ -286,7 +286,7 @@ mfb_get_key_buffer(struct mfb_window *window)  {
 const char *
 mfb_get_key_name(mfb_key key) {
     switch (key) {
-        #define KEY_CASE(NAME, _, STR) case NAME: return STR;
+        #define KEY_CASE(NAME, _, STR) case MFB_##NAME: return STR;
         KEY_LIST(KEY_CASE)
         #undef KEY_CASE
     }

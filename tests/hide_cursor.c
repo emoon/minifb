@@ -23,13 +23,13 @@ resize(struct mfb_window *window, int width, int height) {
 
 void
 keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    if (key == KB_KEY_H) {
+    if (key == MFB_KB_KEY_H) {
         mfb_show_cursor(window, false);
     }
-    else if (key == KB_KEY_S) {
+    else if (key == MFB_KB_KEY_S) {
         mfb_show_cursor(window, true);
     }
-    else if (key == KB_KEY_ESCAPE) {
+    else if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
@@ -40,7 +40,7 @@ int
 main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("H to hide, S to show", g_width, g_height, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("H to hide, S to show", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window)
         return 0;
 
@@ -67,7 +67,7 @@ main() {
         }
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

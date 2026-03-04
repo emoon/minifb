@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <MiniFB_enums.h>
+#include <MiniFB_types.h>
 
 //-------------------------------------
 #define MFB_MAX_KEYS                512

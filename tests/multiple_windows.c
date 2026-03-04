@@ -47,7 +47,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
         window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
-    if (key == KB_KEY_ESCAPE) {
+    if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
@@ -99,7 +99,7 @@ int
 main() {
     int noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, WF_RESIZABLE);
+    struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, MFB_WF_RESIZABLE);
     if (!window_a) {
         return 0;
     }
@@ -116,7 +116,7 @@ main() {
     mfb_set_viewport(window_a, 25, 25, WIDTH_A-50, HEIGHT_A-50);
 
     //--
-    struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, WF_RESIZABLE);
+    struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, MFB_WF_RESIZABLE);
     if (!window_b) {
         return 0;
     }
@@ -172,7 +172,7 @@ main() {
 
             //--
             state_a = mfb_update(window_a, g_buffer_a);
-            if (state_a != STATE_OK) {
+            if (state_a != MFB_STATE_OK) {
                 window_a = NULL;
             }
         }
@@ -195,7 +195,7 @@ main() {
 
             //--
             state_b = mfb_update(window_b, g_buffer_b);
-            if (state_b != STATE_OK) {
+            if (state_b != MFB_STATE_OK) {
                 window_b = NULL;
             }
         }

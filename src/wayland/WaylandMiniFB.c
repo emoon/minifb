@@ -58,19 +58,19 @@ update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_
 
     window_data->mod_keys = 0;
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
-        window_data->mod_keys |= KB_MOD_SHIFT;
+        window_data->mod_keys |= MFB_KB_MOD_SHIFT;
     }
 
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
-        window_data->mod_keys |= KB_MOD_CONTROL;
+        window_data->mod_keys |= MFB_KB_MOD_CONTROL;
     }
 
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
-        window_data->mod_keys |= KB_MOD_ALT;
+        window_data->mod_keys |= MFB_KB_MOD_ALT;
     }
 
     if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
-        window_data->mod_keys |= KB_MOD_SUPER;
+        window_data->mod_keys |= MFB_KB_MOD_SUPER;
     }
 }
 
@@ -484,36 +484,36 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
         else {
             switch (key_code) {
-                case KB_KEY_LEFT_SHIFT:
-                case KB_KEY_RIGHT_SHIFT:
+                case MFB_KB_KEY_LEFT_SHIFT:
+                case MFB_KB_KEY_RIGHT_SHIFT:
                     if(is_pressed)
-                        window_data->mod_keys |= KB_MOD_SHIFT;
+                        window_data->mod_keys |= MFB_KB_MOD_SHIFT;
                     else
-                        window_data->mod_keys &= ~KB_MOD_SHIFT;
+                        window_data->mod_keys &= ~MFB_KB_MOD_SHIFT;
                     break;
 
-                case KB_KEY_LEFT_CONTROL:
-                case KB_KEY_RIGHT_CONTROL:
+                case MFB_KB_KEY_LEFT_CONTROL:
+                case MFB_KB_KEY_RIGHT_CONTROL:
                     if(is_pressed)
-                        window_data->mod_keys |= KB_MOD_CONTROL;
+                        window_data->mod_keys |= MFB_KB_MOD_CONTROL;
                     else
-                        window_data->mod_keys &= ~KB_MOD_CONTROL;
+                        window_data->mod_keys &= ~MFB_KB_MOD_CONTROL;
                     break;
 
-                case KB_KEY_LEFT_ALT:
-                case KB_KEY_RIGHT_ALT:
+                case MFB_KB_KEY_LEFT_ALT:
+                case MFB_KB_KEY_RIGHT_ALT:
                     if(is_pressed)
-                        window_data->mod_keys |= KB_MOD_ALT;
+                        window_data->mod_keys |= MFB_KB_MOD_ALT;
                     else
-                        window_data->mod_keys &= ~KB_MOD_ALT;
+                        window_data->mod_keys &= ~MFB_KB_MOD_ALT;
                     break;
 
-                case KB_KEY_LEFT_SUPER:
-                case KB_KEY_RIGHT_SUPER:
+                case MFB_KB_KEY_LEFT_SUPER:
+                case MFB_KB_KEY_RIGHT_SUPER:
                     if(is_pressed)
-                        window_data->mod_keys |= KB_MOD_SUPER;
+                        window_data->mod_keys |= MFB_KB_MOD_SUPER;
                     else
-                        window_data->mod_keys &= ~KB_MOD_SUPER;
+                        window_data->mod_keys &= ~MFB_KB_MOD_SUPER;
                     break;
             }
         }
@@ -1440,7 +1440,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             if (window_data_way->toplevel_decoration) {
                 zxdg_toplevel_decoration_v1_add_listener(window_data_way->toplevel_decoration,
                                                          &toplevel_decoration_listener, window_data);
-                if (flags & WF_BORDERLESS) {
+                if (flags & MFB_WF_BORDERLESS) {
                     zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
                                                          ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
                 }
@@ -1451,9 +1451,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             }
         }
 
-        window_data_way->request_fullscreen = (flags & WF_FULLSCREEN) ? 1 : 0;
+        window_data_way->request_fullscreen = (flags & MFB_WF_FULLSCREEN) ? 1 : 0;
         window_data_way->request_maximized =
-            (!window_data_way->request_fullscreen && (flags & WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+            (!window_data_way->request_fullscreen && (flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
         window_data_way->startup_state_applied = 0;
 
         if (window_data_way->request_fullscreen || window_data_way->request_maximized) {
@@ -1461,7 +1461,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
         }
         else {
-            if (flags & WF_RESIZABLE) {
+            if (flags & MFB_WF_RESIZABLE) {
                 xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
                 xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
             }
@@ -1471,8 +1471,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             }
         }
 
-        if (flags & WF_ALWAYS_ON_TOP) {
-            mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
+        if (flags & MFB_WF_ALWAYS_ON_TOP) {
+            mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: MFB_WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
         }
 
         xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
@@ -1543,36 +1543,36 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     if(window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     if(buffer == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null buffer.");
-        return STATE_INVALID_BUFFER;
+        return MFB_STATE_INVALID_BUFFER;
     }
 
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
-        return STATE_INVALID_BUFFER;
+        return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_ex.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_ex.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
@@ -1582,12 +1582,12 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         if ((size_t) width > SIZE_MAX / (size_t) height ||
             (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size overflows size_t.");
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
         size_t length = sizeof(uint32_t) * (size_t) width * (size_t) height;
         if (length > (size_t) INT_MAX) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size exceeds Wayland pool limits.");
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
         int length_i = (int) length;
 
@@ -1596,7 +1596,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             if (ftruncate(window_data_way->fd, (off_t) length) == -1)
             {
                 mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed while resizing shared memory buffer (%s).", strerror(errno));
-                return STATE_INTERNAL_ERROR;
+                return MFB_STATE_INTERNAL_ERROR;
             }
 
             uint32_t *old_shm_ptr = window_data_way->shm_ptr;
@@ -1605,7 +1605,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             if (new_shm_ptr == MAP_FAILED)
             {
                 mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed while resizing shared memory buffer (%s).", strerror(errno));
-                return STATE_INTERNAL_ERROR;
+                return MFB_STATE_INTERNAL_ERROR;
             }
             if (old_shm_ptr && old_shm_ptr != MAP_FAILED && old_shm_length > 0) {
                 munmap(old_shm_ptr, old_shm_length);
@@ -1626,7 +1626,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             window_data->buffer_width  = old_buffer_width;
             window_data->buffer_height = old_buffer_height;
             window_data->buffer_stride = old_buffer_stride;
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
         if (window_data->draw_buffer) {
             wl_buffer_destroy(window_data->draw_buffer);
@@ -1643,7 +1643,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     // update shm buffer
     if (window_data_way->shm_ptr == NULL || window_data_way->shm_ptr == MAP_FAILED) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: shared memory buffer is not mapped.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
     memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
@@ -1652,7 +1652,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     struct wl_callback *frame_callback = wl_surface_frame(window_data_way->surface);
     if (!frame_callback) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
     wl_callback_add_listener(frame_callback, &frame_listener, &done);
     wl_surface_commit(window_data_way->surface);
@@ -1663,7 +1663,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             if (!done) {
                 wl_callback_destroy(frame_callback);
             }
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
     }
 
@@ -1672,10 +1672,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             wl_callback_destroy(frame_callback);
         }
         destroy(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -1683,45 +1683,45 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     if(window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events called with a null window pointer.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
     if (window_data_way == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_events.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
     if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
     {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_events.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     // Process already queued events first.
     if (wl_display_dispatch_pending(window_data_way->display) == -1) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_update_events.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     // Non-blocking read/dispatch so mfb_update_events keeps X11-like behavior.
     while (wl_display_prepare_read(window_data_way->display) != 0) {
         if (wl_display_dispatch_pending(window_data_way->display) == -1) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed while preparing read in mfb_update_events.");
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
     }
 
     if (wl_display_flush(window_data_way->display) == -1 && errno != EAGAIN) {
         wl_display_cancel_read(window_data_way->display);
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_flush failed in mfb_update_events.");
-        return STATE_INTERNAL_ERROR;
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     struct pollfd pfd;
@@ -1737,28 +1737,28 @@ mfb_update_events(struct mfb_window *window) {
     if (rc > 0) {
         if (wl_display_read_events(window_data_way->display) == -1) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_read_events failed in mfb_update_events.");
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
         if (wl_display_dispatch_pending(window_data_way->display) == -1) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed after read in mfb_update_events.");
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
     }
     else {
         wl_display_cancel_read(window_data_way->display);
         if (rc < 0) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: poll failed in mfb_update_events (%s).", strerror(errno));
-            return STATE_INTERNAL_ERROR;
+            return MFB_STATE_INTERNAL_ERROR;
         }
     }
 
     if (window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events detected close request after event dispatch.");
         destroy(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -1939,123 +1939,123 @@ init_keycodes(void) {
     for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
         g_keycodes[i] = 0;
 
-    g_keycodes[KEY_GRAVE]      = KB_KEY_GRAVE_ACCENT;
-    g_keycodes[KEY_1]          = KB_KEY_1;
-    g_keycodes[KEY_2]          = KB_KEY_2;
-    g_keycodes[KEY_3]          = KB_KEY_3;
-    g_keycodes[KEY_4]          = KB_KEY_4;
-    g_keycodes[KEY_5]          = KB_KEY_5;
-    g_keycodes[KEY_6]          = KB_KEY_6;
-    g_keycodes[KEY_7]          = KB_KEY_7;
-    g_keycodes[KEY_8]          = KB_KEY_8;
-    g_keycodes[KEY_9]          = KB_KEY_9;
-    g_keycodes[KEY_0]          = KB_KEY_0;
-    g_keycodes[KEY_SPACE]      = KB_KEY_SPACE;
-    g_keycodes[KEY_MINUS]      = KB_KEY_MINUS;
-    g_keycodes[KEY_EQUAL]      = KB_KEY_EQUAL;
-    g_keycodes[KEY_Q]          = KB_KEY_Q;
-    g_keycodes[KEY_W]          = KB_KEY_W;
-    g_keycodes[KEY_E]          = KB_KEY_E;
-    g_keycodes[KEY_R]          = KB_KEY_R;
-    g_keycodes[KEY_T]          = KB_KEY_T;
-    g_keycodes[KEY_Y]          = KB_KEY_Y;
-    g_keycodes[KEY_U]          = KB_KEY_U;
-    g_keycodes[KEY_I]          = KB_KEY_I;
-    g_keycodes[KEY_O]          = KB_KEY_O;
-    g_keycodes[KEY_P]          = KB_KEY_P;
-    g_keycodes[KEY_LEFTBRACE]  = KB_KEY_LEFT_BRACKET;
-    g_keycodes[KEY_RIGHTBRACE] = KB_KEY_RIGHT_BRACKET;
-    g_keycodes[KEY_A]          = KB_KEY_A;
-    g_keycodes[KEY_S]          = KB_KEY_S;
-    g_keycodes[KEY_D]          = KB_KEY_D;
-    g_keycodes[KEY_F]          = KB_KEY_F;
-    g_keycodes[KEY_G]          = KB_KEY_G;
-    g_keycodes[KEY_H]          = KB_KEY_H;
-    g_keycodes[KEY_J]          = KB_KEY_J;
-    g_keycodes[KEY_K]          = KB_KEY_K;
-    g_keycodes[KEY_L]          = KB_KEY_L;
-    g_keycodes[KEY_SEMICOLON]  = KB_KEY_SEMICOLON;
-    g_keycodes[KEY_APOSTROPHE] = KB_KEY_APOSTROPHE;
-    g_keycodes[KEY_Z]          = KB_KEY_Z;
-    g_keycodes[KEY_X]          = KB_KEY_X;
-    g_keycodes[KEY_C]          = KB_KEY_C;
-    g_keycodes[KEY_V]          = KB_KEY_V;
-    g_keycodes[KEY_B]          = KB_KEY_B;
-    g_keycodes[KEY_N]          = KB_KEY_N;
-    g_keycodes[KEY_M]          = KB_KEY_M;
-    g_keycodes[KEY_COMMA]      = KB_KEY_COMMA;
-    g_keycodes[KEY_DOT]        = KB_KEY_PERIOD;
-    g_keycodes[KEY_SLASH]      = KB_KEY_SLASH;
-    g_keycodes[KEY_BACKSLASH]  = KB_KEY_BACKSLASH;
-    g_keycodes[KEY_ESC]        = KB_KEY_ESCAPE;
-    g_keycodes[KEY_TAB]        = KB_KEY_TAB;
-    g_keycodes[KEY_LEFTSHIFT]  = KB_KEY_LEFT_SHIFT;
-    g_keycodes[KEY_RIGHTSHIFT] = KB_KEY_RIGHT_SHIFT;
-    g_keycodes[KEY_LEFTCTRL]   = KB_KEY_LEFT_CONTROL;
-    g_keycodes[KEY_RIGHTCTRL]  = KB_KEY_RIGHT_CONTROL;
-    g_keycodes[KEY_LEFTALT]    = KB_KEY_LEFT_ALT;
-    g_keycodes[KEY_RIGHTALT]   = KB_KEY_RIGHT_ALT;
-    g_keycodes[KEY_LEFTMETA]   = KB_KEY_LEFT_SUPER;
-    g_keycodes[KEY_RIGHTMETA]  = KB_KEY_RIGHT_SUPER;
-    g_keycodes[KEY_MENU]       = KB_KEY_MENU;
-    g_keycodes[KEY_NUMLOCK]    = KB_KEY_NUM_LOCK;
-    g_keycodes[KEY_CAPSLOCK]   = KB_KEY_CAPS_LOCK;
-    g_keycodes[KEY_PRINT]      = KB_KEY_PRINT_SCREEN;
-    g_keycodes[KEY_SCROLLLOCK] = KB_KEY_SCROLL_LOCK;
-    g_keycodes[KEY_PAUSE]      = KB_KEY_PAUSE;
-    g_keycodes[KEY_DELETE]     = KB_KEY_DELETE;
-    g_keycodes[KEY_BACKSPACE]  = KB_KEY_BACKSPACE;
-    g_keycodes[KEY_ENTER]      = KB_KEY_ENTER;
-    g_keycodes[KEY_HOME]       = KB_KEY_HOME;
-    g_keycodes[KEY_END]        = KB_KEY_END;
-    g_keycodes[KEY_PAGEUP]     = KB_KEY_PAGE_UP;
-    g_keycodes[KEY_PAGEDOWN]   = KB_KEY_PAGE_DOWN;
-    g_keycodes[KEY_INSERT]     = KB_KEY_INSERT;
-    g_keycodes[KEY_LEFT]       = KB_KEY_LEFT;
-    g_keycodes[KEY_RIGHT]      = KB_KEY_RIGHT;
-    g_keycodes[KEY_DOWN]       = KB_KEY_DOWN;
-    g_keycodes[KEY_UP]         = KB_KEY_UP;
-    g_keycodes[KEY_F1]         = KB_KEY_F1;
-    g_keycodes[KEY_F2]         = KB_KEY_F2;
-    g_keycodes[KEY_F3]         = KB_KEY_F3;
-    g_keycodes[KEY_F4]         = KB_KEY_F4;
-    g_keycodes[KEY_F5]         = KB_KEY_F5;
-    g_keycodes[KEY_F6]         = KB_KEY_F6;
-    g_keycodes[KEY_F7]         = KB_KEY_F7;
-    g_keycodes[KEY_F8]         = KB_KEY_F8;
-    g_keycodes[KEY_F9]         = KB_KEY_F9;
-    g_keycodes[KEY_F10]        = KB_KEY_F10;
-    g_keycodes[KEY_F11]        = KB_KEY_F11;
-    g_keycodes[KEY_F12]        = KB_KEY_F12;
-    g_keycodes[KEY_F13]        = KB_KEY_F13;
-    g_keycodes[KEY_F14]        = KB_KEY_F14;
-    g_keycodes[KEY_F15]        = KB_KEY_F15;
-    g_keycodes[KEY_F16]        = KB_KEY_F16;
-    g_keycodes[KEY_F17]        = KB_KEY_F17;
-    g_keycodes[KEY_F18]        = KB_KEY_F18;
-    g_keycodes[KEY_F19]        = KB_KEY_F19;
-    g_keycodes[KEY_F20]        = KB_KEY_F20;
-    g_keycodes[KEY_F21]        = KB_KEY_F21;
-    g_keycodes[KEY_F22]        = KB_KEY_F22;
-    g_keycodes[KEY_F23]        = KB_KEY_F23;
-    g_keycodes[KEY_F24]        = KB_KEY_F24;
-    g_keycodes[KEY_KPSLASH]    = KB_KEY_KP_DIVIDE;
-    g_keycodes[KEY_KPDOT]      = KB_KEY_KP_MULTIPLY;
-    g_keycodes[KEY_KPMINUS]    = KB_KEY_KP_SUBTRACT;
-    g_keycodes[KEY_KPPLUS]     = KB_KEY_KP_ADD;
-    g_keycodes[KEY_KP0]        = KB_KEY_KP_0;
-    g_keycodes[KEY_KP1]        = KB_KEY_KP_1;
-    g_keycodes[KEY_KP2]        = KB_KEY_KP_2;
-    g_keycodes[KEY_KP3]        = KB_KEY_KP_3;
-    g_keycodes[KEY_KP4]        = KB_KEY_KP_4;
-    g_keycodes[KEY_KP5]        = KB_KEY_KP_5;
-    g_keycodes[KEY_KP6]        = KB_KEY_KP_6;
-    g_keycodes[KEY_KP7]        = KB_KEY_KP_7;
-    g_keycodes[KEY_KP8]        = KB_KEY_KP_8;
-    g_keycodes[KEY_KP9]        = KB_KEY_KP_9;
-    g_keycodes[KEY_KPCOMMA]    = KB_KEY_KP_DECIMAL;
-    g_keycodes[KEY_KPEQUAL]    = KB_KEY_KP_EQUAL;
-    g_keycodes[KEY_KPENTER]    = KB_KEY_KP_ENTER;
+    g_keycodes[KEY_GRAVE]      = MFB_KB_KEY_GRAVE_ACCENT;
+    g_keycodes[KEY_1]          = MFB_KB_KEY_1;
+    g_keycodes[KEY_2]          = MFB_KB_KEY_2;
+    g_keycodes[KEY_3]          = MFB_KB_KEY_3;
+    g_keycodes[KEY_4]          = MFB_KB_KEY_4;
+    g_keycodes[KEY_5]          = MFB_KB_KEY_5;
+    g_keycodes[KEY_6]          = MFB_KB_KEY_6;
+    g_keycodes[KEY_7]          = MFB_KB_KEY_7;
+    g_keycodes[KEY_8]          = MFB_KB_KEY_8;
+    g_keycodes[KEY_9]          = MFB_KB_KEY_9;
+    g_keycodes[KEY_0]          = MFB_KB_KEY_0;
+    g_keycodes[KEY_SPACE]      = MFB_KB_KEY_SPACE;
+    g_keycodes[KEY_MINUS]      = MFB_KB_KEY_MINUS;
+    g_keycodes[KEY_EQUAL]      = MFB_KB_KEY_EQUAL;
+    g_keycodes[KEY_Q]          = MFB_KB_KEY_Q;
+    g_keycodes[KEY_W]          = MFB_KB_KEY_W;
+    g_keycodes[KEY_E]          = MFB_KB_KEY_E;
+    g_keycodes[KEY_R]          = MFB_KB_KEY_R;
+    g_keycodes[KEY_T]          = MFB_KB_KEY_T;
+    g_keycodes[KEY_Y]          = MFB_KB_KEY_Y;
+    g_keycodes[KEY_U]          = MFB_KB_KEY_U;
+    g_keycodes[KEY_I]          = MFB_KB_KEY_I;
+    g_keycodes[KEY_O]          = MFB_KB_KEY_O;
+    g_keycodes[KEY_P]          = MFB_KB_KEY_P;
+    g_keycodes[KEY_LEFTBRACE]  = MFB_KB_KEY_LEFT_BRACKET;
+    g_keycodes[KEY_RIGHTBRACE] = MFB_KB_KEY_RIGHT_BRACKET;
+    g_keycodes[KEY_A]          = MFB_KB_KEY_A;
+    g_keycodes[KEY_S]          = MFB_KB_KEY_S;
+    g_keycodes[KEY_D]          = MFB_KB_KEY_D;
+    g_keycodes[KEY_F]          = MFB_KB_KEY_F;
+    g_keycodes[KEY_G]          = MFB_KB_KEY_G;
+    g_keycodes[KEY_H]          = MFB_KB_KEY_H;
+    g_keycodes[KEY_J]          = MFB_KB_KEY_J;
+    g_keycodes[KEY_K]          = MFB_KB_KEY_K;
+    g_keycodes[KEY_L]          = MFB_KB_KEY_L;
+    g_keycodes[KEY_SEMICOLON]  = MFB_KB_KEY_SEMICOLON;
+    g_keycodes[KEY_APOSTROPHE] = MFB_KB_KEY_APOSTROPHE;
+    g_keycodes[KEY_Z]          = MFB_KB_KEY_Z;
+    g_keycodes[KEY_X]          = MFB_KB_KEY_X;
+    g_keycodes[KEY_C]          = MFB_KB_KEY_C;
+    g_keycodes[KEY_V]          = MFB_KB_KEY_V;
+    g_keycodes[KEY_B]          = MFB_KB_KEY_B;
+    g_keycodes[KEY_N]          = MFB_KB_KEY_N;
+    g_keycodes[KEY_M]          = MFB_KB_KEY_M;
+    g_keycodes[KEY_COMMA]      = MFB_KB_KEY_COMMA;
+    g_keycodes[KEY_DOT]        = MFB_KB_KEY_PERIOD;
+    g_keycodes[KEY_SLASH]      = MFB_KB_KEY_SLASH;
+    g_keycodes[KEY_BACKSLASH]  = MFB_KB_KEY_BACKSLASH;
+    g_keycodes[KEY_ESC]        = MFB_KB_KEY_ESCAPE;
+    g_keycodes[KEY_TAB]        = MFB_KB_KEY_TAB;
+    g_keycodes[KEY_LEFTSHIFT]  = MFB_KB_KEY_LEFT_SHIFT;
+    g_keycodes[KEY_RIGHTSHIFT] = MFB_KB_KEY_RIGHT_SHIFT;
+    g_keycodes[KEY_LEFTCTRL]   = MFB_KB_KEY_LEFT_CONTROL;
+    g_keycodes[KEY_RIGHTCTRL]  = MFB_KB_KEY_RIGHT_CONTROL;
+    g_keycodes[KEY_LEFTALT]    = MFB_KB_KEY_LEFT_ALT;
+    g_keycodes[KEY_RIGHTALT]   = MFB_KB_KEY_RIGHT_ALT;
+    g_keycodes[KEY_LEFTMETA]   = MFB_KB_KEY_LEFT_SUPER;
+    g_keycodes[KEY_RIGHTMETA]  = MFB_KB_KEY_RIGHT_SUPER;
+    g_keycodes[KEY_MENU]       = MFB_KB_KEY_MENU;
+    g_keycodes[KEY_NUMLOCK]    = MFB_KB_KEY_NUM_LOCK;
+    g_keycodes[KEY_CAPSLOCK]   = MFB_KB_KEY_CAPS_LOCK;
+    g_keycodes[KEY_PRINT]      = MFB_KB_KEY_PRINT_SCREEN;
+    g_keycodes[KEY_SCROLLLOCK] = MFB_KB_KEY_SCROLL_LOCK;
+    g_keycodes[KEY_PAUSE]      = MFB_KB_KEY_PAUSE;
+    g_keycodes[KEY_DELETE]     = MFB_KB_KEY_DELETE;
+    g_keycodes[KEY_BACKSPACE]  = MFB_KB_KEY_BACKSPACE;
+    g_keycodes[KEY_ENTER]      = MFB_KB_KEY_ENTER;
+    g_keycodes[KEY_HOME]       = MFB_KB_KEY_HOME;
+    g_keycodes[KEY_END]        = MFB_KB_KEY_END;
+    g_keycodes[KEY_PAGEUP]     = MFB_KB_KEY_PAGE_UP;
+    g_keycodes[KEY_PAGEDOWN]   = MFB_KB_KEY_PAGE_DOWN;
+    g_keycodes[KEY_INSERT]     = MFB_KB_KEY_INSERT;
+    g_keycodes[KEY_LEFT]       = MFB_KB_KEY_LEFT;
+    g_keycodes[KEY_RIGHT]      = MFB_KB_KEY_RIGHT;
+    g_keycodes[KEY_DOWN]       = MFB_KB_KEY_DOWN;
+    g_keycodes[KEY_UP]         = MFB_KB_KEY_UP;
+    g_keycodes[KEY_F1]         = MFB_KB_KEY_F1;
+    g_keycodes[KEY_F2]         = MFB_KB_KEY_F2;
+    g_keycodes[KEY_F3]         = MFB_KB_KEY_F3;
+    g_keycodes[KEY_F4]         = MFB_KB_KEY_F4;
+    g_keycodes[KEY_F5]         = MFB_KB_KEY_F5;
+    g_keycodes[KEY_F6]         = MFB_KB_KEY_F6;
+    g_keycodes[KEY_F7]         = MFB_KB_KEY_F7;
+    g_keycodes[KEY_F8]         = MFB_KB_KEY_F8;
+    g_keycodes[KEY_F9]         = MFB_KB_KEY_F9;
+    g_keycodes[KEY_F10]        = MFB_KB_KEY_F10;
+    g_keycodes[KEY_F11]        = MFB_KB_KEY_F11;
+    g_keycodes[KEY_F12]        = MFB_KB_KEY_F12;
+    g_keycodes[KEY_F13]        = MFB_KB_KEY_F13;
+    g_keycodes[KEY_F14]        = MFB_KB_KEY_F14;
+    g_keycodes[KEY_F15]        = MFB_KB_KEY_F15;
+    g_keycodes[KEY_F16]        = MFB_KB_KEY_F16;
+    g_keycodes[KEY_F17]        = MFB_KB_KEY_F17;
+    g_keycodes[KEY_F18]        = MFB_KB_KEY_F18;
+    g_keycodes[KEY_F19]        = MFB_KB_KEY_F19;
+    g_keycodes[KEY_F20]        = MFB_KB_KEY_F20;
+    g_keycodes[KEY_F21]        = MFB_KB_KEY_F21;
+    g_keycodes[KEY_F22]        = MFB_KB_KEY_F22;
+    g_keycodes[KEY_F23]        = MFB_KB_KEY_F23;
+    g_keycodes[KEY_F24]        = MFB_KB_KEY_F24;
+    g_keycodes[KEY_KPSLASH]    = MFB_KB_KEY_KP_DIVIDE;
+    g_keycodes[KEY_KPDOT]      = MFB_KB_KEY_KP_MULTIPLY;
+    g_keycodes[KEY_KPMINUS]    = MFB_KB_KEY_KP_SUBTRACT;
+    g_keycodes[KEY_KPPLUS]     = MFB_KB_KEY_KP_ADD;
+    g_keycodes[KEY_KP0]        = MFB_KB_KEY_KP_0;
+    g_keycodes[KEY_KP1]        = MFB_KB_KEY_KP_1;
+    g_keycodes[KEY_KP2]        = MFB_KB_KEY_KP_2;
+    g_keycodes[KEY_KP3]        = MFB_KB_KEY_KP_3;
+    g_keycodes[KEY_KP4]        = MFB_KB_KEY_KP_4;
+    g_keycodes[KEY_KP5]        = MFB_KB_KEY_KP_5;
+    g_keycodes[KEY_KP6]        = MFB_KB_KEY_KP_6;
+    g_keycodes[KEY_KP7]        = MFB_KB_KEY_KP_7;
+    g_keycodes[KEY_KP8]        = MFB_KB_KEY_KP_8;
+    g_keycodes[KEY_KP9]        = MFB_KB_KEY_KP_9;
+    g_keycodes[KEY_KPCOMMA]    = MFB_KB_KEY_KP_DECIMAL;
+    g_keycodes[KEY_KPEQUAL]    = MFB_KB_KEY_KP_EQUAL;
+    g_keycodes[KEY_KPENTER]    = MFB_KB_KEY_KP_ENTER;
 }
 
 //-------------------------------------

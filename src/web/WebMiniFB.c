@@ -450,16 +450,16 @@ EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsign
     function getMfbKeyModFromEvent(event) {
         // FIXME can we make these global somehow? --pre-js maybe?
         // FIXME need to lookup caps and num lock keystates in window_data->key_status
-        const KB_MOD_SHIFT        = 0x0001;
-        const KB_MOD_CONTROL      = 0x0002;
-        const KB_MOD_ALT          = 0x0004;
-        const KB_MOD_SUPER        = 0x0008;
+        const MFB_KB_MOD_SHIFT   = 0x0001;
+        const MFB_KB_MOD_CONTROL = 0x0002;
+        const MFB_KB_MOD_ALT     = 0x0004;
+        const MFB_KB_MOD_SUPER   = 0x0008;
 
         let mod = 0;
-        if (event.shiftKey) mod = mod | KB_MOD_SHIFT;
-        if (event.ctrlKey) mod = mod | KB_MOD_CONTROL;
-        if (event.altKey) mod = mod | KB_MOD_ALT;
-        if (event.metaKey) mod = mod | KB_MOD_SUPER;
+        if (event.shiftKey) mod = mod | MFB_KB_MOD_SHIFT;
+        if (event.ctrlKey) mod = mod | MFB_KB_MOD_CONTROL;
+        if (event.altKey) mod = mod | MFB_KB_MOD_ALT;
+        if (event.metaKey) mod = mod | MFB_KB_MOD_SUPER;
         return mod;
     };
 
@@ -684,7 +684,7 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned heigh
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    int wants_fullscreen = ((flags & WF_FULLSCREEN) || (flags & WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+    int wants_fullscreen = ((flags & MFB_WF_FULLSCREEN) || (flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
     void *specific = mfb_open_ex_js(window_data, title, width, height, wants_fullscreen);
     if (!specific) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", title ? title : "(null)");
@@ -760,15 +760,15 @@ bool mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned off
 
 EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     // FIXME can we make these global somehow? --pre-js maybe?
-    const STATE_OK = 0;
-    const STATE_EXIT = -1;
-    const STATE_INVALID_WINDOW = -2;
-    const STATE_INVALID_BUFFER = -3;
-    const STATE_INTERNAL_ERROR = -4;
-    if (window_data == 0) return STATE_INVALID_WINDOW;
+    const MFB_STATE_OK = 0;
+    const MFB_STATE_EXIT = -1;
+    const MFB_STATE_INVALID_WINDOW = -2;
+    const MFB_STATE_INVALID_BUFFER = -3;
+    const MFB_STATE_INTERNAL_ERROR = -4;
+    if (window_data == 0) return MFB_STATE_INVALID_WINDOW;
     let window_id = Module._window_data_get_specific(window_data);
-    if (!window._minifb) return STATE_INTERNAL_ERROR;
-    if (!window._minifb.windows[window_id]) return STATE_INVALID_WINDOW;
+    if (!window._minifb) return MFB_STATE_INTERNAL_ERROR;
+    if (!window._minifb.windows[window_id]) return MFB_STATE_INVALID_WINDOW;
     let w = window._minifb.windows[window_id];
     let events = w.events;
     w.events = [];
@@ -790,31 +790,31 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
             Module._window_data_call_char_input_func(window_data, event.code);
         }
     }
-    return Module._window_data_get_close(window_data) ? STATE_EXIT : STATE_OK;
+    return Module._window_data_get_close(window_data) ? MFB_STATE_EXIT : MFB_STATE_OK;
 });
 
 mfb_update_state mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events called with an invalid window.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     mfb_update_state state = mfb_update_events_js(window_data);
-    if (state == STATE_EXIT) {
+    if (state == MFB_STATE_EXIT) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events detected close request after event processing.");
         mfb_destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
-    if (state == STATE_INVALID_WINDOW) {
+    if (state == MFB_STATE_INVALID_WINDOW) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window.");
     }
-    else if (state == STATE_INTERNAL_ERROR) {
+    else if (state == MFB_STATE_INTERNAL_ERROR) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error.");
     }
 
@@ -823,16 +823,16 @@ mfb_update_state mfb_update_events(struct mfb_window *window) {
 
 EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *buffer, int width, int height), {
     // FIXME can we make these global somehow? preamble.js maybe?
-    const STATE_OK = 0;
-    const STATE_EXIT = -1;
-    const STATE_INVALID_WINDOW = -2;
-    const STATE_INVALID_BUFFER = -3;
-    const STATE_INTERNAL_ERROR = -4;
-    if (window_data == 0) return STATE_INVALID_WINDOW;
+    const MFB_STATE_OK = 0;
+    const MFB_STATE_EXIT = -1;
+    const MFB_STATE_INVALID_WINDOW = -2;
+    const MFB_STATE_INVALID_BUFFER = -3;
+    const MFB_STATE_INTERNAL_ERROR = -4;
+    if (window_data == 0) return MFB_STATE_INVALID_WINDOW;
     let window_id = Module._window_data_get_specific(window_data);
-    if (!window._minifb) return STATE_INTERNAL_ERROR;
-    if (!window._minifb.windows[window_id]) return STATE_INVALID_WINDOW;
-    if (buffer == 0) return STATE_INVALID_BUFFER;
+    if (!window._minifb) return MFB_STATE_INTERNAL_ERROR;
+    if (!window._minifb.windows[window_id]) return MFB_STATE_INVALID_WINDOW;
+    if (buffer == 0) return MFB_STATE_INVALID_BUFFER;
     let w = window._minifb.windows[window_id];
     let canvas = w.canvas;
     if (width <= 0) {
@@ -847,7 +847,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     Module._window_data_set_buffer_size(window_data, width, height);
 
     let swizzleBuffer = Module._window_data_get_swizzle_buffer(window_data, width, height);
-    if (swizzleBuffer == 0) return STATE_INTERNAL_ERROR;
+    if (swizzleBuffer == 0) return MFB_STATE_INTERNAL_ERROR;
 
     Module._reverse_color_channels(buffer, swizzleBuffer, width, height);
     let framePixels = new Uint8ClampedArray(HEAPU8.buffer, swizzleBuffer, width * height * 4);
@@ -857,7 +857,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     let dstWidth = Module._window_data_get_dst_width(window_data);
     let dstHeight = Module._window_data_get_dst_height(window_data);
     let ctx = w.ctx;
-    if (!ctx) return STATE_INTERNAL_ERROR;
+    if (!ctx) return MFB_STATE_INTERNAL_ERROR;
     ctx.imageSmoothingEnabled = false;
 
     // Clear when viewport does not cover the full canvas to avoid stale pixels.
@@ -874,54 +874,54 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
             w.backCanvas.height = height;
             w.backCtx = w.backCanvas.getContext("2d");
         }
-        if (!w.backCtx) return STATE_INTERNAL_ERROR;
+        if (!w.backCtx) return MFB_STATE_INTERNAL_ERROR;
         w.backCtx.putImageData(imageData, 0, 0);
         ctx.drawImage(w.backCanvas, 0, 0, width, height, dstOffsetX, dstOffsetY, dstWidth, dstHeight);
     }
-    return Module._window_data_get_close(window_data) ? STATE_EXIT : STATE_OK;
+    return Module._window_data_get_close(window_data) ? MFB_STATE_EXIT : MFB_STATE_OK;
 });
 
 mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid window.");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     mfb_update_state state = mfb_update_js(window, buffer, width, height);
-    if (state == STATE_EXIT) {
+    if (state == MFB_STATE_EXIT) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after frame update.");
         mfb_destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
-    if (state != STATE_OK) {
-        if (state == STATE_INVALID_BUFFER) {
+    if (state != MFB_STATE_OK) {
+        if (state == MFB_STATE_INVALID_BUFFER) {
             mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
         }
-        else if (state == STATE_INVALID_WINDOW) {
+        else if (state == MFB_STATE_INVALID_WINDOW) {
             mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported invalid window.");
         }
-        else if (state == STATE_INTERNAL_ERROR) {
+        else if (state == MFB_STATE_INTERNAL_ERROR) {
             mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported internal error.");
         }
         return state;
     }
 
     state = mfb_update_events_js(window_data);
-    if (state == STATE_EXIT) {
+    if (state == MFB_STATE_EXIT) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after event processing.");
         mfb_destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
-    if (state == STATE_INVALID_WINDOW) {
+    if (state == MFB_STATE_INVALID_WINDOW) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window after frame update.");
     }
-    else if (state == STATE_INTERNAL_ERROR) {
+    else if (state == MFB_STATE_INTERNAL_ERROR) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error after frame update.");
     }
 

@@ -53,7 +53,7 @@ print_getters(struct mfb_window *window) {
     float scale_x = 0.0f, scale_y = 0.0f;
     bool is_active = false;
 
-    const char *key_name = mfb_get_key_name(KB_KEY_ESCAPE);
+    const char *key_name = mfb_get_key_name(MFB_KB_KEY_ESCAPE);
     const uint8_t *key_buffer = mfb_get_key_buffer(window);
 
     is_active = mfb_is_window_active(window);
@@ -89,7 +89,7 @@ print_getters(struct mfb_window *window) {
     mfb_get_display_safe_insets(window, &safe_left, &safe_top, &safe_right, &safe_bottom);
 
     LOGI("[getters frame=%d]\n", g_frame_count);
-    LOGI("  key_name(KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
+    LOGI("  key_name(MFB_KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
     LOGI("  is_window_active: %d\n", is_active);
     LOGI("  target_fps: %u\n", fps);
     LOGI("  monitor_scale: %f, %f\n", scale_x, scale_y);
@@ -113,12 +113,12 @@ print_getters(struct mfb_window *window) {
 
     if (key_buffer) {
         LOGI("  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]\n",
-                key_buffer[KB_KEY_ESCAPE],
-                key_buffer[KB_KEY_SPACE],
-                key_buffer[KB_KEY_LEFT],
-                key_buffer[KB_KEY_RIGHT],
-                key_buffer[KB_KEY_UP],
-                key_buffer[KB_KEY_DOWN]);
+                key_buffer[MFB_KB_KEY_ESCAPE],
+                key_buffer[MFB_KB_KEY_SPACE],
+                key_buffer[MFB_KB_KEY_LEFT],
+                key_buffer[MFB_KB_KEY_RIGHT],
+                key_buffer[MFB_KB_KEY_UP],
+                key_buffer[MFB_KB_KEY_DOWN]);
     }
     else {
         LOGI("  key_buffer: (null)\n");
@@ -246,7 +246,7 @@ main(int argc, char *argv[]) {
         }
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

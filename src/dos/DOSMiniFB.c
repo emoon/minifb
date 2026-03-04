@@ -23,95 +23,95 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
 
 //-------------------------------------
 static const uint32_t scancode_to_mfb_key[] = {
-    KB_KEY_UNKNOWN,
-    KB_KEY_ESCAPE,
-    KB_KEY_1,
-    KB_KEY_2,
-    KB_KEY_3,
-    KB_KEY_4,
-    KB_KEY_5,
-    KB_KEY_6,
-    KB_KEY_7,
-    KB_KEY_8,
-    KB_KEY_9,
-    KB_KEY_0,
-    KB_KEY_MINUS,
-    KB_KEY_EQUAL,
-    KB_KEY_BACKSPACE,
-    KB_KEY_TAB,
-    KB_KEY_Q,
-    KB_KEY_W,
-    KB_KEY_E,
-    KB_KEY_R,
-    KB_KEY_T,
-    KB_KEY_Y,
-    KB_KEY_U,
-    KB_KEY_I,
-    KB_KEY_O,
-    KB_KEY_P,
-    KB_KEY_LEFT_BRACKET,
-    KB_KEY_RIGHT_BRACKET,
-    KB_KEY_ENTER,
-    KB_KEY_LEFT_CONTROL,
-    KB_KEY_A,
-    KB_KEY_S,
-    KB_KEY_D,
-    KB_KEY_F,
-    KB_KEY_G,
-    KB_KEY_H,
-    KB_KEY_J,
-    KB_KEY_K,
-    KB_KEY_L,
-    KB_KEY_SEMICOLON,
-    KB_KEY_APOSTROPHE,
-    KB_KEY_GRAVE_ACCENT,
-    KB_KEY_LEFT_SHIFT,
-    KB_KEY_BACKSLASH,
-    KB_KEY_Z,
-    KB_KEY_X,
-    KB_KEY_C,
-    KB_KEY_V,
-    KB_KEY_B,
-    KB_KEY_N,
-    KB_KEY_M,
-    KB_KEY_COMMA,
-    KB_KEY_PERIOD,
-    KB_KEY_SLASH,
-    KB_KEY_RIGHT_SHIFT,
-    KB_KEY_KP_MULTIPLY,   // 0x37 (numpad *); real Print Screen sends E0+0x37
-    KB_KEY_LEFT_ALT,
-    KB_KEY_SPACE,
-    KB_KEY_CAPS_LOCK,
-    KB_KEY_F1,
-    KB_KEY_F2,
-    KB_KEY_F3,
-    KB_KEY_F4,
-    KB_KEY_F5,
-    KB_KEY_F6,
-    KB_KEY_F7,
-    KB_KEY_F8,
-    KB_KEY_F9,
-    KB_KEY_F10,
-    KB_KEY_NUM_LOCK,
-    KB_KEY_SCROLL_LOCK,
-    KB_KEY_HOME,
-    KB_KEY_UP,
-    KB_KEY_PAGE_UP,
-    KB_KEY_KP_SUBTRACT,   // 0x4A (numpad -)
-    KB_KEY_LEFT,
-    KB_KEY_KP_5,          // 0x4C (numpad 5, center)
-    KB_KEY_RIGHT,
-    KB_KEY_KP_ADD,
-    KB_KEY_END,
-    KB_KEY_DOWN,
-    KB_KEY_PAGE_DOWN,
-    KB_KEY_INSERT,
-    KB_KEY_DELETE,
-    KB_KEY_UNKNOWN,       // 0x54 (SysRq / Alt+PrScr)
-    KB_KEY_UNKNOWN,       // 0x55 (undefined)
-    KB_KEY_UNKNOWN,       // 0x56 (ISO extra key between LShift and Z)
-    KB_KEY_F11,           // 0x57
-    KB_KEY_F12,           // 0x58
+    MFB_KB_KEY_UNKNOWN,
+    MFB_KB_KEY_ESCAPE,
+    MFB_KB_KEY_1,
+    MFB_KB_KEY_2,
+    MFB_KB_KEY_3,
+    MFB_KB_KEY_4,
+    MFB_KB_KEY_5,
+    MFB_KB_KEY_6,
+    MFB_KB_KEY_7,
+    MFB_KB_KEY_8,
+    MFB_KB_KEY_9,
+    MFB_KB_KEY_0,
+    MFB_KB_KEY_MINUS,
+    MFB_KB_KEY_EQUAL,
+    MFB_KB_KEY_BACKSPACE,
+    MFB_KB_KEY_TAB,
+    MFB_KB_KEY_Q,
+    MFB_KB_KEY_W,
+    MFB_KB_KEY_E,
+    MFB_KB_KEY_R,
+    MFB_KB_KEY_T,
+    MFB_KB_KEY_Y,
+    MFB_KB_KEY_U,
+    MFB_KB_KEY_I,
+    MFB_KB_KEY_O,
+    MFB_KB_KEY_P,
+    MFB_KB_KEY_LEFT_BRACKET,
+    MFB_KB_KEY_RIGHT_BRACKET,
+    MFB_KB_KEY_ENTER,
+    MFB_KB_KEY_LEFT_CONTROL,
+    MFB_KB_KEY_A,
+    MFB_KB_KEY_S,
+    MFB_KB_KEY_D,
+    MFB_KB_KEY_F,
+    MFB_KB_KEY_G,
+    MFB_KB_KEY_H,
+    MFB_KB_KEY_J,
+    MFB_KB_KEY_K,
+    MFB_KB_KEY_L,
+    MFB_KB_KEY_SEMICOLON,
+    MFB_KB_KEY_APOSTROPHE,
+    MFB_KB_KEY_GRAVE_ACCENT,
+    MFB_KB_KEY_LEFT_SHIFT,
+    MFB_KB_KEY_BACKSLASH,
+    MFB_KB_KEY_Z,
+    MFB_KB_KEY_X,
+    MFB_KB_KEY_C,
+    MFB_KB_KEY_V,
+    MFB_KB_KEY_B,
+    MFB_KB_KEY_N,
+    MFB_KB_KEY_M,
+    MFB_KB_KEY_COMMA,
+    MFB_KB_KEY_PERIOD,
+    MFB_KB_KEY_SLASH,
+    MFB_KB_KEY_RIGHT_SHIFT,
+    MFB_KB_KEY_KP_MULTIPLY,   // 0x37 (numpad *); real Print Screen sends E0+0x37
+    MFB_KB_KEY_LEFT_ALT,
+    MFB_KB_KEY_SPACE,
+    MFB_KB_KEY_CAPS_LOCK,
+    MFB_KB_KEY_F1,
+    MFB_KB_KEY_F2,
+    MFB_KB_KEY_F3,
+    MFB_KB_KEY_F4,
+    MFB_KB_KEY_F5,
+    MFB_KB_KEY_F6,
+    MFB_KB_KEY_F7,
+    MFB_KB_KEY_F8,
+    MFB_KB_KEY_F9,
+    MFB_KB_KEY_F10,
+    MFB_KB_KEY_NUM_LOCK,
+    MFB_KB_KEY_SCROLL_LOCK,
+    MFB_KB_KEY_HOME,
+    MFB_KB_KEY_UP,
+    MFB_KB_KEY_PAGE_UP,
+    MFB_KB_KEY_KP_SUBTRACT,   // 0x4A (numpad -)
+    MFB_KB_KEY_LEFT,
+    MFB_KB_KEY_KP_5,          // 0x4C (numpad 5, center)
+    MFB_KB_KEY_RIGHT,
+    MFB_KB_KEY_KP_ADD,
+    MFB_KB_KEY_END,
+    MFB_KB_KEY_DOWN,
+    MFB_KB_KEY_PAGE_DOWN,
+    MFB_KB_KEY_INSERT,
+    MFB_KB_KEY_DELETE,
+    MFB_KB_KEY_UNKNOWN,       // 0x54 (SysRq / Alt+PrScr)
+    MFB_KB_KEY_UNKNOWN,       // 0x55 (undefined)
+    MFB_KB_KEY_UNKNOWN,       // 0x56 (ISO extra key between LShift and Z)
+    MFB_KB_KEY_F11,           // 0x57
+    MFB_KB_KEY_F12,           // 0x58
 };
 
 //-------------------------------------
@@ -279,15 +279,15 @@ check_window_closed(SWindowData *window_data) {
       free(window_data->specific);
       window_data->specific = NULL;
       free(window_data);
-      return STATE_EXIT;
+      return MFB_STATE_EXIT;
     }
     else {
       mfb_log(MFB_LOG_DEBUG, "mfb window close requested but specific data is NULL");
-      return STATE_INVALID_WINDOW;
+      return MFB_STATE_INVALID_WINDOW;
     }
   }
 
-  return STATE_OK;
+  return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -380,7 +380,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     __dpmi_int(0x16, &regs);
     if (regs.h.al & 0x40) {
       g_keyboard.caps_lock = true;
-      window_data->mod_keys |= KB_MOD_CAPS_LOCK;
+      window_data->mod_keys |= MFB_KB_MOD_CAPS_LOCK;
     }
   }
 
@@ -434,28 +434,28 @@ update_mouse(SWindowData *window_data) {
   __dpmi_int(0x33, &regs);
   int32_t old_x = window_data->mouse_pos_x;
   int32_t old_y = window_data->mouse_pos_y;
-  uint8_t old_left_pressed   = window_data->mouse_button_status[MOUSE_LEFT];
-  uint8_t old_right_pressed  = window_data->mouse_button_status[MOUSE_RIGHT];
-  uint8_t old_middle_pressed = window_data->mouse_button_status[MOUSE_MIDDLE];
+  uint8_t old_left_pressed   = window_data->mouse_button_status[MFB_MOUSE_LEFT];
+  uint8_t old_right_pressed  = window_data->mouse_button_status[MFB_MOUSE_RIGHT];
+  uint8_t old_middle_pressed = window_data->mouse_button_status[MFB_MOUSE_MIDDLE];
   uint8_t left_pressed   = (regs.x.bx >> 0) & 1;
   uint8_t right_pressed  = (regs.x.bx >> 1) & 1;
   uint8_t middle_pressed = (regs.x.bx >> 2) & 1;
-  window_data->mouse_button_status[MOUSE_LEFT]   = left_pressed;
-  window_data->mouse_button_status[MOUSE_RIGHT]  = right_pressed;
-  window_data->mouse_button_status[MOUSE_MIDDLE] = middle_pressed;
+  window_data->mouse_button_status[MFB_MOUSE_LEFT]   = left_pressed;
+  window_data->mouse_button_status[MFB_MOUSE_RIGHT]  = right_pressed;
+  window_data->mouse_button_status[MFB_MOUSE_MIDDLE] = middle_pressed;
   window_data->mouse_pos_x = regs.x.cx;
   window_data->mouse_pos_y = regs.x.dx;
 
   mfb_key_mod mod = (mfb_key_mod)window_data->mod_keys;
 
   if (old_left_pressed != left_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_LEFT,   mod, left_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_LEFT,   mod, left_pressed);
 
   if (old_right_pressed != right_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_RIGHT,  mod, right_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_RIGHT,  mod, right_pressed);
 
   if (old_middle_pressed != middle_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MOUSE_MIDDLE, mod, middle_pressed);
+    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_MIDDLE, mod, middle_pressed);
 
   if ((old_x != regs.x.cx || old_y != regs.x.dx) && window_data->mouse_move_func)
     window_data->mouse_move_func((struct mfb_window *)window_data, regs.x.cx, regs.x.dx);
@@ -482,9 +482,9 @@ update_keyboard(SWindowData *window_data) {
 
     // Some DOS mouse drivers emulate wheel by injecting extended Up/Down keys.
     // Translate those to mouse wheel callbacks to avoid spurious keyboard events.
-    if (is_extended && (key_code == KB_KEY_UP || key_code == KB_KEY_DOWN)) {
+    if (is_extended && (key_code == MFB_KB_KEY_UP || key_code == MFB_KB_KEY_DOWN)) {
       if (pressed) {
-        float delta_y = (key_code == KB_KEY_UP) ? 1.0f : -1.0f;
+        float delta_y = (key_code == MFB_KB_KEY_UP) ? 1.0f : -1.0f;
         window_data->mouse_wheel_x = 0.0f;
         window_data->mouse_wheel_y = delta_y;
         if (window_data->mouse_wheel_func) {
@@ -504,8 +504,8 @@ update_keyboard(SWindowData *window_data) {
       char base_ascii = scancode_to_ascii[scancode];
       bool is_letter  = (base_ascii >= 'a' && base_ascii <= 'z');
       // Caps Lock toggles shift only for letter keys; Shift always applies to all keys
-      bool use_shift  = (window_data->mod_keys & KB_MOD_SHIFT) != 0;
-      if ((window_data->mod_keys & KB_MOD_CAPS_LOCK) && is_letter)
+      bool use_shift  = (window_data->mod_keys & MFB_KB_MOD_SHIFT) != 0;
+      if ((window_data->mod_keys & MFB_KB_MOD_CAPS_LOCK) && is_letter)
         use_shift = !use_shift;
       ascii = use_shift ? scancode_to_ascii_shift[scancode] : base_ascii;
     }
@@ -514,38 +514,38 @@ update_keyboard(SWindowData *window_data) {
     //        (unsigned)scancode, mfb_get_key_name((mfb_key) key_code),
     //        (unsigned)(uint8_t)ascii, (unsigned)pressed);
 
-    // KB_KEY_UNKNOWN == -1 -> as uint32_t it becomes 0xFFFFFFFF, which would
+    // MFB_KB_KEY_UNKNOWN == -1 -> as uint32_t it becomes 0xFFFFFFFF, which would
     // overflow key_status[MFB_MAX_KEYS]. Guard the write with a bounds check.
     if (key_code < MFB_MAX_KEYS)
       window_data->key_status[key_code] = pressed;
 
-    if (key_code == KB_KEY_LEFT_SHIFT || key_code == KB_KEY_RIGHT_SHIFT) {
+    if (key_code == MFB_KB_KEY_LEFT_SHIFT || key_code == MFB_KB_KEY_RIGHT_SHIFT) {
       if (pressed)
-        window_data->mod_keys |= KB_MOD_SHIFT;
+        window_data->mod_keys |= MFB_KB_MOD_SHIFT;
       else
-        window_data->mod_keys &= ~KB_MOD_SHIFT;
+        window_data->mod_keys &= ~MFB_KB_MOD_SHIFT;
     }
 
-    if (key_code == KB_KEY_LEFT_ALT || key_code == KB_KEY_RIGHT_ALT) {
+    if (key_code == MFB_KB_KEY_LEFT_ALT || key_code == MFB_KB_KEY_RIGHT_ALT) {
       if (pressed)
-        window_data->mod_keys |= KB_MOD_ALT;
+        window_data->mod_keys |= MFB_KB_MOD_ALT;
       else
-        window_data->mod_keys &= ~KB_MOD_ALT;
+        window_data->mod_keys &= ~MFB_KB_MOD_ALT;
     }
 
-    if (key_code == KB_KEY_LEFT_CONTROL || key_code == KB_KEY_RIGHT_CONTROL) {
+    if (key_code == MFB_KB_KEY_LEFT_CONTROL || key_code == MFB_KB_KEY_RIGHT_CONTROL) {
       if (pressed)
-        window_data->mod_keys |= KB_MOD_CONTROL;
+        window_data->mod_keys |= MFB_KB_MOD_CONTROL;
       else
-        window_data->mod_keys &= ~KB_MOD_CONTROL;
+        window_data->mod_keys &= ~MFB_KB_MOD_CONTROL;
     }
 
-    if (key_code == KB_KEY_CAPS_LOCK && !pressed) {
+    if (key_code == MFB_KB_KEY_CAPS_LOCK && !pressed) {
       g_keyboard.caps_lock = !g_keyboard.caps_lock;
       if (g_keyboard.caps_lock)
-        window_data->mod_keys |= KB_MOD_CAPS_LOCK;
+        window_data->mod_keys |= MFB_KB_MOD_CAPS_LOCK;
       else
-        window_data->mod_keys &= ~KB_MOD_CAPS_LOCK;
+        window_data->mod_keys &= ~MFB_KB_MOD_CAPS_LOCK;
     }
 
     if (window_data->keyboard_func)
@@ -567,7 +567,7 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
   if (!window) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
-    return STATE_INVALID_WINDOW;
+    return MFB_STATE_INVALID_WINDOW;
   }
 
   SWindowData *window_data = (SWindowData *)window;
@@ -578,7 +578,7 @@ mfb_update_events(struct mfb_window *window) {
   update_mouse(window_data);
   update_keyboard(window_data);
 
-  return STATE_OK;
+  return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -590,12 +590,12 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
   if (!window) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
-    return STATE_INVALID_WINDOW;
+    return MFB_STATE_INVALID_WINDOW;
   }
 
   if (!buffer) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
-    return STATE_INVALID_BUFFER;
+    return MFB_STATE_INVALID_BUFFER;
   }
 
   SWindowData *window_data = (SWindowData *)window;
@@ -606,7 +606,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   SWindowData_DOS *dos_window_data = window_data->specific;
   if (!dos_window_data) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
-    return STATE_INVALID_WINDOW;
+    return MFB_STATE_INVALID_WINDOW;
   }
 
   uint32_t *scale_buffer        = dos_window_data->scale_buffer;
@@ -631,7 +631,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
              height * a_bytes_per_scanline
     );
 
-    return STATE_OK;
+    return MFB_STATE_OK;
   }
 
   // Else we need to transfer to scale, convert to 24-bit, pad the scanlines,
@@ -729,7 +729,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
   }
 
-  return STATE_OK;
+  return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -743,7 +743,7 @@ mfb_wait_sync(struct mfb_window *window) {
   SWindowData *window_data = (SWindowData *)window;
   mfb_update_state state = check_window_closed(window_data);
 
-  return (state == STATE_OK);
+  return (state == MFB_STATE_OK);
 }
 
 //-------------------------------------

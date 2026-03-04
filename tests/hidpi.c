@@ -37,11 +37,11 @@ main() {
 
     while (window_high || window_low) {
         if (window_low)
-            if (mfb_update_ex(window_low, g_buffer_low, DIMEN_LOW, DIMEN_LOW) != STATE_OK)
+            if (mfb_update_ex(window_low, g_buffer_low, DIMEN_LOW, DIMEN_LOW) != MFB_STATE_OK)
                 window_low = NULL;
 
         if (window_high)
-            if (mfb_update_ex(window_high, g_buffer_high, DIMEN_HIGH, DIMEN_HIGH) != STATE_OK)
+            if (mfb_update_ex(window_high, g_buffer_high, DIMEN_HIGH, DIMEN_HIGH) != MFB_STATE_OK)
                 window_high = NULL;
 
         if (window_high) mfb_wait_sync(window_high);

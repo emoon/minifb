@@ -1,4 +1,4 @@
-﻿# MiniFB
+# MiniFB
 
 MiniFB (Mini FrameBuffer) is a small cross-platform library that makes it easy to render (32-bit) pixels in a window.
 
@@ -8,7 +8,7 @@ An example is the best way to show how it works:
 
 ```c
 int main() {
-    struct mfb_window *window = mfb_open_ex("my display", 800, 600, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("my display", 800, 600, MFB_WF_RESIZABLE);
     if (window == NULL)
         return 0;
 
@@ -20,7 +20,7 @@ int main() {
 
         state = mfb_update_ex(window, buffer, 800, 600);
 
-        if (state != STATE_OK)
+        if (state != MFB_STATE_OK)
             break;
 
     } while(mfb_wait_sync(window));
@@ -456,7 +456,7 @@ cmake .. -DMINIFB_USE_METAL_API=OFF
 
 #### Coordinate system
 
-On macOS, the default mouse coordinate system is (0, 0) -> (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) -> (left, top), like on the other platforms.
+On macOS, the default mouse coordinate system is (0, 0) → (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) → (left, top), like on the other platforms.
 
 In any case, if you want to get the default coordinate system you can use the CMake flag: `MINIFB_USE_INVERTED_Y_ON_MACOS=ON`
 
@@ -526,7 +526,7 @@ All other MiniFB functions work normally, including timers and user data managem
     }
 
     mfb_update_state state = mfb_update_ex(g_window, g_buffer, g_width, g_height);
-    if (state != STATE_OK) {
+    if (state != MFB_STATE_OK) {
         free(g_buffer);
         g_window = NULL;
         g_buffer = NULL;
@@ -569,13 +569,13 @@ and can cause a framebuffer-size mismatch if not handled explicitly:
 | API level | Default behaviour                               | Result                        |
 |-----------|-------------------------------------------------|-------------------------------|
 | ≤ 31      | Legacy fullscreen flags handle everything       | Works out of the box          |
-| 32–34     | System reserves space for the cutout by default | **Content shifted / clipped** |
+| 32-34     | System reserves space for the cutout by default | **Content shifted / clipped** |
 | ≥ 35      | Edge-to-edge is forced by the OS                | Works out of the box          |
 
 Two approaches are provided in the example (`tests/android/native2026`); pick whichever fits
 your project.
 
-##### Option A — Manifest + theme (no Java code)
+##### Option A - Manifest + theme (no Java code)
 
 Add a theme to `res/values/styles.xml`:
 
@@ -600,14 +600,14 @@ Then reference it in `AndroidManifest.xml`:
 **Pros**: zero Java code, takes effect before the native thread starts.
 **Cons**: limited runtime control; no way to query inset values from C.
 
-##### Option B — Java subclass (recommended)
+##### Option B - Java subclass (recommended)
 
 Subclass `NativeActivity` in `MiniFBActivity.java` and override `onCreate` /
 `onWindowFocusChanged` to call `setupFullscreen()`, which:
 
-- Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 31+) or `SHORT_EDGES` (API 28–30).
+- Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 31+) or `SHORT_EDGES` (API 28-30).
 - Hides system bars via `WindowInsetsController` (API 30+) or the legacy
-  `setSystemUiVisibility` flags (API 24–29).
+  `setSystemUiVisibility` flags (API 24-29).
 - Re-applies on focus changes (bars can reappear after an edge-swipe gesture).
 
 In `AndroidManifest.xml` replace the activity class name:
@@ -708,7 +708,7 @@ int main() {
 
         state = mfb_update_ex(window, buffer, 320, 240);
 
-        if (state != STATE_OK)
+        if (state != MFB_STATE_OK)
             break;
 
     } while(mfb_wait_sync(window));

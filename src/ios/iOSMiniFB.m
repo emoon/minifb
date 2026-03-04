@@ -123,17 +123,17 @@ destroy_window_data(SWindowData *window_data) {
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     if(window == 0x0) {
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
     if(window_data->close) {
         destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     if(buffer == 0x0) {
-        return STATE_INVALID_BUFFER;
+        return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
@@ -149,17 +149,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     memcpy(window_data->draw_buffer, buffer, window_data->buffer_width * window_data->buffer_height * 4);
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     if(window == 0x0) {
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------

@@ -147,7 +147,7 @@ main(int argc, char *argv[]) {
         }
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

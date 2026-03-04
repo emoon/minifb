@@ -16,7 +16,7 @@ int
 main() {
     int noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("full screen auto", WIDTH, HEIGHT, WF_FULLSCREEN);
+    struct mfb_window *window = mfb_open_ex("full screen auto", WIDTH, HEIGHT, MFB_WF_FULLSCREEN);
     if (!window) {
         return 0;
     }
@@ -46,7 +46,7 @@ main() {
             state = mfb_update_events(window);
         }
 
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

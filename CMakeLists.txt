@@ -39,6 +39,9 @@ set(SrcLib
     include/MiniFB.h
     include/MiniFB_cpp.h
     include/MiniFB_enums.h
+    include/MiniFB_keylist.h
+    include/MiniFB_macros.h
+    include/MiniFB_types.h
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
@@ -68,6 +71,8 @@ set(SrcMacOSX
 
 #--
 set(SrcIOS
+    include/MiniFB_ios.h
+
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
     src/ios/iOSView.h
@@ -76,7 +81,6 @@ set(SrcIOS
     src/ios/iOSViewController.m
     src/ios/iOSViewDelegate.h
     src/ios/iOSViewDelegate.m
-    include/MiniFB_ios.h
 )
 
 #--

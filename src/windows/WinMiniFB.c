@@ -298,7 +298,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 int is_pressed        = !((lParam >> 31) & 1);
                 window_data->mod_keys = translate_mod();
 
-                if (key_code == KB_KEY_UNKNOWN)
+                if (key_code == MFB_KB_KEY_UNKNOWN)
                     return FALSE;
 
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
@@ -356,7 +356,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_XBUTTONDOWN:
         case WM_XBUTTONDBLCLK:
             if (window_data) {
-                mfb_mouse_button button = MOUSE_BTN_0;
+                mfb_mouse_button button = MFB_MOUSE_BTN_0;
                 window_data->mod_keys   = translate_mod();
                 int          is_pressed = 0;
 
@@ -364,21 +364,21 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     case WM_LBUTTONDOWN:
                         is_pressed = 1;
                     case WM_LBUTTONUP:
-                        button = MOUSE_BTN_1;
+                        button = MFB_MOUSE_BTN_1;
                         break;
                     case WM_RBUTTONDOWN:
                         is_pressed = 1;
                     case WM_RBUTTONUP:
-                        button = MOUSE_BTN_2;
+                        button = MFB_MOUSE_BTN_2;
                         break;
                     case WM_MBUTTONDOWN:
                         is_pressed = 1;
                     case WM_MBUTTONUP:
-                        button = MOUSE_BTN_3;
+                        button = MFB_MOUSE_BTN_3;
                         break;
 
                     default:
-                        button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MOUSE_BTN_5 : MOUSE_BTN_6);
+                        button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MFB_MOUSE_BTN_5 : MFB_MOUSE_BTN_6);
                         if (message == WM_XBUTTONDOWN) {
                             is_pressed = 1;
                         }
@@ -552,8 +552,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->is_cursor_visible = true;
 
     g_window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
-    if (flags & WF_FULLSCREEN) {
-        flags = WF_FULLSCREEN;  // Remove all other flags
+    if (flags & MFB_WF_FULLSCREEN) {
+        flags = MFB_WF_FULLSCREEN;  // Remove all other flags
         rect.right  = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
         g_window_style = WS_POPUP & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
@@ -567,19 +567,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         if (ChangeDisplaySettings(&settings, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL) {
             mfb_log(MFB_LOG_WARNING, "ChangeDisplaySettings fullscreen failed, falling back to fullscreen desktop");
-            flags = WF_FULLSCREEN_DESKTOP;
+            flags = MFB_WF_FULLSCREEN_DESKTOP;
         }
     }
 
-    if (flags & WF_BORDERLESS) {
+    if (flags & MFB_WF_BORDERLESS) {
         g_window_style = WS_POPUP;
     }
 
-    if (flags & WF_RESIZABLE) {
+    if (flags & MFB_WF_RESIZABLE) {
         g_window_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
     }
 
-    if (flags & WF_FULLSCREEN_DESKTOP) {
+    if (flags & MFB_WF_FULLSCREEN_DESKTOP) {
         g_window_style = WS_OVERLAPPEDWINDOW;
         show_window_cmd = SW_MAXIMIZE;
 
@@ -600,7 +600,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             rect.top = 0;
         }
     }
-    else if (!(flags & WF_FULLSCREEN)) {
+    else if (!(flags & MFB_WF_FULLSCREEN)) {
         float scale_x, scale_y;
 
         get_monitor_scale(0, &scale_x, &scale_y);
@@ -655,7 +655,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, (LONG_PTR) window_data);
 
-    if (flags & WF_ALWAYS_ON_TOP)
+    if (flags & MFB_WF_ALWAYS_ON_TOP)
         SetWindowPos(window_data_specific->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
     ShowWindow(window_data_specific->window, show_window_cmd);
@@ -744,25 +744,25 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window requested close");
         destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     if (buffer == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
-        return STATE_INVALID_BUFFER;
+        return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific ==  NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     window_data->draw_buffer   = buffer;
@@ -787,10 +787,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window closed after event processing");
         destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -799,30 +799,30 @@ mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window requested close");
         destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window specific data");
-        return STATE_INVALID_WINDOW;
+        return MFB_STATE_INVALID_WINDOW;
     }
 
     update_events(window_data_specific->window);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window closed after event processing");
         destroy_window_data(window_data);
-        return STATE_EXIT;
+        return MFB_STATE_EXIT;
     }
 
-    return STATE_OK;
+    return MFB_STATE_OK;
 }
 
 //-------------------------------------
@@ -952,158 +952,158 @@ extern short int g_keycodes[MFB_MAX_KEYS];
 //-------------------------------------
 void
 init_keycodes() {
-    if ((g_keycodes[0x00B] == KB_KEY_0) && (g_keycodes[0x002] == KB_KEY_1)) {
+    if ((g_keycodes[0x00B] == MFB_KB_KEY_0) && (g_keycodes[0x002] == MFB_KB_KEY_1)) {
         return;
     }
 
-    g_keycodes[0x00B] = KB_KEY_0;
-    g_keycodes[0x002] = KB_KEY_1;
-    g_keycodes[0x003] = KB_KEY_2;
-    g_keycodes[0x004] = KB_KEY_3;
-    g_keycodes[0x005] = KB_KEY_4;
-    g_keycodes[0x006] = KB_KEY_5;
-    g_keycodes[0x007] = KB_KEY_6;
-    g_keycodes[0x008] = KB_KEY_7;
-    g_keycodes[0x009] = KB_KEY_8;
-    g_keycodes[0x00A] = KB_KEY_9;
-    g_keycodes[0x01E] = KB_KEY_A;
-    g_keycodes[0x030] = KB_KEY_B;
-    g_keycodes[0x02E] = KB_KEY_C;
-    g_keycodes[0x020] = KB_KEY_D;
-    g_keycodes[0x012] = KB_KEY_E;
-    g_keycodes[0x021] = KB_KEY_F;
-    g_keycodes[0x022] = KB_KEY_G;
-    g_keycodes[0x023] = KB_KEY_H;
-    g_keycodes[0x017] = KB_KEY_I;
-    g_keycodes[0x024] = KB_KEY_J;
-    g_keycodes[0x025] = KB_KEY_K;
-    g_keycodes[0x026] = KB_KEY_L;
-    g_keycodes[0x032] = KB_KEY_M;
-    g_keycodes[0x031] = KB_KEY_N;
-    g_keycodes[0x018] = KB_KEY_O;
-    g_keycodes[0x019] = KB_KEY_P;
-    g_keycodes[0x010] = KB_KEY_Q;
-    g_keycodes[0x013] = KB_KEY_R;
-    g_keycodes[0x01F] = KB_KEY_S;
-    g_keycodes[0x014] = KB_KEY_T;
-    g_keycodes[0x016] = KB_KEY_U;
-    g_keycodes[0x02F] = KB_KEY_V;
-    g_keycodes[0x011] = KB_KEY_W;
-    g_keycodes[0x02D] = KB_KEY_X;
-    g_keycodes[0x015] = KB_KEY_Y;
-    g_keycodes[0x02C] = KB_KEY_Z;
+    g_keycodes[0x00B] = MFB_KB_KEY_0;
+    g_keycodes[0x002] = MFB_KB_KEY_1;
+    g_keycodes[0x003] = MFB_KB_KEY_2;
+    g_keycodes[0x004] = MFB_KB_KEY_3;
+    g_keycodes[0x005] = MFB_KB_KEY_4;
+    g_keycodes[0x006] = MFB_KB_KEY_5;
+    g_keycodes[0x007] = MFB_KB_KEY_6;
+    g_keycodes[0x008] = MFB_KB_KEY_7;
+    g_keycodes[0x009] = MFB_KB_KEY_8;
+    g_keycodes[0x00A] = MFB_KB_KEY_9;
+    g_keycodes[0x01E] = MFB_KB_KEY_A;
+    g_keycodes[0x030] = MFB_KB_KEY_B;
+    g_keycodes[0x02E] = MFB_KB_KEY_C;
+    g_keycodes[0x020] = MFB_KB_KEY_D;
+    g_keycodes[0x012] = MFB_KB_KEY_E;
+    g_keycodes[0x021] = MFB_KB_KEY_F;
+    g_keycodes[0x022] = MFB_KB_KEY_G;
+    g_keycodes[0x023] = MFB_KB_KEY_H;
+    g_keycodes[0x017] = MFB_KB_KEY_I;
+    g_keycodes[0x024] = MFB_KB_KEY_J;
+    g_keycodes[0x025] = MFB_KB_KEY_K;
+    g_keycodes[0x026] = MFB_KB_KEY_L;
+    g_keycodes[0x032] = MFB_KB_KEY_M;
+    g_keycodes[0x031] = MFB_KB_KEY_N;
+    g_keycodes[0x018] = MFB_KB_KEY_O;
+    g_keycodes[0x019] = MFB_KB_KEY_P;
+    g_keycodes[0x010] = MFB_KB_KEY_Q;
+    g_keycodes[0x013] = MFB_KB_KEY_R;
+    g_keycodes[0x01F] = MFB_KB_KEY_S;
+    g_keycodes[0x014] = MFB_KB_KEY_T;
+    g_keycodes[0x016] = MFB_KB_KEY_U;
+    g_keycodes[0x02F] = MFB_KB_KEY_V;
+    g_keycodes[0x011] = MFB_KB_KEY_W;
+    g_keycodes[0x02D] = MFB_KB_KEY_X;
+    g_keycodes[0x015] = MFB_KB_KEY_Y;
+    g_keycodes[0x02C] = MFB_KB_KEY_Z;
 
-    g_keycodes[0x028] = KB_KEY_APOSTROPHE;
-    g_keycodes[0x02B] = KB_KEY_BACKSLASH;
-    g_keycodes[0x033] = KB_KEY_COMMA;
-    g_keycodes[0x00D] = KB_KEY_EQUAL;
-    g_keycodes[0x029] = KB_KEY_GRAVE_ACCENT;
-    g_keycodes[0x01A] = KB_KEY_LEFT_BRACKET;
-    g_keycodes[0x00C] = KB_KEY_MINUS;
-    g_keycodes[0x034] = KB_KEY_PERIOD;
-    g_keycodes[0x01B] = KB_KEY_RIGHT_BRACKET;
-    g_keycodes[0x027] = KB_KEY_SEMICOLON;
-    g_keycodes[0x035] = KB_KEY_SLASH;
-    g_keycodes[0x056] = KB_KEY_WORLD_2;
+    g_keycodes[0x028] = MFB_KB_KEY_APOSTROPHE;
+    g_keycodes[0x02B] = MFB_KB_KEY_BACKSLASH;
+    g_keycodes[0x033] = MFB_KB_KEY_COMMA;
+    g_keycodes[0x00D] = MFB_KB_KEY_EQUAL;
+    g_keycodes[0x029] = MFB_KB_KEY_GRAVE_ACCENT;
+    g_keycodes[0x01A] = MFB_KB_KEY_LEFT_BRACKET;
+    g_keycodes[0x00C] = MFB_KB_KEY_MINUS;
+    g_keycodes[0x034] = MFB_KB_KEY_PERIOD;
+    g_keycodes[0x01B] = MFB_KB_KEY_RIGHT_BRACKET;
+    g_keycodes[0x027] = MFB_KB_KEY_SEMICOLON;
+    g_keycodes[0x035] = MFB_KB_KEY_SLASH;
+    g_keycodes[0x056] = MFB_KB_KEY_WORLD_2;
 
-    g_keycodes[0x00E] = KB_KEY_BACKSPACE;
-    g_keycodes[0x153] = KB_KEY_DELETE;
-    g_keycodes[0x14F] = KB_KEY_END;
-    g_keycodes[0x01C] = KB_KEY_ENTER;
-    g_keycodes[0x001] = KB_KEY_ESCAPE;
-    g_keycodes[0x147] = KB_KEY_HOME;
-    g_keycodes[0x152] = KB_KEY_INSERT;
-    g_keycodes[0x15D] = KB_KEY_MENU;
-    g_keycodes[0x151] = KB_KEY_PAGE_DOWN;
-    g_keycodes[0x149] = KB_KEY_PAGE_UP;
-    g_keycodes[0x045] = KB_KEY_PAUSE;
-    g_keycodes[0x146] = KB_KEY_PAUSE;
-    g_keycodes[0x039] = KB_KEY_SPACE;
-    g_keycodes[0x00F] = KB_KEY_TAB;
-    g_keycodes[0x03A] = KB_KEY_CAPS_LOCK;
-    g_keycodes[0x145] = KB_KEY_NUM_LOCK;
-    g_keycodes[0x046] = KB_KEY_SCROLL_LOCK;
-    g_keycodes[0x03B] = KB_KEY_F1;
-    g_keycodes[0x03C] = KB_KEY_F2;
-    g_keycodes[0x03D] = KB_KEY_F3;
-    g_keycodes[0x03E] = KB_KEY_F4;
-    g_keycodes[0x03F] = KB_KEY_F5;
-    g_keycodes[0x040] = KB_KEY_F6;
-    g_keycodes[0x041] = KB_KEY_F7;
-    g_keycodes[0x042] = KB_KEY_F8;
-    g_keycodes[0x043] = KB_KEY_F9;
-    g_keycodes[0x044] = KB_KEY_F10;
-    g_keycodes[0x057] = KB_KEY_F11;
-    g_keycodes[0x058] = KB_KEY_F12;
-    g_keycodes[0x064] = KB_KEY_F13;
-    g_keycodes[0x065] = KB_KEY_F14;
-    g_keycodes[0x066] = KB_KEY_F15;
-    g_keycodes[0x067] = KB_KEY_F16;
-    g_keycodes[0x068] = KB_KEY_F17;
-    g_keycodes[0x069] = KB_KEY_F18;
-    g_keycodes[0x06A] = KB_KEY_F19;
-    g_keycodes[0x06B] = KB_KEY_F20;
-    g_keycodes[0x06C] = KB_KEY_F21;
-    g_keycodes[0x06D] = KB_KEY_F22;
-    g_keycodes[0x06E] = KB_KEY_F23;
-    g_keycodes[0x076] = KB_KEY_F24;
-    g_keycodes[0x038] = KB_KEY_LEFT_ALT;
-    g_keycodes[0x01D] = KB_KEY_LEFT_CONTROL;
-    g_keycodes[0x02A] = KB_KEY_LEFT_SHIFT;
-    g_keycodes[0x15B] = KB_KEY_LEFT_SUPER;
-    g_keycodes[0x137] = KB_KEY_PRINT_SCREEN;
-    g_keycodes[0x138] = KB_KEY_RIGHT_ALT;
-    g_keycodes[0x11D] = KB_KEY_RIGHT_CONTROL;
-    g_keycodes[0x036] = KB_KEY_RIGHT_SHIFT;
-    g_keycodes[0x15C] = KB_KEY_RIGHT_SUPER;
-    g_keycodes[0x150] = KB_KEY_DOWN;
-    g_keycodes[0x14B] = KB_KEY_LEFT;
-    g_keycodes[0x14D] = KB_KEY_RIGHT;
-    g_keycodes[0x148] = KB_KEY_UP;
+    g_keycodes[0x00E] = MFB_KB_KEY_BACKSPACE;
+    g_keycodes[0x153] = MFB_KB_KEY_DELETE;
+    g_keycodes[0x14F] = MFB_KB_KEY_END;
+    g_keycodes[0x01C] = MFB_KB_KEY_ENTER;
+    g_keycodes[0x001] = MFB_KB_KEY_ESCAPE;
+    g_keycodes[0x147] = MFB_KB_KEY_HOME;
+    g_keycodes[0x152] = MFB_KB_KEY_INSERT;
+    g_keycodes[0x15D] = MFB_KB_KEY_MENU;
+    g_keycodes[0x151] = MFB_KB_KEY_PAGE_DOWN;
+    g_keycodes[0x149] = MFB_KB_KEY_PAGE_UP;
+    g_keycodes[0x045] = MFB_KB_KEY_PAUSE;
+    g_keycodes[0x146] = MFB_KB_KEY_PAUSE;
+    g_keycodes[0x039] = MFB_KB_KEY_SPACE;
+    g_keycodes[0x00F] = MFB_KB_KEY_TAB;
+    g_keycodes[0x03A] = MFB_KB_KEY_CAPS_LOCK;
+    g_keycodes[0x145] = MFB_KB_KEY_NUM_LOCK;
+    g_keycodes[0x046] = MFB_KB_KEY_SCROLL_LOCK;
+    g_keycodes[0x03B] = MFB_KB_KEY_F1;
+    g_keycodes[0x03C] = MFB_KB_KEY_F2;
+    g_keycodes[0x03D] = MFB_KB_KEY_F3;
+    g_keycodes[0x03E] = MFB_KB_KEY_F4;
+    g_keycodes[0x03F] = MFB_KB_KEY_F5;
+    g_keycodes[0x040] = MFB_KB_KEY_F6;
+    g_keycodes[0x041] = MFB_KB_KEY_F7;
+    g_keycodes[0x042] = MFB_KB_KEY_F8;
+    g_keycodes[0x043] = MFB_KB_KEY_F9;
+    g_keycodes[0x044] = MFB_KB_KEY_F10;
+    g_keycodes[0x057] = MFB_KB_KEY_F11;
+    g_keycodes[0x058] = MFB_KB_KEY_F12;
+    g_keycodes[0x064] = MFB_KB_KEY_F13;
+    g_keycodes[0x065] = MFB_KB_KEY_F14;
+    g_keycodes[0x066] = MFB_KB_KEY_F15;
+    g_keycodes[0x067] = MFB_KB_KEY_F16;
+    g_keycodes[0x068] = MFB_KB_KEY_F17;
+    g_keycodes[0x069] = MFB_KB_KEY_F18;
+    g_keycodes[0x06A] = MFB_KB_KEY_F19;
+    g_keycodes[0x06B] = MFB_KB_KEY_F20;
+    g_keycodes[0x06C] = MFB_KB_KEY_F21;
+    g_keycodes[0x06D] = MFB_KB_KEY_F22;
+    g_keycodes[0x06E] = MFB_KB_KEY_F23;
+    g_keycodes[0x076] = MFB_KB_KEY_F24;
+    g_keycodes[0x038] = MFB_KB_KEY_LEFT_ALT;
+    g_keycodes[0x01D] = MFB_KB_KEY_LEFT_CONTROL;
+    g_keycodes[0x02A] = MFB_KB_KEY_LEFT_SHIFT;
+    g_keycodes[0x15B] = MFB_KB_KEY_LEFT_SUPER;
+    g_keycodes[0x137] = MFB_KB_KEY_PRINT_SCREEN;
+    g_keycodes[0x138] = MFB_KB_KEY_RIGHT_ALT;
+    g_keycodes[0x11D] = MFB_KB_KEY_RIGHT_CONTROL;
+    g_keycodes[0x036] = MFB_KB_KEY_RIGHT_SHIFT;
+    g_keycodes[0x15C] = MFB_KB_KEY_RIGHT_SUPER;
+    g_keycodes[0x150] = MFB_KB_KEY_DOWN;
+    g_keycodes[0x14B] = MFB_KB_KEY_LEFT;
+    g_keycodes[0x14D] = MFB_KB_KEY_RIGHT;
+    g_keycodes[0x148] = MFB_KB_KEY_UP;
 
-    g_keycodes[0x052] = KB_KEY_KP_0;
-    g_keycodes[0x04F] = KB_KEY_KP_1;
-    g_keycodes[0x050] = KB_KEY_KP_2;
-    g_keycodes[0x051] = KB_KEY_KP_3;
-    g_keycodes[0x04B] = KB_KEY_KP_4;
-    g_keycodes[0x04C] = KB_KEY_KP_5;
-    g_keycodes[0x04D] = KB_KEY_KP_6;
-    g_keycodes[0x047] = KB_KEY_KP_7;
-    g_keycodes[0x048] = KB_KEY_KP_8;
-    g_keycodes[0x049] = KB_KEY_KP_9;
-    g_keycodes[0x04E] = KB_KEY_KP_ADD;
-    g_keycodes[0x053] = KB_KEY_KP_DECIMAL;
-    g_keycodes[0x135] = KB_KEY_KP_DIVIDE;
-    g_keycodes[0x11C] = KB_KEY_KP_ENTER;
-    g_keycodes[0x059] = KB_KEY_KP_EQUAL;
-    g_keycodes[0x037] = KB_KEY_KP_MULTIPLY;
-    g_keycodes[0x04A] = KB_KEY_KP_SUBTRACT;
+    g_keycodes[0x052] = MFB_KB_KEY_KP_0;
+    g_keycodes[0x04F] = MFB_KB_KEY_KP_1;
+    g_keycodes[0x050] = MFB_KB_KEY_KP_2;
+    g_keycodes[0x051] = MFB_KB_KEY_KP_3;
+    g_keycodes[0x04B] = MFB_KB_KEY_KP_4;
+    g_keycodes[0x04C] = MFB_KB_KEY_KP_5;
+    g_keycodes[0x04D] = MFB_KB_KEY_KP_6;
+    g_keycodes[0x047] = MFB_KB_KEY_KP_7;
+    g_keycodes[0x048] = MFB_KB_KEY_KP_8;
+    g_keycodes[0x049] = MFB_KB_KEY_KP_9;
+    g_keycodes[0x04E] = MFB_KB_KEY_KP_ADD;
+    g_keycodes[0x053] = MFB_KB_KEY_KP_DECIMAL;
+    g_keycodes[0x135] = MFB_KB_KEY_KP_DIVIDE;
+    g_keycodes[0x11C] = MFB_KB_KEY_KP_ENTER;
+    g_keycodes[0x059] = MFB_KB_KEY_KP_EQUAL;
+    g_keycodes[0x037] = MFB_KB_KEY_KP_MULTIPLY;
+    g_keycodes[0x04A] = MFB_KB_KEY_KP_SUBTRACT;
 }
 
 //-------------------------------------
 mfb_key
 translate_key(unsigned int wParam, unsigned long lParam) {
     if (wParam == 0x92) // VK_OEM_NEC_EQUAL
-        return KB_KEY_KP_EQUAL;
+        return MFB_KB_KEY_KP_EQUAL;
 
     if (wParam == VK_CONTROL) {
         MSG   next;
         DWORD time;
 
         if (lParam & 0x01000000)
-            return KB_KEY_RIGHT_CONTROL;
+            return MFB_KB_KEY_RIGHT_CONTROL;
 
         time = GetMessageTime();
         if (PeekMessageW(&next, NULL, 0, 0, PM_NOREMOVE))
             if (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN || next.message == WM_KEYUP || next.message == WM_SYSKEYUP)
                 if (next.wParam == VK_MENU && (next.lParam & 0x01000000) && next.time == time)
-                    return KB_KEY_UNKNOWN;
+                    return MFB_KB_KEY_UNKNOWN;
 
-        return KB_KEY_LEFT_CONTROL;
+        return MFB_KB_KEY_LEFT_CONTROL;
     }
 
     if (wParam == VK_PROCESSKEY)
-        return KB_KEY_UNKNOWN;
+        return MFB_KB_KEY_UNKNOWN;
 
     return (mfb_key) g_keycodes[HIWORD(lParam) & 0x1FF];
 }
@@ -1114,17 +1114,17 @@ translate_mod() {
     uint32_t mods = 0;
 
     if (GetKeyState(VK_SHIFT) & 0x8000)
-        mods |= KB_MOD_SHIFT;
+        mods |= MFB_KB_MOD_SHIFT;
     if (GetKeyState(VK_CONTROL) & 0x8000)
-        mods |= KB_MOD_CONTROL;
+        mods |= MFB_KB_MOD_CONTROL;
     if (GetKeyState(VK_MENU) & 0x8000)
-        mods |= KB_MOD_ALT;
+        mods |= MFB_KB_MOD_ALT;
     if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)
-        mods |= KB_MOD_SUPER;
+        mods |= MFB_KB_MOD_SUPER;
     if (GetKeyState(VK_CAPITAL) & 1)
-        mods |= KB_MOD_CAPS_LOCK;
+        mods |= MFB_KB_MOD_CAPS_LOCK;
     if (GetKeyState(VK_NUMLOCK) & 1)
-        mods |= KB_MOD_NUM_LOCK;
+        mods |= MFB_KB_MOD_NUM_LOCK;
 
     return mods;
 }

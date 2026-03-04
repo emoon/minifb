@@ -15,7 +15,7 @@
 
     if(window_data != 0x0) {
         CGPoint point;
-        int     button_number = MOUSE_BTN_0;
+        int     button_number = MFB_MOUSE_BTN_0;
         for(UITouch *touch in touches) {
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
@@ -33,7 +33,7 @@
 
     if(window_data != 0x0) {
         CGPoint point;
-        int     button_number = MOUSE_BTN_0;
+        int     button_number = MFB_MOUSE_BTN_0;
         for(UITouch *touch in touches) {
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
@@ -51,7 +51,7 @@
 
     if(window_data != 0x0) {
         CGPoint point;
-        int     button_number = MOUSE_BTN_0;
+        int     button_number = MFB_MOUSE_BTN_0;
         for(UITouch *touch in touches) {
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;
@@ -69,7 +69,7 @@
 
     if(window_data != 0x0) {
         CGPoint point;
-        int     button_number = MOUSE_BTN_0;
+        int     button_number = MFB_MOUSE_BTN_0;
         for(UITouch *touch in touches) {
             point = [touch locationInView:self];
             window_data->mouse_pos_x = point.x;

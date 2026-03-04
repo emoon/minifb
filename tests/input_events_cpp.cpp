@@ -60,7 +60,7 @@ public:
             window_title = (const char *) mfb_get_user_data(window);
         }
         fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
-        if (key == KB_KEY_ESCAPE) {
+        if (key == MFB_KB_KEY_ESCAPE) {
             mfb_close(window);
         }
     }
@@ -110,7 +110,7 @@ int
 main() {
     int noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("Input Events CPP Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Input Events CPP Test", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
     if (!window)
         return 0;
 
@@ -173,7 +173,7 @@ main() {
             window_title = (const char *) mfb_get_user_data(window);
         }
         fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
-        if (key == KB_KEY_ESCAPE) {
+        if (key == MFB_KB_KEY_ESCAPE) {
             mfb_close(window);
         }
     }, window);
@@ -251,7 +251,7 @@ main() {
         }
 
         state = mfb_update(window, g_buffer);
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }

@@ -29,7 +29,7 @@ print_getters(struct mfb_window *window) {
     float scale_x = 0.0f, scale_y = 0.0f;
     bool is_active = false;
 
-    const char *key_name = mfb_get_key_name(KB_KEY_ESCAPE);
+    const char *key_name = mfb_get_key_name(MFB_KB_KEY_ESCAPE);
     const uint8_t *key_buffer = mfb_get_key_buffer(window);
 
     is_active = mfb_is_window_active(window);
@@ -59,7 +59,7 @@ print_getters(struct mfb_window *window) {
     fps = mfb_get_target_fps();
 
     fprintf(stdout, "[getters frame=%d]\n", g_frame_count);
-    fprintf(stdout, "  key_name(KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
+    fprintf(stdout, "  key_name(MFB_KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
     fprintf(stdout, "  is_window_active: %d\n", is_active);
     fprintf(stdout, "  target_fps: %u\n", fps);
     fprintf(stdout, "  monitor_scale: %f, %f\n", scale_x, scale_y);
@@ -81,12 +81,12 @@ print_getters(struct mfb_window *window) {
 
     if (key_buffer) {
         fprintf(stdout, "  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]\n",
-                key_buffer[KB_KEY_ESCAPE],
-                key_buffer[KB_KEY_SPACE],
-                key_buffer[KB_KEY_LEFT],
-                key_buffer[KB_KEY_RIGHT],
-                key_buffer[KB_KEY_UP],
-                key_buffer[KB_KEY_DOWN]);
+                key_buffer[MFB_KB_KEY_ESCAPE],
+                key_buffer[MFB_KB_KEY_SPACE],
+                key_buffer[MFB_KB_KEY_LEFT],
+                key_buffer[MFB_KB_KEY_RIGHT],
+                key_buffer[MFB_KB_KEY_UP],
+                key_buffer[MFB_KB_KEY_DOWN]);
     }
     else {
         fprintf(stdout, "  key_buffer: (null)\n");
@@ -149,11 +149,11 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     }
     fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
 
-    if (key == KB_KEY_SPACE) {
+    if (key == MFB_KB_KEY_SPACE) {
         print_getters(window);
     }
 
-    if (key == KB_KEY_ESCAPE) {
+    if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
@@ -205,7 +205,7 @@ int
 main() {
     int noise, carry, seed = 0xbeef;
 
-    struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
     if (!window) {
         return 0;
     }
@@ -247,7 +247,7 @@ main() {
             state = mfb_update_events(window);
         }
 
-        if (state != STATE_OK) {
+        if (state != MFB_STATE_OK) {
             window = NULL;
             break;
         }
