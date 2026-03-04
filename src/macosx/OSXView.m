@@ -128,8 +128,8 @@
 - (void)mouseDown:(NSEvent*)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        window_data->mouse_button_status[MOUSE_BTN_1] = true;
-        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, true);
+        window_data->mouse_button_status[MFB_MOUSE_BTN_1] = true;
+        kCall(mouse_btn_func, MFB_MOUSE_BTN_1, window_data->mod_keys, true);
     }
 }
 
@@ -137,8 +137,8 @@
 - (void)mouseUp:(NSEvent*)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        window_data->mouse_button_status[MOUSE_BTN_1] = false;
-        kCall(mouse_btn_func, MOUSE_BTN_1, window_data->mod_keys, false);
+        window_data->mouse_button_status[MFB_MOUSE_BTN_1] = false;
+        kCall(mouse_btn_func, MFB_MOUSE_BTN_1, window_data->mod_keys, false);
     }
 }
 
@@ -146,8 +146,8 @@
 - (void)rightMouseDown:(NSEvent*)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        window_data->mouse_button_status[MOUSE_BTN_2] = true;
-        kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, true);
+        window_data->mouse_button_status[MFB_MOUSE_BTN_2] = true;
+        kCall(mouse_btn_func, MFB_MOUSE_BTN_2, window_data->mod_keys, true);
     }
 }
 
@@ -155,8 +155,8 @@
 - (void)rightMouseUp:(NSEvent*)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        window_data->mouse_button_status[MOUSE_BTN_2] = false;
-        kCall(mouse_btn_func, MOUSE_BTN_2, window_data->mod_keys, false);
+        window_data->mouse_button_status[MFB_MOUSE_BTN_2] = false;
+        kCall(mouse_btn_func, MFB_MOUSE_BTN_2, window_data->mod_keys, false);
     }
 }
 
@@ -164,10 +164,10 @@
 - (void)otherMouseDown:(NSEvent *)event {
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
-        if (mapped_button > (uint32_t) MOUSE_BTN_7) {
-            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MOUSE_BTN_7.",
+        if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
+            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
                     (unsigned) [event buttonNumber]);
-            mapped_button = (uint32_t) MOUSE_BTN_7;
+            mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
@@ -180,10 +180,10 @@
 - (void)otherMouseUp:(NSEvent *)event {
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
-        if (mapped_button > (uint32_t) MOUSE_BTN_7) {
-            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MOUSE_BTN_7.",
+        if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
+            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
                     (unsigned) [event buttonNumber]);
-            mapped_button = (uint32_t) MOUSE_BTN_7;
+            mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
         window_data->mod_keys = translate_modifiers([event modifierFlags]);

@@ -8,22 +8,22 @@ translate_modifiers(NSEventModifierFlags flags) {
     uint32_t mod_keys = 0;
 
     if (flags & NSEventModifierFlagCapsLock) {
-        mod_keys |= KB_MOD_CAPS_LOCK;
+        mod_keys |= MFB_KB_MOD_CAPS_LOCK;
     }
     if (flags & NSEventModifierFlagShift) {
-        mod_keys |= KB_MOD_SHIFT;
+        mod_keys |= MFB_KB_MOD_SHIFT;
     }
     if (flags & NSEventModifierFlagControl) {
-        mod_keys |= KB_MOD_CONTROL;
+        mod_keys |= MFB_KB_MOD_CONTROL;
     }
     if (flags & NSEventModifierFlagOption) {
-        mod_keys |= KB_MOD_ALT;
+        mod_keys |= MFB_KB_MOD_ALT;
     }
     if (flags & NSEventModifierFlagCommand) {
-        mod_keys |= KB_MOD_SUPER;
+        mod_keys |= MFB_KB_MOD_SUPER;
     }
     if (flags & NSEventModifierFlagNumericPad) {
-        mod_keys |= KB_MOD_NUM_LOCK;
+        mod_keys |= MFB_KB_MOD_NUM_LOCK;
     }
 
     return mod_keys;

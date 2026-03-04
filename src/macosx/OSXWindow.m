@@ -129,31 +129,31 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
 
     window_data->mod_keys = mod_keys;
 
-    if (key_code != KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
+    if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
         bool is_pressed = false;
 
         switch (key_code) {
-            case KB_KEY_CAPS_LOCK:
-                is_pressed = (mod_keys & KB_MOD_CAPS_LOCK) != 0;
+            case MFB_KB_KEY_CAPS_LOCK:
+                is_pressed = (mod_keys & MFB_KB_MOD_CAPS_LOCK) != 0;
                 break;
-            case KB_KEY_NUM_LOCK:
-                is_pressed = (mod_keys & KB_MOD_NUM_LOCK) != 0;
+            case MFB_KB_KEY_NUM_LOCK:
+                is_pressed = (mod_keys & MFB_KB_MOD_NUM_LOCK) != 0;
                 break;
-            case KB_KEY_LEFT_SHIFT:
-            case KB_KEY_RIGHT_SHIFT:
-                is_pressed = (mod_keys & KB_MOD_SHIFT) != 0;
+            case MFB_KB_KEY_LEFT_SHIFT:
+            case MFB_KB_KEY_RIGHT_SHIFT:
+                is_pressed = (mod_keys & MFB_KB_MOD_SHIFT) != 0;
                 break;
-            case KB_KEY_LEFT_CONTROL:
-            case KB_KEY_RIGHT_CONTROL:
-                is_pressed = (mod_keys & KB_MOD_CONTROL) != 0;
+            case MFB_KB_KEY_LEFT_CONTROL:
+            case MFB_KB_KEY_RIGHT_CONTROL:
+                is_pressed = (mod_keys & MFB_KB_MOD_CONTROL) != 0;
                 break;
-            case KB_KEY_LEFT_ALT:
-            case KB_KEY_RIGHT_ALT:
-                is_pressed = (mod_keys & KB_MOD_ALT) != 0;
+            case MFB_KB_KEY_LEFT_ALT:
+            case MFB_KB_KEY_RIGHT_ALT:
+                is_pressed = (mod_keys & MFB_KB_MOD_ALT) != 0;
                 break;
-            case KB_KEY_LEFT_SUPER:
-            case KB_KEY_RIGHT_SUPER:
-                is_pressed = (mod_keys & KB_MOD_SUPER) != 0;
+            case MFB_KB_KEY_LEFT_SUPER:
+            case MFB_KB_KEY_RIGHT_SUPER:
+                is_pressed = (mod_keys & MFB_KB_MOD_SUPER) != 0;
                 break;
             default:
                 is_pressed = !window_data->key_status[key_code];
@@ -176,7 +176,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     if(window_data != 0x0) {
         short int key_code = g_keycodes[[event keyCode] & 0x1ff];
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        if (key_code != KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
+        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
             window_data->key_status[key_code] = true;
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, true);
         }
@@ -191,7 +191,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     if(window_data != 0x0) {
         short int key_code = g_keycodes[[event keyCode] & 0x1ff];
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        if (key_code != KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
+        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
             window_data->key_status[key_code] = false;
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, false);
         }
