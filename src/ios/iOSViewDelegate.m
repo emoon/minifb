@@ -64,10 +64,26 @@ NSString *g_shader_src = kShader(
 );
 
 //-------------------------------------
+static const char *
+metal_error_description(NSError *error) {
+    if (error == nil) {
+        return "unknown error";
+    }
+
+    NSString *description = [error localizedDescription];
+    if (description == nil) {
+        return "unknown error";
+    }
+
+    const char *utf8 = [description UTF8String];
+    return utf8 != NULL ? utf8 : "unknown error";
+}
+
+//-------------------------------------
 @implementation iOSViewDelegate {
     SWindowData                 *window_data;
     SWindowData_IOS             *window_data_ios;
-    
+
     id<MTLDevice>               metal_device;
     id<MTLLibrary>              metal_library;
 
@@ -75,7 +91,7 @@ NSString *g_shader_src = kShader(
     id<MTLCommandQueue>         command_queue;
 
     id<MTLRenderPipelineState>  pipeline_state;
-    id<MTLTexture>              texture_buffer;
+    id<MTLTexture>              texture_buffers[MaxBuffersInFlight];
 
     uint8_t                     current_buffer;
 }
@@ -91,6 +107,7 @@ NSString *g_shader_src = kShader(
         view.sampleCount      = 1;
 
         metal_device  = view.device;
+        current_buffer = (uint8_t)(MaxBuffersInFlight - 1);
 
         // Used for syncing the CPU and GPU
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
@@ -109,12 +126,18 @@ NSString *g_shader_src = kShader(
 - (bool) _createShaders {
     NSError *error = 0x0;
 
+    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
     metal_library = [metal_device newLibraryWithSource:g_shader_src
-                                               options:[[MTLCompileOptions alloc] init]
+                                               options:options
                                                  error:&error
     ];
+
+#if !__has_feature(objc_arc)
+    [options release];
+#endif
+
     if (error || !metal_library) {
-        NSLog(@"Unable to create shaders %@", error);
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to create shaders: %s", metal_error_description(error));
         return false;
     }
 
@@ -122,12 +145,17 @@ NSString *g_shader_src = kShader(
     id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
 
     if (!vertex_shader_func) {
-        NSLog(@"Unable to get vertFunc!\n");
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to find vertex function 'vertFunc'.");
         return false;
     }
 
     if (!fragment_shader_func) {
-        NSLog(@"Unable to get fragFunc!\n");
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to find fragment function 'fragFunc'.");
+
+#if !__has_feature(objc_arc)
+        [vertex_shader_func release];
+#endif
+
         return false;
     }
 
@@ -136,11 +164,18 @@ NSString *g_shader_src = kShader(
     pipelineStateDescriptor.label = @"MiniFB_pipeline";
     pipelineStateDescriptor.vertexFunction = vertex_shader_func;
     pipelineStateDescriptor.fragmentFunction = fragment_shader_func;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = 80; //bgra8Unorm;
+    pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
 
     pipeline_state = [metal_device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+
+#if !__has_feature(objc_arc)
+    [pipelineStateDescriptor release];
+    [vertex_shader_func release];
+    [fragment_shader_func release];
+#endif
+
     if (!pipeline_state) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create pipeline state: %s", metal_error_description(error));
         return false;
     }
 
@@ -163,28 +198,56 @@ NSString *g_shader_src = kShader(
                                                            height:window_data->buffer_height
                                                         mipmapped:false];
 
-    // Create the texture from the device by using the descriptor
-    texture_buffer = [metal_device newTextureWithDescriptor:td];
+    // Create all triple-buffered textures
+    for (int i = 0; i < MaxBuffersInFlight; ++i) {
+        texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
+    }
 }
 
 //-------------------------------------
-- (void) resizeTextures {
+- (bool) resizeTextures {
+    if (window_data == NULL || metal_device == nil) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: resizeTextures called with invalid window state.");
+        return false;
+    }
+
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                             width:window_data->buffer_width
                                                            height:window_data->buffer_height
                                                         mipmapped:false];
 
-    // Create the texture from the device by using the descriptor
-    [texture_buffer release];
-    texture_buffer = [metal_device newTextureWithDescriptor:td];
+    // Create new textures first, then release old ones to avoid dangling pointers if creation fails
+    id<MTLTexture> new_textures[MaxBuffersInFlight];
+    for (int i = 0; i < MaxBuffersInFlight; ++i) {
+        new_textures[i] = [metal_device newTextureWithDescriptor:td];
+        if (!new_textures[i]) {
+            // Release any textures already created in this attempt
+#if !__has_feature(objc_arc)
+            for (int j = 0; j < i; ++j) {
+                [new_textures[j] release];
+            }
+#endif
+            return false;
+        }
+    }
+    for (int i = 0; i < MaxBuffersInFlight; ++i) {
+#if !__has_feature(objc_arc)
+        [texture_buffers[i] release];
+#endif
+        texture_buffers[i] = new_textures[i];
+    }
+
+    return true;
 }
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     // by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    if (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW) != 0) {
+        return; // GPU is still busy, skip this frame instead of blocking
+    }
 
     current_buffer = (current_buffer + 1) % MaxBuffersInFlight;
 
@@ -203,9 +266,9 @@ NSString *g_shader_src = kShader(
         dispatch_semaphore_signal(block_sema);
     }];
 
-    // Copy the bytes from our data object into the texture
+    // Copy the bytes from our data object into the current texture slot
     MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
-    [texture_buffer replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
+    [texture_buffers[current_buffer] replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
 
     // Delay getting the currentRenderPassDescriptor until absolutely needed. This avoids
     // holding onto the drawable and blocking the display pipeline any longer than necessary
@@ -221,8 +284,7 @@ NSString *g_shader_src = kShader(
         [renderEncoder setRenderPipelineState:pipeline_state];
         [renderEncoder setVertexBytes:window_data_ios->vertices length:sizeof(window_data_ios->vertices) atIndex:0];
 
-        //[renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
-        [renderEncoder setFragmentTexture:texture_buffer atIndex:0];
+        [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
 
         // Draw the vertices of our quads
         [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -239,6 +301,34 @@ NSString *g_shader_src = kShader(
 }
 
 //-------------------------------------
+- (void) dealloc {
+#if !__has_feature(objc_arc)
+    for (int i = 0; i < MaxBuffersInFlight; ++i) {
+        [texture_buffers[i] release];
+        texture_buffers[i] = nil;
+    }
+
+    [pipeline_state release];
+    pipeline_state = nil;
+
+    [command_queue release];
+    command_queue = nil;
+
+    [metal_library release];
+    metal_library = nil;
+
+    #if !OS_OBJECT_USE_OBJC
+    if (semaphore) {
+        dispatch_release(semaphore);
+    }
+    #endif
+    semaphore = nil;
+
+    [super dealloc];
+#endif
+}
+
+//-------------------------------------
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
     (void) view;
     // Respond to drawable size or orientation changes here
@@ -248,7 +338,10 @@ NSString *g_shader_src = kShader(
     window_data->window_height = size.height * scale;
     resize_dst(window_data, size.width, size.height);
 
-    kCall(resize_func, size.width, size.height);
+    // Defer the resize callback to the main thread via mfb_update_ex / mfb_update_events,
+    // which are called from user code. This avoids invoking the callback from the
+    // CADisplayLink render thread.
+    window_data->must_resize_context = true;
 }
 
 @end

@@ -19,10 +19,10 @@ interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, 
     uint32_t wx1 = 0x10000 - wx2;
     uint32_t wy1 = 0x10000 - wy2;
 
-    uint32_t w1 = ((uint64_t) wx1 * wy1) >> 16;
-    uint32_t w2 = ((uint64_t) wx2 * wy1) >> 16;
-    uint32_t w3 = ((uint64_t) wx1 * wy2) >> 16;
-    uint32_t w4 = ((uint64_t) wx2 * wy2) >> 16;
+    uint32_t w1 = (uint32_t)(((uint64_t) wx1 * wy1) >> 16);
+    uint32_t w2 = (uint32_t)(((uint64_t) wx2 * wy1) >> 16);
+    uint32_t w3 = (uint32_t)(((uint64_t) wx1 * wy2) >> 16);
+    uint32_t w4 = (uint32_t)(((uint64_t) wx2 * wy2) >> 16);
 
     // If you don't have uint64_t
     //uint32_t b = (((p00[0] * wx1 + p01[0] * wx2) >> 16) * wy1 + ((p10[0] * wx1 + p11[0] * wx2) >> 16) * wy2) >> 16;

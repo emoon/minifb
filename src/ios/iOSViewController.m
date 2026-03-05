@@ -12,6 +12,7 @@
 #import "iOSViewDelegate.h"
 #import "iOSView.h"
 #include "WindowData_IOS.h"
+#include <MiniFB_internal.h>
 
 //-------------------------------------
 @implementation iOSViewController
@@ -34,12 +35,13 @@
     iOSView *view = [[iOSView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     // Probably the window was created automatically by an storyboard or similar
     if(window_data == 0x0) {
-        NSLog(@"WindowData is null!");
+        mfb_log(MFB_LOG_ERROR, "iOSViewController: window_data is null in loadView!");
     }
     view->window_data = window_data;
     view.userInteractionEnabled = true;
 
     [self setView:view];
+
 #if !__has_feature(objc_arc)
     [view release];
 #endif
@@ -55,8 +57,12 @@
     metal_view.backgroundColor = UIColor.blackColor;
 
     if(!metal_view.device) {
-        NSLog(@"Metal is not supported on this device");
-        self.view = [[UIView alloc] initWithFrame:self.view.frame];
+        mfb_log(MFB_LOG_ERROR, "iOSViewController: Metal is not supported on this device.");
+        UIView *fallback = [[UIView alloc] initWithFrame:self.view.frame];
+        self.view = fallback;
+#if !__has_feature(objc_arc)
+        [fallback release];
+#endif
         return;
     }
 

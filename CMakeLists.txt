@@ -541,7 +541,7 @@ endforeach()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
-if (MINIFB_BUILD_EXAMPLES)
+if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
     set_property(TARGET timer PROPERTY FOLDER "Tests")
     set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
