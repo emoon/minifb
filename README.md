@@ -85,6 +85,7 @@ mfb_update_state    mfb_update_events(struct mfb_window *window);
 bool                mfb_wait_sync(struct mfb_window *window);
 
 // Viewport control
+// Coordinates/sizes are in drawable coordinates (same units as mfb_get_window_width/height and resize callback).
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 ```
@@ -113,7 +114,7 @@ void active(struct mfb_window *window, bool is_active) {
 }
 
 void resize(struct mfb_window *window, int width, int height) {
-    // Called when window is resized
+    // Called when window is resized (width/height use the same drawable units as mfb_set_viewport)
     // Optionally adjust viewport:
     // mfb_set_viewport(window, x, y, width, height);
 }
@@ -268,6 +269,15 @@ void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x,
 - Returns scale multipliers (`1.0` = 100%).
 - If `window == NULL`, outputs still receive a safe fallback (`1.0`) when their pointers are non-`NULL`.
 - Some backends provide real scale values (for example Retina/HiDPI); others currently return fixed `1.0`.
+
+If you define layout in logical units and need drawable-coordinate values for `mfb_set_viewport()`, convert explicitly:
+
+```c
+float sx = 1.0f, sy = 1.0f;
+mfb_get_monitor_scale(window, &sx, &sy);
+unsigned margin_x_viewport = (unsigned) lroundf(margin_logical_x * sx);
+unsigned margin_y_viewport = (unsigned) lroundf(margin_logical_y * sy);
+```
 
 ### Display Insets
 

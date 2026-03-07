@@ -39,25 +39,6 @@ calculate_buffer_layout(unsigned width, unsigned height, uint32_t *stride_out, s
     return true;
 }
 
-//-------------------------------------
-static bool
-safe_scale_value(unsigned value, float scale, uint32_t *value_out) {
-    if (value_out == NULL) {
-        return false;
-    }
-
-    double safe_scale = (scale > 0.0f) ? (double) scale : 1.0;
-    double scaled = (double) value * safe_scale;
-    if (scaled < 0.0 || scaled > (double) UINT32_MAX) {
-        return false;
-    }
-
-    *value_out = (uint32_t) lround(scaled);
-
-    return true;
-}
-
-//-------------------------------------
 static UIWindow *
 get_application_window(void) {
     UIApplication *application = [UIApplication sharedApplication];
@@ -452,13 +433,6 @@ mfb_wait_sync(struct mfb_window *window) {
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    float scale_x = 1.0f;
-    float scale_y = 1.0f;
-    bool scaled_values_valid = false;
-    uint32_t offset_x_px = 0;
-    uint32_t offset_y_px = 0;
-    uint32_t width_px = 0;
-    uint32_t height_px = 0;
 
     if(window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport called with a null window pointer.");
@@ -477,44 +451,30 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    mfb_get_monitor_scale(window, &scale_x, &scale_y);
-
-    scaled_values_valid =
-        safe_scale_value(offset_x, scale_x, &offset_x_px) &&
-        safe_scale_value(width,    scale_x, &width_px)    &&
-        safe_scale_value(offset_y, scale_y, &offset_y_px) &&
-        safe_scale_value(height,   scale_y, &height_px);
-
-    if (scaled_values_valid == false) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport values overflow after monitor scale (scale_x=%.3f, scale_y=%.3f).",
-                scale_x, scale_y);
-        return false;
-    }
-
-    if (offset_x_px > window_data->window_width || width_px > (window_data->window_width - offset_x_px)) {
+    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u). "
-                "Values must be in logical points, not pixels.",
-                offset_x_px, width_px, window_data->window_width);
+                "Values must be in drawable pixels.",
+                offset_x, width, window_data->window_width);
         return false;
     }
 
-    if (offset_y_px > window_data->window_height || height_px > (window_data->window_height - offset_y_px)) {
+    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u). "
-                "Values must be in logical points, not pixels.",
-                offset_y_px, height_px, window_data->window_height);
+                "Values must be in drawable pixels.",
+                offset_y, height, window_data->window_height);
         return false;
     }
 
-    window_data->dst_offset_x = offset_x_px;
-    window_data->dst_offset_y = offset_y_px;
-    window_data->dst_width    = width_px;
-    window_data->dst_height   = height_px;
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
-    float x1 =  ((float) offset_x_px              / window_data->window_width)  * 2.0f - 1.0f;
-    float x2 = (((float) offset_x_px + width_px)  / window_data->window_width)  * 2.0f - 1.0f;
-    float y1 =  ((float) offset_y_px              / window_data->window_height) * 2.0f - 1.0f;
-    float y2 = (((float) offset_y_px + height_px) / window_data->window_height) * 2.0f - 1.0f;
+    float x1 =  ((float) offset_x          / window_data->window_width)  * 2.0f - 1.0f;
+    float x2 = (((float) offset_x + width) / window_data->window_width)  * 2.0f - 1.0f;
+    float y1 =  ((float) offset_y          / window_data->window_height) * 2.0f - 1.0f;
+    float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL) {

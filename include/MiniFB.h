@@ -29,9 +29,9 @@ void                mfb_close(struct mfb_window *window);
 void                mfb_set_user_data(struct mfb_window *window, void *user_data);
 void *              mfb_get_user_data(struct mfb_window *window);
 
-// Set viewport (useful when resize)
+// Set viewport in drawable coordinates (same units as mfb_get_window_width/height and resize callback)
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
-// Let mfb to calculate the best fit from your framebuffer original size
+// Let mfb calculate the best fit from your framebuffer original size (same drawable coordinate units)
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 
 // DPI

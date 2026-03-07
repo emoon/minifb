@@ -259,6 +259,11 @@ resize(struct mfb_window *window, int width, int height) {
         g_height = (uint32_t)([UIScreen mainScreen].bounds.size.height * g_scale);
         g_window = mfb_open("noise", g_width, g_height);
         if(g_window != 0x0) {
+            // Do not delete. It is here to test the viewport
+            //g_width -= 100;
+            //g_height -= 100;
+            //mfb_set_viewport(g_window, 50, 50, g_width, g_height);
+
             g_buffer = malloc(g_width * g_height * 4);
             mfb_set_active_callback(g_window, active_changed);
             mfb_set_close_callback(g_window, window_closing);

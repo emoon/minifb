@@ -437,14 +437,10 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_SIZE:
             if (window_data) {
-                float       scale_x, scale_y;
-                uint32_t    width, height;
-
                 if (wParam == SIZE_MINIMIZED) {
                     return res;
                 }
 
-                get_monitor_scale(hWnd, &scale_x, &scale_y);
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
@@ -455,11 +451,10 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 resize_GL(window_data);
 #endif
                 if (window_data->window_width != 0 && window_data->window_height != 0) {
-                    width  = (uint32_t) (window_data->window_width  / scale_x);
-                    height = (uint32_t) (window_data->window_height / scale_y);
-                    mfb_log(MFB_LOG_DEBUG, "WM_SIZE: window=%ux%u framebuffer=%ux%u scale=(%.2f, %.2f)",
-                            window_data->window_width, window_data->window_height, width, height, scale_x, scale_y);
-                    kCall(resize_func, width, height);
+                    mfb_log(MFB_LOG_DEBUG, "WM_SIZE: window=%ux%u framebuffer=%ux%u",
+                            window_data->window_width, window_data->window_height,
+                            window_data->window_width, window_data->window_height);
+                    kCall(resize_func, window_data->window_width, window_data->window_height);
                 }
             }
             break;
@@ -1134,7 +1129,6 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData     *window_data     = (SWindowData *) window;
     SWindowData_Win *window_data_specific = NULL;
-    float           scale_x, scale_y;
 
     if (window_data == NULL) {
         return false;
@@ -1152,12 +1146,10 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    get_monitor_scale(window_data_specific->window, &scale_x, &scale_y);
-    window_data->dst_offset_x = (uint32_t) (offset_x * scale_x);
-    window_data->dst_offset_y = (uint32_t) (offset_y * scale_y);
-
-    window_data->dst_width    = (uint32_t) (width  * scale_x);
-    window_data->dst_height   = (uint32_t) (height * scale_y);
+    window_data->dst_offset_x = offset_x;
+    window_data->dst_offset_y = offset_y;
+    window_data->dst_width    = width;
+    window_data->dst_height   = height;
 
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 

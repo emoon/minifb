@@ -173,12 +173,11 @@ mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigne
         unsigned offset_x = (new_width  - final_width)  >> 1;
         unsigned offset_y = (new_height - final_height) >> 1;
 
-        mfb_get_monitor_scale(window, &scale_x, &scale_y);
         return mfb_set_viewport(window,
-                                (unsigned) (offset_x     / scale_x),
-                                (unsigned) (offset_y     / scale_y),
-                                (unsigned) (final_width  / scale_x),
-                                (unsigned) (final_height / scale_y));
+                                offset_x,
+                                offset_y,
+                                final_width,
+                                final_height);
     }
 
     return false;
