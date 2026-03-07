@@ -749,8 +749,7 @@ mfb_wait_sync(struct mfb_window *window) {
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-  if (!window)
-    return;
+  kUnused(window);
 
   if (scale_x)
     *scale_x = 1.0f;

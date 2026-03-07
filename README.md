@@ -263,6 +263,12 @@ void                mfb_get_monitor_scale(struct mfb_window *window, float *scal
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y); // [Deprecated]
 ```
 
+`mfb_get_monitor_scale()`:
+
+- Returns scale multipliers (`1.0` = 100%).
+- If `window == NULL`, outputs still receive a safe fallback (`1.0`) when their pointers are non-`NULL`.
+- Some backends provide real scale values (for example Retina/HiDPI); others currently return fixed `1.0`.
+
 ### Display Insets
 
 Two C functions let you query display insets from native code:

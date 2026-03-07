@@ -1172,19 +1172,25 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
+    float x = 1.0f;
+    float y = 1.0f;
     HWND hWnd = NULL;
 
     SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL) {
-        return;
+    if (window_data != NULL) {
+        SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+        if (window_data_specific != NULL) {
+            hWnd = window_data_specific->window;
+            get_monitor_scale(hWnd, &x, &y);
+        }
     }
 
-    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
-    if (window_data_specific == NULL)
-        return;
-
-    hWnd = window_data_specific->window;
-    get_monitor_scale(hWnd, scale_x, scale_y);
+    if (scale_x) {
+        *scale_x = x;
+    }
+    if (scale_y) {
+        *scale_y = y;
+    }
 }
 
 //-------------------------------------
