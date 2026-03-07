@@ -228,7 +228,7 @@ unsigned            mfb_get_target_fps(void);
 bool                mfb_wait_sync(struct mfb_window *window); // Frame sync point
 ```
 
-**Note:** Hardware-accelerated syncing (OpenGL, iOS) will use vertical sync. Other platforms use software pacing.
+**Note:** Hardware-accelerated syncing (OpenGL / Metal, where supported) will use vertical sync. Other platforms use software pacing.
 
 ### Logging
 
@@ -559,10 +559,13 @@ Apple references:
 - No keyboard or char-input callbacks (iOS backend uses touch events instead)
 - Single window only (flags to `mfb_open_ex()` are ignored)
 - `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- `mfb_set_active_callback()` and `mfb_set_close_callback()` are not triggered by iOS system events
 - No dedicated multitouch API; touches are mapped to mouse callbacks (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`)
 - Mouse events represent touch events (coordinates track the last processed touch event)
 - No mouse wheel/scroll callback support on iOS
+
+`mfb_set_active_callback()` is triggered from iOS app lifecycle notifications
+(active/inactive transitions).
+`mfb_set_close_callback()` is called as a termination notification only; iOS does not allow canceling app termination.
 
 `mfb_set_target_fps()` / `mfb_get_target_fps()` are supported on iOS for software pacing via `mfb_wait_sync()`.
 If your app is driven by `CADisplayLink` (like the example), frame pacing is display-driven by iOS.
@@ -631,14 +634,16 @@ Take a look at the example in tests/android. You need **Android Studio** to buil
 
 **Limitations**:
 
-- No keyboard input callbacks (use char input callbacks instead)
+- No general keyboard/char-input callback support yet
 - Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops
 - `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support
-- Mouse events represent touch events (last touch position)
+- No dedicated multitouch API; touches are mapped to mouse callbacks (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`)
+- Mouse events represent touch events (last processed touch position)
+- `mfb_get_monitor_scale()` reports Android density scale (same value for X/Y, from `AConfiguration_getDensity()` with `160dpi = 1.0`)
 
 **Note**: On Android, pressing `BACK` should close the app by default. In some emulators, right-click may be mapped to `BACK`. For debugging this case, the Android example CMake option `MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC` can be enabled to map `BACK` to `ESC` instead (default: `OFF`).
+
+`mfb_set_target_fps()` / `mfb_get_target_fps()` are supported on Android for software pacing via `mfb_wait_sync()`.
 
 All other MiniFB functions work normally, including timers, viewports, and user data management.
 
@@ -807,18 +812,14 @@ Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.h
 
 #### Limitations & caveats
 
-The web backend currently does not support the following MiniFB features:
+The web backend has the following backend-specific behavior:
 
-- The flags to `mfb_open_ex()` are ignored
-- `mfb_set_viewport()` (no-op)
-- `mfb_set_viewport_best_fit()` (no-op)
-- `mfb_get_monitor_dpi()` (reports a fixed value)
-- `mfb_get_monitor_scale()` (reports a fixed value)
-- `mfb_set_target_fps()` (no-op)
-- `mfb_get_target_fps()` (no-op)
-- `mfb_show_cursor()` (no-op)
+- In `mfb_open_ex()`, only fullscreen flags are currently interpreted (`MFB_WF_FULLSCREEN`, `MFB_WF_FULLSCREEN_DESKTOP`); other window flags are ignored
+- `mfb_get_monitor_dpi()` / `mfb_get_monitor_scale()` report fixed values (`1.0` scale)
+- `mfb_set_target_fps()` / `mfb_get_target_fps()` store/query the target value, but do not currently control browser frame pacing (the browser event loop / RAF timing drives pacing)
+- `mfb_show_cursor()` tracks requested visibility, but hiding the browser cursor is not implemented yet
 
-Everything else is supported.
+Core rendering, events, viewport and timers are supported.
 
 When calling `mfb_open()` or `mfb_open_ex()`, the specified title must match the `id` attribute of a `<canvas>` element in the DOM. The functions will modify the `width` and `height` attribute of the `<canvas>` element. If not already set, then the functions will also modify the CSS style `width` and `height` attributes of the canvas.
 
@@ -941,14 +942,18 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Window creation | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | mfb_update | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Keyboard input | Yes | Yes | Yes | Yes | No | Limited | Yes | Limited |
-| Mouse input | Yes | Yes | Yes | Yes | Touch | Touch | Yes | No |
-| Multi-window | Yes | Yes | Yes | Yes | No | No | No | No |
-| Viewport | Yes | Yes | Yes | Yes | Yes | Yes | No-op | No-op |
-| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
-| Monitor DPI | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
-| Target FPS | Yes | Yes | Yes | Yes | Yes* | No-op | No-op | No-op |
-| Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
+| Mouse input | Yes | Yes | Yes | Yes | Touch | Touch | Yes | Limited |
+| Multi-window | Yes | Yes | Yes | Yes | No | No | Yes | No |
+| Viewport | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op* | No-op |
+| Monitor DPI / scale | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
+| Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Limited*** | Limited*** |
+| Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | Browser-driven | - |
 
-`*` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
+`*` Web backend currently tracks requested cursor state, but does not hide the browser cursor.
+
+`**` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
+
+`***` Web/DOS currently store/report the target FPS value, but frame pacing is not controlled by it.
 
 For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).
