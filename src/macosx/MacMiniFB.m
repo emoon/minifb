@@ -141,6 +141,8 @@ dispatch_pending_resize(SWindowData *window_data) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     @autoreleasepool {
+        const char *window_title_c = (title != NULL && title[0] != '\0') ? title : "minifb";
+
         if (width == 0 || height == 0) {
             mfb_log(MFB_LOG_ERROR, "MacMiniFB: invalid window size %ux%u.", width, height);
             return NULL;
@@ -245,15 +247,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         //[window_data->window updateSize];
     #endif
 
-        NSString *window_title = @"minifb";
-        if (title != NULL) {
-            NSString *utf8_title = [NSString stringWithUTF8String:title];
-            if (utf8_title != nil) {
-                window_title = utf8_title;
-            }
-            else {
-                mfb_log(MFB_LOG_WARNING, "MacMiniFB: window title is not valid UTF-8; falling back to default title.");
-            }
+        NSString *window_title = [NSString stringWithUTF8String:window_title_c];
+        if (window_title == nil) {
+            mfb_log(MFB_LOG_WARNING, "MacMiniFB: window title is not valid UTF-8; falling back to default title.");
+            window_title = @"minifb";
         }
         [window_data_specific->window setTitle:window_title];
         [window_data_specific->window performSelectorOnMainThread:@selector(makeKeyAndOrderFront:) withObject:nil waitUntilDone:YES];
@@ -277,10 +274,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #if defined(USE_METAL_API)
         mfb_log(MFB_LOG_DEBUG, "MacMiniFB: window created using Metal API (title='%s', size=%ux%u, flags=0x%x).",
-                title ? title : "(null)", width, height, flags);
+                window_title_c, width, height, flags);
 #else
         mfb_log(MFB_LOG_DEBUG, "MacMiniFB: window created using Cocoa API (title='%s', size=%ux%u, flags=0x%x).",
-                title ? title : "(null)", width, height, flags);
+                window_title_c, width, height, flags);
 #endif
 
         window_data->is_initialized = true;

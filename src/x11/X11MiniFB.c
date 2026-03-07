@@ -504,6 +504,7 @@ update_events(SWindowData *window_data, Display *display) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     int depth, i, format_count, conv_depth = -1;
     XPixmapFormatValues* formats;
     XSetWindowAttributes window_attributes;
@@ -690,7 +691,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
 
-    XStoreName(window_data_specific->display, window_data_specific->window, title);
+    XStoreName(window_data_specific->display, window_data_specific->window, window_title);
 
     if (flags & MFB_WF_BORDERLESS) {
         struct StyleHints {

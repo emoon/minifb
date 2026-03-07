@@ -1250,6 +1250,7 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
@@ -1477,7 +1478,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
 
-        xdg_toplevel_set_title(window_data_way->toplevel, title ? title : "minifb");
+        xdg_toplevel_set_title(window_data_way->toplevel, window_title);
         xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
 
         // Commit without a buffer to trigger initial configure event

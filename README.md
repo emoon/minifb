@@ -90,6 +90,12 @@ bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 ```
 
+`mfb_open()` and `mfb_open_ex()` return `NULL` if:
+- `width == 0` or `height == 0`
+- `width * 4` would overflow the internal framebuffer stride
+
+If `title` is `NULL` or empty, MiniFB uses `"minifb"` as the effective window/canvas title.
+
 ### Event Callbacks
 
 Register callbacks to handle window events:
@@ -773,7 +779,7 @@ target_link_options(my_app PRIVATE "-sEXPORT_NAME=my_app")
 
 The Emscripten toolchain will then build a `my_app.wasm` and `my_app.js` file containing your app's WASM code and JavaScript glue code to load the WASM file and run it. To load and run your app, you need to:
 
-1. Create a `<canvas>` element with an `id` attribute matching the `title` you specify when calling `mfb_open_window()` or `mfb_open_window_ex()`.
+1. Create a `<canvas>` element with an `id` attribute matching the `title` you specify when calling `mfb_open()` or `mfb_open_ex()`.
 2. Call the `<my_module_name>()` in JavaScript.
 
 Example app:
@@ -841,7 +847,8 @@ The web backend has the following backend-specific behavior:
 
 Core rendering, events, viewport and timers are supported.
 
-When calling `mfb_open()` or `mfb_open_ex()`, the specified title must match the `id` attribute of a `<canvas>` element in the DOM. The functions will modify the `width` and `height` attribute of the `<canvas>` element. If not already set, then the functions will also modify the CSS style `width` and `height` attributes of the canvas.
+When calling `mfb_open()` or `mfb_open_ex()`, the effective title must match the `id` attribute of a `<canvas>` element in the DOM. If `title` is `NULL` or empty, the effective title is `"minifb"`, so the backend looks for `<canvas id="minifb">`.
+The functions will modify the `width` and `height` attribute of the `<canvas>` element. If not already set, then the functions will also modify the CSS style `width` and `height` attributes of the canvas.
 
 Setting the CSS width and height of the canvas allows you to up-scale the framebuffer arbitrarily:
 

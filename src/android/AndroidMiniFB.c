@@ -599,6 +599,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     kUnused(title);
     kUnused(flags);
 
+    if (width == 0 || height == 0) {
+        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window size %ux%u.", width, height);
+        return NULL;
+    }
+
+    if (width > UINT32_MAX / 4u) {
+        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window width %u (stride overflow).", width);
+        return NULL;
+    }
+
     if (gApplication == NULL) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: mfb_open_ex called before android_main initialized the app context.");
         return NULL;

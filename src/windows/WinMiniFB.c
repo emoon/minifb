@@ -508,11 +508,22 @@ release_window_counter(void) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     RECT rect = { 0 };
     int  x = 0, y = 0;
     int  show_window_cmd = SW_NORMAL;
     SWindowData *window_data = NULL;
     SWindowData_Win *window_data_specific = NULL;
+
+    if (width == 0 || height == 0) {
+        mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window size %ux%u.", width, height);
+        return NULL;
+    }
+
+    if (width > UINT32_MAX / 4u) {
+        mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window width %u (stride overflow).", width);
+        return NULL;
+    }
 
     if (g_window_counter == 0) {
         timeBeginPeriod(1); // To be able to sleep 1 ms on Windows
@@ -615,7 +626,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_specific->wc.lpfnWndProc   = WndProc;
     window_data_specific->wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    window_data_specific->wc.lpszClassName = title;
+    window_data_specific->wc.lpszClassName = window_title;
     if (RegisterClass(&window_data_specific->wc) == 0) {
         uint32_t error = GetLastError();
         if (error != ERROR_CLASS_ALREADY_EXISTS) {
@@ -634,7 +645,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->window = CreateWindowEx(
         0,
-        title, title,
+        window_title, window_title,
         g_window_style,
         x, y,
         window_data->window_width, window_data->window_height,

@@ -7,7 +7,8 @@
 extern "C" {
 #endif
 
-// Create a window that is used to display the buffer sent into the mfb_update function, returns 0 if fails
+// Create a window that is used to display the buffer sent into the mfb_update function, returns 0 if fails.
+// If title is NULL or empty, a backend-default title ("minifb") is used.
 struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height);
 struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);
 
