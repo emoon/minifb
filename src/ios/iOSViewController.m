@@ -15,10 +15,14 @@
 #include <MiniFB_internal.h>
 
 //-------------------------------------
+@interface iOSViewController ()
+- (void) setupRendererIfPossible;
+@end
+
+//-------------------------------------
 @implementation iOSViewController
 {
     iOSView         *metal_view;
-    //iOSViewDelegate *view_delegate;
 }
 
 //-------------------------------------
@@ -28,6 +32,74 @@
         window_data = windowData;
     }
     return self;
+}
+
+//-------------------------------------
+- (void) attachWindowData:(SWindowData *) windowData {
+    window_data = windowData;
+
+    if ([self isViewLoaded] && [self.view isKindOfClass:[iOSView class]]) {
+        ((iOSView *) self.view)->window_data = window_data;
+    }
+
+    [self setupRendererIfPossible];
+}
+
+//-------------------------------------
+- (void) setupRendererIfPossible {
+    if (![self isViewLoaded] || ![self.view isKindOfClass:[iOSView class]]) {
+        return;
+    }
+
+    metal_view = (iOSView *) self.view;
+    metal_view->window_data = window_data;
+    metal_view.backgroundColor = UIColor.blackColor;
+
+    if (metal_view.device == nil) {
+        id<MTLDevice> default_device = MTLCreateSystemDefaultDevice();
+        metal_view.device = default_device;
+#if !__has_feature(objc_arc)
+        [default_device release];
+#endif
+    }
+
+    if(!metal_view.device) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewController: Metal is not supported on this device.");
+        UIView *fallback = [[UIView alloc] initWithFrame:self.view.frame];
+        self.view = fallback;
+#if !__has_feature(objc_arc)
+        [fallback release];
+#endif
+        return;
+    }
+
+    if (window_data == NULL || window_data->specific == NULL) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewController: window_data is null in setupRendererIfPossible.");
+        return;
+    }
+
+    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
+    if (window_data_ios->view_delegate == nil) {
+        window_data_ios->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
+    }
+    if (window_data_ios->view_delegate == nil) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewController: failed to initialize iOSViewDelegate.");
+        return;
+    }
+
+    // Use MTKView's effective drawable size in pixels.
+    [metal_view layoutIfNeeded];
+    CGSize pixelSize = metal_view.drawableSize;
+    if (pixelSize.width <= 0.0 || pixelSize.height <= 0.0) {
+        CGFloat scale = UIScreen.mainScreen.scale;
+        pixelSize = CGSizeMake(metal_view.bounds.size.width  * scale,
+                               metal_view.bounds.size.height * scale);
+    }
+    [window_data_ios->view_delegate mtkView:metal_view drawableSizeWillChange:pixelSize];
+
+    if (metal_view.delegate != window_data_ios->view_delegate) {
+        metal_view.delegate = window_data_ios->view_delegate;
+    }
 }
 
 //-------------------------------------
@@ -51,26 +123,7 @@
 - (void) viewDidLoad
 {
     [super viewDidLoad];
-
-    metal_view = (iOSView *) self.view;
-    metal_view.device = MTLCreateSystemDefaultDevice();
-    metal_view.backgroundColor = UIColor.blackColor;
-
-    if(!metal_view.device) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewController: Metal is not supported on this device.");
-        UIView *fallback = [[UIView alloc] initWithFrame:self.view.frame];
-        self.view = fallback;
-#if !__has_feature(objc_arc)
-        [fallback release];
-#endif
-        return;
-    }
-
-    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
-    window_data_ios->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
-    [window_data_ios->view_delegate mtkView:metal_view drawableSizeWillChange:metal_view.bounds.size];
-
-    metal_view.delegate = window_data_ios->view_delegate;
+    [self setupRendererIfPossible];
 }
 
 @end

@@ -491,19 +491,34 @@ if (MINIFB_BUILD_EXAMPLES)
 
     else() # iOS
 
-        add_executable(noise
+        set(IOS_NOISE_COMMON_SOURCES
             tests/ios/main.m
             tests/ios/AppDelegate.h
             tests/ios/AppDelegate.m
         )
-        list(APPEND MINIFB_TEST_TARGETS noise)
+
+        add_executable(noise
+            ${IOS_NOISE_COMMON_SOURCES}
+        )
+        add_executable(noise_no_storyboard
+            ${IOS_NOISE_COMMON_SOURCES}
+        )
+        list(APPEND MINIFB_TEST_TARGETS noise noise_no_storyboard)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
-        target_include_directories(noise PRIVATE src)
-        target_include_directories(noise PRIVATE src/ios)
+        foreach(ios_noise_target IN ITEMS noise noise_no_storyboard)
+            target_include_directories(${ios_noise_target} PRIVATE src)
+            target_include_directories(${ios_noise_target} PRIVATE src/ios)
+        endforeach()
 
-        target_compile_definitions(noise PRIVATE TVOS_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+        set_target_properties(noise PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/tests/ios/Info.plist"
+            RESOURCE "tests/ios/LaunchScreen.storyboard"
+        )
+        set_target_properties(noise_no_storyboard PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/tests/ios/Info.no_storyboard.plist"
+        )
 
     endif()
 

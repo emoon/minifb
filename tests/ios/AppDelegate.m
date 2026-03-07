@@ -41,9 +41,26 @@ mouse_move(struct mfb_window *window, int x, int y) {
 void
 resize(struct mfb_window *window, int width, int height) {
     kUnused(window);
-    g_width  = width;
-    g_height = height;
-    g_buffer = realloc(g_buffer, g_width * g_height * 4);
+
+    if (width <= 0 || height <= 0) {
+        free(g_buffer);
+        g_buffer = 0x0;
+        g_width  = 0;
+        g_height = 0;
+        NSLog(@"Resize %d, %d", width, height);
+        return;
+    }
+
+    size_t new_size = (size_t) width * (size_t) height * sizeof(uint32_t);
+    uint32_t *new_buffer = realloc(g_buffer, new_size);
+    if (new_buffer == 0x0) {
+        NSLog(@"Resize %d, %d failed: out of memory", width, height);
+        return;
+    }
+
+    g_width  = (uint32_t) width;
+    g_height = (uint32_t) height;
+    g_buffer = new_buffer;
     NSLog(@"Resize %d, %d", width, height);
 }
 
@@ -54,7 +71,10 @@ resize(struct mfb_window *window, int width, int height) {
 - (void) OnUpdateFrame {
     static int seed = 0xbeef;
     int noise, carry;
-    int dis = 0;
+
+    if(g_window == 0x0) {
+        return;
+    }
 
     if(g_buffer != 0x0) {
         uint32_t i = 0;
@@ -67,20 +87,22 @@ resize(struct mfb_window *window, int width, int height) {
                 noise >>= 1;
                 seed >>= 1;
                 seed |= (carry << 30);
-                noise &= 0xFF >> dis;
-                g_buffer[i++] = MFB_RGB(noise, noise, noise);
+                noise &= 0xFF;
+                g_buffer[i++] = MFB_ARGB(0xFF, noise, noise, noise);
             }
-            if((y & 0x07) == 0x07)
-                dis ^= 0x01;
         }
     }
 
     mfb_update_state state = mfb_update_ex(g_window, g_buffer, g_width, g_height);
-    if (state != MFB_STATE_OK) {
+    if (state == MFB_STATE_EXIT) {
+        g_window = 0x0;
         free(g_buffer);
         g_buffer = 0x0;
         g_width   = 0;
         g_height  = 0;
+    }
+    else if (state != MFB_STATE_OK) {
+        NSLog(@"mfb_update_ex returned state=%d", state);
     }
 }
 
@@ -92,9 +114,8 @@ resize(struct mfb_window *window, int width, int height) {
 
     if(g_window == 0x0) {
         mfb_get_monitor_scale(0x0, &g_scale, 0x0);
-        //g_scale  = [UIScreen mainScreen].scale;
-        g_width  = [UIScreen mainScreen].bounds.size.width  * g_scale;
-        g_height = [UIScreen mainScreen].bounds.size.height * g_scale;
+        g_width  = [UIScreen mainScreen].bounds.size.width;
+        g_height = [UIScreen mainScreen].bounds.size.height;
         g_window = mfb_open("noise", g_width, g_height);
         if(g_window != 0x0) {
             g_width  -= 100;
@@ -146,7 +167,10 @@ resize(struct mfb_window *window, int width, int height) {
     kUnused(application);
 
     [mDisplayLink invalidate];
-    mfb_close(g_window);
+    if (g_window != 0x0) {
+        mfb_close(g_window);
+        g_window = 0x0;
+    }
 }
 
 @end

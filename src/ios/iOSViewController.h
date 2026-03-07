@@ -15,5 +15,6 @@
 }
 
 - (id) initWithWindowData:(SWindowData *) windowData;
+- (void) attachWindowData:(SWindowData *) windowData;
 
 @end

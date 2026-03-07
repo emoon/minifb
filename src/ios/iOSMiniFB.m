@@ -2,6 +2,7 @@
 #import <UIKit/UIKit.h>
 #include <mach/mach_time.h>
 #include <limits.h>
+#include <math.h>
 #include <unistd.h>
 
 #include "iOSViewController.h"
@@ -13,7 +14,7 @@
 
 //-------------------------------------
 static bool
-compute_rgba_layout(unsigned width, unsigned height, uint32_t *stride_out, size_t *total_bytes_out) {
+calculate_buffer_layout(unsigned width, unsigned height, uint32_t *stride_out, size_t *total_bytes_out) {
     if (width == 0 || height == 0) {
         return false;
     }
@@ -23,6 +24,7 @@ compute_rgba_layout(unsigned width, unsigned height, uint32_t *stride_out, size_
     }
 
     uint32_t stride = width * 4u;
+
     if (total_bytes_out != NULL) {
         if ((size_t) height > SIZE_MAX / (size_t) stride) {
             return false;
@@ -38,12 +40,91 @@ compute_rgba_layout(unsigned width, unsigned height, uint32_t *stride_out, size_
 }
 
 //-------------------------------------
+static bool
+safe_scale_value(unsigned value, float scale, uint32_t *value_out) {
+    if (value_out == NULL) {
+        return false;
+    }
+
+    double safe_scale = (scale > 0.0f) ? (double) scale : 1.0;
+    double scaled = (double) value * safe_scale;
+    if (scaled < 0.0 || scaled > (double) UINT32_MAX) {
+        return false;
+    }
+
+    *value_out = (uint32_t) lround(scaled);
+
+    return true;
+}
+
+//-------------------------------------
+static UIWindow *
+get_application_window(void) {
+    UIApplication *application = [UIApplication sharedApplication];
+    if (application == nil) {
+        return nil;
+    }
+
+#if defined(__IPHONE_OS_VERSION_MAX_ALLOWED) && (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000)
+    if (@available(iOS 13.0, *)) {
+        UIWindow *fallback_window = nil;
+
+        for (UIScene *scene in application.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+
+            UIWindowScene *window_scene = (UIWindowScene *) scene;
+            bool is_foreground_scene =
+                (scene.activationState == UISceneActivationStateForegroundActive) ||
+                (scene.activationState == UISceneActivationStateForegroundInactive);
+
+            if (is_foreground_scene) {
+                if (@available(iOS 15.0, *)) {
+                    if (window_scene.keyWindow != nil) {
+                        return window_scene.keyWindow;
+                    }
+                }
+
+                for (UIWindow *candidate in window_scene.windows) {
+                    if (candidate.isKeyWindow) {
+                        return candidate;
+                    }
+                    if (fallback_window == nil) {
+                        fallback_window = candidate;
+                    }
+                }
+            }
+            else if (fallback_window == nil && window_scene.windows.count > 0) {
+                fallback_window = window_scene.windows.firstObject;
+            }
+        }
+
+        if (fallback_window != nil) {
+            return fallback_window;
+        }
+    }
+#endif
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NSArray<UIWindow *> *windows = application.windows;
+#pragma clang diagnostic pop
+
+    if (windows.count > 0) {
+        return windows.firstObject;
+    }
+
+    return nil;
+}
+
+//-------------------------------------
 SWindowData *
 create_window_data(unsigned width, unsigned height) {
-    uint32_t initial_stride = 0;
-    size_t   initial_total_bytes = 0;
+    uint32_t stride = 0;
+    size_t   total_bytes = 0;
 
-    if (!compute_rgba_layout(width, height, &initial_stride, &initial_total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &stride, &total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: invalid window buffer size %ux%u.", width, height);
         return NULL;
     }
@@ -74,18 +155,18 @@ create_window_data(unsigned width, unsigned height) {
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = initial_stride;
+    window_data->buffer_stride = stride;
 
     window_data->is_cursor_visible = false;
 
-    window_data->draw_buffer = malloc(initial_total_bytes);
+    window_data->draw_buffer = malloc(total_bytes);
     if (!window_data->draw_buffer) {
         free(window_data_ios);
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate draw buffer (%zu bytes).", initial_total_bytes);
+        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate draw buffer (%zu bytes).", total_bytes);
         return NULL;
     }
-    memset(window_data->draw_buffer, 0, initial_total_bytes);
+    memset(window_data->draw_buffer, 0, total_bytes);
 
     return window_data;
 }
@@ -94,8 +175,6 @@ create_window_data(unsigned width, unsigned height) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     UIWindow    *window;
-    NSArray     *windows;
-    size_t      numWindows;
 
     kUnused(title);
     kUnused(flags);
@@ -122,22 +201,20 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             return NULL;
         }
 
-        windows = [[UIApplication sharedApplication] windows];
-        numWindows = [windows count];
-        if(numWindows > 0) {
-            window = [windows objectAtIndex:0];
-        }
-        else {
+        window = get_application_window();
+        if (window == nil) {
             // Notice that you need to set "Launch Screen File" in:
             // project > executable > general
             // to get the real size with [UIScreen mainScreen].bounds].
             window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
             mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: UIApplication has no window, creating one (%f x %f).",
-                    [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height);
+                    [UIScreen mainScreen].bounds.size.width,
+                    [UIScreen mainScreen].bounds.size.height);
         }
 
+        iOSViewController *controller = nil;
         if([window.rootViewController isKindOfClass:[iOSViewController class]] == false) {
-            iOSViewController *controller = [[iOSViewController alloc] initWithWindowData:window_data];
+            controller = [[iOSViewController alloc] initWithWindowData:window_data];
             [window setRootViewController:controller];
 
     #if !__has_feature(objc_arc)
@@ -147,8 +224,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             controller = (iOSViewController *) window.rootViewController;
         }
         else {
-            ((iOSViewController *) window.rootViewController)->window_data = window_data;
+            controller = (iOSViewController *) window.rootViewController;
         }
+
+        [controller attachWindowData:window_data];
         [window makeKeyAndVisible];
 
         window_data->is_initialized = true;
@@ -220,7 +299,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (!compute_rgba_layout(width, height, &new_stride, &total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &new_stride, &total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -373,6 +452,13 @@ mfb_wait_sync(struct mfb_window *window) {
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
+    float scale_x = 1.0f;
+    float scale_y = 1.0f;
+    bool scaled_values_valid = false;
+    uint32_t offset_x_px = 0;
+    uint32_t offset_y_px = 0;
+    uint32_t width_px = 0;
+    uint32_t height_px = 0;
 
     if(window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport called with a null window pointer.");
@@ -391,28 +477,44 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
         return false;
     }
 
-    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
+    mfb_get_monitor_scale(window, &scale_x, &scale_y);
+
+    scaled_values_valid =
+        safe_scale_value(offset_x, scale_x, &offset_x_px) &&
+        safe_scale_value(width,    scale_x, &width_px)    &&
+        safe_scale_value(offset_y, scale_y, &offset_y_px) &&
+        safe_scale_value(height,   scale_y, &height_px);
+
+    if (scaled_values_valid == false) {
+        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport values overflow after monitor scale (scale_x=%.3f, scale_y=%.3f).",
+                scale_x, scale_y);
         return false;
     }
 
-    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (offset_x_px > window_data->window_width || width_px > (window_data->window_width - offset_x_px)) {
+        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u). "
+                "Values must be in logical points, not pixels.",
+                offset_x_px, width_px, window_data->window_width);
         return false;
     }
 
-    window_data->dst_offset_x = offset_x;
-    window_data->dst_offset_y = offset_y;
-    window_data->dst_width    = width;
-    window_data->dst_height   = height;
+    if (offset_y_px > window_data->window_height || height_px > (window_data->window_height - offset_y_px)) {
+        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u). "
+                "Values must be in logical points, not pixels.",
+                offset_y_px, height_px, window_data->window_height);
+        return false;
+    }
+
+    window_data->dst_offset_x = offset_x_px;
+    window_data->dst_offset_y = offset_y_px;
+    window_data->dst_width    = width_px;
+    window_data->dst_height   = height_px;
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
-    float x1 =  ((float) offset_x           / window_data->window_width)  * 2.0f - 1.0f;
-    float x2 = (((float) offset_x + width)  / window_data->window_width)  * 2.0f - 1.0f;
-    float y1 =  ((float) offset_y           / window_data->window_height) * 2.0f - 1.0f;
-    float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
+    float x1 =  ((float) offset_x_px              / window_data->window_width)  * 2.0f - 1.0f;
+    float x2 = (((float) offset_x_px + width_px)  / window_data->window_width)  * 2.0f - 1.0f;
+    float y1 =  ((float) offset_y_px              / window_data->window_height) * 2.0f - 1.0f;
+    float y2 = (((float) offset_y_px + height_px) / window_data->window_height) * 2.0f - 1.0f;
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL) {

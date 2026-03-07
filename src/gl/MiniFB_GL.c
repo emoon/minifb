@@ -382,6 +382,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     if (window_data->must_resize_context) {
         effective_resize_GL(window_data);
     }
+
 #if defined(_WIN32) || defined(WIN32)
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;

@@ -8,6 +8,7 @@
 
 #import <simd/simd.h>
 #import <ModelIO/ModelIO.h>
+#include <math.h>
 
 #import "iOSViewDelegate.h"
 #include "WindowData_IOS.h"
@@ -65,7 +66,7 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 static const char *
-metal_error_description(NSError *error) {
+get_metal_error_description(NSError *error) {
     if (error == nil) {
         return "unknown error";
     }
@@ -77,6 +78,49 @@ metal_error_description(NSError *error) {
 
     const char *utf8 = [description UTF8String];
     return utf8 != NULL ? utf8 : "unknown error";
+}
+
+//-------------------------------------
+static void
+build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) {
+    if (out_vertices == NULL) {
+        return;
+    }
+
+    float x1 = -1.0f;
+    float y1 = -1.0f;
+    float x2 =  1.0f;
+    float y2 =  1.0f;
+
+    if (window_data != NULL && window_data->window_width > 0 && window_data->window_height > 0) {
+        const float inv_width  = 1.0f / (float) window_data->window_width;
+        const float inv_height = 1.0f / (float) window_data->window_height;
+
+        x1 =  ((float) window_data->dst_offset_x * inv_width)  * 2.0f - 1.0f;
+        y1 =  ((float) window_data->dst_offset_y * inv_height) * 2.0f - 1.0f;
+        x2 = (((float) window_data->dst_offset_x + (float) window_data->dst_width)  * inv_width)  * 2.0f - 1.0f;
+        y2 = (((float) window_data->dst_offset_y + (float) window_data->dst_height) * inv_height) * 2.0f - 1.0f;
+    }
+
+    out_vertices[0].x = x1;
+    out_vertices[0].y = y1;
+    out_vertices[0].z = 0.0f;
+    out_vertices[0].w = 1.0f;
+
+    out_vertices[1].x = x1;
+    out_vertices[1].y = y2;
+    out_vertices[1].z = 0.0f;
+    out_vertices[1].w = 1.0f;
+
+    out_vertices[2].x = x2;
+    out_vertices[2].y = y1;
+    out_vertices[2].z = 0.0f;
+    out_vertices[2].w = 1.0f;
+
+    out_vertices[3].x = x2;
+    out_vertices[3].y = y2;
+    out_vertices[3].z = 0.0f;
+    out_vertices[3].w = 1.0f;
 }
 
 //-------------------------------------
@@ -98,6 +142,11 @@ metal_error_description(NSError *error) {
 
 //-------------------------------------
 -(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData {
+    if (view == nil || windowData == NULL || windowData->specific == NULL) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: initWithMetalKitView received invalid state.");
+        return nil;
+    }
+
     self = [super init];
     if (self) {
         window_data     = windowData;
@@ -107,16 +156,49 @@ metal_error_description(NSError *error) {
         view.sampleCount      = 1;
 
         metal_device  = view.device;
+        if (metal_device == nil) {
+            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: MTKView has no Metal device.");
+#if !__has_feature(objc_arc)
+            [self release];
+#endif
+            return nil;
+        }
+
         current_buffer = (uint8_t)(MaxBuffersInFlight - 1);
 
         // Used for syncing the CPU and GPU
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
+        if (semaphore == nil) {
+            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create frame semaphore.");
+#if !__has_feature(objc_arc)
+            [self release];
+#endif
+            return nil;
+        }
 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
+        if (command_queue == nil) {
+            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create command queue.");
+#if !__has_feature(objc_arc)
+            [self release];
+#endif
+            return nil;
+        }
 
-        [self _createShaders];
-        [self _createAssets];
+        if ([self _createShaders] == false) {
+#if !__has_feature(objc_arc)
+            [self release];
+#endif
+            return nil;
+        }
+
+        if ([self _createAssets] == false) {
+#if !__has_feature(objc_arc)
+            [self release];
+#endif
+            return nil;
+        }
     }
 
     return self;
@@ -137,7 +219,7 @@ metal_error_description(NSError *error) {
 #endif
 
     if (error || !metal_library) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to create shaders: %s", metal_error_description(error));
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to create shaders: %s", get_metal_error_description(error));
         return false;
     }
 
@@ -175,7 +257,7 @@ metal_error_description(NSError *error) {
 #endif
 
     if (!pipeline_state) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create pipeline state: %s", metal_error_description(error));
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create pipeline state: %s", get_metal_error_description(error));
         return false;
     }
 
@@ -183,14 +265,13 @@ metal_error_description(NSError *error) {
 }
 
 //-------------------------------------
-- (void) _createAssets {
-    static Vertex s_vertices[4] = {
-        {-1.0, -1.0, 0, 1},
-        {-1.0,  1.0, 0, 1},
-        { 1.0, -1.0, 0, 1},
-        { 1.0,  1.0, 0, 1},
-    };
-    memcpy(window_data_ios->vertices, s_vertices, sizeof(s_vertices));
+- (bool) _createAssets {
+    if (window_data == NULL || window_data_ios == NULL || metal_device == nil) {
+        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: invalid state while creating assets.");
+        return false;
+    }
+
+    build_viewport_vertices(window_data, window_data_ios->vertices);
 
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
@@ -201,7 +282,19 @@ metal_error_description(NSError *error) {
     // Create all triple-buffered textures
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
         texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
+        if (texture_buffers[i] == nil) {
+            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create texture buffer %d.", i);
+#if !__has_feature(objc_arc)
+            for (int j = 0; j < i; ++j) {
+                [texture_buffers[j] release];
+                texture_buffers[j] = nil;
+            }
+#endif
+            return false;
+        }
     }
+
+    return true;
 }
 
 //-------------------------------------
@@ -231,6 +324,7 @@ metal_error_description(NSError *error) {
             return false;
         }
     }
+
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
 #if !__has_feature(objc_arc)
         [texture_buffers[i] release];
@@ -243,6 +337,12 @@ metal_error_description(NSError *error) {
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
+    if (window_data == NULL || window_data_ios == NULL ||
+        window_data->draw_buffer == NULL || window_data->buffer_width == 0 || window_data->buffer_height == 0 ||
+        command_queue == nil || pipeline_state == nil) {
+        return;
+    }
+
     // Wait to ensure only MaxBuffersInFlight number of frames are getting proccessed
     // by any stage in the Metal pipeline (App, Metal, Drivers, GPU, etc)
     if (dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW) != 0) {
@@ -253,6 +353,11 @@ metal_error_description(NSError *error) {
 
     // Create a new command buffer for each render pass to the current drawable
     id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
+    if (commandBuffer == nil || texture_buffers[current_buffer] == nil) {
+        mfb_log(MFB_LOG_WARNING, "iOSViewDelegate: skipping frame due to unavailable command buffer or texture.");
+        dispatch_semaphore_signal(semaphore);
+        return;
+    }
     commandBuffer.label = @"minifb_command_buffer";
 
     // Add completion hander which signals semaphore when Metal and the GPU has fully
@@ -278,11 +383,18 @@ metal_error_description(NSError *error) {
 
         // Create a render command encoder so we can render into something
         id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+        if (renderEncoder == nil) {
+            mfb_log(MFB_LOG_WARNING, "iOSViewDelegate: failed to create render encoder.");
+            [commandBuffer commit];
+            return;
+        }
         renderEncoder.label = @"minifb_command_encoder";
 
         // Set render command encoder state
+        Vertex vertices[4];
+        build_viewport_vertices(window_data, vertices);
         [renderEncoder setRenderPipelineState:pipeline_state];
-        [renderEncoder setVertexBytes:window_data_ios->vertices length:sizeof(window_data_ios->vertices) atIndex:0];
+        [renderEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
 
@@ -293,7 +405,10 @@ metal_error_description(NSError *error) {
         [renderEncoder endEncoding];
 
         // Schedule a present once the framebuffer is complete using the current drawable
-        [commandBuffer presentDrawable:view.currentDrawable];
+        id<CAMetalDrawable> drawable = view.currentDrawable;
+        if (drawable != nil) {
+            [commandBuffer presentDrawable:drawable];
+        }
     }
 
     // Finalize rendering here & push the command buffer to the GPU
@@ -317,11 +432,11 @@ metal_error_description(NSError *error) {
     [metal_library release];
     metal_library = nil;
 
-    #if !OS_OBJECT_USE_OBJC
+  #if !OS_OBJECT_USE_OBJC
     if (semaphore) {
         dispatch_release(semaphore);
     }
-    #endif
+  #endif
     semaphore = nil;
 
     [super dealloc];
@@ -331,12 +446,15 @@ metal_error_description(NSError *error) {
 //-------------------------------------
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
     (void) view;
-    // Respond to drawable size or orientation changes here
-    float scale = [UIScreen mainScreen].scale;
+    // size is already in PIXELS (Metal drawable size, not logical points).
+    // Do NOT multiply by screen scale here — that would double the value.
+    uint32_t drawable_width  = (uint32_t) lround(size.width);
+    uint32_t drawable_height = (uint32_t) lround(size.height);
 
-    window_data->window_width  = size.width  * scale;
-    window_data->window_height = size.height * scale;
-    resize_dst(window_data, size.width, size.height);
+    window_data->window_width  = drawable_width;
+    window_data->window_height = drawable_height;
+    resize_dst(window_data, drawable_width, drawable_height);
+    build_viewport_vertices(window_data, window_data_ios->vertices);
 
     // Defer the resize callback to the main thread via mfb_update_ex / mfb_update_events,
     // which are called from user code. This avoids invoking the callback from the

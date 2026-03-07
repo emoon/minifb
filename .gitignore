@@ -4,6 +4,9 @@ t2-output
 /.vs
 /win
 /macosx
+/mac
+/apple
+/metal
 /linux
 /way
 /x11
@@ -11,6 +14,8 @@ t2-output
 /vs
 /mingw
 /build
+/build-*
+/build_*
 /xcode
 /bin
 /web

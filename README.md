@@ -471,27 +471,42 @@ cmake .. -DMINIFB_USE_INVERTED_Y_ON_MACOS=ON
 
 ### iOS (beta)
 
-It works with and without a UIWindow.
-If you want to create the UIWindow through a Storyboard, remember to set the UIViewController as iOSViewController and the UIView as iOSView.
+It works with and without a `UIWindow`.
+If you create the window/view hierarchy through Storyboard, set the `UIViewController` to `iOSViewController` and the root `UIView` to `iOSView`.
+
+**Launch screen / storyboard requirement**:
+
+For App Store distribution, Apple requires a launch storyboard (legacy static launch images are deprecated). Without a launch storyboard, iOS can start in a compatibility layout and you may see top/bottom black bands or an incorrect initial drawable size.
+
+That is why there are now two iOS example targets:
+
+- `noise`: uses `tests/ios/Info.plist` + `tests/ios/LaunchScreen.storyboard` (recommended, App Store-ready).
+- `noise_no_storyboard`: uses `tests/ios/Info.no_storyboard.plist` without launch storyboard (useful for legacy/manual setups and behavior comparison).
+
+Apple references:
+- https://developer.apple.com/news/?id=03042020b
+- https://developer.apple.com/documentation/xcode/specifying-your-apps-launch-screen
+- https://developer.apple.com/videos/play/wwdc2019/401/
 
 **Issues**:
 
-- It seems that you have to manually set 'tvOS Deployment Target' to less than 13.
-- It seems that you have to manually set 'Launch Screen File' in project > executable > general to be able to get the real device height.
-- You need to manually set the 'Signing Team' and 'Bundle Identifier'.
-- No multitouch is available yet.
-- As this version uses Metal API it cannot be run in the emulator.
+- To run on a physical device, you need to set a valid 'Signing Team' and 'Bundle Identifier'.
+- iOS Simulator supports Metal on modern Xcode versions, but final validation should still be done on real devices.
 
 **Limitations**:
 
-- No keyboard input callbacks (iOS handles touch events instead)
+- No keyboard or char-input callbacks (iOS backend uses touch events instead)
 - Single window only (flags to `mfb_open_ex()` are ignored)
-- `mfb_set_target_fps()` and `mfb_get_target_fps()` are no-ops (hardware synced to display refresh rate)
 - `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
-- No multitouch support yet
-- Mouse events represent touch events (last touch position)
+- `mfb_set_active_callback()` and `mfb_set_close_callback()` are not triggered by iOS system events
+- No dedicated multitouch API; touches are mapped to mouse callbacks (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`)
+- Mouse events represent touch events (coordinates track the last processed touch event)
+- No mouse wheel/scroll callback support on iOS
 
-All other MiniFB functions work normally, including timers and user data management.
+`mfb_set_target_fps()` / `mfb_get_target_fps()` are supported on iOS for software pacing via `mfb_wait_sync()`.
+If your app is driven by `CADisplayLink` (like the example), frame pacing is display-driven by iOS.
+
+Core rendering, viewport, timers, and user data management work normally.
 
 **Example**:
 
@@ -543,6 +558,11 @@ mkdir build-ios
 cd build-ios
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
 ```
+
+Then choose the Xcode scheme you want to run:
+
+- `noise` (with launch storyboard, recommended)
+- `noise_no_storyboard` (without launch storyboard)
 
 ### Android (beta)
 
@@ -887,7 +907,9 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Viewport | Yes | Yes | Yes | Yes | Yes | Yes | No-op | No-op |
 | Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
 | Monitor DPI | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
-| Target FPS | Yes | Yes | Yes | Yes | No-op | No-op | No-op | No-op |
+| Target FPS | Yes | Yes | Yes | Yes | Yes* | No-op | No-op | No-op |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | - | - |
+
+`*` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
 
 For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).

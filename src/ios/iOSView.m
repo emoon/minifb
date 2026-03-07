@@ -1,5 +1,30 @@
 #include "iOSView.h"
 #include <MiniFB_internal.h>
+#include <math.h>
+
+//-------------------------------------
+static inline CGFloat
+input_scale_for_view(iOSView *view) {
+    CGFloat scale = 0.0;
+
+    if (view != nil) {
+        scale = view.contentScaleFactor;
+    }
+
+    if (scale <= 0.0 && view.window != nil && view.window.screen != nil) {
+        scale = view.window.screen.scale;
+    }
+
+    if (scale <= 0.0) {
+        scale = UIScreen.mainScreen.scale;
+    }
+
+    if (scale <= 0.0) {
+        scale = 1.0;
+    }
+
+    return scale;
+}
 
 //-------------------------------------
 @implementation iOSView
@@ -14,6 +39,7 @@
     if (self) {
         touch_to_button = [[NSMutableDictionary alloc] init];
     }
+
     return self;
 }
 
@@ -42,6 +68,7 @@
             used[idx] = true;
         }
     }
+
     int btn = MFB_MOUSE_BTN_0;
     while (btn <= MFB_MAX_MOUSE_BUTTONS_MASK && used[btn]) {
         ++btn;
@@ -74,6 +101,7 @@
     kUnused(event);
 
     if(window_data != 0x0) {
+        CGFloat scale = input_scale_for_view(self);
         CGPoint point;
         for(UITouch *touch in touches) {
             int button_number = [self _allocButtonForTouch:touch];
@@ -81,8 +109,8 @@
                 continue;
             }
             point = [touch locationInView:self];
-            window_data->mouse_pos_x = point.x;
-            window_data->mouse_pos_y = point.y;
+            window_data->mouse_pos_x = (int32_t) lround(point.x * scale);
+            window_data->mouse_pos_y = (int32_t) lround(point.y * scale);
             window_data->mouse_button_status[button_number & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
             kCall(mouse_btn_func, button_number, 0, true);
         }
@@ -94,6 +122,7 @@
     kUnused(event);
 
     if(window_data != 0x0) {
+        CGFloat scale = input_scale_for_view(self);
         CGPoint point;
         for(UITouch *touch in touches) {
             int button_number = [self _buttonForTouch:touch];
@@ -101,10 +130,12 @@
                 continue;
             }
             point = [touch locationInView:self];
-            window_data->mouse_pos_x = point.x;
-            window_data->mouse_pos_y = point.y;
+            int32_t x = (int32_t) lround(point.x * scale);
+            int32_t y = (int32_t) lround(point.y * scale);
+            window_data->mouse_pos_x = x;
+            window_data->mouse_pos_y = y;
             // button_status does not change on move — touch is still pressed
-            kCall(mouse_move_func, point.x, point.y);
+            kCall(mouse_move_func, x, y);
         }
     }
 }
@@ -112,6 +143,7 @@
 //-------------------------------------
 - (void) _endTouches:(NSSet<UITouch *> *)touches {
     if(window_data != 0x0) {
+        CGFloat scale = input_scale_for_view(self);
         CGPoint point;
         for(UITouch *touch in touches) {
             int button_number = [self _buttonForTouch:touch];
@@ -119,8 +151,8 @@
                 continue;
             }
             point = [touch locationInView:self];
-            window_data->mouse_pos_x = point.x;
-            window_data->mouse_pos_y = point.y;
+            window_data->mouse_pos_x = (int32_t) lround(point.x * scale);
+            window_data->mouse_pos_y = (int32_t) lround(point.y * scale);
             window_data->mouse_button_status[button_number & MFB_MAX_MOUSE_BUTTONS_MASK] = false;
             kCall(mouse_btn_func, button_number, 0, false);
             [self _freeButtonForTouch:touch];
