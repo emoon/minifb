@@ -17,6 +17,9 @@
 //-------------------------------------
 @interface iOSViewController ()
 - (void) setupRendererIfPossible;
+- (void) _onAppDidBecomeActive:(NSNotification *) note;
+- (void) _onAppWillResignActive:(NSNotification *) note;
+- (void) _onAppWillTerminate:(NSNotification *) note;
 @end
 
 //-------------------------------------
@@ -123,7 +126,48 @@
 - (void) viewDidLoad
 {
     [super viewDidLoad];
+
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:self selector:@selector(_onAppDidBecomeActive:)  name:UIApplicationDidBecomeActiveNotification    object:nil];
+    [nc addObserver:self selector:@selector(_onAppWillResignActive:) name:UIApplicationWillResignActiveNotification  object:nil];
+    [nc addObserver:self selector:@selector(_onAppWillTerminate:)    name:UIApplicationWillTerminateNotification     object:nil];
+
     [self setupRendererIfPossible];
+}
+
+//-------------------------------------
+- (void) _onAppDidBecomeActive:(NSNotification *) note {
+    (void) note;
+    if (window_data == NULL) return;
+    window_data->is_active = true;
+    kCall(active_func, true);
+}
+
+//-------------------------------------
+- (void) _onAppWillResignActive:(NSNotification *) note {
+    (void) note;
+    if (window_data == NULL) return;
+    window_data->is_active = false;
+    kCall(active_func, false);
+}
+
+//-------------------------------------
+- (void) _onAppWillTerminate:(NSNotification *) note {
+    (void) note;
+    if (window_data == NULL) return;
+    // iOS cannot cancel termination; fire the callback as a notification only.
+    if (window_data->close_func != NULL) {
+        window_data->close_func((struct mfb_window *) window_data);
+    }
+    window_data->close = true;
+}
+
+//-------------------------------------
+- (void) dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+#if !__has_feature(objc_arc)
+    [super dealloc];
+#endif
 }
 
 @end

@@ -18,6 +18,7 @@ uint32_t            *g_buffer = 0x0;
 uint32_t            g_width   = 0;
 uint32_t            g_height  = 0;
 float               g_scale   = 1;
+bool                g_is_active = false;
 
 //-------------------------------------
 @interface AppDelegate ()
@@ -25,20 +26,37 @@ float               g_scale   = 1;
 @end
 
 //-------------------------------------
-void
+static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
     NSLog(@"Touch: %d at %d, %d is %d", (int)button - MFB_MOUSE_BTN_0, mfb_get_mouse_x(window), mfb_get_mouse_y(window), (int) is_pressed);
 }
 
 //-------------------------------------
-void
+static void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     NSLog(@"Touch moved %d, %d", x, y);
 }
 
-void
+//-------------------------------------
+static void
+active_changed(struct mfb_window *window, bool is_active) {
+    kUnused(window);
+    NSLog(@"Active: %s", is_active ? "true" : "false");
+    g_is_active = is_active;
+}
+
+//-------------------------------------
+static bool
+window_closing(struct mfb_window *window) {
+    kUnused(window);
+    NSLog(@"Window closing");
+    return true;
+}
+
+//-------------------------------------
+static void
 resize(struct mfb_window *window, int width, int height) {
     kUnused(window);
 
@@ -72,10 +90,14 @@ resize(struct mfb_window *window, int width, int height) {
     static int seed = 0xbeef;
     int noise, carry;
 
-    if(g_window == 0x0) {
+    if (g_is_active == false) {
         return;
     }
 
+    if(g_window == 0x0) {
+        return;
+    }
+    
     if(g_buffer != 0x0) {
         uint32_t i = 0;
         for (uint32_t y = 0; y < g_height; ++y) {
@@ -107,7 +129,7 @@ resize(struct mfb_window *window, int width, int height) {
 }
 
 //-------------------------------------
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+- (BOOL) application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
     kUnused(application);
     kUnused(launchOptions);
@@ -122,6 +144,8 @@ resize(struct mfb_window *window, int width, int height) {
             g_height -= 100;
             mfb_set_viewport(g_window, 50, 50, g_width, g_height);
             g_buffer = malloc(g_width * g_height * 4);
+            mfb_set_active_callback(g_window, active_changed);
+            mfb_set_close_callback(g_window, window_closing);
             mfb_set_mouse_move_callback(g_window, mouse_move);
             mfb_set_mouse_button_callback(g_window, mouse_btn);
             mfb_set_resize_callback(g_window, resize);
@@ -139,11 +163,12 @@ resize(struct mfb_window *window, int width, int height) {
 }
 
 //-------------------------------------
-- (void)applicationDidEnterBackground:(UIApplication *)application {
+- (void) applicationDidEnterBackground:(UIApplication *)application {
     // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
     // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     kUnused(application);
     [mDisplayLink invalidate];
+    mDisplayLink = nil;
 }
 
 //-------------------------------------
@@ -166,7 +191,11 @@ resize(struct mfb_window *window, int width, int height) {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     kUnused(application);
 
-    [mDisplayLink invalidate];
+    if (mDisplayLink != nil) {
+        [mDisplayLink invalidate];
+        mDisplayLink = nil;
+    }
+    
     if (g_window != 0x0) {
         mfb_close(g_window);
         g_window = 0x0;
