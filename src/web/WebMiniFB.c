@@ -8,11 +8,14 @@
 #include <stdio.h>
 #include <string.h>
 
+//-------------------------------------
 #define EM_EXPORT __attribute__((used))
 
+//-------------------------------------
 static bool g_initialized = false;
 static bool g_cursor_warning_logged = false;
 
+//-------------------------------------
 static SWindowData_Web *
 mfb_web_get_data(SWindowData *window_data) {
     if (window_data == NULL) {
@@ -22,6 +25,7 @@ mfb_web_get_data(SWindowData *window_data) {
     return (SWindowData_Web *) window_data->specific;
 }
 
+//-------------------------------------
 static uint8_t *
 mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned height) {
     SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
@@ -54,6 +58,7 @@ mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned
     return window_data_web->swizzle_buffer;
 }
 
+//-------------------------------------
 EM_ASYNC_JS(void, setup_web_mfb, (), {
     // FIXME currently disabled. This will make requests pile up
     // and potentially execute multiple C calls in parallel (sort of).
@@ -189,7 +194,9 @@ EM_ASYNC_JS(void, setup_web_mfb, (), {
     };
 })
 
-EM_EXPORT void reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
+//-------------------------------------
+EM_EXPORT void
+reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
     int32_t num_pixels = (width * height) << 2;
     for (int i = 0; i < num_pixels; i += 4) {
         uint8_t b = src[i];
@@ -203,41 +210,55 @@ EM_EXPORT void reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int
     }
 }
 
-EM_EXPORT void window_data_set_mouse_pos(SWindowData *window_data, int x, int y) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_mouse_pos(SWindowData *window_data, int x, int y) {
     if (!window_data) return;
     window_data->mouse_pos_x = x;
     window_data->mouse_pos_y = y;
 }
 
-EM_EXPORT void window_data_set_mouse_wheel(SWindowData *window_data, float x, float y) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_mouse_wheel(SWindowData *window_data, float x, float y) {
     if (!window_data) return;
     window_data->mouse_wheel_x = x;
     window_data->mouse_wheel_y = y;
 }
 
-EM_EXPORT void window_data_set_mouse_button(SWindowData *window_data, uint8_t button, bool is_pressed) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_mouse_button(SWindowData *window_data, uint8_t button, bool is_pressed) {
     if (!window_data) return;
     if (button > 7) return;
     window_data->mouse_button_status[button] = is_pressed;
 }
 
-EM_EXPORT void window_data_set_key(SWindowData *window_data, unsigned key, bool is_pressed) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_key(SWindowData *window_data, unsigned key, bool is_pressed) {
     if (!window_data) return;
     if (key >= 512) return;
     window_data->key_status[key] = is_pressed;
 }
 
-EM_EXPORT void window_data_set_mod_keys(SWindowData *window_data, uint32_t mod) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_mod_keys(SWindowData *window_data, uint32_t mod) {
     if (!window_data) return;
     window_data->mod_keys = mod;
 }
 
-EM_EXPORT void window_data_set_active(SWindowData *window_data, bool is_active) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_active(SWindowData *window_data, bool is_active) {
     if (!window_data) return;
     window_data->is_active = is_active;
 }
 
-EM_EXPORT void window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned height) {
+//-------------------------------------
+EM_EXPORT void
+window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned height) {
     if (!window_data) return;
     if (width > (UINT32_MAX / 4)) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: buffer stride overflow for width=%u.", width);
@@ -251,7 +272,9 @@ EM_EXPORT void window_data_set_buffer_size(SWindowData *window_data, unsigned wi
     window_data->buffer_stride = width * 4;
 }
 
-EM_EXPORT void window_data_update_window_size(SWindowData *window_data, unsigned width, unsigned height) {
+//-------------------------------------
+EM_EXPORT void
+window_data_update_window_size(SWindowData *window_data, unsigned width, unsigned height) {
     if (!window_data || width == 0 || height == 0) return;
 
     bool changed = (window_data->window_width != width) || (window_data->window_height != height);
@@ -274,81 +297,112 @@ EM_EXPORT void window_data_update_window_size(SWindowData *window_data, unsigned
     }
 }
 
-EM_EXPORT void *window_data_get_specific(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT void *
+window_data_get_specific(SWindowData *window_data) {
     SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
     if (window_data_web == NULL) return 0;
     return (void *) window_data_web->window_id;
 }
 
-EM_EXPORT uint8_t *window_data_get_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned height) {
+//-------------------------------------
+EM_EXPORT uint8_t *
+window_data_get_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned height) {
     return mfb_web_ensure_swizzle_buffer(window_data, width, height);
 }
 
-EM_EXPORT unsigned window_data_get_dst_offset_x(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT unsigned
+window_data_get_dst_offset_x(SWindowData *window_data) {
     if (!window_data) return 0;
     return window_data->dst_offset_x;
 }
 
-EM_EXPORT unsigned window_data_get_dst_offset_y(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT unsigned
+window_data_get_dst_offset_y(SWindowData *window_data) {
     if (!window_data) return 0;
     return window_data->dst_offset_y;
 }
 
-EM_EXPORT unsigned window_data_get_dst_width(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT unsigned
+window_data_get_dst_width(SWindowData *window_data) {
     if (!window_data) return 0;
     return window_data->dst_width;
 }
 
-EM_EXPORT unsigned window_data_get_dst_height(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT unsigned
+window_data_get_dst_height(SWindowData *window_data) {
     if (!window_data) return 0;
     return window_data->dst_height;
 }
 
-EM_EXPORT void window_data_call_active_func(SWindowData *window_data, bool is_active) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_active_func(SWindowData *window_data, bool is_active) {
     if (window_data == NULL) return;
     if (window_data->active_func) window_data->active_func((struct mfb_window*)window_data, is_active);
 }
 
-EM_EXPORT void window_data_call_resize_func(SWindowData *window_data, int width, int height) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_resize_func(SWindowData *window_data, int width, int height) {
     if (window_data == NULL) return;
     if (window_data->resize_func) window_data->resize_func((struct mfb_window*)window_data, width, height);
 }
 
-EM_EXPORT void window_data_call_close_func(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_close_func(SWindowData *window_data) {
     if (window_data == NULL) return;
     if (window_data->close_func) window_data->close_func((struct mfb_window*)window_data);
 }
 
-EM_EXPORT void window_data_call_keyboard_func(SWindowData *window_data, mfb_key key, mfb_key_mod mod, bool is_pressed) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_keyboard_func(SWindowData *window_data, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     if (window_data == NULL) return;
     if (window_data->keyboard_func) window_data->keyboard_func((struct mfb_window*)window_data, key, mod, is_pressed);
 }
 
-EM_EXPORT void window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
     if (window_data == NULL) return;
     if (window_data->char_input_func) window_data->char_input_func((struct mfb_window*)window_data, code);
 }
 
-EM_EXPORT void window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     if (window_data == NULL) return;
     if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window*)window_data, button, mod, is_pressed);
 }
 
-EM_EXPORT void window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
     if (window_data == NULL) return;
     if (window_data->mouse_move_func) window_data->mouse_move_func((struct mfb_window*)window_data, x, y);
 }
 
-EM_EXPORT void window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
+//-------------------------------------
+EM_EXPORT void
+window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
     if (window_data == NULL) return;
     if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window*)window_data, mod, x, y);
 }
 
-EM_EXPORT bool window_data_get_close(SWindowData *window_data) {
+//-------------------------------------
+EM_EXPORT bool
+window_data_get_close(SWindowData *window_data) {
     if (!window_data) return true;
     return window_data->close;
 }
 
+//-------------------------------------
 EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
     let canvas = document.getElementById(UTF8ToString(title));
     if (!canvas) return 0;
@@ -651,6 +705,7 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
     delete window._minifb.windows[window_id];
 });
 
+//-------------------------------------
 static void
 mfb_destroy_window_data(SWindowData *window_data) {
     if (window_data == NULL) {
@@ -674,7 +729,9 @@ mfb_destroy_window_data(SWindowData *window_data) {
     free(window_data);
 }
 
-struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+//-------------------------------------
+struct mfb_window *
+mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     SWindowData *window_data;
 
     window_data = malloc(sizeof(SWindowData));
@@ -731,7 +788,9 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned heigh
     return (struct mfb_window*)window_data;
 }
 
-bool mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
+//-------------------------------------
+bool
+mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_set_viewport called with a null window pointer.");
@@ -758,6 +817,7 @@ bool mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned off
     return true;
 }
 
+//-------------------------------------
 EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     // FIXME can we make these global somehow? --pre-js maybe?
     const MFB_STATE_OK = 0;
@@ -793,7 +853,9 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     return Module._window_data_get_close(window_data) ? MFB_STATE_EXIT : MFB_STATE_OK;
 });
 
-mfb_update_state mfb_update_events(struct mfb_window *window) {
+//-------------------------------------
+mfb_update_state
+mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events called with an invalid window.");
@@ -821,6 +883,7 @@ mfb_update_state mfb_update_events(struct mfb_window *window) {
     return state;
 }
 
+//-------------------------------------
 EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *buffer, int width, int height), {
     // FIXME can we make these global somehow? preamble.js maybe?
     const MFB_STATE_OK = 0;
@@ -881,7 +944,9 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     return Module._window_data_get_close(window_data) ? MFB_STATE_EXIT : MFB_STATE_OK;
 });
 
-mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+//-------------------------------------
+mfb_update_state
+mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid window.");
@@ -928,7 +993,9 @@ mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned
     return state;
 }
 
-bool mfb_wait_sync(struct mfb_window *window) {
+//-------------------------------------
+bool
+mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync called with an invalid window.");
@@ -950,29 +1017,44 @@ bool mfb_wait_sync(struct mfb_window *window) {
     return true;
 }
 
-void mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    if (!window) return;
-    if (scale_x) *scale_x = 1.0f;
-    if (scale_y) *scale_y = 1.0f;
+//-------------------------------------
+void
+mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
+    kUnused(window);
+
+    if (scale_x) {
+        *scale_x = 1.0f;
+    }
+
+    if (scale_y) {
+        *scale_y = 1.0f;
+    }
 }
 
+//-------------------------------------
 extern double g_timer_frequency;
 extern double g_timer_resolution;
 
-void mfb_timer_init(void) {
+//-------------------------------------
+void
+mfb_timer_init(void) {
     g_timer_frequency  = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
 
+//-------------------------------------
 EM_JS(double, mfb_timer_tick_js, (), {
    return performance.now();
 });
 
-uint64_t mfb_timer_tick(void) {
+//-------------------------------------
+uint64_t
+mfb_timer_tick(void) {
     uint64_t now = (uint64_t)(mfb_timer_tick_js() * 1e+6);
     return now;
 }
 
+//-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
