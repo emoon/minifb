@@ -269,6 +269,7 @@ void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x,
 - Returns scale multipliers (`1.0` = 100%).
 - If `window == NULL`, outputs still receive a safe fallback (`1.0`) when their pointers are non-`NULL`.
 - Some backends provide real scale values (for example Retina/HiDPI); others currently return fixed `1.0`.
+- On X11, scale detection is implemented (Xresources/XRandR/fallbacks), but in many desktop setups the value is effectively startup-time and may not update dynamically after changing global scale while the app is running.
 
 If you define layout in logical units and need drawable-coordinate values for `mfb_set_viewport()`, convert explicitly:
 
@@ -410,7 +411,8 @@ sudo apt-get install -y \
     pkg-config \
     libx11-dev \
     libxkbcommon-dev \
-    libgl1-mesa-dev
+    libgl1-mesa-dev \
+    libxrandr-dev
 ```
 
 - **build-essential**: Compiler toolchain (gcc, g++, make)
@@ -419,8 +421,10 @@ sudo apt-get install -y \
 - **libx11-dev**: X11 core libraries and headers
 - **libxkbcommon-dev**: Keyboard handling library
 - **libgl1-mesa-dev**: OpenGL libraries (required if using OpenGL backend, which is default)
+- **libxrandr-dev** *(optional)*: Enables XRandR-based monitor scale/DPI queries on X11 (`mfb_get_monitor_scale` fallback path and diagnostics)
 
 If you prefer to use X11 without OpenGL (XImage rendering), you can omit `libgl1-mesa-dev`.
+If you do not need XRandR-assisted scale/DPI detection, you can omit `libxrandr-dev`.
 
 Equivalent packages for other distros:
 
@@ -962,7 +966,7 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Multi-window | Yes | Yes | Yes | Yes | No | No | Yes | No |
 | Viewport | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op* | No-op |
-| Monitor DPI / scale | Yes | Yes | Limited | Yes | Yes | Yes | Fixed | Fixed |
+| Monitor DPI / scale | Yes | Yes | Yes* | Yes | Yes | Yes | Fixed | Fixed |
 | Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Limited*** | Limited*** |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | Browser-driven | - |
 
@@ -971,5 +975,7 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 `**` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
 
 `***` Web/DOS currently store/report the target FPS value, but frame pacing is not controlled by it.
+
+`*` X11 monitor scale is available, but often behaves as an initial value only; runtime global-scale changes may not be reflected until restart (environment-dependent, especially under XWayland).
 
 For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).

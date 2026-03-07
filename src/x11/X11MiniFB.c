@@ -4,10 +4,6 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
-
-// I cannot find a way to get dpi under VirtualBox
-//#include <X11/Xresource.h>
-//#include <X11/extensions/Xrandr.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include <stdio.h>
@@ -24,13 +20,19 @@
 #include <MiniFB_internal.h>
 #include "WindowData.h"
 #include "WindowData_X11.h"
+#include "X11MiniFB_scale_funcs.h"
 
 #if defined(USE_OPENGL_API)
     #include <gl/MiniFB_GL.h>
 #endif
 
+#if defined(MINIFB_HAS_XRANDR)
+    #include <X11/extensions/Xrandr.h>
+#endif
+
 static Atom s_delete_window_atom;
 static bool s_x11_locale_checked;
+static int s_xrr_event_base = -1;
 
 //-------------------------------------
 static bool
@@ -478,6 +480,14 @@ process_event(SWindowData *window_data, XEvent *event) {
         }
         break;
     }
+
+#if defined(MINIFB_HAS_XRANDR)
+    // XRandR events have dynamic type IDs, must check with event_base
+    if (s_xrr_event_base >= 0 && event->type == (s_xrr_event_base + RRScreenChangeNotify)) {
+        mfb_log(MFB_LOG_TRACE, "XRRScreenChangeNotify event received");
+        // Scale will be refreshed on next mfb_get_monitor_scale() call
+    }
+#endif
 }
 
 //-------------------------------------
@@ -534,6 +544,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         free(window_data_specific);
         return NULL;
     }
+
+#if defined(MINIFB_HAS_XRANDR)
+    // Initialize XRandR event base for dynamic event type IDs
+    if (s_xrr_event_base < 0) {
+        int error_base = 0;
+        if (XRRQueryExtension(window_data_specific->display, &s_xrr_event_base, &error_base)) {
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR event base = %d", s_xrr_event_base);
+        } else {
+            mfb_log(MFB_LOG_WARNING, "X11MiniFB: XRRQueryExtension failed; XRandR events unavailable.");
+            s_xrr_event_base = -1;
+        }
+    }
+#endif
 
     if (!s_x11_locale_checked) {
         const char *locale = setlocale(LC_CTYPE, NULL);
@@ -639,6 +662,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         | FocusChangeMask
         | EnterWindowMask | LeaveWindowMask
     );
+
+#if defined(MINIFB_HAS_XRANDR)
+    // Register for XRandR screen change events on the root window
+    if (s_xrr_event_base >= 0) {
+        XRRSelectInput(window_data_specific->display, default_root_window,
+            RRScreenChangeNotifyMask
+        );
+        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRRSelectInput registered for RRScreenChangeNotifyMask");
+    }
+#endif
 
     window_data_specific->im = XOpenIM(window_data_specific->display, NULL, NULL, NULL);
     if (window_data_specific->im == NULL) {
@@ -1408,29 +1441,78 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float x = 96.0, y = 96.0;
+    float x = 1.0f, y = 1.0f;
 
     if (window != NULL) {
-        //SWindowData     *window_data     = (SWindowData *) window;
-        //SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+        SWindowData     *window_data = (SWindowData *) window;
+        SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
-        // I cannot find a way to get dpi under VirtualBox
-        // XrmGetResource "Xft.dpi", "Xft.Dpi"
-        // XRRGetOutputInfo
-        // DisplayWidthMM, DisplayHeightMM
-        // All returning invalid values or 0
+        if (window_data_specific != NULL && window_data_specific->display != NULL) {
+            Display *display = window_data_specific->display;
+            int      screen  = window_data_specific->screen;
+            const char *scale_source = "default";
+            SX11ScaleMethods methods;
+
+            if (screen < 0) {
+                screen = DefaultScreen(display);
+            }
+            mfb_log(MFB_LOG_TRACE,
+                    "X11MiniFB: monitor_scale begin window=%lu screen=%d.",
+                    (unsigned long) window_data_specific->window,
+                    screen);
+
+            mfb_x11_query_scale_methods(display, window_data_specific->window, screen, &methods);
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xresources ok=%d scale=%.6f,%.6f.", methods.has_xresources ? 1 : 0, methods.x_xresources, methods.y_xresources);
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xsettings ok=%d scale=%.6f,%.6f.", methods.has_xsettings ? 1 : 0, methods.x_xsettings, methods.y_xsettings);
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-window ok=%d scale=%.6f,%.6f.", methods.has_xrandr_window ? 1 : 0, methods.x_xrandr_window, methods.y_xrandr_window);
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-any ok=%d scale=%.6f,%.6f.", methods.has_xrandr_any ? 1 : 0, methods.x_xrandr_any, methods.y_xrandr_any);
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method display-mm ok=%d scale=%.6f,%.6f.", methods.has_display_mm ? 1 : 0, methods.x_display_mm, methods.y_display_mm);
+
+            // Stable policy for desktop X11:
+            // 1) Xsettings (desktop settings protocol)
+            // 2) Xresources (logical DPI)
+            // 3) XRandR by current window
+            // 4) XRandR any output
+            // 5) Physical DPI from DisplayWidthMM/HeightMM
+            if (methods.has_xsettings) {
+                x = methods.x_xsettings;
+                y = methods.y_xsettings;
+                scale_source = "xsettings";
+            }
+            else if (methods.has_xresources) {
+                x = methods.x_xresources;
+                y = methods.y_xresources;
+                scale_source = "xresources";
+            }
+            else if (methods.has_xrandr_window) {
+                x = methods.x_xrandr_window;
+                y = methods.y_xrandr_window;
+                scale_source = "xrandr-window";
+            }
+            else if (methods.has_xrandr_any) {
+                x = methods.x_xrandr_any;
+                y = methods.y_xrandr_any;
+                scale_source = "xrandr-any";
+            }
+            else if (methods.has_display_mm) {
+                x = methods.x_display_mm;
+                y = methods.y_display_mm;
+                scale_source = "display-mm";
+            }
+            mfb_log(MFB_LOG_TRACE, "X11MiniFB: monitor_scale resolved source=%s scale_x=%.3f scale_y=%.3f.", scale_source, x, y);
+        }
     }
 
     if (scale_x) {
-        *scale_x = x / 96.0f;
-        if (*scale_x == 0) {
+        *scale_x = x;
+        if (*scale_x <= 0.0f) {
             *scale_x = 1.0f;
         }
     }
 
     if (scale_y) {
-        *scale_y = y / 96.0f;
-        if (*scale_y == 0) {
+        *scale_y = y;
+        if (*scale_y <= 0.0f) {
             *scale_y = 1.0f;
         }
     }
@@ -1457,11 +1539,13 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor called with a null window pointer.");
         return;
     }
+
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific == NULL) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor missing X11-specific window data.");
         return;
     }
+
     if (window_data_specific->display == NULL) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor has a null X11 display handle.");
         return;

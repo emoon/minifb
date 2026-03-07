@@ -205,6 +205,8 @@ int
 main() {
     int noise, carry, seed = 0xbeef;
 
+    mfb_set_log_level(MFB_LOG_TRACE);
+
     struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
     if (!window) {
         return 0;

@@ -96,6 +96,8 @@ set(SrcWayland
 #--
 set(SrcX11
     src/x11/X11MiniFB.c
+    src/x11/X11MiniFB_scale_funcs.c
+    src/x11/X11MiniFB_scale_funcs.h
     src/x11/WindowData_X11.h
     src/MiniFB_linux.c
 )
@@ -364,8 +366,15 @@ elseif (UNIX)
         target_link_libraries(minifb PRIVATE
             X11::X11
             #"-lxkbcommon"
-            #"-lXrandr" DPI NOT WORKING
         )
+        if (X11_Xrandr_FOUND)
+            if (TARGET X11::Xrandr)
+                target_link_libraries(minifb PRIVATE X11::Xrandr)
+            else()
+                target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
+            endif()
+            target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
+        endif()
         if (USE_OPENGL_API)
             find_package(OpenGL)
             if (NOT OpenGL_FOUND)
