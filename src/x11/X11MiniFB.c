@@ -504,6 +504,8 @@ update_events(SWindowData *window_data, Display *display) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
+    unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     int depth, i, format_count, conv_depth = -1;
     XPixmapFormatValues* formats;
@@ -520,6 +522,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (!compute_rgba_layout(width, height, &initial_stride, &initial_total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: window size %ux%u is too large for X11 image layout.", width, height);
         return NULL;
+    }
+
+    if ((effective_flags & ~known_flags) != 0u) {
+        mfb_log(MFB_LOG_WARNING, "X11MiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
+    }
+
+    if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
+        mfb_log(MFB_LOG_WARNING, "X11MiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+        effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
@@ -615,7 +626,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     int pos_x, pos_y;
     int window_width, window_height;
-    bool request_maximized_desktop = (flags & MFB_WF_FULLSCREEN_DESKTOP) != 0;
+    bool request_maximized_desktop = (effective_flags & MFB_WF_FULLSCREEN_DESKTOP) != 0;
 
     window_data->window_width  = width;
     window_data->window_height = height;
@@ -624,7 +635,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->buffer_stride = initial_stride;
     calc_dst_factor(window_data, width, height);
 
-    if (flags & MFB_WF_FULLSCREEN_DESKTOP) {
+    if (effective_flags & MFB_WF_FULLSCREEN_DESKTOP) {
         pos_x         = 0;
         pos_y         = 0;
         window_width  = screen_width;
@@ -693,7 +704,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     XStoreName(window_data_specific->display, window_data_specific->window, window_title);
 
-    if (flags & MFB_WF_BORDERLESS) {
+    if (effective_flags & MFB_WF_BORDERLESS) {
         struct StyleHints {
             unsigned long   flags;
             unsigned long   functions;
@@ -716,7 +727,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
 
-    if (flags & MFB_WF_ALWAYS_ON_TOP) {
+    if (effective_flags & MFB_WF_ALWAYS_ON_TOP) {
         Atom sa_p = XInternAtom(window_data_specific->display, "_NET_WM_STATE_ABOVE", False);
         Atom state_atom = XInternAtom(window_data_specific->display, "_NET_WM_STATE", False);
         if (sa_p == None || state_atom == None) {
@@ -727,7 +738,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
 
-    if (flags & MFB_WF_FULLSCREEN) {
+    if (effective_flags & MFB_WF_FULLSCREEN) {
         Atom sf_p = XInternAtom(window_data_specific->display, "_NET_WM_STATE_FULLSCREEN", True);
         Atom state_atom = XInternAtom(window_data_specific->display, "_NET_WM_STATE", True);
         if (sf_p == None || state_atom == None) {
@@ -763,7 +774,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         size_hints.min_width  = width;
         size_hints.min_height = height;
     }
-    if (!request_maximized_desktop && (flags & MFB_WF_RESIZABLE)) {
+    if (!request_maximized_desktop && (effective_flags & MFB_WF_RESIZABLE)) {
         size_hints.max_width  = screen_width;
         size_hints.max_height = screen_height;
     }

@@ -141,14 +141,22 @@ dispatch_pending_resize(SWindowData *window_data) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     @autoreleasepool {
+        const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
+        unsigned effective_flags = flags;
         const char *window_title_c = (title != NULL && title[0] != '\0') ? title : "minifb";
 
         if (width == 0 || height == 0) {
             mfb_log(MFB_LOG_ERROR, "MacMiniFB: invalid window size %ux%u.", width, height);
             return NULL;
         }
-        if ((flags & MFB_WF_FULLSCREEN) && (flags & MFB_WF_FULLSCREEN_DESKTOP)) {
+
+        if ((effective_flags & ~known_flags) != 0u) {
+            mfb_log(MFB_LOG_WARNING, "MacMiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
+        }
+
+        if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
             mfb_log(MFB_LOG_WARNING, "MacMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+            effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
         }
 
         SWindowData *window_data = create_window_data(width, height);
@@ -166,17 +174,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         NSWindowStyleMask   styles = 0;
         bool                request_maximized_desktop = false;
 
-        if (flags & MFB_WF_BORDERLESS) {
+        if (effective_flags & MFB_WF_BORDERLESS) {
             styles |= NSWindowStyleMaskBorderless;
         }
         else {
             styles |= NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskTitled;
         }
 
-        if (flags & MFB_WF_RESIZABLE)
+        if (effective_flags & MFB_WF_RESIZABLE)
             styles |= NSWindowStyleMaskResizable;
 
-        if (flags & MFB_WF_FULLSCREEN) {
+        if (effective_flags & MFB_WF_FULLSCREEN) {
             styles = NSWindowStyleMaskFullScreen;
             NSScreen *mainScreen = [NSScreen mainScreen];
             if (mainScreen == nil) {
@@ -192,7 +200,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             rectangle = NSMakeRect(0, 0, window_data->window_width, window_data->window_height);
             frameRect = rectangle;
         }
-        else if (flags & MFB_WF_FULLSCREEN_DESKTOP) {
+        else if (effective_flags & MFB_WF_FULLSCREEN_DESKTOP) {
             request_maximized_desktop = true;
             styles |= NSWindowStyleMaskResizable;
             window_data->window_width  = width;
@@ -214,7 +222,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             return NULL;
         }
         [window_data_specific->window setReleasedWhenClosed:NO];
-        if (flags & MFB_WF_ALWAYS_ON_TOP) {
+        if (effective_flags & MFB_WF_ALWAYS_ON_TOP) {
             [window_data_specific->window setLevel:NSFloatingWindowLevel];
         }
 

@@ -508,6 +508,7 @@ release_window_counter(void) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     RECT rect = { 0 };
     int  x = 0, y = 0;
@@ -523,6 +524,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (width > UINT32_MAX / 4u) {
         mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window width %u (stride overflow).", width);
         return NULL;
+    }
+
+    if ((flags & ~known_flags) != 0u) {
+        mfb_log(MFB_LOG_WARNING, "WinMiniFB: unknown window flags 0x%x will be ignored.", flags & ~known_flags);
+    }
+
+    if ((flags & MFB_WF_FULLSCREEN) && (flags & MFB_WF_FULLSCREEN_DESKTOP)) {
+        mfb_log(MFB_LOG_WARNING, "WinMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
     }
 
     if (g_window_counter == 0) {

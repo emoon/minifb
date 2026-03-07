@@ -158,11 +158,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     UIWindow    *window;
 
     kUnused(title);
-    kUnused(flags);
 
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
+    }
+
+    if (flags != 0u) {
+        mfb_log(MFB_LOG_WARNING, "iOSMiniFB: window flags 0x%x are ignored by the iOS backend.", flags);
     }
 
     @autoreleasepool {

@@ -597,7 +597,6 @@ android_main(struct android_app* app) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     kUnused(title);
-    kUnused(flags);
 
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window size %ux%u.", width, height);
@@ -607,6 +606,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (width > UINT32_MAX / 4u) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window width %u (stride overflow).", width);
         return NULL;
+    }
+
+    if (flags != 0u) {
+        mfb_log(MFB_LOG_WARNING, "AndroidMiniFB: window flags 0x%x are ignored by the Android backend.", flags);
     }
 
     if (gApplication == NULL) {

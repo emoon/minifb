@@ -96,6 +96,29 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 
 If `title` is `NULL` or empty, MiniFB uses `"minifb"` as the effective window/canvas title.
 
+If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_WF_FULLSCREEN` takes precedence.
+
+Open-time readiness is backend-specific:
+- Wayland waits for the initial configure handshake before returning from `mfb_open_ex()`.
+- Android may return a window handle before `ANativeWindow` is ready (rendering starts once the native window becomes available).
+
+`mfb_open_ex()` flag support by backend:
+
+| Backend | RESIZABLE | BORDERLESS | ALWAYS_ON_TOP | FULLSCREEN | FULLSCREEN_DESKTOP |
+|---------|-----------|------------|---------------|------------|--------------------|
+| Windows | Yes | Yes | Yes | Yes | Yes |
+| X11 | Yes | Yes* | Yes* | Yes* | Yes* |
+| Wayland | Yes | Yes | No (ignored, warning) | Yes | Yes (maximized) |
+| macOS | Yes | Yes | Yes | Yes | Yes (zoom/maximize) |
+| Web | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | Yes** | Yes** |
+| DOS | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
+| Android | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
+| iOS | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
+
+\* Best effort via window-manager hints/properties; behavior depends on compositor/WM support.
+
+\** Browser-managed fullscreen; typically requires a user gesture before entering fullscreen.
+
 ### Event Callbacks
 
 Register callbacks to handle window events:

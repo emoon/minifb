@@ -1250,10 +1250,25 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
+    unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
+    }
+
+    if ((effective_flags & ~known_flags) != 0u) {
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
+    }
+
+    if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+        effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
+    }
+
+    if (effective_flags & MFB_WF_ALWAYS_ON_TOP) {
+        mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: MFB_WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
@@ -1441,7 +1456,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             if (window_data_way->toplevel_decoration) {
                 zxdg_toplevel_decoration_v1_add_listener(window_data_way->toplevel_decoration,
                                                          &toplevel_decoration_listener, window_data);
-                if (flags & MFB_WF_BORDERLESS) {
+                if (effective_flags & MFB_WF_BORDERLESS) {
                     zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
                                                          ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
                 }
@@ -1452,9 +1467,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             }
         }
 
-        window_data_way->request_fullscreen = (flags & MFB_WF_FULLSCREEN) ? 1 : 0;
+        window_data_way->request_fullscreen = (effective_flags & MFB_WF_FULLSCREEN) ? 1 : 0;
         window_data_way->request_maximized =
-            (!window_data_way->request_fullscreen && (flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+            (!window_data_way->request_fullscreen && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
         window_data_way->startup_state_applied = 0;
 
         if (window_data_way->request_fullscreen || window_data_way->request_maximized) {
@@ -1462,7 +1477,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
         }
         else {
-            if (flags & MFB_WF_RESIZABLE) {
+            if (effective_flags & MFB_WF_RESIZABLE) {
                 xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
                 xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
             }
@@ -1470,10 +1485,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
                 xdg_toplevel_set_min_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
                 xdg_toplevel_set_max_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
             }
-        }
-
-        if (flags & MFB_WF_ALWAYS_ON_TOP) {
-            mfb_log(MFB_LOG_WARNING, "WaylandMiniFB: MFB_WF_ALWAYS_ON_TOP is not supported by xdg-shell and will be ignored.");
         }
 
         xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));

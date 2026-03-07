@@ -732,6 +732,8 @@ mfb_destroy_window_data(SWindowData *window_data) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
+    const unsigned supported_flags = MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP;
+    unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     SWindowData *window_data;
 
@@ -745,6 +747,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
 
+    if ((effective_flags & ~supported_flags) != 0u) {
+        mfb_log(MFB_LOG_WARNING, "WebMiniFB: window flags 0x%x are not supported by the web backend and will be ignored.", effective_flags & ~supported_flags);
+    }
+
+    if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
+        mfb_log(MFB_LOG_WARNING, "WebMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+        effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
+    }
+
     window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData.");
@@ -752,7 +763,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    int wants_fullscreen = ((flags & MFB_WF_FULLSCREEN) || (flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+    int wants_fullscreen = ((effective_flags & MFB_WF_FULLSCREEN) || (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
     void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen);
     if (!specific) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);

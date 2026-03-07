@@ -294,7 +294,6 @@ check_window_closed(SWindowData *window_data) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
   (void)title;
-  (void)flags;
 
   if (width == 0 || height == 0) {
     mfb_log(MFB_LOG_ERROR, "DOSMiniFB: invalid window size %ux%u", width, height);
@@ -304,6 +303,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   if (width > UINT32_MAX / 4u) {
     mfb_log(MFB_LOG_ERROR, "DOSMiniFB: invalid window width %u (stride overflow)", width);
     return NULL;
+  }
+
+  if (flags != 0u) {
+    mfb_log(MFB_LOG_WARNING, "DOSMiniFB: window flags 0x%x are ignored by the DOS backend", flags);
   }
 
   if (g_window) {
