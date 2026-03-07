@@ -1,4 +1,5 @@
 #include <android_native_app_glue.h>
+#include <android/configuration.h>
 #include <android/log.h>
 #include <jni.h>
 //--
@@ -12,6 +13,18 @@
 #include "WindowData_Android.h"
 
 #define  LOG_TAG    "MiniFB"
+
+#ifndef ACONFIGURATION_DENSITY_DEFAULT
+#define ACONFIGURATION_DENSITY_DEFAULT 160
+#endif
+
+#ifndef ACONFIGURATION_DENSITY_ANY
+#define ACONFIGURATION_DENSITY_ANY 0xfffe
+#endif
+
+#ifndef ACONFIGURATION_DENSITY_NONE
+#define ACONFIGURATION_DENSITY_NONE 0xffff
+#endif
 
 struct android_app  *gApplication = NULL;
 
@@ -837,13 +850,41 @@ mfb_wait_sync(struct mfb_window *window) {
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    kUnused(window);
+    float x = 1.0f;
+    float y = 1.0f;
+
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+
+        if (window_data_android != NULL &&
+            window_data_android->app != NULL &&
+            window_data_android->app->config != NULL) {
+            int32_t density = AConfiguration_getDensity(window_data_android->app->config);
+
+            if (density > 0 &&
+                density != ACONFIGURATION_DENSITY_ANY &&
+                density != ACONFIGURATION_DENSITY_NONE) {
+                float scale = (float) density / (float) ACONFIGURATION_DENSITY_DEFAULT;
+                if (scale > 0.0f) {
+                    x = scale;
+                    y = scale;
+                }
+            }
+        }
+    }
 
     if (scale_x != NULL) {
-        *scale_x = 1.0f;
+        *scale_x = x;
+        if (*scale_x == 0.0f) {
+            *scale_x = 1.0f;
+        }
     }
     if (scale_y != NULL) {
-        *scale_y = 1.0f;
+        *scale_y = y;
+        if (*scale_y == 0.0f) {
+            *scale_y = 1.0f;
+        }
     }
 }
 
