@@ -263,6 +263,67 @@ void                mfb_get_monitor_scale(struct mfb_window *window, float *scal
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y); // [Deprecated]
 ```
 
+### Display Insets
+
+Two C functions let you query display insets from native code:
+
+```c
+// Physical cutout/notch area only.
+bool mfb_get_display_cutout_insets(struct mfb_window *window,
+                                   int *left, int *top, int *right, int *bottom);
+
+// Full safe area: cutout + system UI reserved regions.
+bool mfb_get_display_safe_insets(struct mfb_window *window,
+                                 int *left, int *top, int *right, int *bottom);
+```
+
+Insets are **edge margins in pixels**, not a rectangle:
+
+- `left`, `top`, `right`, `bottom` are distances from each window edge.
+- No reserved area means `0, 0, 0, 0`.
+- If you need a safe rectangle, derive it from window size:
+  - `safe_x = left`
+  - `safe_y = top`
+  - `safe_w = window_w - left - right`
+  - `safe_h = window_h - top - bottom`
+
+Return value contract (all backends):
+
+- `true`: query succeeded, output values are valid (possibly all zeros).
+- `false`: query unavailable/invalid at that moment; outputs are set to zeros.
+
+Behavior by backend:
+
+| Backend | `mfb_get_display_cutout_insets` | `mfb_get_display_safe_insets` |
+|---------|----------------------------------|--------------------------------|
+| Android | Physical cutout only (`DisplayCutout`, API 28+). Returns `true` with zeros when there is no cutout. Returns `false` if unavailable (e.g. API < 28 or query failure). | Full safe insets. API 30+: `WindowInsets.getInsets(systemBars|displayCutout)`. API 24-29: `getSystemWindowInset*()` fallback. |
+| iOS | Approximated from `UIWindow.safeAreaInsets` for physical cutout intent. Bottom is kept `0` (home indicator is not a physical cutout). | Uses `UIWindow.safeAreaInsets` directly (includes notch/Dynamic Island + status bar + home indicator). |
+| Desktop/Web/DOS | Returns `true` with zeros for a valid window (no platform cutout/safe-inset data exposed). | Returns `true` with zeros for a valid window. |
+
+For any backend, passing `window == NULL` returns `false` and zero outputs.
+
+Example usage (safe layout):
+
+```c
+void on_resize(struct mfb_window *window, int width, int height) {
+    int left = 0, top = 0, right = 0, bottom = 0;
+    if (!mfb_get_display_safe_insets(window, &left, &top, &right, &bottom)) {
+        return;
+    }
+
+    int safe_x = left;
+    int safe_y = top;
+    int safe_w = width  - left - right;
+    int safe_h = height - top  - bottom;
+
+    // Clamp defensive, in case platform values arrive before resize settles.
+    if (safe_w < 0) safe_w = 0;
+    if (safe_h < 0) safe_h = 0;
+
+    // Place important UI inside [safe_x, safe_y, safe_w, safe_h].
+}
+```
+
 ## Integration
 
 ### Adding MiniFB to Your Project
@@ -646,35 +707,13 @@ The theme is kept as an early fallback; the Java code overrides it once the Acti
 
 Both options can coexist (the theme fires first, the Java code reinforces it).
 
-#### Display cutout API (Android-only)
+#### Querying Insets from C
 
-Two C functions let you query the cutout/safe-area dimensions from native code:
+The display inset APIs are backend-agnostic:
+`mfb_get_display_cutout_insets()` and `mfb_get_display_safe_insets()`.
 
-```c
-// Physical notch/punch-hole area only. Requires API 28+.
-// Returns false (all zeros) on devices without a cutout or on API < 28.
-bool mfb_get_display_cutout_insets(struct mfb_window *window,
-                                   int *left, int *top, int *right, int *bottom);
-
-// Full safe-area: cutout + system bars (status bar, nav bar).
-// API 30+: uses the modern WindowInsets API.
-// API 24-29: falls back to the deprecated getSystemWindowInsets().
-bool mfb_get_display_safe_insets(struct mfb_window *window,
-                                 int *left, int *top, int *right, int *bottom);
-```
-
-Example usage in a resize callback:
-
-```c
-void on_resize(struct mfb_window *window, int width, int height) {
-    int left = 0, top = 0, right = 0, bottom = 0;
-    mfb_get_display_cutout_insets(window, &left, &top, &right, &bottom);
-    // Place HUD elements at least 'top' pixels from the top edge, etc.
-}
-```
-
-Both functions are declared only when `__ANDROID__` is defined, so they do not pollute the
-API on other platforms.
+See [Display Insets](#display-insets) in the API reference for exact semantics,
+return contract, and backend behavior details.
 
 ### Web (WASM)
 

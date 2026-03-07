@@ -33,8 +33,9 @@ typedef struct {
 static uint32_t  g_width  = 200;
 static uint32_t  g_height = 100;
 static uint32_t *g_buffer = NULL;
-static Pos      g_positions[16] = {};
-static unsigned int g_frame_count = 0;
+static Pos       g_positions[16] = {};
+static uint32_t  g_frame_count = 0;
+static bool      g_is_active = false;
 
 //-------------------------------------
 static void
@@ -61,10 +62,10 @@ print_getters(struct mfb_window *window) {
     win_h = mfb_get_window_height(window);
     mfb_get_window_size(window, &win_sw, &win_sh);
     if (win_w != win_sw) {
-        fprintf(stderr, "Width does not match: %u != %u\n", win_w, win_sw);
+        LOGE("Width does not match: %u != %u\n", win_w, win_sw);
     }
     if (win_h != win_sh) {
-        fprintf(stderr, "Height does not match: %u != %u\n", win_h, win_sh);
+        LOGE("Height does not match: %u != %u\n", win_h, win_sh);
     }
 
     draw_offset_x = mfb_get_drawable_offset_x(window);
@@ -129,6 +130,7 @@ print_getters(struct mfb_window *window) {
 void
 active(struct mfb_window *window, bool is_active) {
     LOGI("active: %d", is_active);
+    g_is_active = is_active;
 }
 
 //-------------------------------------
@@ -207,6 +209,11 @@ main(int argc, char *argv[]) {
 
     mfb_update_state state;
     do {
+        if (!g_is_active) {
+            mfb_wait_sync(window);
+            continue;
+        }
+
         int safe_left = 0, safe_top = 0, safe_right = 0, safe_bottom = 0;
         mfb_get_display_safe_insets(window, &safe_left, &safe_top, &safe_right, &safe_bottom);
 

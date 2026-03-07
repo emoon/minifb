@@ -435,3 +435,39 @@ void
 mfb_set_log_level(mfb_log_level level) {
     g_mfb_log_level = level;
 }
+
+//-------------------------------------
+// Android and iOS provide their own platform-specific implementations.
+// All other backends return 0 insets. A NULL window is treated as an invalid query.
+#if !defined(__ANDROID__) && !(defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+
+bool
+mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom) {
+    if (left)   *left   = 0;
+    if (top)    *top    = 0;
+    if (right)  *right  = 0;
+    if (bottom) *bottom = 0;
+
+    if (window == NULL) {
+        return false;
+    }
+
+    return true;
+}
+
+//-------------------------------------
+bool
+mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom) {
+    if (left)   *left   = 0;
+    if (top)    *top    = 0;
+    if (right)  *right  = 0;
+    if (bottom) *bottom = 0;
+
+    if (window == NULL) {
+        return false;
+    }
+
+    return true;
+}
+
+#endif // !__ANDROID__ && !TARGET_OS_IOS

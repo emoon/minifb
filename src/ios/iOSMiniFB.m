@@ -589,3 +589,71 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     kUnused(show);
     // iOS has no visible cursor
 }
+
+//-------------------------------------
+bool
+mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom) {
+    if (left)   *left   = 0;
+    if (top)    *top    = 0;
+    if (right)  *right  = 0;
+    if (bottom) *bottom = 0;
+
+    if (window == NULL) {
+        return false;
+    }
+
+    UIWindow *app_window = get_application_window();
+    if (app_window == nil) {
+        return false;
+    }
+
+    UIEdgeInsets insets = app_window.safeAreaInsets;
+
+    // iOS has no public API to query the physical cutout separately from system bars.
+    // Heuristic: iPhones without a home button (iPhone X / Dynamic Island models) have
+    // a non-zero bottom safe-area inset (home indicator) in portrait orientation.
+    // On those devices the top/left/right safe-area insets are caused by the physical
+    // cutout; the bottom inset is the home indicator and is intentionally excluded here.
+    BOOL has_cutout = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPhone)
+                   && (insets.bottom > 0.0f);
+
+    if (!has_cutout) {
+        return true; // valid answer: device has no physical cutout
+    }
+
+    CGFloat scale = UIScreen.mainScreen.scale;
+    if (left)   *left   = (int) round(insets.left  * scale);
+    if (top)    *top    = (int) round(insets.top   * scale);
+    if (right)  *right  = (int) round(insets.right * scale);
+    // bottom intentionally left 0: home indicator is not a physical screen obstruction
+
+    return true;
+}
+
+//-------------------------------------
+bool
+mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom) {
+    if (left)   *left   = 0;
+    if (top)    *top    = 0;
+    if (right)  *right  = 0;
+    if (bottom) *bottom = 0;
+
+    if (window == NULL) {
+        return false;
+    }
+
+    UIWindow *app_window = get_application_window();
+    if (app_window == nil) {
+        return false;
+    }
+
+    UIEdgeInsets insets = app_window.safeAreaInsets;
+    CGFloat scale = UIScreen.mainScreen.scale;
+
+    if (left)   *left   = (int) round(insets.left   * scale);
+    if (top)    *top    = (int) round(insets.top    * scale);
+    if (right)  *right  = (int) round(insets.right  * scale);
+    if (bottom) *bottom = (int) round(insets.bottom * scale);
+
+    return true;
+}
