@@ -813,6 +813,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+    uint32_t buffer_stride = 0;
     SWindowData *window_data = (SWindowData *) window;
     if (window_data ==  NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
@@ -831,6 +832,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
+        return MFB_STATE_INVALID_BUFFER;
+    }
+
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific ==  NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
@@ -843,20 +849,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
-        return MFB_STATE_INVALID_BUFFER;
-    }
-
 #if !defined(USE_OPENGL_API)
     bool different_size = false;
 #endif
 
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
-        uint32_t buffer_stride = 0;
-        if (!calculate_buffer_layout(width, height, &buffer_stride, NULL) ||
-            buffer_stride > (uint32_t) INT_MAX) {
-            mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid buffer layout for size %ux%u.", width, height);
+        if (buffer_stride > (uint32_t) INT_MAX) {
+            mfb_log(MFB_LOG_ERROR, "X11MiniFB: buffer stride for size %ux%u exceeds XImage limit.", width, height);
             return MFB_STATE_INVALID_BUFFER;
         }
         window_data->buffer_width  = width;

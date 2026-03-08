@@ -611,7 +611,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     return MFB_STATE_INVALID_WINDOW;
   }
 
-  window_data->buffer_width = width;
+  window_data->buffer_width  = width;
   window_data->buffer_height = height;
   window_data->buffer_stride = buffer_stride;
 
