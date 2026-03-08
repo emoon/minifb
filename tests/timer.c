@@ -65,7 +65,7 @@ main() {
             time = 0;
 
         }
-    } while(mfb_wait_sync(window));
+    } while (mfb_wait_sync(window));
 
     return 0;
 }

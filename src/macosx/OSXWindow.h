@@ -37,10 +37,10 @@ translate_modifiers(NSEventModifierFlags flags) {
 }
 
 //-------------------------------------
-- (id)initWithContentRect:(NSRect)contentRect
-                styleMask:(NSWindowStyleMask)windowStyle
-                  backing:(NSBackingStoreType)bufferingType
-                    defer:(BOOL)deferCreation
+- (id) initWithContentRect:(NSRect) contentRect
+                styleMask:(NSWindowStyleMask) windowStyle
+                  backing:(NSBackingStoreType) bufferingType
+                    defer:(BOOL) deferCreation
                windowData:(SWindowData *) windowData;
 
 - (void) removeWindowData;

@@ -9,7 +9,7 @@ struct mfb_timer;
 // Event callbacks
 typedef void(*mfb_active_func)(struct mfb_window *window, bool is_active);
 typedef void(*mfb_resize_func)(struct mfb_window *window, int width, int height);
-typedef bool(*mfb_close_func)(struct mfb_window* window);
+typedef bool(*mfb_close_func)(struct mfb_window *window);
 typedef void(*mfb_keyboard_func)(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);
 typedef void(*mfb_char_input_func)(struct mfb_window *window, unsigned int code);
 typedef void(*mfb_mouse_button_func)(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed);

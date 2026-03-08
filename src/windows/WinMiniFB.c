@@ -214,7 +214,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             client_rect.bottom = (LONG) (client_height * scale);
 
             if (mfb_AdjustWindowRectExForDpi != NULL) {
-                // Turn client size into *window* size for this DPI
+                // Turn client size into window size for this DPI
                 DWORD style   = (DWORD) (GetWindowLongPtr(hWnd, GWL_STYLE));
                 DWORD exStyle = (DWORD) (GetWindowLongPtr(hWnd, GWL_EXSTYLE));
                 if (!mfb_AdjustWindowRectExForDpi(&client_rect, style, FALSE, exStyle, dpi)) {
@@ -269,7 +269,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 bool destroy = false;
 
                 // Obtain a confirmation of close
-                if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+                if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
                     destroy = true;
                 }
 
@@ -293,7 +293,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_KEYUP:
         case WM_SYSKEYUP:
             if (window_data) {
-                mfb_key key_code      = translate_key((unsigned int)wParam, (unsigned long)lParam);
+                mfb_key key_code      = translate_key((unsigned int) wParam, (unsigned long) lParam);
                 int is_pressed        = !((lParam >> 31) & 1);
                 window_data->mod_keys = translate_mod();
 
@@ -389,7 +389,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_MOUSEWHEEL:
             if (window_data) {
-                window_data->mouse_wheel_y = (SHORT)HIWORD(wParam) / (float)WHEEL_DELTA;
+                window_data->mouse_wheel_y = (SHORT) HIWORD(wParam) / (float) WHEEL_DELTA;
                 kCall(mouse_wheel_func, translate_mod(), 0.0f, window_data->mouse_wheel_y);
             }
             break;
@@ -398,7 +398,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             // This message is only sent on Windows Vista and later
             // NOTE: The X-axis is inverted for consistency with macOS and X11
             if (window_data) {
-                window_data->mouse_wheel_x = -((SHORT)HIWORD(wParam) / (float)WHEEL_DELTA);
+                window_data->mouse_wheel_x = -((SHORT) HIWORD(wParam) / (float) WHEEL_DELTA);
                 kCall(mouse_wheel_func, translate_mod(), window_data->mouse_wheel_x, 0.0f);
             }
             break;
@@ -698,7 +698,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->bitmap_info->bmiHeader.biBitCount    = 32;
     window_data_specific->bitmap_info->bmiHeader.biCompression = BI_BITFIELDS;
     window_data_specific->bitmap_info->bmiHeader.biWidth       = window_data->buffer_width;
-    window_data_specific->bitmap_info->bmiHeader.biHeight      = -(LONG)window_data->buffer_height;
+    window_data_specific->bitmap_info->bmiHeader.biHeight      = -(LONG) window_data->buffer_height;
     window_data_specific->bitmap_info->bmiColors[0].rgbRed     = 0xff;
     window_data_specific->bitmap_info->bmiColors[1].rgbGreen   = 0xff;
     window_data_specific->bitmap_info->bmiColors[2].rgbBlue    = 0xff;

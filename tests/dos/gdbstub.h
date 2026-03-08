@@ -293,7 +293,7 @@ static void exception_init() {
   signal(SIGILL, exception_handler);
 
   _go32_dpmi_get_protected_mode_interrupt_vector(0x1c, &ctx.old_tick_handler);
-  ctx.tick_handler.pm_offset = (int)gdb_tick_handler;
+  ctx.tick_handler.pm_offset = (int) gdb_tick_handler;
   ctx.tick_handler.pm_selector = _go32_my_cs();
   _go32_dpmi_allocate_iret_wrapper(&ctx.tick_handler);
   _go32_dpmi_set_protected_mode_interrupt_vector(0x1c, &ctx.tick_handler);
@@ -309,7 +309,7 @@ static void exception_dispose() {
 }
 
 void gdb_start(void) {
-  ((void)register_names[0]);
+  ((void) register_names[0]);
   serial_port_init();
   exception_init();
   atexit(exception_dispose);
@@ -317,7 +317,7 @@ void gdb_start(void) {
 }
 
 static unsigned char *gdb_read_packet() {
-  register unsigned char *buffer = (unsigned char *)ctx.input_buffer;
+  register unsigned char *buffer = (unsigned char *) ctx.input_buffer;
   register unsigned char checksum;
   register unsigned char xmitcsum;
   register int count;
@@ -408,8 +408,8 @@ void gdb_loop(int exception_number) {
   /* reply to host that an exception has occurred */
   int sigval = exception_to_signal(exception_number);
   gdb_debug("\n=== STOPPED: sig: %i, evec: %i, ip %p, [ip] %x\n", sigval,
-            exception_number, (void *)ctx.registers[EIP],
-            *(unsigned char *)ctx.registers[EIP]);
+            exception_number, (void *) ctx.registers[EIP],
+            *(unsigned char *) ctx.registers[EIP]);
   for (int l = 0; l < NUM_REGISTERS; l++)
     gdb_debug("%s: %x ", register_names[l], ctx.registers[l]);
   gdb_debug("\n");
@@ -419,13 +419,13 @@ void gdb_loop(int exception_number) {
   ctx.output_buffer[2] = hex_chars[sigval % 16];
   ctx.output_buffer[3] = 0;
 
-  gdb_write_packet((unsigned char *)ctx.output_buffer);
+  gdb_write_packet((unsigned char *) ctx.output_buffer);
 
   stepping = 0;
 
   while (1 == 1) {
     ctx.output_buffer[0] = 0;
-    ptr = (char *)gdb_read_packet();
+    ptr = (char *) gdb_read_packet();
     char cmd = *ptr++;
     switch (cmd) {
     case '?':
@@ -499,12 +499,12 @@ void gdb_loop(int exception_number) {
                   "",
                   register_names[l], ctx.registers[l]);
       gdb_debug("\n");
-      mem_to_hex((char *)ctx.registers, ctx.output_buffer, NUM_REGISTERS * 4,
+      mem_to_hex((char *) ctx.registers, ctx.output_buffer, NUM_REGISTERS * 4,
                  0);
       break;
     case 'G':
       gdb_debug("G (Write general registers)\n");
-      hex_to_mem(ptr, (char *)ctx.registers, NUM_REGISTERS * 4, 0);
+      hex_to_mem(ptr, (char *) ctx.registers, NUM_REGISTERS * 4, 0);
       strcpy(ctx.output_buffer, "OK");
       break;
     case 'P': {
@@ -527,12 +527,12 @@ void gdb_loop(int exception_number) {
       gdb_debug("m (Read length addressable memory units starting at address "
                 "addr)\n");
       if (hex_to_int(&ptr, &addr)) {
-        gdb_debug("read, addr: %p, ", (void *)addr);
+        gdb_debug("read, addr: %p, ", (void *) addr);
         if (*(ptr++) == ',') {
           if (hex_to_int(&ptr, &length)) {
             ptr = 0;
             ctx.mem_error = 0;
-            mem_to_hex((char *)addr, ctx.output_buffer, length, 1);
+            mem_to_hex((char *) addr, ctx.output_buffer, length, 1);
             if (ctx.mem_error) {
               strcpy(ctx.output_buffer, "E03");
             }
@@ -548,12 +548,12 @@ void gdb_loop(int exception_number) {
       gdb_debug("M (Write length addressable memory units starting at address "
                 "addr)\n");
       if (hex_to_int(&ptr, &addr)) {
-        gdb_debug("write, addr: %p, ", (void *)addr);
+        gdb_debug("write, addr: %p, ", (void *) addr);
         if (*(ptr++) == ',') {
           if (hex_to_int(&ptr, &length))
             if (*(ptr++) == ':') {
               ctx.mem_error = 0;
-              hex_to_mem(ptr, (char *)addr, length, 1);
+              hex_to_mem(ptr, (char *) addr, length, 1);
 
               if (ctx.mem_error) {
                 strcpy(ctx.output_buffer, "E03");
@@ -579,8 +579,8 @@ void gdb_loop(int exception_number) {
       if (hex_to_int(&ptr, &addr)) {
         ctx.registers[EIP] = addr;
       }
-      gdb_debug("%c, offset: %p, ip: %p (%s)\n", cmd, (void *)addr,
-                (void *)ctx.registers[EIP], cmd == 'c' ? "Continue" : "Step");
+      gdb_debug("%c, offset: %p, ip: %p (%s)\n", cmd, (void *) addr,
+                (void *) ctx.registers[EIP], cmd == 'c' ? "Continue" : "Step");
       ctx.registers[EFLAGS] &= 0xfffffeff;
       if (stepping)
         ctx.registers[EFLAGS] |= 0x100;
@@ -594,7 +594,7 @@ void gdb_loop(int exception_number) {
       gdb_debug("Unhandled: %c%s\n", cmd, ptr);
     }
 
-    gdb_write_packet((unsigned char *)ctx.output_buffer);
+    gdb_write_packet((unsigned char *) ctx.output_buffer);
   }
 
   handler_mutex = 0;

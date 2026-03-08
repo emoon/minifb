@@ -87,7 +87,7 @@ get_info(vesa_info_t *vesa_info) {
     return false;
 
   dosmemget(dosbuf, sizeof(vesa_info_t), vesa_info);
-  if (strncmp((const char *)vesa_info->vesa_signature, "VESA", 4) != 0)
+  if (strncmp((const char *) vesa_info->vesa_signature, "VESA", 4) != 0)
     return false;
 
   return true;
@@ -184,11 +184,11 @@ vesa_init(uint32_t width, uint32_t height,
 
     mfb_log(MFB_LOG_TRACE,
             "mode=%d res=%ux%u bpp=%u model=%u planes=%u bps=%u linear=%u",
-            mode_list[i], (unsigned)mode_info.width, (unsigned)mode_info.height,
-            (unsigned)mode_info.bits_per_pixel, (unsigned)mode_info.memory_model,
-            (unsigned)mode_info.number_of_planes,
-            (unsigned)mode_info.bytes_per_scanline,
-            (unsigned)((mode_info.mode_attributes & (1 << 7)) != 0));
+            mode_list[i], (unsigned) mode_info.width, (unsigned) mode_info.height,
+            (unsigned) mode_info.bits_per_pixel, (unsigned) mode_info.memory_model,
+            (unsigned) mode_info.number_of_planes,
+            (unsigned) mode_info.bytes_per_scanline,
+            (unsigned) ((mode_info.mode_attributes & (1 << 7)) != 0));
 
     if (!(mode_info.width == width || mode_info.width == width * 2))
       continue;
@@ -219,13 +219,13 @@ vesa_init(uint32_t width, uint32_t height,
   }
 
   mfb_log(MFB_LOG_TRACE, "Selected VESA mode=%d actual=%ux%u bpp=%u bps=%u",
-          found_mode, (unsigned)found_mode_info.width,
-          (unsigned)found_mode_info.height,
-          (unsigned)found_mode_info.bits_per_pixel,
-          (unsigned)found_mode_info.bytes_per_scanline);
+          found_mode, (unsigned) found_mode_info.width,
+          (unsigned) found_mode_info.height,
+          (unsigned) found_mode_info.bits_per_pixel,
+          (unsigned) found_mode_info.bytes_per_scanline);
 
   vesa_frame_buffer_mapping.address = found_mode_info.physical_base_ptr;
-  vesa_frame_buffer_mapping.size = (uint32_t)vesa_info.total_memory << 16;
+  vesa_frame_buffer_mapping.size = (uint32_t) vesa_info.total_memory << 16;
   if (__dpmi_physical_address_mapping(&vesa_frame_buffer_mapping) != 0) {
     mfb_log(MFB_LOG_ERROR, "Couldn't create VESA frame buffer address mapping");
     return false;

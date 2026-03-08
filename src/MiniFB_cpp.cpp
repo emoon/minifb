@@ -11,12 +11,12 @@ mfb_stub::get_instance(struct mfb_window *window) {
         stub_vector() = default;
 
         ~stub_vector() {
-            for(mfb_stub *instance : instances)
+            for (mfb_stub *instance : instances)
                 delete instance;
         }
 
         mfb_stub *get(struct mfb_window *window) {
-            for(mfb_stub *instance : instances) {
+            for (mfb_stub *instance : instances) {
                 if (instance->m_window == window) {
                     return instance;
                 }

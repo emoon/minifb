@@ -131,9 +131,9 @@ resize(struct mfb_window *window, int width, int height) {
 //-------------------------------------
 static bool
 close(struct mfb_window *window) {
-    const char* window_title = "";
+    const char *window_title = "";
     if (window) {
-        window_title = (const char*)mfb_get_user_data(window);
+        window_title = (const char *) mfb_get_user_data(window);
     }
     fprintf(stdout, "%s > close\n", window_title);
     return true;    // true => confirm close
@@ -255,7 +255,7 @@ main() {
         }
 
         g_frame_count++;
-    } while(mfb_wait_sync(window));
+    } while (mfb_wait_sync(window));
 
     return 0;
 }

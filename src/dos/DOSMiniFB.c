@@ -255,7 +255,7 @@ init_keyboard(void) {
   _go32_dpmi_get_protected_mode_interrupt_vector(
       0x9, &g_keyboard.old_keyboard_handler);
 
-  g_keyboard.new_keyboard_handler.pm_offset = (int)keyboard_handler;
+  g_keyboard.new_keyboard_handler.pm_offset = (int) keyboard_handler;
   g_keyboard.new_keyboard_handler.pm_selector = _my_cs();
 
   _go32_dpmi_allocate_iret_wrapper(&g_keyboard.new_keyboard_handler);
@@ -293,7 +293,7 @@ check_window_closed(SWindowData *window_data) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-  (void)title;
+  (void) title;
   uint32_t buffer_stride = 0;
 
   if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
@@ -347,10 +347,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   specific->actual_height = actual_height;
   specific->actual_bpp = actual_bpp;
   specific->bytes_per_scanline = bytes_per_scanline;
-  specific->scale_buffer = (uint32_t *)malloc(actual_width * actual_height * sizeof(uint32_t));
+  specific->scale_buffer = (uint32_t *) malloc(actual_width * actual_height * sizeof(uint32_t));
   specific->scanline_buffer =
       actual_bpp != 32 || bytes_per_scanline != width << 2
-          ? (uint8_t *)malloc(actual_height * bytes_per_scanline)
+          ? (uint8_t *) malloc(actual_height * bytes_per_scanline)
           : NULL;
 
   if (!specific->scale_buffer) {
@@ -372,7 +372,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   window_data->specific = specific;
 
-  mfb_set_keyboard_callback((struct mfb_window *)window_data, keyboard_default);
+  mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
   window_data->is_active = true;
   window_data->is_initialized = true;
@@ -404,7 +404,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-  SWindowData *window_data = (SWindowData *)window;
+  SWindowData *window_data = (SWindowData *) window;
   if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "DOSMiniFB")) {
     return false;
   }
@@ -441,19 +441,19 @@ update_mouse(SWindowData *window_data) {
   window_data->mouse_pos_x = regs.x.cx;
   window_data->mouse_pos_y = regs.x.dx;
 
-  mfb_key_mod mod = (mfb_key_mod)window_data->mod_keys;
+  mfb_key_mod mod = (mfb_key_mod) window_data->mod_keys;
 
   if (old_left_pressed != left_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_LEFT,   mod, left_pressed);
+    window_data->mouse_btn_func((struct mfb_window *) window_data, MFB_MOUSE_LEFT,   mod, left_pressed);
 
   if (old_right_pressed != right_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_RIGHT,  mod, right_pressed);
+    window_data->mouse_btn_func((struct mfb_window *) window_data, MFB_MOUSE_RIGHT,  mod, right_pressed);
 
   if (old_middle_pressed != middle_pressed && window_data->mouse_btn_func)
-    window_data->mouse_btn_func((struct mfb_window *)window_data, MFB_MOUSE_MIDDLE, mod, middle_pressed);
+    window_data->mouse_btn_func((struct mfb_window *) window_data, MFB_MOUSE_MIDDLE, mod, middle_pressed);
 
   if ((old_x != regs.x.cx || old_y != regs.x.dx) && window_data->mouse_move_func)
-    window_data->mouse_move_func((struct mfb_window *)window_data, regs.x.cx, regs.x.dx);
+    window_data->mouse_move_func((struct mfb_window *) window_data, regs.x.cx, regs.x.dx);
 }
 
 //-------------------------------------
@@ -506,8 +506,8 @@ update_keyboard(SWindowData *window_data) {
     }
 
     //mfb_log(MFB_LOG_TRACE, "scancode=%u key=%s ascii=%u pressed=%u",
-    //        (unsigned)scancode, mfb_get_key_name((mfb_key) key_code),
-    //        (unsigned)(uint8_t)ascii, (unsigned)pressed);
+    //        (unsigned) scancode, mfb_get_key_name((mfb_key) key_code),
+    //        (unsigned)(uint8_t) ascii, (unsigned) pressed);
 
     // MFB_KB_KEY_UNKNOWN == -1 -> as uint32_t it becomes 0xFFFFFFFF, which would
     // overflow key_status[MFB_MAX_KEYS]. Guard the write with a bounds check.
@@ -544,13 +544,13 @@ update_keyboard(SWindowData *window_data) {
     }
 
     if (window_data->keyboard_func)
-      window_data->keyboard_func((struct mfb_window *)window_data,
+      window_data->keyboard_func((struct mfb_window *) window_data,
                                  key_code,
                                  window_data->mod_keys,
                                  pressed);
 
     if (window_data->char_input_func && pressed && ascii != 0)
-      window_data->char_input_func((struct mfb_window *)window_data, ascii);
+      window_data->char_input_func((struct mfb_window *) window_data, ascii);
 
     // FIXME we currently ignore extended keys
     g_keyboard.last_scancode_was_extended = 0;
@@ -565,7 +565,7 @@ mfb_update_events(struct mfb_window *window) {
     return MFB_STATE_INVALID_WINDOW;
   }
 
-  SWindowData *window_data = (SWindowData *)window;
+  SWindowData *window_data = (SWindowData *) window;
   mfb_update_state state = check_window_closed(window_data);
   if (state)
     return state;
@@ -600,7 +600,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     return MFB_STATE_INVALID_BUFFER;
   }
 
-  SWindowData *window_data = (SWindowData *)window;
+  SWindowData *window_data = (SWindowData *) window;
   mfb_update_state state = mfb_update_events(window);
   if (state)
     return state;
@@ -631,7 +631,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
       a_width == width && a_height == height && a_bpp == 32 &&
       a_bytes_per_scanline == a_width * sizeof(uint32_t)) {
     movedata(_my_ds(),
-             (unsigned int)buffer,
+             (unsigned int) buffer,
              vesa_get_frame_buffer_selector(),
              0,
              height * a_bytes_per_scanline
@@ -646,13 +646,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   if (has_viewport) {
     memset(scale_buffer, 0, a_width * a_height * sizeof(uint32_t));
 
-    uint32_t vp_x = (uint32_t)(((uint64_t)window_data->dst_offset_x * a_width) /
+    uint32_t vp_x = (uint32_t)(((uint64_t) window_data->dst_offset_x * a_width) /
                                window_data->window_width);
-    uint32_t vp_y = (uint32_t)(((uint64_t)window_data->dst_offset_y * a_height) /
+    uint32_t vp_y = (uint32_t)(((uint64_t) window_data->dst_offset_y * a_height) /
                                window_data->window_height);
-    uint32_t vp_w = (uint32_t)(((uint64_t)window_data->dst_width * a_width) /
+    uint32_t vp_w = (uint32_t)(((uint64_t) window_data->dst_width * a_width) /
                                window_data->window_width);
-    uint32_t vp_h = (uint32_t)(((uint64_t)window_data->dst_height * a_height) /
+    uint32_t vp_h = (uint32_t)(((uint64_t) window_data->dst_height * a_height) /
                                window_data->window_height);
 
     if (vp_w == 0)
@@ -671,7 +671,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
                     vp_y, vp_w, vp_h, a_width);
     }
 
-    frame = (uint8_t *)scale_buffer;
+    frame = (uint8_t *) scale_buffer;
   }
 
   else if (a_width != width || a_height != height) {
@@ -700,7 +700,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     movedata(_my_ds(),
-             (unsigned int)scanline_buffer,
+             (unsigned int) scanline_buffer,
              vesa_get_frame_buffer_selector(),
              0,
              a_height * a_bytes_per_scanline
@@ -710,15 +710,15 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   else {
     if (a_bytes_per_scanline != a_width * 4) {
       // bpp matched, but pitch didn't. very unlikely to happen...
-      uint8_t *source = (uint8_t *)frame;
-      uint8_t *dest = (uint8_t *)scanline_buffer;
+      uint8_t *source = (uint8_t *) frame;
+      uint8_t *dest = (uint8_t *) scanline_buffer;
       uint32_t source_pitch = a_width << 2;
       for (uint32_t y = 0; y < a_height; y++, dest += a_bytes_per_scanline, source += source_pitch) {
         memcpy(dest, source, source_pitch);
       }
 
       movedata(_my_ds(),
-               (unsigned int)scanline_buffer,
+               (unsigned int) scanline_buffer,
                vesa_get_frame_buffer_selector(),
                0,
                a_height * a_bytes_per_scanline
@@ -727,7 +727,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     else {
       // Only stretched
       movedata(_my_ds(),
-               (unsigned int)frame,
+               (unsigned int) frame,
                vesa_get_frame_buffer_selector(),
                0,
                a_height * a_width * sizeof(uint32_t)
@@ -782,7 +782,7 @@ mfb_timer_tick(void) {
 //-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
-    (void)window;
-    (void)show;
+    (void) window;
+    (void) show;
     // Hardware cursor not supported in VESA mode; is_cursor_visible is always false
 }

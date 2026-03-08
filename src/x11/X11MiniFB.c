@@ -433,12 +433,12 @@ process_event(SWindowData *window_data, XEvent *event) {
 
         case ClientMessage:
         {
-            if ((Atom)event->xclient.data.l[0] == s_delete_window_atom) {
+            if ((Atom) event->xclient.data.l[0] == s_delete_window_atom) {
                 if (window_data) {
                     bool destroy = false;
 
                     // Obtain a confirmation of close
-                    if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+                    if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
                         destroy = true;
                     }
 
@@ -479,10 +479,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     int depth, i, format_count, conv_depth = -1;
-    XPixmapFormatValues* formats;
+    XPixmapFormatValues *formats;
     XSetWindowAttributes window_attributes;
     XSizeHints size_hints;
-    Visual* visual;
+    Visual *visual;
     uint32_t buffer_stride = 0;
 
     if (width == 0 || height == 0) {
@@ -694,7 +694,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             mfb_log(MFB_LOG_WARNING, "X11MiniFB: _MOTIF_WM_HINTS atom is unavailable; borderless hint may be ignored.");
         }
         else {
-            XChangeProperty(window_data_specific->display, window_data_specific->window, sh_p, sh_p, 32, PropModeReplace, (unsigned char*)&sh, 5);
+            XChangeProperty(window_data_specific->display, window_data_specific->window, sh_p, sh_p, 32, PropModeReplace, (unsigned char *) &sh, 5);
         }
     }
 
@@ -716,7 +716,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             mfb_log(MFB_LOG_WARNING, "X11MiniFB: fullscreen WM atoms are unavailable; fullscreen request may be ignored.");
         }
         else {
-            XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char*)&sf_p, 1);
+            XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char *) &sf_p, 1);
         }
     }
     if (request_maximized_desktop) {
@@ -1052,7 +1052,7 @@ mfb_wait_sync(struct mfb_window *window) {
             }
         }
         else {
-            sched_yield(); // or nanosleep((const struct timespec){0,0}, NULL);
+            sched_yield(); // or nanosleep((const struct timespec){0, 0}, NULL);
         }
 
         update_events(window_data, display);
@@ -1305,7 +1305,7 @@ init_keycodes(SWindowData_X11 *window_data_specific) {
     for (i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
         g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
 
-    // Valid key code range is  [8,255], according to the Xlib manual
+    // Valid key code range is  [8, 255], according to the Xlib manual
     for (i=8; i<=255; ++i) {
         // Try secondary keysym, for numeric keypad keys
          key_sym  = XkbKeycodeToKeysym(window_data_specific->display, i, 0, 1);

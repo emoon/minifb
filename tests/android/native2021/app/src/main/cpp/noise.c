@@ -18,8 +18,8 @@
 #define kTouchPosMask   0x0fffffff
 #define kTouchIdShift   28
 
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct {
     bool    enabled;
@@ -61,7 +61,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) is_pressed, x, y);
+    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
 }
 
 void
@@ -137,9 +137,9 @@ main(int argc, char *argv[]) {
                 int maxX = MIN(g_positions[p].x + 16, g_width);
                 int minY = MAX(g_positions[p].y - 16, 0);
                 int maxY = MIN(g_positions[p].y + 16, g_height);
-                for(int y=minY; y<maxY; ++y) {
+                for (int y=minY; y<maxY; ++y) {
                     i = y * g_width + minX;
-                    for(int x=minX; x<maxX; ++x) {
+                    for (int x=minX; x<maxX; ++x) {
                         g_buffer[i++] = 0;
                     }
                 }
@@ -151,4 +151,4 @@ main(int argc, char *argv[]) {
             window = NULL;
             break;
         }
-    } while(mfb_wait_sync(window));}
+    } while (mfb_wait_sync(window));}

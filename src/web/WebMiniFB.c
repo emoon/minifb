@@ -345,56 +345,56 @@ window_data_get_dst_height(SWindowData *window_data) {
 EM_EXPORT void
 window_data_call_active_func(SWindowData *window_data, bool is_active) {
     if (window_data == NULL) return;
-    if (window_data->active_func) window_data->active_func((struct mfb_window*)window_data, is_active);
+    if (window_data->active_func) window_data->active_func((struct mfb_window *) window_data, is_active);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_resize_func(SWindowData *window_data, int width, int height) {
     if (window_data == NULL) return;
-    if (window_data->resize_func) window_data->resize_func((struct mfb_window*)window_data, width, height);
+    if (window_data->resize_func) window_data->resize_func((struct mfb_window *) window_data, width, height);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_close_func(SWindowData *window_data) {
     if (window_data == NULL) return;
-    if (window_data->close_func) window_data->close_func((struct mfb_window*)window_data);
+    if (window_data->close_func) window_data->close_func((struct mfb_window *) window_data);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_keyboard_func(SWindowData *window_data, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     if (window_data == NULL) return;
-    if (window_data->keyboard_func) window_data->keyboard_func((struct mfb_window*)window_data, key, mod, is_pressed);
+    if (window_data->keyboard_func) window_data->keyboard_func((struct mfb_window *) window_data, key, mod, is_pressed);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
     if (window_data == NULL) return;
-    if (window_data->char_input_func) window_data->char_input_func((struct mfb_window*)window_data, code);
+    if (window_data->char_input_func) window_data->char_input_func((struct mfb_window *) window_data, code);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     if (window_data == NULL) return;
-    if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window*)window_data, button, mod, is_pressed);
+    if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window *) window_data, button, mod, is_pressed);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
     if (window_data == NULL) return;
-    if (window_data->mouse_move_func) window_data->mouse_move_func((struct mfb_window*)window_data, x, y);
+    if (window_data->mouse_move_func) window_data->mouse_move_func((struct mfb_window *) window_data, x, y);
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
     if (window_data == NULL) return;
-    if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window*)window_data, mod, x, y);
+    if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window *) window_data, mod, x, y);
 }
 
 //-------------------------------------
@@ -411,7 +411,7 @@ EM_JS(int, mfb_canvas_exists_js, (const char *title), {
 });
 
 //-------------------------------------
-EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
+EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
     let canvasId = UTF8ToString(title);
     let canvas = document.getElementById(canvasId);
     if (!canvas) {
@@ -826,7 +826,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     mfb_log(MFB_LOG_DEBUG, "WebMiniFB: window created using Web API (title='%s', size=%ux%u, flags=0x%x).",
             window_title, width, height, flags);
-    return (struct mfb_window*)window_data;
+    return (struct mfb_window *) window_data;
 }
 
 //-------------------------------------

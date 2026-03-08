@@ -49,7 +49,7 @@ check_GL_extension(const char *name) {
 
     const char *start = extensions;
     const char *end, *where;
-    while(1) {
+    while (1) {
         where = strstr(start, name);
         if (where == NULL)
             return false;
@@ -153,7 +153,7 @@ setup_pixel_format(SWindowData_X11 *window_data_specific) {
     return true;
 }
 
-typedef void (*PFNGLXSWAPINTERVALEXTPROC)(Display*,GLXDrawable,int);
+typedef void (*PFNGLXSWAPINTERVALEXTPROC)(Display *, GLXDrawable, int);
 PFNGLXSWAPINTERVALEXTPROC   SwapIntervalEXT = NULL;
 
 #endif
@@ -548,7 +548,7 @@ set_target_fps_aux() {
         else {
             SwapIntervalEXT(dpy, drawable, interval);
             glXQueryDrawable(dpy, drawable, kGLX_SWAP_INTERVAL_EXT, &currentInterval);
-            if (interval != (int)currentInterval) {
+            if (interval != (int) currentInterval) {
                 glXQueryDrawable(dpy, drawable, kGLX_MAX_SWAP_INTERVAL_EXT, &maxInterval);
                 mfb_log(MFB_LOG_WARNING, "Cannot set target swap interval. Current swap interval is %u (max: %u)", currentInterval, maxInterval);
             }

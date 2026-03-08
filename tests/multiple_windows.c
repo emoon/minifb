@@ -134,16 +134,16 @@ main() {
     // Generate pallete for plasma effect
     uint32_t    pallete[512];
     float       inc = 90.0f / 64.0f;
-    for(uint32_t c=0; c<64; ++c) {
+    for (uint32_t c=0; c<64; ++c) {
         int32_t col = (int32_t) ((255.0f * sinf(c * inc * kPI / 180.0f)) + 0.5f);
-        pallete[64*0 + c] = MFB_ARGB(255, col,     0,       0);
-        pallete[64*1 + c] = MFB_ARGB(255, 255,     col,     0);
-        pallete[64*2 + c] = MFB_ARGB(255, 255-col, 255,     0);
-        pallete[64*3 + c] = MFB_ARGB(255, 0,       255,     col);
-        pallete[64*4 + c] = MFB_ARGB(255, 0,       255-col, 255);
-        pallete[64*5 + c] = MFB_ARGB(255, col,     0,       255);
-        pallete[64*6 + c] = MFB_ARGB(255, 255,     0,       255-col);
-        pallete[64*7 + c] = MFB_ARGB(255, 255-col, 0,       0);
+        pallete[64 * 0 + c] = MFB_ARGB(255, col,     0,       0);
+        pallete[64 * 1 + c] = MFB_ARGB(255, 255,     col,     0);
+        pallete[64 * 2 + c] = MFB_ARGB(255, 255-col, 255,     0);
+        pallete[64 * 3 + c] = MFB_ARGB(255, 0,       255,     col);
+        pallete[64 * 4 + c] = MFB_ARGB(255, 0,       255-col, 255);
+        pallete[64 * 5 + c] = MFB_ARGB(255, col,     0,       255);
+        pallete[64 * 6 + c] = MFB_ARGB(255, 255,     0,       255-col);
+        pallete[64 * 7 + c] = MFB_ARGB(255, 255-col, 0,       0);
     }
 
     mfb_set_target_fps(10);
@@ -182,9 +182,9 @@ main() {
             time_x = sinf(time * kPI / 180.0f);
             time_y = cosf(time * kPI / 180.0f);
             i = 0;
-            for(y=0; y<HEIGHT_B; ++y) {
+            for (y=0; y<HEIGHT_B; ++y) {
                 dy = cosf((y * time_y) * kPI / 180.0f);                // [-1, 1]
-                for(x=0; x<WIDTH_B; ++x) {
+                for (x=0; x<WIDTH_B; ++x) {
                     dx = sinf((x * time_x) * kPI / 180.0f);            // [-1, 1]
 
                     index = (int) ((2.0f + dx + dy) * 0.25f * 511.0f);  // [0, 511]

@@ -157,7 +157,7 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
 
 //-------------------------------------
 static int32_t
-handle_input(struct android_app* app, AInputEvent* event) {
+handle_input(struct android_app *app, AInputEvent *event) {
     if (app == NULL || event == NULL) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: handle_input received null app or event.");
         return 0;
@@ -203,7 +203,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
                 {
                     bool is_pressed = (action_type == AMOTION_EVENT_ACTION_DOWN);
                     int count = AMotionEvent_getPointerCount(event);
-                    for(int i=0; i < count; ++i) {
+                    for (int i=0; i < count; ++i) {
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
@@ -218,7 +218,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
             case AMOTION_EVENT_ACTION_MOVE:
                 {
                     int count = AMotionEvent_getPointerCount(event);
-                    for(int i=0; i < count; ++i){
+                    for (int i=0; i < count; ++i){
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
@@ -310,7 +310,7 @@ handle_input(struct android_app* app, AInputEvent* event) {
 
 //-------------------------------------
 static void
-handle_cmd(struct android_app* app, int32_t cmd) {
+handle_cmd(struct android_app *app, int32_t cmd) {
     static int32_t  format = WINDOW_FORMAT_RGBX_8888;
 
     if (app == NULL) {
@@ -553,7 +553,7 @@ timeout_ms_from_remaining_seconds(double remaining_seconds) {
 
 //-------------------------------------
 void
-android_main(struct android_app* app) {
+android_main(struct android_app *app) {
     if (app == NULL) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: android_main received null app.");
         return;
@@ -822,7 +822,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     double current;
 
-    while(1) {
+    while (1) {
         int timeout_ms;
         if (window_data->is_active && window_data_android->app->window != NULL) {
             current = mfb_timer_now(window_data_android->timer);
@@ -1135,7 +1135,7 @@ mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int 
         }
 
         // ----------------------------------------------------------------
-        // API 24-29 fallback: individual getSystemWindowInset{Top,Right,Bottom,Left}()
+        // API 24-29 fallback: individual getSystemWindowInset{Top, Right, Bottom, Left}()
         // methods each return int directly and are available from API 20.
         // (getSystemWindowInsets() returning android.graphics.Insets is API 30+ only.)
         // ----------------------------------------------------------------

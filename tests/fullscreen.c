@@ -50,7 +50,7 @@ main() {
             window = NULL;
             break;
         }
-    } while(mfb_wait_sync(window));
+    } while (mfb_wait_sync(window));
 
     return 0;
 }

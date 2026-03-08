@@ -51,7 +51,7 @@ void                mfb_show_cursor(struct mfb_window *window, bool show);
 // Callbacks
 void                mfb_set_active_callback(struct mfb_window *window, mfb_active_func callback);
 void                mfb_set_resize_callback(struct mfb_window *window, mfb_resize_func callback);
-void                mfb_set_close_callback(struct mfb_window* window, mfb_close_func callback);
+void                mfb_set_close_callback(struct mfb_window *window, mfb_close_func callback);
 void                mfb_set_keyboard_callback(struct mfb_window *window, mfb_keyboard_func callback);
 void                mfb_set_char_input_callback(struct mfb_window *window, mfb_char_input_func callback);
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
@@ -107,7 +107,7 @@ void                mfb_set_log_level(mfb_log_level level);
 // Returns the display cutout (notch/punch-hole) insets in pixels - the physical area of
 // the screen obstructed by the camera notch or Dynamic Island.  Values are 0 on edges
 // that have no physical cutout, or on devices/platforms without a cutout.
-// Insets are margins from each edge (not a rectangle): no inset means 0,0,0,0.
+// Insets are margins from each edge (not a rectangle): no inset means 0, 0, 0, 0.
 // Android: requires API 28+; returns false (all zeros) on older APIs.
 // iOS: approximated from UIWindow.safeAreaInsets; bottom is always 0 (home indicator
 //   is excluded since it is not a physical obstruction).
@@ -118,9 +118,9 @@ bool                mfb_get_display_cutout_insets(struct mfb_window *window, int
 // Returns the full safe-area insets in pixels - the union of the display cutout area
 // AND the system bars (status bar, navigation bar / home indicator).  Useful to know
 // how much of the screen edges are reserved by the OS, even when bars are transparent.
-// Insets are margins from each edge (not a rectangle): no inset means 0,0,0,0.
+// Insets are margins from each edge (not a rectangle): no inset means 0, 0, 0, 0.
 // Android API 30+: queries WindowInsets.Type.systemBars()|displayCutout().
-// Android API 24-29: falls back to getSystemWindowInset{Top,Right,Bottom,Left}().
+// Android API 24-29: falls back to getSystemWindowInset{Top, Right, Bottom, Left}().
 // iOS: reads UIWindow.safeAreaInsets (includes notch + status bar + home indicator).
 // Desktop platforms (macOS, Windows, Linux, Web): true with all zeros for a valid window.
 // All output parameters are optional (may be NULL).

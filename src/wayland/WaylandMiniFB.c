@@ -77,18 +77,18 @@ update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_
 //-------------------------------------
 static void
 destroy_window_data(SWindowData *window_data) {
-    if(window_data == NULL) {
+    if (window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: destroy_window_data called with a null window pointer.");
         return;
     }
 
-    if(window_data->draw_buffer) {
+    if (window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = NULL;
     }
 
     SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if(window_data_way != NULL) {
+    if (window_data_way != NULL) {
         if (window_data_way->shm_ptr && window_data_way->shm_ptr != MAP_FAILED && window_data_way->shm_length > 0) {
             munmap(window_data_way->shm_ptr, window_data_way->shm_length);
             window_data_way->shm_ptr = NULL;
@@ -118,7 +118,7 @@ destroy_window_data(SWindowData *window_data) {
 //-------------------------------------
 static void
 destroy(SWindowData *window_data) {
-    if(window_data == NULL) {
+    if (window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: destroy called with a null window pointer.");
         return;
     }
@@ -284,7 +284,7 @@ destroy(SWindowData *window_data) {
     } while (0)
 
     //KILL(buffer);
-    if(window_data->draw_buffer) {
+    if (window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = NULL;
     }
@@ -467,7 +467,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    if(key < 512) {
+    if (key < 512) {
         mfb_key key_code = (mfb_key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
         if (window_data_way && window_data_way->xkb_state) {
@@ -486,7 +486,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
             switch (key_code) {
                 case MFB_KB_KEY_LEFT_SHIFT:
                 case MFB_KB_KEY_RIGHT_SHIFT:
-                    if(is_pressed)
+                    if (is_pressed)
                         window_data->mod_keys |= MFB_KB_MOD_SHIFT;
                     else
                         window_data->mod_keys &= ~MFB_KB_MOD_SHIFT;
@@ -494,7 +494,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
                 case MFB_KB_KEY_LEFT_CONTROL:
                 case MFB_KB_KEY_RIGHT_CONTROL:
-                    if(is_pressed)
+                    if (is_pressed)
                         window_data->mod_keys |= MFB_KB_MOD_CONTROL;
                     else
                         window_data->mod_keys &= ~MFB_KB_MOD_CONTROL;
@@ -502,7 +502,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
                 case MFB_KB_KEY_LEFT_ALT:
                 case MFB_KB_KEY_RIGHT_ALT:
-                    if(is_pressed)
+                    if (is_pressed)
                         window_data->mod_keys |= MFB_KB_MOD_ALT;
                     else
                         window_data->mod_keys &= ~MFB_KB_MOD_ALT;
@@ -510,7 +510,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
                 case MFB_KB_KEY_LEFT_SUPER:
                 case MFB_KB_KEY_RIGHT_SUPER:
-                    if(is_pressed)
+                    if (is_pressed)
                         window_data->mod_keys |= MFB_KB_MOD_SUPER;
                     else
                         window_data->mod_keys &= ~MFB_KB_MOD_SUPER;
@@ -739,11 +739,11 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
 
     //mfb_log(MFB_LOG_DEBUG, "Pointer handle axis: axis: %d (0x%x)", axis, value);
     SWindowData *window_data = (SWindowData *) data;
-    if(axis == 0) {
+    if (axis == 0) {
         window_data->mouse_wheel_y = -(value / 256.0f);
         kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
     }
-    else if(axis == 1) {
+    else if (axis == 1) {
         window_data->mouse_wheel_x = -(value / 256.0f);
         kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
     }
@@ -1274,14 +1274,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
-    if(window_data == NULL) {
+    if (window_data == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
-    if(window_data_way == NULL) {
+    if (window_data_way == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData_Way.");
         free(window_data);
         return NULL;
@@ -1535,7 +1535,7 @@ frame_done(void *data, struct wl_callback *callback, uint32_t cookie) {
     kUnused(cookie);
     wl_callback_destroy(callback);
 
-    *(uint32_t *)data = 1;
+    *(uint32_t *) data = 1;
 }
 
 //-------------------------------------
@@ -1551,19 +1551,19 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
 
-    if(window == NULL) {
+    if (window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy(window_data);
         return MFB_STATE_EXIT;
     }
 
-    if(buffer == NULL) {
+    if (buffer == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null buffer.");
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -1585,7 +1585,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INTERNAL_ERROR;
     }
 
-    if(window_data->buffer_width != width || window_data->buffer_height != height) {
+    if (window_data->buffer_width != width || window_data->buffer_height != height) {
         unsigned old_buffer_width = window_data->buffer_width;
         unsigned old_buffer_height = window_data->buffer_height;
         unsigned old_buffer_stride = window_data->buffer_stride;
@@ -1686,13 +1686,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    if(window == NULL) {
+    if (window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events called with a null window pointer.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy(window_data);
         return MFB_STATE_EXIT;
@@ -1862,7 +1862,7 @@ mfb_wait_sync(struct mfb_window *window) {
             }
         }
         else {
-            sched_yield(); // or nanosleep((const struct timespec){0,0}, NULL);
+            sched_yield(); // or nanosleep((const struct timespec){0, 0}, NULL);
         }
 
         if (wl_display_dispatch_pending(display) == -1) {
@@ -1884,13 +1884,13 @@ mfb_wait_sync(struct mfb_window *window) {
 //-------------------------------------
 bool
 mfb_wait_sync2(struct mfb_window *window) {
-    if(window == NULL) {
+    if (window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 called with a null window pointer.");
         return false;
     }
 
     SWindowData *window_data = (SWindowData *) window;
-    if(window_data->close) {
+    if (window_data->close) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 aborted because the window is marked for close.");
         destroy(window_data);
         return false;
@@ -1904,26 +1904,26 @@ mfb_wait_sync2(struct mfb_window *window) {
 
     double      current;
     uint32_t    millis = 1;
-    while(1) {
+    while (1) {
         current = mfb_timer_now(window_data_way->timer);
         if (current >= g_time_for_frame * 0.96) {
             mfb_timer_reset(window_data_way->timer);
             return true;
         }
-        else if(current >= g_time_for_frame * 0.8) {
+        else if (current >= g_time_for_frame * 0.8) {
             millis = 0;
         }
 
         usleep(millis * 1000);
         //sched_yield();
 
-        if(millis == 1) {
+        if (millis == 1) {
             if (wl_display_dispatch_pending(window_data_way->display) == -1) {
                 mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_wait_sync2.");
                 return false;
             }
 
-            if(window_data->close) {
+            if (window_data->close) {
                 mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 aborted during sync loop because the window is marked for close.");
                 destroy(window_data);
                 return false;
@@ -2085,7 +2085,7 @@ void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 1.0f, y = 1.0f;
 
-    if(window != NULL) {
+    if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
         SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
         if (window_data_way) {
@@ -2105,7 +2105,7 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 
     if (scale_x) {
         *scale_x = x;
-        if(*scale_x == 0) {
+        if (*scale_x == 0) {
             *scale_x = 1.0f;
         }
     }

@@ -20,8 +20,8 @@
 #define kTouchPosMask   0x0fffffff
 #define kTouchIdShift   28
 
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 //-------------------------------------
 typedef struct {
@@ -162,7 +162,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int)button, (int) is_pressed, x, y);
+    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
 }
 
 //-------------------------------------
@@ -259,4 +259,5 @@ main(int argc, char *argv[]) {
         }
 
         g_frame_count++;
-    } while(mfb_wait_sync(window));}
+    } while (mfb_wait_sync(window));
+}

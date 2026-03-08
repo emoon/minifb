@@ -124,9 +124,9 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
     const uint32_t delta_y = (src_height << 16) / dst_height;
 
     src_offset_y = 0;
-    for(y=0; y<dst_height; ++y) {
+    for (y=0; y<dst_height; ++y) {
         src_offset_x = 0;
-        for(x=0; x<dst_width; ++x) {
+        for (x=0; x<dst_width; ++x) {
 #if defined(kUseBilinearInterpolation)
             dst_image[x] = interpolate(src_image, x+src_x, y+src_y, src_offset_x, src_offset_y, src_width, src_height, src_pitch);
 #else
