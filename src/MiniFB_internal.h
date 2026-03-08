@@ -7,6 +7,36 @@
 #define kCall(func, ...)    if (window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
 #define kUnused(var)        (void) var;
 
+// Mobile backends may encode a pointer id in the upper bits of mouse positions.
+// Keep these constants centralized so packing/unpacking stays compatible.
+#define MFB_COMBINED_POS_ID_BITS   4u
+#define MFB_COMBINED_POS_BITS      (32u - MFB_COMBINED_POS_ID_BITS)
+#define MFB_COMBINED_POS_ID_SHIFT  MFB_COMBINED_POS_BITS
+#define MFB_COMBINED_POS_MASK      ((1u << MFB_COMBINED_POS_BITS) - 1u)
+#define MFB_COMBINED_POS_SIGN_BIT  (1u << (MFB_COMBINED_POS_BITS - 1u))
+#define MFB_COMBINED_ID_MASK       ((1u << MFB_COMBINED_POS_ID_BITS) - 1u)
+
+static inline int
+mfb_pack_pos_id(int32_t pos, uint32_t id) {
+    uint32_t packed = (((uint32_t) pos) & MFB_COMBINED_POS_MASK)
+                    | ((id & MFB_COMBINED_ID_MASK) << MFB_COMBINED_POS_ID_SHIFT);
+    return (int) packed;
+}
+
+static inline int32_t
+mfb_unpack_pos_id_pos(uint32_t combined) {
+    uint32_t pos_bits = combined & MFB_COMBINED_POS_MASK;
+    if ((pos_bits & MFB_COMBINED_POS_SIGN_BIT) != 0u) {
+        pos_bits |= ~MFB_COMBINED_POS_MASK;
+    }
+    return (int32_t) pos_bits;
+}
+
+static inline uint32_t
+mfb_unpack_pos_id_id(uint32_t combined) {
+    return (combined >> MFB_COMBINED_POS_ID_SHIFT) & MFB_COMBINED_ID_MASK;
+}
+
 typedef struct mfb_timer {
     int64_t     start_ticks;
     int64_t     last_delta_ticks;

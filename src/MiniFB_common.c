@@ -239,6 +239,27 @@ mfb_get_mouse_y(struct mfb_window *window) {
 }
 
 //-------------------------------------
+void
+mfb_split_pos_id(int combined, int *pos, int *id) {
+#if defined(__ANDROID__) || (defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+    uint32_t packed = (uint32_t) combined;
+    if (pos != NULL) {
+        *pos = (int) mfb_unpack_pos_id_pos(packed);
+    }
+    if (id != NULL) {
+        *id = (int) mfb_unpack_pos_id_id(packed);
+    }
+#else
+    if (pos != NULL) {
+        *pos = combined;
+    }
+    if (id != NULL) {
+        *id = 0;
+    }
+#endif
+}
+
+//-------------------------------------
 float
 mfb_get_mouse_scroll_x(struct mfb_window *window) {
     if (window != NULL) {

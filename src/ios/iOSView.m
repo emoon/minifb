@@ -109,8 +109,10 @@ input_scale_for_view(iOSView *view) {
                 continue;
             }
             point = [touch locationInView:self];
-            window_data->mouse_pos_x = (int32_t) lround(point.x * scale);
-            window_data->mouse_pos_y = (int32_t) lround(point.y * scale);
+            int32_t x = (int32_t) lround(point.x * scale);
+            int32_t y = (int32_t) lround(point.y * scale);
+            window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) button_number);
+            window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) button_number);
             window_data->mouse_button_status[button_number & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
             kCall(mouse_btn_func, button_number, 0, true);
         }
@@ -132,10 +134,10 @@ input_scale_for_view(iOSView *view) {
             point = [touch locationInView:self];
             int32_t x = (int32_t) lround(point.x * scale);
             int32_t y = (int32_t) lround(point.y * scale);
-            window_data->mouse_pos_x = x;
-            window_data->mouse_pos_y = y;
+            window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) button_number);
+            window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) button_number);
             // button_status does not change on move — touch is still pressed
-            kCall(mouse_move_func, x, y);
+            kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
         }
     }
 }
@@ -151,8 +153,10 @@ input_scale_for_view(iOSView *view) {
                 continue;
             }
             point = [touch locationInView:self];
-            window_data->mouse_pos_x = (int32_t) lround(point.x * scale);
-            window_data->mouse_pos_y = (int32_t) lround(point.y * scale);
+            int32_t x = (int32_t) lround(point.x * scale);
+            int32_t y = (int32_t) lround(point.y * scale);
+            window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) button_number);
+            window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) button_number);
             window_data->mouse_button_status[button_number & MFB_MAX_MOUSE_BUTTONS_MASK] = false;
             kCall(mouse_btn_func, button_number, 0, false);
             [self _freeButtonForTouch:touch];

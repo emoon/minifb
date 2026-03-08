@@ -191,8 +191,8 @@ handle_input(struct android_app* app, AInputEvent* event) {
                     int id  = AMotionEvent_getPointerId(event, idx);
                     int x   = AMotionEvent_getX(event, idx);
                     int y   = AMotionEvent_getY(event, idx);
-                    window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
-                    window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                    window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                    window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
                     window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, id, 0, is_pressed);
                 }
@@ -207,8 +207,8 @@ handle_input(struct android_app* app, AInputEvent* event) {
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
-                        window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                        window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                        window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
                         window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                         kCall(mouse_btn_func, id, 0, is_pressed);
                     }
@@ -222,8 +222,8 @@ handle_input(struct android_app* app, AInputEvent* event) {
                         int id = AMotionEvent_getPointerId(event, i);
                         int x  = AMotionEvent_getX(event, i);
                         int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = x | (int) ((uint32_t) id << 28);
-                        window_data->mouse_pos_y = y | (int) ((uint32_t) id << 28);
+                        window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                        window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
                         // MOVE events are only delivered while the pointer is down,
                         // so the pressed state is always true by definition.
                         window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
@@ -250,11 +250,16 @@ handle_input(struct android_app* app, AInputEvent* event) {
                 // Only available when a Bluetooth/USB-OTG mouse or stylus is connected.
                 // Not a common use case on mobile; difficult to test without physical hardware.
                 {
+                    int id = AMotionEvent_getPointerId(event, 0);
+                    if (id < 0) {
+                        // Fallback id for hover events where Android does not provide a valid pointer id.
+                        id = (int) MFB_COMBINED_ID_MASK;
+                    }
                     int x = (int) AMotionEvent_getX(event, 0);
                     int y = (int) AMotionEvent_getY(event, 0);
-                    window_data->mouse_pos_x = x;
-                    window_data->mouse_pos_y = y;
-                    kCall(mouse_move_func, x, y);
+                    window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                    window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
+                    kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
                 }
                 break;
 

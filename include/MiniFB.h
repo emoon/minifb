@@ -70,8 +70,14 @@ unsigned            mfb_get_drawable_offset_y(struct mfb_window *window);
 unsigned            mfb_get_drawable_width(struct mfb_window *window);
 unsigned            mfb_get_drawable_height(struct mfb_window *window);
 void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
-int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X
-int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y
+int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X (Android/iOS touch path may encode pointer id in upper bits)
+int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y (Android/iOS touch path may encode pointer id in upper bits)
+// Split a position value that may contain an encoded pointer id.
+// Android/iOS may encode touch pointer id in upper bits of mouse X/Y getters.
+// Desktop/Web/DOS return id=0 and pos=combined.
+// Mobile decoding preserves signed position values.
+// Output pointers may be NULL.
+void                mfb_split_pos_id(int combined, int *pos, int *id);
 float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Last mouse wheel delta X.
 float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Last mouse wheel delta Y.
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
