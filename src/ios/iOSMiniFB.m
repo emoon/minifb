@@ -375,12 +375,12 @@ mfb_wait_sync(struct mfb_window *window) {
 
     // Hardware sync: MTKView's CADisplayLink already handles vsync
     if (g_use_hardware_sync) {
-        return true;
+        return mfb_update_events(window) == MFB_STATE_OK;
     }
 
     // No target FPS set: nothing to pace against
     if (g_time_for_frame == 0.0) {
-        return true;
+        return mfb_update_events(window) == MFB_STATE_OK;
     }
 
     // Software pacing: sleep for the remaining frame time to avoid busy-waiting,
