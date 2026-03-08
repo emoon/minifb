@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <MiniFB.h>
 #include "WindowData.h"
 
@@ -20,6 +21,11 @@ extern "C" {
     extern short int g_keycodes[MFB_MAX_KEYS];
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);
 
+    bool calculate_buffer_layout(uint32_t width, uint32_t height, uint32_t *stride_out, size_t *total_bytes_out);
+    bool mfb_validate_viewport(const SWindowData *window_data,
+                               unsigned offset_x, unsigned offset_y,
+                               unsigned width, unsigned height,
+                               const char *backend_name);
     void calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height);
     void resize_dst(SWindowData *window_data, uint32_t width, uint32_t height);
     void set_target_fps_aux();

@@ -59,7 +59,6 @@ HMODULE                           mfb_shcore_dll                    = NULL;
 PFN_SetProcessDpiAwareness        mfb_SetProcessDpiAwareness        = NULL;
 PFN_GetDpiForMonitor              mfb_GetDpiForMonitor              = NULL;
 
-//-------------------------------------
 void
 load_functions() {
     if (mfb_user32_dll == NULL) {
@@ -513,16 +512,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     RECT rect = { 0 };
     int  x = 0, y = 0;
     int  show_window_cmd = SW_NORMAL;
+    uint32_t buffer_stride = 0;
     SWindowData *window_data = NULL;
     SWindowData_Win *window_data_specific = NULL;
 
-    if (width == 0 || height == 0) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window size %ux%u.", width, height);
-        return NULL;
-    }
-
-    if (width > UINT32_MAX / 4u) {
-        mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window width %u (stride overflow).", width);
         return NULL;
     }
 
@@ -562,7 +557,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->specific      = window_data_specific;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
 
     window_data->is_cursor_visible = true;
 
@@ -757,6 +752,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
+    uint32_t buffer_stride = 0;
     if (window_data == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
         return MFB_STATE_INVALID_WINDOW;
@@ -774,6 +770,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
+        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
+        return MFB_STATE_INVALID_BUFFER;
+    }
+
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific ==  NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
@@ -782,7 +783,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     window_data->draw_buffer   = buffer;
     window_data->buffer_width  = width;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
     window_data->buffer_height = height;
 
 #if !defined(USE_OPENGL_API)
@@ -1150,19 +1151,13 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     SWindowData     *window_data     = (SWindowData *) window;
     SWindowData_Win *window_data_specific = NULL;
 
-    if (window_data == NULL) {
-        return false;
-    }
-
-    if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
-        return false;
-    }
-    if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "WinMiniFB")) {
         return false;
     }
 
     window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
+        mfb_log(MFB_LOG_ERROR, "WinMiniFB: mfb_set_viewport missing Windows-specific window data.");
         return false;
     }
 

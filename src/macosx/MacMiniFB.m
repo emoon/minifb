@@ -7,7 +7,6 @@
 #include <sched.h>
 #include <mach/mach_time.h>
 #include <stdint.h>
-#include <limits.h>
 
 #include "OSXWindow.h"
 #include "OSXView.h"
@@ -23,38 +22,13 @@ void     init_keycodes();
 void     destroy_window_data(SWindowData *window_data);
 
 //-------------------------------------
-static bool
-compute_rgba_layout(unsigned width, unsigned height, uint32_t *stride_out, size_t *total_bytes_out) {
-    if (width == 0 || height == 0) {
-        return false;
-    }
-    if (width > UINT32_MAX / 4u) {
-        return false;
-    }
-
-    uint32_t stride = width * 4u;
-    if (total_bytes_out != NULL) {
-        if ((size_t) height > SIZE_MAX / (size_t) stride) {
-            return false;
-        }
-        *total_bytes_out = (size_t) stride * (size_t) height;
-    }
-
-    if (stride_out != NULL) {
-        *stride_out = stride;
-    }
-
-    return true;
-}
-
-//-------------------------------------
 SWindowData *
 create_window_data(unsigned width, unsigned height) {
     SWindowData *window_data;
-    uint32_t initial_stride = 0;
-    size_t initial_total_bytes = 0;
+    uint32_t buffer_stride = 0;
+    size_t buffer_total_bytes = 0;
 
-    if (!compute_rgba_layout(width, height, &initial_stride, &initial_total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "MacMiniFB: invalid window buffer size %ux%u.", width, height);
         return NULL;
     }
@@ -80,15 +54,15 @@ create_window_data(unsigned width, unsigned height) {
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = initial_stride;
-    window_data->draw_buffer   = malloc(initial_total_bytes);
+    window_data->buffer_stride = buffer_stride;
+    window_data->draw_buffer   = malloc(buffer_total_bytes);
     if (!window_data->draw_buffer) {
         free(window_data_specific);
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate draw buffer (%zu bytes).", initial_total_bytes);
+        mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate draw buffer (%zu bytes).", buffer_total_bytes);
         return NULL;
     }
-    memset(window_data->draw_buffer, 0, initial_total_bytes);
+    memset(window_data->draw_buffer, 0, buffer_total_bytes);
     window_data->is_cursor_visible = true;
 
     return window_data;
@@ -297,7 +271,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    uint32_t new_stride = 0;
+    uint32_t buffer_stride = 0;
     size_t total_bytes = 0;
 
     if (window_data == NULL) {
@@ -316,7 +290,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with a null buffer.");
         return MFB_STATE_INVALID_BUFFER;
     }
-    if (!compute_rgba_layout(width, height, &new_stride, &total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -345,7 +319,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
         window_data->buffer_width  = width;
         window_data->buffer_height = height;
-        window_data->buffer_stride = new_stride;
+        window_data->buffer_stride = buffer_stride;
 
         if (window_data_specific->viewController == nil) {
             mfb_log(MFB_LOG_ERROR, "MacMiniFB: Metal view controller is missing during buffer resize.");
@@ -370,7 +344,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 #if !defined(USE_METAL_API)
         window_data->buffer_width  = width;
-        window_data->buffer_stride = new_stride;
+        window_data->buffer_stride = buffer_stride;
         window_data->buffer_height = height;
 #endif
     }
@@ -693,29 +667,7 @@ init_keycodes() {
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
-    if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_set_viewport called with zero viewport size (width=%u, height=%u).",
-                width, height);
-        return false;
-    }
-    if (window_data->window_width == 0 || window_data->window_height == 0) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_set_viewport called with invalid window dimensions %ux%u.",
-                window_data->window_width, window_data->window_height);
-        return false;
-    }
-    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "MacMiniFB")) {
         return false;
     }
 
@@ -766,12 +718,6 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
         }
         else {
             mfb_log(MFB_LOG_WARNING, "MacMiniFB: missing macOS window handle while querying monitor scale; falling back to 1.0.");
-        }
-    }
-    else {
-        NSScreen *main_screen = [NSScreen mainScreen];
-        if (main_screen != nil) {
-            scale = [main_screen backingScaleFactor];
         }
     }
 

@@ -294,14 +294,10 @@ check_window_closed(SWindowData *window_data) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
   (void)title;
+  uint32_t buffer_stride = 0;
 
-  if (width == 0 || height == 0) {
+  if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
     mfb_log(MFB_LOG_ERROR, "DOSMiniFB: invalid window size %ux%u", width, height);
-    return NULL;
-  }
-
-  if (width > UINT32_MAX / 4u) {
-    mfb_log(MFB_LOG_ERROR, "DOSMiniFB: invalid window width %u (stride overflow)", width);
     return NULL;
   }
 
@@ -333,6 +329,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   window_data->window_height = height;
   window_data->buffer_width = width;
   window_data->buffer_height = height;
+  window_data->buffer_stride = buffer_stride;
   window_data->dst_offset_x = 0;
   window_data->dst_offset_y = 0;
   window_data->dst_width = width;
@@ -408,22 +405,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
   SWindowData *window_data = (SWindowData *)window;
-  if (window_data == NULL) {
-    mfb_log(MFB_LOG_ERROR, "DOSMiniFB: mfb_set_viewport called with null window");
-    return false;
-  }
-
-  if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
-    mfb_log(MFB_LOG_ERROR,
-            "DOSMiniFB: viewport exceeds window width (offset_x=%u width=%u window_width=%u)",
-            offset_x, width, window_data->window_width);
-    return false;
-  }
-
-  if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
-    mfb_log(MFB_LOG_ERROR,
-            "DOSMiniFB: viewport exceeds window height (offset_y=%u height=%u window_height=%u)",
-            offset_y, height, window_data->window_height);
+  if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "DOSMiniFB")) {
     return false;
   }
 
@@ -601,6 +583,8 @@ mfb_update_events(struct mfb_window *window) {
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+  uint32_t buffer_stride = 0;
+
   if (!window) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
     return MFB_STATE_INVALID_WINDOW;
@@ -608,6 +592,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
   if (!buffer) {
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
+    return MFB_STATE_INVALID_BUFFER;
+  }
+
+  if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
+    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
     return MFB_STATE_INVALID_BUFFER;
   }
 
@@ -621,6 +610,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
     return MFB_STATE_INVALID_WINDOW;
   }
+
+  window_data->buffer_width = width;
+  window_data->buffer_height = height;
+  window_data->buffer_stride = buffer_stride;
 
   uint32_t *scale_buffer        = dos_window_data->scale_buffer;
   uint8_t  *scanline_buffer     = dos_window_data->scanline_buffer;
@@ -753,9 +746,7 @@ mfb_wait_sync(struct mfb_window *window) {
     return false;
   }
 
-  SWindowData *window_data = (SWindowData *)window;
-  mfb_update_state state = check_window_closed(window_data);
-
+  mfb_update_state state = mfb_update_events(window);
   return (state == MFB_STATE_OK);
 }
 

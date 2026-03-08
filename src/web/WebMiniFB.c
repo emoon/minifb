@@ -259,9 +259,11 @@ window_data_set_active(SWindowData *window_data, bool is_active) {
 //-------------------------------------
 EM_EXPORT void
 window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned height) {
+    uint32_t buffer_stride = 0;
+
     if (!window_data) return;
-    if (width > (UINT32_MAX / 4)) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: buffer stride overflow for width=%u.", width);
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
+        mfb_log(MFB_LOG_ERROR, "WebMiniFB: invalid buffer size %ux%u.", width, height);
         window_data->buffer_width = 0;
         window_data->buffer_height = 0;
         window_data->buffer_stride = 0;
@@ -269,7 +271,7 @@ window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned h
     }
     window_data->buffer_width = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
 }
 
 //-------------------------------------
@@ -735,15 +737,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     const unsigned supported_flags = MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP;
     unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
+    uint32_t buffer_stride = 0;
     SWindowData *window_data;
 
-    if (width == 0 || height == 0) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: invalid window size %ux%u.", width, height);
-        return NULL;
-    }
-
-    if (width > UINT32_MAX / 4u) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: invalid window width %u (stride overflow).", width);
         return NULL;
     }
 
@@ -794,7 +792,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->window_height = height;
     window_data->buffer_width = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
     window_data->dst_offset_x = 0;
     window_data->dst_offset_y = 0;
     window_data->dst_width = width;
@@ -814,19 +812,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
-    if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-    if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "WebMiniFB")) {
         return false;
     }
 
@@ -978,6 +964,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
+    }
+
+    if (buffer == NULL) {
+        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
+        return MFB_STATE_INVALID_BUFFER;
+    }
+
+    if (!calculate_buffer_layout(width, height, NULL, NULL)) {
+        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
+        return MFB_STATE_INVALID_BUFFER;
     }
 
     mfb_update_state state = mfb_update_js(window, buffer, width, height);

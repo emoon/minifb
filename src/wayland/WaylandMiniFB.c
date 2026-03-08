@@ -1253,7 +1253,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
     unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
-    if (width == 0 || height == 0) {
+    uint32_t buffer_stride = 0;
+    size_t buffer_total_bytes = 0;
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
@@ -1360,13 +1362,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     unlink(shmfile);
 
-    if ((size_t) width > SIZE_MAX / (size_t) height ||
-        (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: requested window buffer size overflows size_t.");
-        goto out;
-    }
-
-    size_t length_sz = sizeof(uint32_t) * (size_t) width * (size_t) height;
+    size_t length_sz = buffer_total_bytes;
     if (length_sz > (size_t) INT_MAX) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: requested window buffer size exceeds Wayland pool limits.");
         goto out;
@@ -1392,7 +1388,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->window_height = height;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * sizeof(uint32_t);
+    window_data->buffer_stride = buffer_stride;
     calc_dst_factor(window_data, width, height);
 
     window_data->is_cursor_visible = true;
@@ -1552,6 +1548,8 @@ wl_callback_listener frame_listener = {
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     uint32_t done = 0;
+    uint32_t buffer_stride = 0;
+    size_t buffer_total_bytes = 0;
 
     if(window == NULL) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
@@ -1570,7 +1568,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (width == 0 || height == 0) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -1591,12 +1589,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         unsigned old_buffer_width = window_data->buffer_width;
         unsigned old_buffer_height = window_data->buffer_height;
         unsigned old_buffer_stride = window_data->buffer_stride;
-        if ((size_t) width > SIZE_MAX / (size_t) height ||
-            (size_t) width * (size_t) height > SIZE_MAX / sizeof(uint32_t)) {
-            mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size overflows size_t.");
-            return MFB_STATE_INTERNAL_ERROR;
-        }
-        size_t length = sizeof(uint32_t) * (size_t) width * (size_t) height;
+        size_t length = buffer_total_bytes;
         if (length > (size_t) INT_MAX) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size exceeds Wayland pool limits.");
             return MFB_STATE_INTERNAL_ERROR;
@@ -1629,7 +1622,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             window_data_way->shm_pool_size = length;
         }
 
-        unsigned new_buffer_stride = width * sizeof(uint32_t);
+        unsigned new_buffer_stride = buffer_stride;
         struct wl_buffer *new_draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
                                         width, height,
                                         new_buffer_stride, window_data_way->shm_format);
@@ -2074,20 +2067,7 @@ init_keycodes(void) {
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
-    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-
-    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
-        mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "WaylandMiniFB")) {
         return false;
     }
 

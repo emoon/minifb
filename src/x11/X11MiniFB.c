@@ -35,35 +35,6 @@ static bool s_x11_locale_checked;
 static int s_xrr_event_base = -1;
 
 //-------------------------------------
-static bool
-compute_rgba_layout(uint32_t width, uint32_t height, uint32_t *stride_out, size_t *total_bytes_out) {
-    if (width == 0 || height == 0) {
-        return false;
-    }
-    if (width > UINT32_MAX / 4u) {
-        return false;
-    }
-
-    uint32_t stride = width * 4u;
-    if (stride > (uint32_t) INT_MAX) {
-        return false;
-    }
-
-    if (total_bytes_out != NULL) {
-        if ((size_t) height > (SIZE_MAX / (size_t) stride)) {
-            return false;
-        }
-        *total_bytes_out = (size_t) stride * (size_t) height;
-    }
-
-    if (stride_out != NULL) {
-        *stride_out = stride;
-    }
-
-    return true;
-}
-
-//-------------------------------------
 void init_keycodes(SWindowData_X11 *window_data_specific);
 Cursor create_blank_cursor(Display *display, Window window);
 
@@ -512,14 +483,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     XSetWindowAttributes window_attributes;
     XSizeHints size_hints;
     Visual* visual;
-    uint32_t initial_stride = 0;
-    size_t initial_total_bytes = 0;
+    uint32_t buffer_stride = 0;
 
     if (width == 0 || height == 0) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
-    if (!compute_rgba_layout(width, height, &initial_stride, &initial_total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL) ||
+        buffer_stride > (uint32_t) INT_MAX) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: window size %ux%u is too large for X11 image layout.", width, height);
         return NULL;
     }
@@ -632,7 +603,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->window_height = height;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = initial_stride;
+    window_data->buffer_stride = buffer_stride;
     calc_dst_factor(window_data, width, height);
 
     if (effective_flags & MFB_WF_FULLSCREEN_DESKTOP) {
@@ -799,7 +770,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
 #else
-    window_data_specific->image = XCreateImage(window_data_specific->display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, (int) initial_stride);
+    window_data_specific->image = XCreateImage(window_data_specific->display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, (int) buffer_stride);
     if (window_data_specific->image == NULL) {
         mfb_log(MFB_LOG_ERROR, "X11MiniFB: XCreateImage failed.");
         destroy_window_data(window_data);
@@ -882,14 +853,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 #endif
 
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
-        uint32_t new_stride = 0;
-        size_t new_total_bytes = 0;
-        if (!compute_rgba_layout(width, height, &new_stride, &new_total_bytes)) {
+        uint32_t buffer_stride = 0;
+        if (!calculate_buffer_layout(width, height, &buffer_stride, NULL) ||
+            buffer_stride > (uint32_t) INT_MAX) {
             mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid buffer layout for size %ux%u.", width, height);
             return MFB_STATE_INVALID_BUFFER;
         }
         window_data->buffer_width  = width;
-        window_data->buffer_stride = new_stride;
+        window_data->buffer_stride = buffer_stride;
         window_data->buffer_height = height;
 #if !defined(USE_OPENGL_API)
         different_size = true;
@@ -911,7 +882,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             int depth = DefaultDepth(display, window_data_specific->screen);
             uint32_t scaler_stride = 0;
             size_t scaler_size = 0;
-            if (!compute_rgba_layout(window_data->dst_width, window_data->dst_height, &scaler_stride, &scaler_size)) {
+            if (!calculate_buffer_layout(window_data->dst_width, window_data->dst_height, &scaler_stride, &scaler_size) ||
+                scaler_stride > (uint32_t) INT_MAX) {
                 mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid scaler layout for size %ux%u.", window_data->dst_width, window_data->dst_height);
                 return MFB_STATE_INTERNAL_ERROR;
             }
@@ -1425,19 +1397,7 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height)  {
     SWindowData *window_data = (SWindowData *) window;
 
-    if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
-    if (offset_x + width > window_data->window_width) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-    if (offset_y + height > window_data->window_height) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "X11MiniFB")) {
         return false;
     }
 

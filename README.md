@@ -90,6 +90,10 @@ bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 ```
 
+`mfb_set_viewport()` returns `false` if:
+- `width == 0` or `height == 0`
+- viewport bounds exceed the current window drawable size
+
 `mfb_open()` and `mfb_open_ex()` return `NULL` if:
 - `width == 0` or `height == 0`
 - `width * 4` would overflow the internal framebuffer stride
@@ -97,6 +101,11 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 If `title` is `NULL` or empty, MiniFB uses `"minifb"` as the effective window/canvas title.
 
 If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_WF_FULLSCREEN` takes precedence.
+
+`mfb_update_ex()` returns `MFB_STATE_INVALID_BUFFER` if:
+- `buffer == NULL`
+- `width == 0` or `height == 0`
+- `width * 4` would overflow internal stride calculations
 
 Open-time readiness is backend-specific:
 - Wayland waits for the initial configure handshake before returning from `mfb_open_ex()`.
@@ -907,6 +916,13 @@ You can optionally run the script with the argument `--with-vs-code`. If you hav
 ```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=./tools/dos/toolchain-djgpp.cmake -S . -B build-dos
 cmake --build build-dos
+```
+
+or from the build-dos directory:
+
+```sh
+cmake -DCMAKE_TOOLCHAIN_FILE=../tools/dos/toolchain-djgpp.cmake -S ..
+cmake --build .
 ```
 
 > **Note**: On Windows, you will need a build tool other than Visual Studio. [Ninja](https://ninja-build.org/) is the best and easiest option. Simply download it, put the `ninja.exe` executable somewhere, and make it available on the command line via your `PATH` environment variable. Then invoke the first command above with the addition of `-G Ninja` at the end.

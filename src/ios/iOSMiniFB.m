@@ -1,7 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #include <mach/mach_time.h>
-#include <limits.h>
 #include <math.h>
 #include <unistd.h>
 
@@ -11,33 +10,6 @@
 #include <MiniFB.h>
 #include <MiniFB_internal.h>
 #include <WindowData.h>
-
-//-------------------------------------
-static bool
-calculate_buffer_layout(unsigned width, unsigned height, uint32_t *stride_out, size_t *total_bytes_out) {
-    if (width == 0 || height == 0) {
-        return false;
-    }
-
-    if (width > UINT32_MAX / 4u) {
-        return false;
-    }
-
-    uint32_t stride = width * 4u;
-
-    if (total_bytes_out != NULL) {
-        if ((size_t) height > SIZE_MAX / (size_t) stride) {
-            return false;
-        }
-        *total_bytes_out = (size_t) stride * (size_t) height;
-    }
-
-    if (stride_out != NULL) {
-        *stride_out = stride;
-    }
-
-    return true;
-}
 
 static UIWindow *
 get_application_window(void) {
@@ -102,10 +74,10 @@ get_application_window(void) {
 //-------------------------------------
 SWindowData *
 create_window_data(unsigned width, unsigned height) {
-    uint32_t stride = 0;
+    uint32_t buffer_stride = 0;
     size_t   total_bytes = 0;
 
-    if (!calculate_buffer_layout(width, height, &stride, &total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: invalid window buffer size %ux%u.", width, height);
         return NULL;
     }
@@ -136,7 +108,7 @@ create_window_data(unsigned width, unsigned height) {
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = stride;
+    window_data->buffer_stride = buffer_stride;
 
     window_data->is_cursor_visible = false;
 
@@ -264,7 +236,7 @@ destroy_window_data(SWindowData *window_data) {
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
-    uint32_t new_stride = 0;
+    uint32_t buffer_stride = 0;
     size_t total_bytes = 0;
 
     if(window_data == NULL) {
@@ -283,7 +255,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (!calculate_buffer_layout(width, height, &new_stride, &total_bytes)) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
         mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -307,7 +279,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
         window_data->buffer_width  = width;
         window_data->buffer_height = height;
-        window_data->buffer_stride = new_stride;
+        window_data->buffer_stride = buffer_stride;
 
         if (window_data_ios->view_delegate == nil) {
             mfb_log(MFB_LOG_ERROR, "iOSMiniFB: Metal view delegate is missing during buffer resize.");
@@ -397,7 +369,8 @@ mfb_wait_sync(struct mfb_window *window) {
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL || window_data_ios->timer == NULL) {
-        return true;
+        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_wait_sync missing iOS timer state.");
+        return false;
     }
 
     // Hardware sync: MTKView's CADisplayLink already handles vsync
@@ -437,34 +410,7 @@ bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
 
-    if(window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
-    if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport called with zero viewport size (width=%u, height=%u).",
-                width, height);
-        return false;
-    }
-
-    if (window_data->window_width == 0 || window_data->window_height == 0) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport called with invalid window dimensions %ux%u.",
-                window_data->window_width, window_data->window_height);
-        return false;
-    }
-
-    if (offset_x > window_data->window_width || width > (window_data->window_width - offset_x)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u). "
-                "Values must be in drawable pixels.",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-
-    if (offset_y > window_data->window_height || height > (window_data->window_height - offset_y)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u). "
-                "Values must be in drawable pixels.",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "iOSMiniFB")) {
         return false;
     }
 
@@ -533,8 +479,10 @@ mfb_timer_init() {
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    kUnused(window);
-    float scale = [[UIScreen mainScreen] scale];
+    float scale = 1.0f;
+    if (window != NULL) {
+        scale = [[UIScreen mainScreen] scale];
+    }
 
     if (scale_x) {
         *scale_x = (scale != 0.0f) ? scale : 1.0f;

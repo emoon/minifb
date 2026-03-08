@@ -9,6 +9,7 @@
 #include <limits.h>
 //--
 #include <MiniFB.h>
+#include <MiniFB_internal.h>
 #include <WindowData.h>
 #include "WindowData_Android.h"
 
@@ -597,14 +598,10 @@ android_main(struct android_app* app) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     kUnused(title);
+    uint32_t buffer_stride = 0;
 
-    if (width == 0 || height == 0) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window size %ux%u.", width, height);
-        return NULL;
-    }
-
-    if (width > UINT32_MAX / 4u) {
-        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: invalid window width %u (stride overflow).", width);
         return NULL;
     }
 
@@ -647,7 +644,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
 
     gApplication->userData = window_data;
     if (gApplication->window != NULL) {
@@ -679,6 +676,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+    uint32_t buffer_stride = 0;
+
     if (window == NULL) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
         return MFB_STATE_INVALID_WINDOW;
@@ -696,14 +695,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (width == 0 || height == 0) {
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
 
     window_data->draw_buffer   = buffer;
     window_data->buffer_width  = width;
-    window_data->buffer_stride = width * 4;
+    window_data->buffer_stride = buffer_stride;
     window_data->buffer_height = height;
 
     SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
@@ -904,21 +903,9 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 //-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
-    if (window == NULL) {
-        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: mfb_set_viewport called with a null window pointer.");
-        return false;
-    }
-
     SWindowData *window_data = (SWindowData *) window;
 
-    if (offset_x + width > window_data->window_width) {
-        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
-                offset_x, width, window_data->window_width);
-        return false;
-    }
-    if (offset_y + height > window_data->window_height) {
-        mfb_log(MFB_LOG_ERROR, "AndroidMiniFB: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
-                offset_y, height, window_data->window_height);
+    if (!mfb_validate_viewport(window_data, offset_x, offset_y, width, height, "AndroidMiniFB")) {
         return false;
     }
 
