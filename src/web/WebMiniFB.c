@@ -405,9 +405,26 @@ window_data_get_close(SWindowData *window_data) {
 }
 
 //-------------------------------------
-EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
+EM_JS(int, mfb_canvas_exists_js, (const char *title), {
     let canvas = document.getElementById(UTF8ToString(title));
-    if (!canvas) return 0;
+    return canvas ? 1 : 0;
+});
+
+//-------------------------------------
+EM_JS(void*, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
+    let canvasId = UTF8ToString(title);
+    let canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        canvas = document.createElement("canvas");
+        canvas.id = canvasId;
+        if (document.body) {
+            document.body.appendChild(canvas);
+        } else if (document.documentElement) {
+            document.documentElement.appendChild(canvas);
+        } else {
+            return 0;
+        }
+    }
 
     if (!window._minifb) {
         window._minifb = {
@@ -762,11 +779,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     memset(window_data, 0, sizeof(SWindowData));
 
     int wants_fullscreen = ((effective_flags & MFB_WF_FULLSCREEN) || (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+    int canvas_existed = mfb_canvas_exists_js(window_title);
     void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen);
     if (!specific) {
         mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);
         free(window_data);
         return NULL;
+    }
+    if (!canvas_existed) {
+        mfb_log(MFB_LOG_WARNING, "WebMiniFB: canvas with id '%s' was not found; created a new canvas and appended it to the document.", window_title);
     }
 
     SWindowData_Web *window_data_web = malloc(sizeof(SWindowData_Web));
@@ -1026,9 +1047,19 @@ mfb_wait_sync(struct mfb_window *window) {
     }
 
     emscripten_sleep(0);
-    if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync.");
+
+    mfb_update_state state = mfb_update_events_js(window_data);
+    if (state == MFB_STATE_EXIT || window_data->close) {
+        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
         mfb_destroy_window_data(window_data);
+        return false;
+    }
+    if (state == MFB_STATE_INVALID_WINDOW) {
+        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned invalid window.");
+        return false;
+    }
+    if (state == MFB_STATE_INTERNAL_ERROR) {
+        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned internal error.");
         return false;
     }
 

@@ -820,8 +820,9 @@ target_link_options(my_app PRIVATE "-sEXPORT_NAME=my_app")
 
 The Emscripten toolchain will then build a `my_app.wasm` and `my_app.js` file containing your app's WASM code and JavaScript glue code to load the WASM file and run it. To load and run your app, you need to:
 
-1. Create a `<canvas>` element with an `id` attribute matching the `title` you specify when calling `mfb_open()` or `mfb_open_ex()`.
-2. Call the `<my_module_name>()` in JavaScript.
+1. Call the `<my_module_name>()` in JavaScript.
+2. Optionally create a `<canvas>` element whose `id` matches the effective MiniFB title.
+   If it does not exist, the backend will create one and append it to the document, logging a warning.
 
 Example app:
 
@@ -888,8 +889,10 @@ The web backend has the following backend-specific behavior:
 
 Core rendering, events, viewport and timers are supported.
 
-When calling `mfb_open()` or `mfb_open_ex()`, the effective title must match the `id` attribute of a `<canvas>` element in the DOM. If `title` is `NULL` or empty, the effective title is `"minifb"`, so the backend looks for `<canvas id="minifb">`.
-The functions will modify the `width` and `height` attribute of the `<canvas>` element. If not already set, then the functions will also modify the CSS style `width` and `height` attributes of the canvas.
+When calling `mfb_open()` or `mfb_open_ex()`, Web uses the effective title as canvas id.
+If `title` is `NULL` or empty, the effective title is `"minifb"`, so the backend looks for `<canvas id="minifb">`.
+If a matching canvas is not found, the backend creates one automatically and appends it to the document, and logs a warning.
+The functions modify the `width` and `height` attributes of the selected/created `<canvas>`. If not already set, they also modify CSS `width` and `height`.
 
 Setting the CSS width and height of the canvas allows you to up-scale the framebuffer arbitrarily:
 
