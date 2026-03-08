@@ -16,6 +16,24 @@ struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned heig
 // Input buffer is assumed to be a 32-bit buffer of the size given in the open call
 // Will return a negative status if something went wrong or the user want to exit
 // Also updates the window events
+//
+// Pixel format:
+//   Each pixel is a packed uint32_t.  The expected byte order in memory depends on the
+//   platform and is handled automatically by the MFB_RGB / MFB_ARGB macros:
+//
+//     Desktop / iOS / Web:  BGRA in memory  (B at lowest address)
+//     Android (LE):         RGBA in memory  (R at lowest address)
+//
+//   Always use MFB_RGB(r,g,b) or MFB_ARGB(a,r,g,b) to construct pixel values; these
+//   macros expand to the correct bit layout on every platform.
+//
+//   If you copy pixel data from an external source (image loader, GPU readback, etc.)
+//   that always produces RGBA bytes (e.g. stb_image, libpng), you must swizzle R<->B
+//   before passing the buffer to mfb_update_ex on non-Android platforms.
+//
+// On Wayland, mfb_update_ex may block until the compositor grants a frame callback.
+// On Android, mfb_update_ex returns MFB_STATE_OK without rendering when ANativeWindow
+//   is temporarily unavailable during lifecycle transitions (pause / surface lost).
 mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);
 
 mfb_update_state    mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height);

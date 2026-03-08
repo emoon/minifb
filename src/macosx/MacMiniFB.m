@@ -402,6 +402,7 @@ mfb_update_events(struct mfb_window *window) {
         mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_events has invalid macOS window state.");
         return MFB_STATE_INVALID_WINDOW;
     }
+
 #if !defined(USE_METAL_API)
     // In non-Metal mode, signal the OSXView that it should redraw via drawRect:.
     // Metal rendering is driven by the MTKView render loop; setNeedsDisplay has no effect there.

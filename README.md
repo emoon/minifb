@@ -107,6 +107,10 @@ If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_W
 - `width == 0` or `height == 0`
 - `width * 4` would overflow internal stride calculations
 
+`mfb_update_ex()` runtime behavior is backend-specific:
+- Wayland waits for compositor frame callback inside `mfb_update_ex()` (can block).
+- Android may return `MFB_STATE_OK` without presenting when `ANativeWindow` is temporarily unavailable during lifecycle transitions.
+
 Open-time readiness is backend-specific:
 - Wayland waits for the initial configure handshake before returning from `mfb_open_ex()`.
 - Android may return a window handle before `ANativeWindow` is ready (rendering starts once the native window becomes available).
@@ -227,8 +231,8 @@ void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned 
 int                 mfb_get_mouse_x(struct mfb_window *window);
 int                 mfb_get_mouse_y(struct mfb_window *window);
 void                mfb_split_pos_id(int combined, int *pos, int *id);     // Split packed mobile pos/id safely
-float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Resets after call
-float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Resets after call
+float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Last mouse wheel delta X
+float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Last mouse wheel delta Y
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1=pressed, 0=released (8 buttons)
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // 1=pressed, 0=released
 ```
@@ -714,6 +718,46 @@ Take a look at the example in tests/android. You need **Android Studio** to buil
 
 All other MiniFB functions work normally, including timers, viewports, and user data management.
 
+#### Pixel format on Android
+
+MiniFB uses a **32-bit pixel buffer** on all platforms, but the byte order in memory
+differs between Android and desktop/iOS:
+
+| Platform | Byte order in memory | Equivalent uint32_t (LE) |
+|----------|----------------------|--------------------------|
+| Desktop (Windows, Linux, macOS) | B · G · R · X | `0x00RRGGBB` |
+| iOS | B · G · R · A | `0x00RRGGBB` |
+| **Android** | **R · G · B · X** | **`0x00BBGGRR`** |
+
+**You do not need to think about this** as long as you construct pixels with the
+`MFB_RGB` / `MFB_ARGB` macros — they expand to the correct bit layout automatically
+on every platform:
+
+```c
+buffer[i] = MFB_RGB(255, 0, 0);   // always displays red, on every platform
+```
+
+**Where it matters: external pixel data.**
+If you load an image with a library that always produces RGBA bytes in memory
+(e.g. `stb_image`, `libpng`, browser canvas), and you pass that data directly
+to `mfb_update_ex`, the colors will be correct on Android but **red and blue will
+be swapped on desktop/iOS** (and vice-versa if you adapt for desktop).
+
+```c
+// stb_image / libpng give RGBA bytes in memory:
+//   byte[0]=R  byte[1]=G  byte[2]=B  byte[3]=A
+
+// On Android this is exactly what ANativeWindow expects — pass as-is.
+// On desktop/iOS you must swap R <-> B before calling mfb_update_ex.
+```
+
+**Why can't Android just accept the same format as desktop?**
+`ANativeWindow` (the Android NDK surface API) does not expose a BGRA format in its
+public interface — only `WINDOW_FORMAT_RGBX_8888` (RGBA bytes) and `WINDOW_FORMAT_RGB_565`
+are guaranteed on all devices. Doing a full-buffer swizzle per frame inside the library
+would add CPU cost for every rendered frame. The current design avoids that cost by
+adjusting the macro at compile time instead.
+
 #### Display cutout / Notch (API 32-34)
 
 Android's handling of the display cutout (notch, punch-hole camera) changed across API levels
@@ -798,7 +842,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/P
 cmake --build build-web
 ```
 
-On Windows you cannot use Visual C++. If you have MinGW installed:
+On Windows, you can't use Visual Studio's default CMake generator because Emscripten uses its own toolchain based on a modified version of Clang. Instead, you need to generate MinGW-compatible makefiles. If you have MinGW installed:
 
 ```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=C:\Path\to\emsdk\<version>\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake -G "MinGW Makefiles" -B build-web .
