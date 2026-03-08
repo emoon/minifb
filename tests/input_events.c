@@ -153,6 +153,14 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
         print_getters(window);
     }
 
+    if (key == MFB_KB_KEY_LEFT_CONTROL) {
+        mfb_show_cursor(window, true);
+    }
+
+    if (key == MFB_KB_KEY_RIGHT_CONTROL) {
+        mfb_show_cursor(window, false);
+    }
+
     if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }

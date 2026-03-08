@@ -1074,12 +1074,10 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Mouse input | Yes | Yes | Yes | Yes | Touch | Touch | Yes | Limited |
 | Multi-window | Yes | Yes | Yes | Yes | No | No | Yes | No |
 | Viewport | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | No-op* | No-op |
-| Monitor DPI / scale | Yes | Yes | Yes* | Yes | Yes | Yes | Fixed | Fixed |
+| Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | Yes | No-op |
+| Monitor DPI / scale | Yes | Yes | Yes* | Yes | Yes | Yes | Yes | Fixed |
 | Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Limited*** | Limited*** |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | Browser-driven | - |
-
-`*` Web backend currently tracks requested cursor state, but does not hide the browser cursor.
 
 `**` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
 

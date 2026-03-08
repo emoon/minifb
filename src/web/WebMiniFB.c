@@ -13,7 +13,6 @@
 
 //-------------------------------------
 static bool g_initialized = false;
-static bool g_cursor_warning_logged = false;
 
 //-------------------------------------
 static SWindowData_Web *
@@ -1067,16 +1066,25 @@ mfb_wait_sync(struct mfb_window *window) {
 }
 
 //-------------------------------------
+EM_JS(double, mfb_device_pixel_ratio_js, (), {
+    return (typeof window !== "undefined" && window.devicePixelRatio > 0)
+        ? window.devicePixelRatio
+        : 1.0;
+})
+
+//-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     kUnused(window);
+    float scale = (float) mfb_device_pixel_ratio_js();
+    if (scale <= 0.0f) scale = 1.0f;
 
     if (scale_x) {
-        *scale_x = 1.0f;
+        *scale_x = scale;
     }
 
     if (scale_y) {
-        *scale_y = 1.0f;
+        *scale_y = scale;
     }
 }
 
@@ -1104,6 +1112,12 @@ mfb_timer_tick(void) {
 }
 
 //-------------------------------------
+EM_JS(void, mfb_show_cursor_js, (uintptr_t window_id, int show), {
+    if (!window._minifb || !window._minifb.windows[window_id]) return;
+    window._minifb.windows[window_id].canvas.style.cursor = show ? "" : "none";
+})
+
+//-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
@@ -1113,8 +1127,12 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     }
 
     window_data->is_cursor_visible = show;
-    if (!show && !g_cursor_warning_logged) {
-        mfb_log(MFB_LOG_WARNING, "WebMiniFB: cursor hiding is not implemented in the web backend yet.");
-        g_cursor_warning_logged = true;
+
+    SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
+    if (window_data_web == NULL) {
+        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor missing web-specific window data.");
+        return;
     }
+
+    mfb_show_cursor_js(window_data_web->window_id, show ? 1 : 0);
 }
