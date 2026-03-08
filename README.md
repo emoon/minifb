@@ -794,7 +794,14 @@ Download and install [Emscripten](https://emscripten.org/). When configuring you
 #### Building and running the examples (WASM)
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -S . -B build-web
+cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/Platform/Emscripten.cmake -B build-web .
+cmake --build build-web
+```
+
+On Windows you cannot use Visual C++. If you have MinGW installed:
+
+```sh
+cmake -DCMAKE_TOOLCHAIN_FILE=C:\Path\to\emsdk\<version>\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake -G "MinGW Makefiles" -B build-web .
 cmake --build build-web
 ```
 
@@ -805,7 +812,7 @@ Then open the file `build-web/index.html` in your browser to view the example in
 The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
 
 ```sh
-python3 -m http.server build-web/
+python3 -m http.server --directory build-web
 ```
 
 You can then open the index at [http://localhost:8000](http://localhost:8000) in your browser.
@@ -926,14 +933,14 @@ You can optionally run the script with the argument `--with-vs-code`. If you hav
 #### Building and running the examples (DOS)
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=./tools/dos/toolchain-djgpp.cmake -S . -B build-dos
+cmake -DCMAKE_TOOLCHAIN_FILE=./tools/dos/toolchain-djgpp.cmake -B build-dos .
 cmake --build build-dos
 ```
 
 or from the build-dos directory:
 
 ```sh
-cmake -DCMAKE_TOOLCHAIN_FILE=../tools/dos/toolchain-djgpp.cmake -S ..
+cmake -DCMAKE_TOOLCHAIN_FILE=../tools/dos/toolchain-djgpp.cmake ..
 cmake --build .
 ```
 
