@@ -41,6 +41,7 @@ typedef struct mfb_timer {
     int64_t     start_ticks;
     int64_t     last_delta_ticks;
     uint64_t    accumulated_ticks;
+    int64_t     accumulated_error_ticks;
 } mfb_timer;
 
 #if defined(__cplusplus)
