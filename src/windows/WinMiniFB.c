@@ -167,9 +167,6 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
 }
 
 //-------------------------------------
-long    g_window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
-
-//-------------------------------------
 void     init_keycodes();
 uint32_t translate_mod();
 mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
@@ -452,7 +449,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 if (window_data->window_width != 0 && window_data->window_height != 0) {
                     mfb_log(MFB_LOG_DEBUG, "WM_SIZE: window=%ux%u framebuffer=%ux%u",
                             window_data->window_width, window_data->window_height,
-                            window_data->window_width, window_data->window_height);
+                            window_data->buffer_width, window_data->buffer_height);
                     kCall(resize_func, window_data->window_width, window_data->window_height);
                 }
             }
@@ -512,14 +509,15 @@ release_window_counter(void) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
-    const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
-    RECT rect = { 0 };
-    int  x = 0, y = 0;
-    int  show_window_cmd = SW_NORMAL;
-    uint32_t buffer_stride = 0;
-    SWindowData *window_data = NULL;
+    const unsigned  known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
+    const char      *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
+    RECT            rect = { 0 };
+    int             x = 0, y = 0;
+    int             show_window_cmd = SW_NORMAL;
+    uint32_t        buffer_stride = 0;
+    SWindowData     *window_data = NULL;
     SWindowData_Win *window_data_specific = NULL;
+    long            window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_ERROR, "WinMiniFB: invalid window size %ux%u.", width, height);
@@ -566,12 +564,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data->is_cursor_visible = true;
 
-    g_window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
+    window_style = WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME;
     if (flags & MFB_WF_FULLSCREEN) {
         flags = MFB_WF_FULLSCREEN;  // Remove all other flags
         rect.right  = GetSystemMetrics(SM_CXSCREEN);
         rect.bottom = GetSystemMetrics(SM_CYSCREEN);
-        g_window_style = WS_POPUP & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
+        window_style = WS_POPUP & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE | WS_SYSMENU);
 
         DEVMODE settings = { 0 };
         EnumDisplaySettings(0, 0, &settings);
@@ -587,15 +585,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     if (flags & MFB_WF_BORDERLESS) {
-        g_window_style = WS_POPUP;
+        window_style = WS_POPUP;
     }
 
     if (flags & MFB_WF_RESIZABLE) {
-        g_window_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
+        window_style |= WS_MAXIMIZEBOX | WS_SIZEBOX;
     }
 
     if (flags & MFB_WF_FULLSCREEN_DESKTOP) {
-        g_window_style = WS_OVERLAPPEDWINDOW;
+        window_style = WS_OVERLAPPEDWINDOW;
         show_window_cmd = SW_MAXIMIZE;
 
         width  = GetSystemMetrics(SM_CXFULLSCREEN);
@@ -603,7 +601,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         rect.right  = width;
         rect.bottom = height;
-        AdjustWindowRect(&rect, g_window_style, 0);
+        AdjustWindowRect(&rect, window_style, 0);
         if (rect.left < 0) {
             width += rect.left * 2;
             rect.right += rect.left;
@@ -623,7 +621,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         rect.right  = (LONG) (width  * scale_x);
         rect.bottom = (LONG) (height * scale_y);
 
-        AdjustWindowRect(&rect, g_window_style, 0);
+        AdjustWindowRect(&rect, window_style, 0);
 
         rect.right  -= rect.left;
         rect.bottom -= rect.top;
@@ -649,15 +647,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     calc_dst_factor(window_data, width, height);
 
-    window_data->window_width  = rect.right;
-    window_data->window_height = rect.bottom;
-
     window_data_specific->window = CreateWindowEx(
         0,
         window_title, window_title,
-        g_window_style,
+        window_style,
         x, y,
-        window_data->window_width, window_data->window_height,
+        rect.right, rect.bottom,
         0, 0, 0, 0);
 
     if (!window_data_specific->window) {
@@ -668,12 +663,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
 
+    if (GetClientRect(window_data_specific->window, &rect)) {
+        window_data->window_width  = (uint32_t) (rect.right - rect.left);
+        window_data->window_height = (uint32_t) (rect.bottom - rect.top);
+    }
+
     SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, (LONG_PTR) window_data);
 
     if (flags & MFB_WF_ALWAYS_ON_TOP)
         SetWindowPos(window_data_specific->window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-
-    ShowWindow(window_data_specific->window, show_window_cmd);
 
     window_data_specific->hdc = GetDC(window_data_specific->window);
     if (window_data_specific->hdc == NULL) {
@@ -741,13 +739,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
-#if defined(_DEBUG)
     #if defined(USE_OPENGL_API)
         mfb_log(MFB_LOG_DEBUG, "Window created using OpenGL API");
     #else
         mfb_log(MFB_LOG_DEBUG, "Window created using GDI API");
     #endif
-#endif
+
+    ShowWindow(window_data_specific->window, show_window_cmd);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;

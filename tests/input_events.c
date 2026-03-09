@@ -1,16 +1,21 @@
 #include <MiniFB.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 //-------------------------------------
 #define kUnused(var)    (void) var
 
 //-------------------------------------
-#define WIDTH      800
-#define HEIGHT     600
-static unsigned int g_buffer[WIDTH * HEIGHT];
-static bool         g_active = true;
-static unsigned int g_frame_count = 0;
+static uint32_t g_width       = 800;
+static uint32_t g_height      = 600;
+static uint32_t *g_buffer     = NULL;
+static bool     g_active      = true;
+static uint32_t g_frame_count = 0;
+// Convert phisical pixels to logical pixels
+static float    g_to_logic_width;
+static float    g_to_logic_height;
 
 //-------------------------------------
 static void
@@ -115,17 +120,10 @@ resize(struct mfb_window *window, int width, int height) {
     }
 
     fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
-    if (width > WIDTH) {
-        x = (width - WIDTH) >> 1;
-        width = WIDTH;
-    }
-    if (height > HEIGHT) {
-        y = (height - HEIGHT) >> 1;
-        height = HEIGHT;
-    }
 
-    bool ok = mfb_set_viewport(window, x, y, width, height);
-    fprintf(stdout, "%s > viewport: off(%u,%u) size(%d,%d) result=%d\n", window_title, x, y, width, height, ok ? 1 : 0);
+    // Convert phisical pixels to logical pixels
+    g_to_logic_width  = 1.0f / width;
+    g_to_logic_height = 1.0f / height;
 }
 
 //-------------------------------------
@@ -180,13 +178,22 @@ char_input(struct mfb_window *window, unsigned int char_code) {
 static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     const char *window_title = "";
-    int x, y;
+    int x, y, xl, yl;
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
+
     x = mfb_get_mouse_x(window);
     y = mfb_get_mouse_y(window);
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: %d, %d) [key_mod: %x]\n", window_title, button, is_pressed, x, y, mod);
+    xl = x * (g_width  * g_to_logic_width);
+    yl = y * (g_height * g_to_logic_height);
+    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d]) [key_mod: %x]\n",
+            window_title,
+            button,
+            is_pressed,
+            x, y,
+            xl, yl,
+            mod);
 }
 
 //-------------------------------------
@@ -212,12 +219,21 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
 int
 main() {
     int noise, carry, seed = 0xbeef;
+    g_buffer = (uint32_t *) malloc(g_width * g_height * sizeof(uint32_t));
+    if (!g_buffer) {
+        fprintf(stderr, "malloc failed (%u x %u)\n", g_width, g_height);
+        return -1;
+    }
+
+    // Convert phisical pixels to logical pixels
+    g_to_logic_width  = 1.0f / g_width;
+    g_to_logic_height = 1.0f / g_height;
 
     mfb_set_log_level(MFB_LOG_TRACE);
 
-    struct mfb_window *window = mfb_open_ex("Input Events Test", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
+    struct mfb_window *window = mfb_open_ex("Input Events Test", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window) {
-        return 0;
+        return -1;
     }
 
     mfb_set_active_callback(window, active);
@@ -231,7 +247,7 @@ main() {
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 
-    mfb_set_viewport(window, 10, 10, WIDTH-20, HEIGHT-20);
+    mfb_set_viewport(window, 10, 10, g_width-20, g_height-20);
     print_getters(window);
 
     do {
@@ -239,7 +255,7 @@ main() {
         mfb_update_state state;
 
         if (g_active) {
-            for (i = 0; i < WIDTH * HEIGHT; ++i) {
+            for (i = 0; i < g_width * g_height; ++i) {
                 noise = seed;
                 noise >>= 3;
                 noise ^= seed;
