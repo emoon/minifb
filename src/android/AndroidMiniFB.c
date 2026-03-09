@@ -510,6 +510,9 @@ process_events(SWindowData *window_data, int timeout_ms) {
     int events;
     struct android_poll_source *source = NULL;
 
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     // First poll may block (timeout_ms), subsequent polls are non-blocking to drain the queue.
     int poll_timeout_ms = timeout_ms;
     while ((ident = ALooper_pollOnce(poll_timeout_ms, NULL, &events, (void **) &source)) >= 0) {

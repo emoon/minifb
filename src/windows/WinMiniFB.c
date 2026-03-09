@@ -481,8 +481,13 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
 //-------------------------------------
 static inline void
-update_events(HWND window) {
+update_events(SWindowData *window_data, HWND window) {
     MSG msg;
+
+    if (window_data != NULL) {
+        window_data->mouse_wheel_x = 0.0f;
+        window_data->mouse_wheel_y = 0.0f;
+    }
 
     while (PeekMessage(&msg, window, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
@@ -799,7 +804,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
 #endif
 
-    update_events(window_data_specific->window);
+    update_events(window_data, window_data_specific->window);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window closed after event processing");
         destroy_window_data(window_data);
@@ -831,7 +836,7 @@ mfb_update_events(struct mfb_window *window) {
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    update_events(window_data_specific->window);
+    update_events(window_data, window_data_specific->window);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window closed after event processing");
         destroy_window_data(window_data);
@@ -865,7 +870,7 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    update_events(NULL);
+    update_events(window_data, NULL);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while polling events");
         destroy_window_data(window_data);
@@ -903,7 +908,7 @@ mfb_wait_sync(struct mfb_window *window) {
             SwitchToThread();
         }
 
-        update_events(NULL);
+        update_events(window_data, NULL);
         if (window_data->close) {
             mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while waiting for frame sync");
             destroy_window_data(window_data);

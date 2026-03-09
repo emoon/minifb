@@ -96,8 +96,8 @@ int                 mfb_get_mouse_y(struct mfb_window *window);             // L
 // Mobile decoding preserves signed position values.
 // Output pointers may be NULL.
 void                mfb_split_pos_id(int combined, int *pos, int *id);
-float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Last mouse wheel delta X.
-float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Last mouse wheel delta Y.
+float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel delta X from the most recent event pump (0.0f if none).
+float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel delta Y from the most recent event pump (0.0f if none).
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // One byte for every key. Press (1), Release 0.
 

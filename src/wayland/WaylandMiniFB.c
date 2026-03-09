@@ -1662,6 +1662,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     wl_callback_add_listener(frame_callback, &frame_listener, &done);
     wl_surface_commit(window_data_way->surface);
 
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     while (!done && window_data->close == false) {
         if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
             mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: display dispatch/roundtrip failed during frame wait.");
@@ -1708,6 +1711,9 @@ mfb_update_events(struct mfb_window *window) {
         mfb_log(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_events.");
         return MFB_STATE_INTERNAL_ERROR;
     }
+
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
 
     // Process already queued events first.
     if (wl_display_dispatch_pending(window_data_way->display) == -1) {
@@ -1800,6 +1806,9 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
     const int fd = wl_display_get_fd(display);
+
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
 
     // Flush outgoing requests and dispatch pending events once before pacing
     wl_display_flush(display);
@@ -1904,6 +1913,8 @@ mfb_wait_sync2(struct mfb_window *window) {
 
     double      current;
     uint32_t    millis = 1;
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
     while (1) {
         current = mfb_timer_now(window_data_way->timer);
         if (current >= g_time_for_frame * 0.96) {

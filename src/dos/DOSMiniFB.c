@@ -570,6 +570,9 @@ mfb_update_events(struct mfb_window *window) {
   if (state)
     return state;
 
+  window_data->mouse_wheel_x = 0.0f;
+  window_data->mouse_wheel_y = 0.0f;
+
   update_mouse(window_data);
   update_keyboard(window_data);
 

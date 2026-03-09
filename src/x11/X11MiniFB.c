@@ -466,6 +466,11 @@ static inline void
 update_events(SWindowData *window_data, Display *display) {
     XEvent event;
 
+    if (window_data != NULL) {
+        window_data->mouse_wheel_x = 0.0f;
+        window_data->mouse_wheel_y = 0.0f;
+    }
+
     while (XPending(display) > 0) {
         XNextEvent(display, &event);
         process_event(window_data, &event);

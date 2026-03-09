@@ -340,6 +340,9 @@ mfb_update_events(struct mfb_window *window) {
         return MFB_STATE_EXIT;
     }
 
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     if (window_data->must_resize_context) {
         window_data->must_resize_context = false;
         kCall(resize_func, (int) window_data->window_width, (int) window_data->window_height);

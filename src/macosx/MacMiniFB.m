@@ -90,7 +90,12 @@ update_events_for_mode(NSString *mode) {
 
 //-------------------------------------
 static inline void
-update_events() {
+update_events(SWindowData *window_data) {
+    if (window_data != NULL) {
+        window_data->mouse_wheel_x = 0.0f;
+        window_data->mouse_wheel_y = 0.0f;
+    }
+
     @autoreleasepool {
         update_events_for_mode(NSDefaultRunLoopMode);
         update_events_for_mode(NSEventTrackingRunLoopMode);
@@ -355,7 +360,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
     memcpy(window_data->draw_buffer, buffer, total_bytes);
 
-    update_events();
+    update_events(window_data);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex detected close request after event processing.");
         destroy_window_data(window_data);
@@ -389,7 +394,7 @@ mfb_update_events(struct mfb_window *window) {
         return MFB_STATE_EXIT;
     }
 
-    update_events();
+    update_events(window_data);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events detected close request after event processing.");
         destroy_window_data(window_data);
@@ -443,7 +448,7 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    update_events();
+    update_events(window_data);
     if (window_data->close) {
         mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request after event processing.");
         destroy_window_data(window_data);
@@ -476,7 +481,7 @@ mfb_wait_sync(struct mfb_window *window) {
                 sched_yield(); // small cooperative yield
             }
 
-            update_events();
+            update_events(window_data);
             if (window_data->close) {
                 mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request while waiting for frame sync.");
                 destroy_window_data(window_data);

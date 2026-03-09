@@ -895,6 +895,9 @@ mfb_update_events(struct mfb_window *window) {
         return MFB_STATE_EXIT;
     }
 
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events detected close request after event processing.");
@@ -1015,6 +1018,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return state;
     }
 
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after event processing.");
@@ -1046,6 +1052,9 @@ mfb_wait_sync(struct mfb_window *window) {
     }
 
     emscripten_sleep(0);
+
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
 
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT || window_data->close) {
