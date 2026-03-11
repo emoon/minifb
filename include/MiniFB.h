@@ -144,7 +144,19 @@ bool                mfb_get_display_cutout_insets(struct mfb_window *window, int
 // All output parameters are optional (may be NULL).
 bool                mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom);
 
+// Map window coordinates (x, y) to framebuffer/buffer pixel coordinates.
+// "Logical" here means the coordinate grid of the user buffer (col, row in the array passed
+// to mfb_update_ex) — it is NOT related to OS-level DPI logical pixels.
+// Formula: out = round(in * buffer_size / window_size).
+// Returns true if the result is inside the buffer bounds; false otherwise (outputs still written).
+// Output pointers may be NULL.
 bool                mfb_get_logical_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
+
+// Map window coordinates (x, y) to buffer pixel coordinates relative to the viewport.
+// The viewport is the sub-rectangle where the framebuffer is drawn (see mfb_set_viewport).
+// Subtracts the viewport offset, then scales to buffer space: out = round((in - offset) * buffer_size / dst_size).
+// Returns true if (x, y) is inside the viewport; false otherwise (outputs still written).
+// Output pointers may be NULL.
 bool                mfb_get_viewport_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
 
 //-------------------------------------

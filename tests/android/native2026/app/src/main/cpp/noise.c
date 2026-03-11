@@ -136,10 +136,11 @@ active(struct mfb_window *window, bool is_active) {
 //-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    LOGI("resize: %d, %d", width, height);
     g_width  = (width  >> 1);
     g_height = (height >> 1);
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
+    mfb_set_viewport(window, 20, 20, width-40, height-40);
+    LOGI("resize: %d, %d -> %d, %d", width, height, g_width, g_height);
 }
 
 //-------------------------------------
@@ -162,7 +163,19 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
+
+    int xl, yl, xv, yv;
+    bool linside = mfb_get_logical_coords(window, x, y, &xl, &yl);
+    bool vinside = mfb_get_viewport_coords(window, x, y, &xv, &yv);
+    LOGI("mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d (%d)] [view: %d, %d (%d)]) [key_mod: %x]\n",
+            button,
+            is_pressed,
+            x, y,
+            xl, yl,
+            linside,
+            xv, yv,
+            vinside,
+            mod);
 }
 
 //-------------------------------------
