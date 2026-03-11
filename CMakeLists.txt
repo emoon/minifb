@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
-project(MiniFB VERSION 0.9.2 LANGUAGES C CXX)
+project(MiniFB VERSION 0.9.3 LANGUAGES C CXX)
 
-include(CheckLanguage)
-check_language(OBJC)
-if(CMAKE_OBJC_COMPILER)
-  enable_language(OBJC)
+if (APPLE)
+    include(CheckLanguage)
+    check_language(OBJC)
+    if (CMAKE_OBJC_COMPILER)
+        enable_language(OBJC)
+    endif()
 endif()
 
 message(STATUS "Processing " ${PROJECT_NAME})
@@ -66,6 +68,8 @@ set(SrcMacOSX
 
 #--
 set(SrcIOS
+    include/MiniFB_ios.h
+
     src/ios/WindowData_IOS.h
     src/ios/iOSMiniFB.m
     src/ios/iOSView.h
@@ -74,7 +78,6 @@ set(SrcIOS
     src/ios/iOSViewController.m
     src/ios/iOSViewDelegate.h
     src/ios/iOSViewDelegate.m
-    include/MiniFB_ios.h
 )
 
 #--
@@ -119,6 +122,15 @@ set(MINIFB_COMPILE_OPTIONS)
 set(MINIFB_COMPILE_DEFINITIONS)
 set(MINIFB_LINK_OPTIONS_LIB)
 set(MINIFB_LINK_OPTIONS_EXE)
+
+if (DJGPP)
+    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
+    set(MINIFB_C_EXTENSIONS   ON)
+    set(MINIFB_CXX_EXTENSIONS ON)
+else()
+    set(MINIFB_C_EXTENSIONS   OFF)
+    set(MINIFB_CXX_EXTENSIONS OFF)
+endif()
 
 # Options
 #--------------------------------------
@@ -369,7 +381,7 @@ elseif (WIN32)
             message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
         endif()
         target_link_libraries(minifb PRIVATE
-            OpenGL::GL
+            "opengl32.lib"
         )
     endif()
 
@@ -384,10 +396,10 @@ endif()
 set_target_properties(minifb PROPERTIES
     C_STANDARD ${MINIFB_C_STANDARD}
     C_STANDARD_REQUIRED ON
-    C_EXTENSIONS OFF
+    C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
     CXX_STANDARD ${MINIFB_CXX_STANDARD}
     CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
+    CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
 )
 
 if (MINIFB_COMPILE_OPTIONS)
@@ -501,10 +513,10 @@ foreach(minifb_test_target IN LISTS MINIFB_TEST_TARGETS)
     set_target_properties(${minifb_test_target} PROPERTIES
         C_STANDARD ${MINIFB_C_STANDARD}
         C_STANDARD_REQUIRED ON
-        C_EXTENSIONS OFF
+        C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
         CXX_STANDARD ${MINIFB_CXX_STANDARD}
         CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
+        CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
     )
 
     if (MINIFB_COMPILE_OPTIONS)
@@ -525,7 +537,7 @@ endforeach()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
-if (MINIFB_BUILD_EXAMPLES)
+if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
     set_property(TARGET noise PROPERTY FOLDER "Tests")
     set_property(TARGET timer PROPERTY FOLDER "Tests")
     set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
