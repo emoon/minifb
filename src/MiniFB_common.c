@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <math.h>
 
 #include <MiniFB.h>
 #include "WindowData.h"
@@ -491,3 +492,68 @@ mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int 
 }
 
 #endif // !__ANDROID__ && !TARGET_OS_IOS
+
+//-------------------------------------
+bool
+mfb_get_logical_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y) {
+    if (window == NULL) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+
+    int log_x = (int) lround((x * (int) window_data->buffer_width)  / (float) window_data->window_width);
+    int log_y = (int) lround((y * (int) window_data->buffer_height) / (float) window_data->window_height);
+
+    if (out_x != NULL) {
+        *out_x = log_x;
+    }
+
+    if (out_y != NULL) {
+        *out_y = log_y;
+    }
+
+    if (log_x < 0 || log_x >= (int) window_data->buffer_width) {
+        return false;
+    }
+
+    if (log_y < 0 || log_y >= (int) window_data->buffer_height) {
+        return false;
+    }
+
+    return true;
+}
+
+//-------------------------------------
+bool
+mfb_get_viewport_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y) {
+    if (window == NULL) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+
+    int x_aux = x - (int) window_data->dst_offset_x;
+    int y_aux = y - (int) window_data->dst_offset_y;
+
+    int v_x = (int) lround((x_aux * (int) window_data->buffer_width)  / (float) window_data->dst_width);
+    int v_y = (int) lround((y_aux * (int) window_data->buffer_height) / (float) window_data->dst_height);
+
+    if (out_x != NULL) {
+        *out_x = v_x;
+    }
+
+    if (out_y != NULL) {
+        *out_y = v_y;
+    }
+
+    if (x_aux < 0 || x_aux >= (int) window_data->dst_width) {
+        return false;
+    }
+
+    if (y_aux < 0 || y_aux >= (int) window_data->dst_height) {
+        return false;
+    }
+
+    return true;
+}

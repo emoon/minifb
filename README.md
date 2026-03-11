@@ -231,6 +231,8 @@ void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned 
 int                 mfb_get_mouse_x(struct mfb_window *window);
 int                 mfb_get_mouse_y(struct mfb_window *window);
 void                mfb_split_pos_id(int combined, int *pos, int *id);     // Split packed mobile pos/id safely
+bool                mfb_get_logical_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
+bool                mfb_get_viewport_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
 float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel delta X from the most recent event pump (0.0f if none)
 float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel delta Y from the most recent event pump (0.0f if none)
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1=pressed, 0=released (8 buttons)
@@ -243,6 +245,26 @@ For touch callbacks, the pointer id is also exposed as `button` in `mfb_mouse_bu
 On Android/iOS touch move callbacks, `mfb_mouse_move_func` receives packed `x/y` values (same encoding as getters).
 On Android, external `HOVER_MOVE` also uses packed `x/y`; if Android does not provide a valid pointer id, MiniFB uses fallback id `15`.
 `mfb_get_mouse_scroll_x/y()` are pump-local values: MiniFB resets them to `0.0f` before each backend event pump, then writes the delta if a scroll event is received during that pump.
+
+Coordinate conversion helpers:
+
+- `mfb_get_viewport_coords(window, x, y, &out_x, &out_y)` converts window/drawable coordinates to coordinates relative to the active viewport (`mfb_set_viewport` rectangle).
+- `mfb_get_logical_coords(window, x, y, &out_x, &out_y)` converts window/drawable coordinates to logical framebuffer coordinates (the buffer size used by `mfb_update_ex`).
+- Both return `true` when the input point is inside the corresponding target bounds, `false` otherwise.
+- Output pointers are optional; pass `NULL` for any output you do not need.
+
+Example:
+
+```c
+int x = mfb_get_mouse_x(window);
+int y = mfb_get_mouse_y(window);
+
+int vx = 0, vy = 0;
+int lx = 0, ly = 0;
+
+bool inside_view = mfb_get_viewport_coords(window, x, y, &vx, &vy);
+bool inside_logical = mfb_get_logical_coords(window, x, y, &lx, &ly);
+```
 
 ### Per-Window Data
 

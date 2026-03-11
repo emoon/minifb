@@ -144,6 +144,9 @@ bool                mfb_get_display_cutout_insets(struct mfb_window *window, int
 // All output parameters are optional (may be NULL).
 bool                mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom);
 
+bool                mfb_get_logical_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
+bool                mfb_get_viewport_coords(struct mfb_window *window, int x, int y, int *out_x, int *out_y);
+
 //-------------------------------------
 
 #ifdef __cplusplus

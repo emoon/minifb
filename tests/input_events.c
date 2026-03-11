@@ -13,9 +13,6 @@ static uint32_t g_height      = 600;
 static uint32_t *g_buffer     = NULL;
 static bool     g_active      = true;
 static uint32_t g_frame_count = 0;
-// Convert phisical pixels to logical pixels
-static float    g_to_logic_width;
-static float    g_to_logic_height;
 
 //-------------------------------------
 static void
@@ -112,18 +109,12 @@ active(struct mfb_window *window, bool is_active) {
 //-------------------------------------
 static void
 resize(struct mfb_window *window, int width, int height) {
-    uint32_t x = 0;
-    uint32_t y = 0;
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
     fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
-
-    // Convert phisical pixels to logical pixels
-    g_to_logic_width  = 1.0f / width;
-    g_to_logic_height = 1.0f / height;
 }
 
 //-------------------------------------
@@ -147,7 +138,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     }
     fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
 
-    if (key == MFB_KB_KEY_SPACE) {
+    if (key == MFB_KB_KEY_SPACE && is_pressed == false) {
         print_getters(window);
     }
 
@@ -178,21 +169,24 @@ char_input(struct mfb_window *window, unsigned int char_code) {
 static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     const char *window_title = "";
-    int x, y, xl, yl;
+    int x, y, xl, yl, xv, yv;
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
     x = mfb_get_mouse_x(window);
     y = mfb_get_mouse_y(window);
-    xl = x * (g_width  * g_to_logic_width);
-    yl = y * (g_height * g_to_logic_height);
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d]) [key_mod: %x]\n",
+    bool linside = mfb_get_logical_coords(window, x, y, &xl, &yl);
+    bool vinside = mfb_get_viewport_coords(window, x, y, &xv, &yv);
+    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d (%d)] [view: %d, %d (%d)]) [key_mod: %x]\n",
             window_title,
             button,
             is_pressed,
             x, y,
             xl, yl,
+            linside,
+            xv, yv,
+            vinside,
             mod);
 }
 
@@ -225,10 +219,6 @@ main() {
         return -1;
     }
 
-    // Convert phisical pixels to logical pixels
-    g_to_logic_width  = 1.0f / g_width;
-    g_to_logic_height = 1.0f / g_height;
-
     mfb_set_log_level(MFB_LOG_TRACE);
 
     struct mfb_window *window = mfb_open_ex("Input Events Test", g_width, g_height, MFB_WF_RESIZABLE);
@@ -247,13 +237,12 @@ main() {
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 
-    mfb_set_viewport(window, 10, 10, g_width-20, g_height-20);
+    mfb_set_viewport(window, 20, 20, g_width-40, g_height-40);
     print_getters(window);
 
+    uint32_t         i;
+    mfb_update_state state;
     do {
-        int              i;
-        mfb_update_state state;
-
         if (g_active) {
             for (i = 0; i < g_width * g_height; ++i) {
                 noise = seed;
@@ -268,6 +257,7 @@ main() {
             }
 
             state = mfb_update(window, g_buffer);
+            g_frame_count++;
         }
         else {
             state = mfb_update_events(window);
@@ -277,8 +267,6 @@ main() {
             window = NULL;
             break;
         }
-
-        g_frame_count++;
     } while (mfb_wait_sync(window));
 
     return 0;
