@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(MiniFB VERSION 0.9.1 LANGUAGES C CXX)
+project(MiniFB VERSION 0.9.2 LANGUAGES C CXX)
 
 include(CheckLanguage)
 check_language(OBJC)

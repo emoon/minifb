@@ -8,6 +8,10 @@ All notable changes to this project are documented in this file.
 
 - Fixed an Emscripten build issue caused by a legacy linker setting used in strict mode.
 
+### Notes
+
+- 2026-03-11: The `v0.9.2` tag was re-pointed to include a CMake version number correction only (`CMakeLists.txt`), with no functional source code changes.
+
 ## [0.9.1]
 
 ### Fixed
