@@ -50,6 +50,8 @@ typedef enum {
     WF_FULLSCREEN_DESKTOP = 0x04,
     WF_BORDERLESS         = 0x08,
     WF_ALWAYS_ON_TOP      = 0x10,
+    MFB_WF_SIZE_LOGICAL   = 0x20,  // width/height passed to mfb_open_on_monitor_ex are OS logical units (points on macOS, CSS px on Web)
+    MFB_WF_SIZE_PHYSICAL  = 0x40,  // width/height passed to mfb_open_on_monitor_ex are physical device pixels
 } mfb_window_flags;
 
 // Opaque pointer

@@ -48,6 +48,23 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Monitor info returned by mfb_get_monitor_info and mfb_get_window_monitor.
+// Logical coordinates use the OS coordinate system (points on macOS, device-independent
+// pixels on Windows with DPI awareness, pixels on X11/Wayland).
+// Physical coordinates are raw device pixels.
+// position (logical_x, logical_y) is relative to the virtual desktop origin.
+// physical_x/y are intentionally omitted: the virtual desktop layout is always
+// defined in logical units and mixing scales across monitors makes physical
+// desktop coordinates ill-defined.
+typedef struct mfb_monitor_info {
+    int      logical_x, logical_y;            // position in virtual desktop (OS logical units)
+    unsigned logical_width,  logical_height;  // size in OS logical units
+    unsigned physical_width, physical_height; // size in physical/device pixels
+    float    scale_x, scale_y;               // content scale: physical / logical
+    bool     is_primary;
+    char     name[128];                       // display name, truncated to 127 chars if longer
+} mfb_monitor_info;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,6 +95,33 @@ void *              mfb_get_user_data(struct mfb_window *window);
 bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height);
 // Let mfb to calculate the best fit from your framebuffer original size
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
+
+// Monitor enumeration
+// Index 0 is always the primary monitor.
+// On single-display backends (Web, iOS, Android, DOS) always returns 1.
+int                 mfb_get_num_monitors(void);
+// Fills out_info with the properties of the monitor at the given index.
+// Returns false if index is out of range or out_info is NULL.
+bool                mfb_get_monitor_info(unsigned index, mfb_monitor_info *out_info);
+// Returns a pointer to the info of the monitor that contains the given window.
+// When the window straddles two monitors, returns the one with the largest overlap.
+// Returns NULL if window is NULL or the monitor cannot be determined.
+// The pointer is valid until the next call to any mfb_*monitor* function on the
+// same window, or until the window is destroyed. Copy the struct to keep the data.
+mfb_monitor_info *  mfb_get_window_monitor(struct mfb_window *window);
+
+// Open a window on a specific monitor, centered on it.
+// monitor_index 0 = primary monitor. Falls back to primary if out of range.
+struct mfb_window * mfb_open_on_monitor(const char *title, unsigned width, unsigned height,
+                                         unsigned monitor_index);
+// Extended version: same as mfb_open_on_monitor plus mfb_window_flags.
+// MFB_WF_SIZE_LOGICAL  — width/height are OS logical units (points / CSS px).
+// MFB_WF_SIZE_PHYSICAL — width/height are physical device pixels.
+// Passing both flags simultaneously is an error: returns NULL and logs a message.
+// If neither flag is set the size is in the backend's current native units
+// (same behavior as mfb_open_ex — kept for backward compatibility).
+struct mfb_window * mfb_open_on_monitor_ex(const char *title, unsigned width, unsigned height,
+                                            unsigned flags, unsigned monitor_index);
 
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale

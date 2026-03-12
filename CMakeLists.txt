@@ -52,6 +52,9 @@ set(SrcLib
 set(SrcWindows
     src/windows/WinMiniFB.c
     src/windows/WindowData_Win.h
+    src/windows/WinMiniFB_dpi.h
+    src/windows/WinMiniFB_dpi.c
+    src/windows/WinMiniFB_monitor.c
 )
 
 #--
@@ -64,6 +67,7 @@ set(SrcMacOSX
     src/macosx/OSXViewDelegate.h
     src/macosx/OSXViewDelegate.m
     src/macosx/WindowData_OSX.h
+    src/macosx/MacMiniFB_monitor.m
 )
 
 #--
@@ -78,6 +82,7 @@ set(SrcIOS
     src/ios/iOSViewController.m
     src/ios/iOSViewDelegate.h
     src/ios/iOSViewDelegate.m
+    src/MiniFB_monitor.c
 )
 
 #--
@@ -85,8 +90,10 @@ set(SrcWayland
     src/wayland/generated/xdg-shell-protocol.c
     src/wayland/generated/xdg-decoration-protocol.c
     src/wayland/generated/fractional-scale-v1-protocol.c
+    src/wayland/generated/xdg-output-unstable-v1-protocol.c
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
+    src/wayland/WaylandMiniFB_monitor.c
     src/MiniFB_linux.c
 )
 
@@ -94,6 +101,7 @@ set(SrcWayland
 set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/WindowData_X11.h
+    src/x11/X11MiniFB_monitor.c
     src/MiniFB_linux.c
 )
 
@@ -105,12 +113,14 @@ set(SrcGL
 #--
 set(SrcWeb
     src/web/WebMiniFB.c
+    src/MiniFB_monitor.c
 )
 
 #--
 set(SrcDOS
     src/dos/DOSMiniFB.c
     src/dos/vesa.c
+    src/MiniFB_monitor.c
 )
 
 # Set features
@@ -360,8 +370,16 @@ elseif (UNIX)
         target_link_libraries(minifb PRIVATE
             X11::X11
             #"-lxkbcommon"
-            #"-lXrandr" DPI NOT WORKING
         )
+
+        # XRandR: used for monitor enumeration (mfb_get_num_monitors / mfb_get_monitor_info).
+        # Note: per-monitor DPI is still not reliable on all systems (see X11MiniFB.c),
+        # but position and resolution data from XRandR are used for multi-monitor support.
+        find_library(XRANDR_LIB Xrandr)
+        if (XRANDR_LIB)
+            target_compile_definitions(minifb PRIVATE HAVE_XRANDR)
+            target_link_libraries(minifb PRIVATE ${XRANDR_LIB})
+        endif()
         if (USE_OPENGL_API)
             find_package(OpenGL)
             if (NOT OpenGL_FOUND)
@@ -442,6 +460,7 @@ if (MINIFB_BUILD_EXAMPLES)
         add_executable(fullscreen tests/fullscreen.c)
         add_executable(timer tests/timer.c)
         add_executable(hide_cursor tests/hide_cursor.c)
+        add_executable(show_monitor_info tests/show_monitor_info.c)
 
         list(APPEND MINIFB_TEST_TARGETS
             noise
@@ -452,6 +471,7 @@ if (MINIFB_BUILD_EXAMPLES)
             fullscreen
             timer
             hide_cursor
+            show_monitor_info
         )
 
         if (EMSCRIPTEN)
@@ -546,6 +566,7 @@ if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
     set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
     set_property(TARGET hidpi PROPERTY FOLDER "Tests")
     set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
+    set_property(TARGET show_monitor_info PROPERTY FOLDER "Tests")
 endif()
 
 if (MINIFB_BUILD_VERSION_INFO)

@@ -95,4 +95,17 @@ if [ -f "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" ]; then
       "$OUTPUT_DIR/fractional-scale-v1-protocol.c"
 fi
 
+# XDG Output — per-output logical size; needed for fractional scale detection
+# without a surface (zxdg_output_manager_v1).
+if [ -f "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" ]; then
+    echo "Generando xdg-output-unstable-v1..."
+    wayland-scanner client-header \
+      "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" \
+      "$OUTPUT_DIR/xdg-output-unstable-v1-client-protocol.h"
+
+    wayland-scanner private-code \
+      "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" \
+      "$OUTPUT_DIR/xdg-output-unstable-v1-protocol.c"
+fi
+
 echo "Protocols successfully generated in $OUTPUT_DIR"
