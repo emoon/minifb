@@ -13,8 +13,9 @@ int main(void) {
 
   gdb_start();
 
-  uint32_t *pixels = (uint32_t *) malloc(sizeof(uint32_t) * buf_x * buf_y);
+  uint32_t *pixels = (uint32_t *)malloc(sizeof(uint32_t) * buf_x * buf_y);
   memset(pixels, 0, buf_x * buf_y * 4);
+
   struct mfb_window *window = mfb_open_ex("Noise Test", res_x, res_y, MFB_WF_RESIZABLE);
 
   do {
@@ -34,8 +35,7 @@ int main(void) {
       x = x < 0 ? 0 : x;
       y = y >= buf_y ? buf_y - 1 : y;
       y = y < 0 ? 0 : y;
-
-      uint8_t *dst = (uint8_t *) pixels;
+      uint8_t *dst = (uint8_t *)pixels;
       while (y >= 0) {
         memset(dst, 0, x * 4);
         dst += buf_x * 4;
@@ -49,6 +49,5 @@ int main(void) {
 
     gdb_checkpoint();
   } while (mfb_wait_sync(window));
-
   return 0;
 }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MiniFB VERSION 0.9.1 LANGUAGES C CXX)
+project(MiniFB VERSION 0.9.3 LANGUAGES C CXX)
 
 if (APPLE)
     include(CheckLanguage)
