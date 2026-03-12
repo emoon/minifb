@@ -21,21 +21,21 @@ set -e
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Project root is one level up from scripts/
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+# Project root is two levels up from tools/wayland/
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-PROTOCOL_DIR="/usr/share/wayland-protocols"
+PROTOCOL_DIR="wayland-protocols-1.47"
 OUTPUT_DIR="$PROJECT_ROOT/src/wayland/generated"
 
 # Verify we're in the correct project (check for CMakeLists.txt or other project files)
 if [ ! -f "$PROJECT_ROOT/CMakeLists.txt" ]; then
-    echo "Error: No se encontró CMakeLists.txt en $PROJECT_ROOT"
-    echo "Asegúrate de que el script esté en la carpeta scripts/ del proyecto minifb"
+    echo "Error: CMakeLists.txt was not found in $PROJECT_ROOT"
+    echo "Make sure this script is in tools/wayland/ within the minifb project"
     exit 1
 fi
 
-echo "Directorio del proyecto: $PROJECT_ROOT"
-echo "Directorio de salida: $OUTPUT_DIR"
+echo "Project directory: $PROJECT_ROOT"
+echo "Output directory: $OUTPUT_DIR"
 
 # Check wayland-scanner version
 if command -v wayland-scanner >/dev/null 2>&1; then
@@ -62,7 +62,7 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 # XDG Shell
-echo "Generando xdg-shell..."
+echo "Generating xdg-shell..."
 wayland-scanner client-header \
   "$PROTOCOL_DIR/stable/xdg-shell/xdg-shell.xml" \
   "$OUTPUT_DIR/xdg-shell-client-protocol.h"
@@ -73,7 +73,7 @@ wayland-scanner private-code \
 
 # Other optional protocols
 if [ -f "$PROTOCOL_DIR/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml" ]; then
-    echo "Generando xdg-decoration..."
+    echo "Generating xdg-decoration..."
     wayland-scanner client-header \
       "$PROTOCOL_DIR/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml" \
       "$OUTPUT_DIR/xdg-decoration-client-protocol.h"
@@ -85,7 +85,7 @@ fi
 
 # Fractional scale (staging)
 if [ -f "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" ]; then
-    echo "Generando fractional-scale-v1..."
+    echo "Generating fractional-scale-v1..."
     wayland-scanner client-header \
       "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" \
       "$OUTPUT_DIR/fractional-scale-v1-client-protocol.h"
