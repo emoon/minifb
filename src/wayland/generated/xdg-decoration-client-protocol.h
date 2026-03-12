@@ -215,6 +215,10 @@ enum zxdg_toplevel_decoration_v1_error {
 	 * xdg_toplevel destroyed before the decoration object
 	 */
 	ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ORPHANED = 2,
+	/**
+	 * invalid mode
+	 */
+	ZXDG_TOPLEVEL_DECORATION_V1_ERROR_INVALID_MODE = 3,
 };
 #endif /* ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ENUM */
 
@@ -244,13 +248,12 @@ enum zxdg_toplevel_decoration_v1_mode {
  */
 struct zxdg_toplevel_decoration_v1_listener {
 	/**
-	 * suggest a surface change
+	 * notify a decoration mode change
 	 *
-	 * The configure event asks the client to change its decoration
-	 * mode. The configured state should not be applied immediately.
-	 * Clients must send an ack_configure in response to this event.
-	 * See xdg_surface.configure and xdg_surface.ack_configure for
-	 * details.
+	 * The configure event configures the effective decoration mode.
+	 * The configured state should not be applied immediately. Clients
+	 * must send an ack_configure in response to this event. See
+	 * xdg_surface.configure and xdg_surface.ack_configure for details.
 	 *
 	 * A configure event can be sent at any time. The specified mode
 	 * must be obeyed by the client.
@@ -334,7 +337,7 @@ zxdg_toplevel_decoration_v1_destroy(struct zxdg_toplevel_decoration_v1 *zxdg_top
  * that the client prefers the provided decoration mode.
  *
  * After requesting a decoration mode, the compositor will respond by
- * emitting a xdg_surface.configure event. The client should then update
+ * emitting an xdg_surface.configure event. The client should then update
  * its content, drawing it without decorations if the received mode is
  * server-side decorations. The client must also acknowledge the configure
  * when committing the new content (see xdg_surface.ack_configure).
@@ -343,11 +346,14 @@ zxdg_toplevel_decoration_v1_destroy(struct zxdg_toplevel_decoration_v1 *zxdg_top
  * different mode instead.
  *
  * Clients whose decoration mode depend on the xdg_toplevel state may send
- * a set_mode request in response to a xdg_surface.configure event and wait
+ * a set_mode request in response to an xdg_surface.configure event and wait
  * for the next xdg_surface.configure event to prevent unwanted state.
  * Such clients are responsible for preventing configure loops and must
  * make sure not to send multiple successive set_mode requests with the
  * same decoration mode.
+ *
+ * If an invalid mode is supplied by the client, the invalid_mode protocol
+ * error is raised by the compositor.
  */
 static inline void
 zxdg_toplevel_decoration_v1_set_mode(struct zxdg_toplevel_decoration_v1 *zxdg_toplevel_decoration_v1, uint32_t mode)
