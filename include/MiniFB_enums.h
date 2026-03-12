@@ -6,7 +6,11 @@
 #include "MiniFB_keylist.h"
 #include "MiniFB_macros.h"
 
+//-------------------------------------
 // Enums
+//-------------------------------------
+
+//-------------------------------------
 typedef enum {
     MFB_STATE_OK             =  0,
     MFB_STATE_EXIT           = -1,
@@ -21,6 +25,7 @@ typedef enum {
     STATE_INTERNAL_ERROR __MFB_ENUM_DEPRECATED("STATE_INTERNAL_ERROR is deprecated, use MFB_STATE_INTERNAL_ERROR") = MFB_STATE_INTERNAL_ERROR,
 } mfb_update_state;
 
+//-------------------------------------
 typedef enum {
     MFB_MOUSE_BTN_0, // No mouse button
     MFB_MOUSE_BTN_1,
@@ -53,6 +58,7 @@ typedef enum {
 #define MOUSE_RIGHT      __mfb_mouse_right_deprecated
 #define MOUSE_MIDDLE     __mfb_mouse_middle_deprecated
 
+//-------------------------------------
 typedef enum {
     #define KEY_VALUE(NAME, VALUE, _) MFB_##NAME = VALUE,
 KEY_LIST(KEY_VALUE)
@@ -68,6 +74,7 @@ KEY_LIST(KEY_VALUE)
 #define MFB_KB_KEY_LAST  MFB_KB_KEY_MENU
 #define KB_KEY_LAST      __mfb_kb_key_last_deprecated
 
+//-------------------------------------
 typedef enum {
     MFB_KB_MOD_SHIFT        = 0x0001,
     MFB_KB_MOD_CONTROL      = 0x0002,
@@ -84,6 +91,7 @@ typedef enum {
     KB_MOD_NUM_LOCK  __MFB_ENUM_DEPRECATED("KB_MOD_NUM_LOCK is deprecated, use MFB_KB_MOD_NUM_LOCK")   = MFB_KB_MOD_NUM_LOCK
 } mfb_key_mod;
 
+//-------------------------------------
 typedef enum {
     MFB_WF_RESIZABLE          = 0x01,
     MFB_WF_FULLSCREEN         = 0x02,
@@ -98,6 +106,7 @@ typedef enum {
     WF_ALWAYS_ON_TOP      __MFB_ENUM_DEPRECATED("WF_ALWAYS_ON_TOP is deprecated, use MFB_WF_ALWAYS_ON_TOP")           = MFB_WF_ALWAYS_ON_TOP,
 } mfb_window_flags;
 
+//-------------------------------------
 typedef enum {
     MFB_LOG_TRACE = 0,
     MFB_LOG_DEBUG,

@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Project root is two levels up from tools/wayland/
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-PROTOCOL_DIR="/usr/share/wayland-protocols"
+PROTOCOL_DIR="wayland-protocols-1.47"
 OUTPUT_DIR="$PROJECT_ROOT/src/wayland/generated"
 
 # Verify we're in the correct project (check for CMakeLists.txt or other project files)
