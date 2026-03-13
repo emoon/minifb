@@ -427,6 +427,9 @@ struct mfb_window *mfb_open_ex(const char *title, unsigned width, unsigned heigh
         return NULL;
     }
     window_data->specific = specific;
+    window_data->buffer_width  = width;
+    window_data->buffer_height = height;
+    window_data->buffer_stride = width * 4;
 
     // setup key map if not initialized yet
     if (!g_initialized) {
@@ -516,9 +519,15 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * windowData, void *bu
 });
 
 mfb_update_state mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
+    SWindowData *window_data = (SWindowData *)window;
+    if (window_data != NULL) {
+        window_data->buffer_width  = width;
+        window_data->buffer_height = height;
+        window_data->buffer_stride = width * 4;
+    }
     mfb_update_state state = mfb_update_js(window, buffer, width, height);
     if (state != STATE_OK) return state;
-    state = mfb_update_events_js((SWindowData *)window);
+    state = mfb_update_events_js(window_data);
     return state;
 }
 
