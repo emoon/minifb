@@ -461,6 +461,7 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         window_data: window_data,
         wants_full_screen: wants_full_screen !== 0,
         activeTouchId: null,
+        globalMouseupTarget: null,
         is_active: true,
         handlers: {},
         events: [
@@ -633,7 +634,10 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
             Module._window_data_set_mod_keys(window_data, mod);
             enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: false});
     };
-    document.body.addEventListener("mouseup", w.handlers.bodyMouseup, false);
+    w.globalMouseupTarget = document.body || document.documentElement || document;
+    if (w.globalMouseupTarget) {
+        w.globalMouseupTarget.addEventListener("mouseup", w.handlers.bodyMouseup, false);
+    }
 
     w.handlers.wheel = (event) => {
             event.preventDefault();
@@ -713,7 +717,9 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
         w.canvas.removeEventListener("mousedown", w.handlers.mousedown, false);
         w.canvas.removeEventListener("mousemove", w.handlers.mousemove, false);
         w.canvas.removeEventListener("mouseup", w.handlers.mouseup, false);
-        document.body.removeEventListener("mouseup", w.handlers.bodyMouseup, false);
+        if (w.globalMouseupTarget) {
+            w.globalMouseupTarget.removeEventListener("mouseup", w.handlers.bodyMouseup, false);
+        }
         w.canvas.removeEventListener("wheel", w.handlers.wheel, false);
         w.canvas.removeEventListener("touchstart", w.handlers.touchstart, false);
         w.canvas.removeEventListener("touchmove", w.handlers.touchmove, false);
