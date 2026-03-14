@@ -994,10 +994,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (!calculate_buffer_layout(width, height, NULL, NULL)) {
+    uint32_t buffer_stride;
+    if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
+
+    window_data->draw_buffer   = buffer;
+    window_data->buffer_width  = width;
+    window_data->buffer_height = height;
+    window_data->buffer_stride = buffer_stride;
 
     mfb_update_state state = mfb_update_js(window, buffer, width, height);
     if (state == MFB_STATE_EXIT) {
