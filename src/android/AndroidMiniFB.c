@@ -44,12 +44,16 @@ mfb_log_level_to_android_priority(mfb_log_level level) {
 
 //-------------------------------------
 static void
-android_mfb_log_sink(mfb_log_level level, const char *message) {
+android_mfb_log_sink(const mfb_log_info *info, const char *tag, const char *message) {
     if (message == NULL) {
         return;
     }
 
-    __android_log_write(mfb_log_level_to_android_priority(level), LOG_TAG, message);
+    if (tag == NULL) {
+        tag = LOG_TAG;
+    }
+
+    __android_log_write(mfb_log_level_to_android_priority(info->level), tag, message);
 }
 
 //-------------------------------------

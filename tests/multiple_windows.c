@@ -7,6 +7,7 @@
 //-------------------------------------
 #define kPI             3.14159265358979323846f
 #define kUnused(var)    (void) var;
+#define TEST_TAG        "multiple_windows"
 
 //-------------------------------------
 #define WIDTH_A      800
@@ -25,7 +26,7 @@ active(struct mfb_window *window, bool is_active) {
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > active: %d\n", window_title, is_active);
+    MFB_LOGI(TEST_TAG, "%s > active: %d", window_title, is_active);
 }
 
 //-------------------------------------
@@ -36,7 +37,7 @@ resize(struct mfb_window *window, int width, int height) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
-    fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
+    MFB_LOGI(TEST_TAG, "%s > resize: %d, %d", window_title, width, height);
 }
 
 //-------------------------------------
@@ -46,7 +47,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
+    MFB_LOGI(TEST_TAG, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]", window_title, mfb_get_key_name(key), is_pressed, mod);
     if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }
@@ -59,7 +60,7 @@ char_input(struct mfb_window *window, unsigned int char_code) {
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > char_code: %d\n", window_title, char_code);
+    MFB_LOGI(TEST_TAG, "%s > char_code: %d", window_title, char_code);
 }
 
 //-------------------------------------
@@ -69,7 +70,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]\n", window_title, button, is_pressed, mod);
+    MFB_LOGI(TEST_TAG, "%s > mouse_btn: button: %d (pressed: %d) [key_mod: %x]", window_title, button, is_pressed, mod);
 }
 
 //-------------------------------------
@@ -82,7 +83,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
     // if (window) {
     //     window_t(const char *) itle = mfb_get_user_data(window);
     // }
-    //fprintf(stdout, "%s > mouse_move: %d, %d\n", window_title, x, y);
+    //MFB_LOGI(TEST_TAG, "%s > mouse_move: %d, %d", window_title, x, y);
 }
 
 void
@@ -91,7 +92,7 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, delta_x, delta_y, mod);
+    MFB_LOGI(TEST_TAG, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]", window_title, delta_x, delta_y, mod);
 }
 
 //-------------------------------------

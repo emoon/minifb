@@ -4,14 +4,10 @@
 #include <stdlib.h>
 #include <math.h>
 
+//-------------------------------------
 #define  LOG_TAG    "Noise"
-#define  LOGV(...)  __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
-#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,   LOG_TAG, __VA_ARGS__)
-#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,    LOG_TAG, __VA_ARGS__)
-#define  LOGW(...)  __android_log_print(ANDROID_LOG_WARN,    LOG_TAG, __VA_ARGS__)
-#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,   LOG_TAG, __VA_ARGS__)
-#define  LOGF(...)  __android_log_print(ANDROID_LOG_FATAL,   LOG_TAG, __VA_ARGS__)
 
+//-------------------------------------
 #define kUnused(var)        (void) var;
 
 #define kTouchIdMask    0xf0000000
@@ -21,39 +17,49 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+//-------------------------------------
 typedef struct {
     bool    enabled;
     int     x, y;
 } Pos;
 
+//-------------------------------------
 static uint32_t  g_width  = 200;
 static uint32_t  g_height = 100;
 static uint32_t *g_buffer = NULL;
-static Pos      g_positions[16] = {};
+static Pos       g_positions[16] = {};
+static uint32_t  g_frame_count = 0;
+static bool      g_is_active = false;
 
+//-------------------------------------
 void
 active(struct mfb_window *window, bool is_active) {
-    LOGI("active: %d", is_active);
+    MFB_LOGI(LOG_TAG, "active: %d", is_active);
+    g_is_active = is_active;
 }
 
+//-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    LOGI("resize: %d, %d", width, height);
+    MFB_LOGI(LOG_TAG, "resize: %d, %d", width, height);
     g_width  = (width  >> 1);
     g_height = (height >> 1);
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
 }
 
+//-------------------------------------
 void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    LOGI("keyboard:");
+    MFB_LOGI(LOG_TAG, "keyboard:");
 }
 
+//-------------------------------------
 void
 char_input(struct mfb_window *window, unsigned int char_code) {
-    LOGI("char_input:");
+    MFB_LOGI(LOG_TAG, "char_input:");
 }
 
+//-------------------------------------
 void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     int x = (mfb_get_mouse_x(window) & kTouchPosMask) >> 1;
@@ -61,9 +67,10 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
+    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
 }
 
+//-------------------------------------
 void
 mouse_move(struct mfb_window *window, int x, int y) {
     int id = (x & kTouchIdMask) >> kTouchIdShift;
@@ -72,12 +79,13 @@ mouse_move(struct mfb_window *window, int x, int y) {
     g_positions[id].enabled = true;
     g_positions[id].x = x;
     g_positions[id].y = y;
-    LOGI("mouse_move: %d, %d [%d]", x, y, id);
+    MFB_LOGI(LOG_TAG, "mouse_move: %d, %d [%d]", x, y, id);
 }
 
+//-------------------------------------
 void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
-    LOGI("mouse_scroll:");
+    MFB_LOGI(LOG_TAG, "mouse_scroll:");
 }
 
 // I'm not sure that we can use this function name but it works
@@ -86,7 +94,7 @@ int
 main(int argc, char *argv[]) {
     kUnused(argc);
     kUnused(argv);
-    uint32_t    i, noise, carry, seed = 0xbeef;
+    uint32_t    i, x, y, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open("Ignored", g_width, g_height);
     if (window == NULL)
@@ -104,6 +112,11 @@ main(int argc, char *argv[]) {
 
     mfb_update_state state;
     do {
+        if (!g_is_active) {
+            mfb_wait_sync(window);
+            continue;
+        }
+
         bool is_active   = mfb_is_window_active(window);
         unsigned width  = mfb_get_window_width(window);
         unsigned height = mfb_get_window_height(window);
@@ -114,21 +127,24 @@ main(int argc, char *argv[]) {
         const uint8_t *buttons = mfb_get_mouse_button_buffer(window);
         const uint8_t *keys = mfb_get_key_buffer(window);   // not working
 
-        for (i = 0; i < g_width * g_height; ++i) {
-            noise = seed;
-            noise >>= 3;
-            noise ^= seed;
-            carry = noise & 1;
-            noise >>= 1;
-            seed >>= 1;
-            seed |= (carry << 30);
-            noise &= 0xFF;
+        i = 0;
+        for (y = 0; y < g_height; ++y) {
+            for (x = 0; x < g_width; ++x) {
+                noise = seed;
+                noise >>= 3;
+                noise ^= seed;
+                carry = noise & 1;
+                noise >>= 1;
+                seed >>= 1;
+                seed |= (carry << 30);
+                noise &= 0xFF;
 
-            // Comment out to test appropriate colour channel
-            //g_buffer[i] = MFB_RGB(noise, 0, 0);     // Test red channel
-            //g_buffer[i] = MFB_RGB(0, noise, 0);     // Test green channel
-            //g_buffer[i] = MFB_RGB(0, 0, noise);     // Test blue channel
-            g_buffer[i] = MFB_RGB(noise, noise, noise);
+                // Comment out to test appropriate colour channel
+                //g_buffer[i] = MFB_RGB(noise, 0, 0);     // Test red channel
+                //g_buffer[i] = MFB_RGB(0, noise, 0);     // Test green channel
+                //g_buffer[i] = MFB_RGB(0, 0, noise);     // Test blue channel
+                g_buffer[i] = MFB_RGB(noise, noise, noise);
+            }
         }
 
         for (int p = 0; p < 16; ++p) {
@@ -151,4 +167,7 @@ main(int argc, char *argv[]) {
             window = NULL;
             break;
         }
-    } while (mfb_wait_sync(window));}
+
+        g_frame_count++;
+    } while (mfb_wait_sync(window));
+}

@@ -6,6 +6,7 @@
 
 //-------------------------------------
 #define kUnused(var)    (void) var
+#define TEST_TAG        "input_events"
 
 //-------------------------------------
 static uint32_t g_width       = 800;
@@ -42,10 +43,10 @@ print_getters(struct mfb_window *window) {
     win_h = mfb_get_window_height(window);
     mfb_get_window_size(window, &win_sw, &win_sh);
     if (win_w != win_sw) {
-        fprintf(stderr, "Width does not match: %u != %u\n", win_w, win_sw);
+        MFB_LOG(MFB_LOG_ERROR, TEST_TAG, "Width does not match: %u != %u", win_w, win_sw);
     }
     if (win_h != win_sh) {
-        fprintf(stderr, "Height does not match: %u != %u\n", win_h, win_sh);
+        MFB_LOG(MFB_LOG_ERROR, TEST_TAG, "Height does not match: %u != %u", win_h, win_sh);
     }
 
     draw_off_x = mfb_get_drawable_offset_x(window);
@@ -63,29 +64,29 @@ print_getters(struct mfb_window *window) {
     mfb_get_monitor_scale(window, &scale_x, &scale_y);
     fps = mfb_get_target_fps();
 
-    fprintf(stdout, "[getters frame=%d]\n", g_frame_count);
-    fprintf(stdout, "  key_name(MFB_KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
-    fprintf(stdout, "  is_window_active: %d\n", is_active);
-    fprintf(stdout, "  target_fps: %u\n", fps);
-    fprintf(stdout, "  monitor_scale: %f, %f\n", scale_x, scale_y);
-    fprintf(stdout, "  window_size: %u x %u\n", win_w, win_h);
-    fprintf(stdout, "  drawable_offsets: %u, %u\n", draw_off_x, draw_off_y);
-    fprintf(stdout, "  drawable_size: %u x %u\n", draw_w, draw_h);
-    fprintf(stdout, "  drawable_bounds: off(%u,%u) size(%u,%u)\n", bounds_off_x, bounds_off_y, bounds_w, bounds_h);
-    fprintf(stdout, "  mouse_pos: %d, %d\n", mouse_x, mouse_y);
-    fprintf(stdout, "  mouse_scroll: %f, %f\n", scroll_x, scroll_y);
+    MFB_LOGI(TEST_TAG, "[getters frame=%d]", g_frame_count);
+    MFB_LOGI(TEST_TAG, "  key_name(MFB_KB_KEY_ESCAPE): %s", key_name ? key_name : "(null)");
+    MFB_LOGI(TEST_TAG, "  is_window_active: %d", is_active);
+    MFB_LOGI(TEST_TAG, "  target_fps: %u", fps);
+    MFB_LOGI(TEST_TAG, "  monitor_scale: %f, %f", scale_x, scale_y);
+    MFB_LOGI(TEST_TAG, "  window_size: %u x %u", win_w, win_h);
+    MFB_LOGI(TEST_TAG, "  drawable_offsets: %u, %u", draw_off_x, draw_off_y);
+    MFB_LOGI(TEST_TAG, "  drawable_size: %u x %u", draw_w, draw_h);
+    MFB_LOGI(TEST_TAG, "  drawable_bounds: off(%u,%u) size(%u,%u)", bounds_off_x, bounds_off_y, bounds_w, bounds_h);
+    MFB_LOGI(TEST_TAG, "  mouse_pos: %d, %d", mouse_x, mouse_y);
+    MFB_LOGI(TEST_TAG, "  mouse_scroll: %f, %f", scroll_x, scroll_y);
 
     if (mouse_buttons) {
-        fprintf(stdout, "  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u\n",
+        MFB_LOGI(TEST_TAG, "  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u",
                 mouse_buttons[0], mouse_buttons[1], mouse_buttons[2], mouse_buttons[3],
                 mouse_buttons[4], mouse_buttons[5], mouse_buttons[6], mouse_buttons[7]);
     }
     else {
-        fprintf(stdout, "  mouse_buttons: (null)\n");
+        MFB_LOGI(TEST_TAG, "  mouse_buttons: (null)");
     }
 
     if (key_buffer) {
-        fprintf(stdout, "  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]\n",
+        MFB_LOGI(TEST_TAG, "  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]",
                 key_buffer[MFB_KB_KEY_ESCAPE],
                 key_buffer[MFB_KB_KEY_SPACE],
                 key_buffer[MFB_KB_KEY_LEFT],
@@ -94,7 +95,7 @@ print_getters(struct mfb_window *window) {
                 key_buffer[MFB_KB_KEY_DOWN]);
     }
     else {
-        fprintf(stdout, "  key_buffer: (null)\n");
+        MFB_LOGI(TEST_TAG, "  key_buffer: (null)");
     }
 }
 
@@ -105,7 +106,7 @@ active(struct mfb_window *window, bool is_active) {
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > active: %d\n", window_title, is_active);
+    MFB_LOGI(TEST_TAG, "%s > active: %d", window_title, is_active);
     g_active = is_active;
 }
 
@@ -117,7 +118,7 @@ resize(struct mfb_window *window, int width, int height) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
-    fprintf(stdout, "%s > resize: %d, %d\n", window_title, width, height);
+    MFB_LOGI(TEST_TAG, "%s > resize: %d, %d", window_title, width, height);
 
     // Convert phisical pixels to logical pixels
     g_to_logic_width  = 1.0f / width;
@@ -131,7 +132,7 @@ close(struct mfb_window *window) {
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > close\n", window_title);
+    MFB_LOGI(TEST_TAG, "%s > close", window_title);
     return true;    // true => confirm close
                     // false => don't close
 }
@@ -143,7 +144,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]\n", window_title, mfb_get_key_name(key), is_pressed, mod);
+    MFB_LOGI(TEST_TAG, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]", window_title, mfb_get_key_name(key), is_pressed, mod);
 
     if (key == MFB_KB_KEY_SPACE) {
         print_getters(window);
@@ -169,7 +170,7 @@ char_input(struct mfb_window *window, unsigned int char_code) {
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > char_code: %d\n", window_title, char_code);
+    MFB_LOGI(TEST_TAG, "%s > char_code: %d", window_title, char_code);
 }
 
 //-------------------------------------
@@ -185,7 +186,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     y = mfb_get_mouse_y(window);
     xl = x * (g_width  * g_to_logic_width);
     yl = y * (g_height * g_to_logic_height);
-    fprintf(stdout, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d]) [key_mod: %x]\n",
+    MFB_LOGI(TEST_TAG, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d]) [key_mod: %x]",
             window_title,
             button,
             is_pressed,
@@ -200,7 +201,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
-    //fprintf(stdout, "mouse_move: %d, %d\n", x, y);
+    //MFB_LOGI(TEST_TAG, "mouse_move: %d, %d", x, y);
 }
 
 //-------------------------------------
@@ -210,7 +211,7 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
-    fprintf(stdout, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]\n", window_title, delta_x, delta_y, mod);
+    MFB_LOGI(TEST_TAG, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]", window_title, delta_x, delta_y, mod);
 }
 
 //-------------------------------------
@@ -220,7 +221,7 @@ main() {
 
     g_buffer = (uint32_t *) malloc(g_width * g_height * sizeof(uint32_t));
     if (!g_buffer) {
-        fprintf(stderr, "malloc failed (%u x %u)\n", g_width, g_height);
+        MFB_LOG(MFB_LOG_ERROR, TEST_TAG, "malloc failed (%u x %u)", g_width, g_height);
         return -1;
     }
 

@@ -6,12 +6,6 @@
 
 //-------------------------------------
 #define  LOG_TAG    "Noise"
-#define  LOGV(...)  __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
-#define  LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,   LOG_TAG, __VA_ARGS__)
-#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,    LOG_TAG, __VA_ARGS__)
-#define  LOGW(...)  __android_log_print(ANDROID_LOG_WARN,    LOG_TAG, __VA_ARGS__)
-#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,   LOG_TAG, __VA_ARGS__)
-#define  LOGF(...)  __android_log_print(ANDROID_LOG_FATAL,   LOG_TAG, __VA_ARGS__)
 
 //-------------------------------------
 #define kUnused(var)        (void) var;
@@ -62,10 +56,10 @@ print_getters(struct mfb_window *window) {
     win_h = mfb_get_window_height(window);
     mfb_get_window_size(window, &win_sw, &win_sh);
     if (win_w != win_sw) {
-        LOGE("Width does not match: %u != %u\n", win_w, win_sw);
+        MFB_LOGE(LOG_TAG, "Width does not match: %u != %u\n", win_w, win_sw);
     }
     if (win_h != win_sh) {
-        LOGE("Height does not match: %u != %u\n", win_h, win_sh);
+        MFB_LOGE(LOG_TAG, "Height does not match: %u != %u\n", win_h, win_sh);
     }
 
     draw_offset_x = mfb_get_drawable_offset_x(window);
@@ -89,31 +83,31 @@ print_getters(struct mfb_window *window) {
     mfb_get_display_cutout_insets(window, &cutout_left, &cutout_top, &cutout_right, &cutout_bottom);
     mfb_get_display_safe_insets(window, &safe_left, &safe_top, &safe_right, &safe_bottom);
 
-    LOGI("[getters frame=%d]\n", g_frame_count);
-    LOGI("  key_name(MFB_KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
-    LOGI("  is_window_active: %d\n", is_active);
-    LOGI("  target_fps: %u\n", fps);
-    LOGI("  monitor_scale: %f, %f\n", scale_x, scale_y);
-    LOGI("  window_size: %u x %u\n", win_w, win_h);
-    LOGI("  drawable_offsets: %u, %u\n", draw_offset_x, draw_offset_y);
-    LOGI("  drawable_size: %u x %u\n", draw_w, draw_h);
-    LOGI("  drawable_bounds: offset (%u, %u) size (%u, %u)\n", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
-    LOGI("  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
-    LOGI("  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
-    LOGI("  mouse_pos: %d, %d\n", mouse_x, mouse_y);
-    LOGI("  mouse_scroll: %f, %f\n", scroll_x, scroll_y);
+    MFB_LOGI(LOG_TAG, "[getters frame=%d]\n", g_frame_count);
+    MFB_LOGI(LOG_TAG, "  key_name(MFB_KB_KEY_ESCAPE): %s\n", key_name ? key_name : "(null)");
+    MFB_LOGI(LOG_TAG, "  is_window_active: %d\n", is_active);
+    MFB_LOGI(LOG_TAG, "  target_fps: %u\n", fps);
+    MFB_LOGI(LOG_TAG, "  monitor_scale: %f, %f\n", scale_x, scale_y);
+    MFB_LOGI(LOG_TAG, "  window_size: %u x %u\n", win_w, win_h);
+    MFB_LOGI(LOG_TAG, "  drawable_offsets: %u, %u\n", draw_offset_x, draw_offset_y);
+    MFB_LOGI(LOG_TAG, "  drawable_size: %u x %u\n", draw_w, draw_h);
+    MFB_LOGI(LOG_TAG, "  drawable_bounds: offset (%u, %u) size (%u, %u)\n", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
+    MFB_LOGI(LOG_TAG, "  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
+    MFB_LOGI(LOG_TAG, "  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
+    MFB_LOGI(LOG_TAG, "  mouse_pos: %d, %d\n", mouse_x, mouse_y);
+    MFB_LOGI(LOG_TAG, "  mouse_scroll: %f, %f\n", scroll_x, scroll_y);
 
     if (mouse_buttons) {
-        LOGI("  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u\n",
+        MFB_LOGI(LOG_TAG, "  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u\n",
                 mouse_buttons[0], mouse_buttons[1], mouse_buttons[2], mouse_buttons[3],
                 mouse_buttons[4], mouse_buttons[5], mouse_buttons[6], mouse_buttons[7]);
     }
     else {
-        LOGI("  mouse_buttons: (null)\n");
+        MFB_LOGI(LOG_TAG, "  mouse_buttons: (null)\n");
     }
 
     if (key_buffer) {
-        LOGI("  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]\n",
+        MFB_LOGI(LOG_TAG, "  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]\n",
                 key_buffer[MFB_KB_KEY_ESCAPE],
                 key_buffer[MFB_KB_KEY_SPACE],
                 key_buffer[MFB_KB_KEY_LEFT],
@@ -122,21 +116,21 @@ print_getters(struct mfb_window *window) {
                 key_buffer[MFB_KB_KEY_DOWN]);
     }
     else {
-        LOGI("  key_buffer: (null)\n");
+        MFB_LOGI(LOG_TAG, "  key_buffer: (null)\n");
     }
 }
 
 //-------------------------------------
 void
 active(struct mfb_window *window, bool is_active) {
-    LOGI("active: %d", is_active);
+    MFB_LOGI(LOG_TAG, "active: %d", is_active);
     g_is_active = is_active;
 }
 
 //-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    LOGI("resize: %d, %d", width, height);
+    MFB_LOGI(LOG_TAG, "resize: %d, %d", width, height);
     g_width  = (width  >> 1);
     g_height = (height >> 1);
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
@@ -145,13 +139,13 @@ resize(struct mfb_window *window, int width, int height) {
 //-------------------------------------
 void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    LOGI("keyboard:");
+    MFB_LOGI(LOG_TAG, "keyboard:");
 }
 
 //-------------------------------------
 void
 char_input(struct mfb_window *window, unsigned int char_code) {
-    LOGI("char_input:");
+    MFB_LOGI(LOG_TAG, "char_input:");
 }
 
 //-------------------------------------
@@ -162,7 +156,7 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    LOGI("mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
+    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
 }
 
 //-------------------------------------
@@ -174,13 +168,13 @@ mouse_move(struct mfb_window *window, int x, int y) {
     g_positions[id].enabled = true;
     g_positions[id].x = x;
     g_positions[id].y = y;
-    LOGI("mouse_move: %d, %d [%d]", x, y, id);
+    MFB_LOGI(LOG_TAG, "mouse_move: %d, %d [%d]", x, y, id);
 }
 
 //-------------------------------------
 void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
-    LOGI("mouse_scroll:");
+    MFB_LOGI(LOG_TAG, "mouse_scroll:");
 }
 
 // I'm not sure that we can use this function name but it works

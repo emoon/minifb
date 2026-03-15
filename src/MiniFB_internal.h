@@ -56,7 +56,15 @@ typedef struct mfb_timer {
 extern "C" {
 #endif
     #undef MFB_LOG
-    #define MFB_LOG(level, ...) mfb_log(&(mfb_log_info){ level, __FILE__, MFB_FUNC_NAME, __LINE__ }, "MiniFB", __VA_ARGS__)
+    #if defined(__cplusplus)
+        #define MFB_LOG(level, ...)                                                      \
+            do {                                                                          \
+                const mfb_log_info mfb_log_info_aux = { level, __FILE__, MFB_FUNC_NAME, __LINE__ }; \
+                mfb_log(&mfb_log_info_aux, "MiniFB", __VA_ARGS__);                      \
+            } while (0)
+    #else
+        #define MFB_LOG(level, ...) mfb_log(&(mfb_log_info){ level, __FILE__, MFB_FUNC_NAME, __LINE__ }, "MiniFB", __VA_ARGS__)
+    #endif
 
     extern short int g_keycodes[MFB_MAX_KEYS];
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);

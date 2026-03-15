@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <MiniFB.h>
 
+#define TEST_TAG        "noise"
+
 //-------------------------------------
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
@@ -11,8 +13,8 @@ static uint32_t *g_buffer = NULL;
 //-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    printf("Resize:\n");
-    printf("- Params: Width: %d, Height: %d\n",
+    MFB_LOGI(TEST_TAG, "Resize:");
+    MFB_LOGI(TEST_TAG, "- Params: Width: %d, Height: %d",
         width,
         height
     );
@@ -20,18 +22,18 @@ resize(struct mfb_window *window, int width, int height) {
     float scale_x = 0, scale_y = 0;
     mfb_get_monitor_scale(window, &scale_x, &scale_y);
 
-    printf("- Scale X: %.2f, Scale Y: %.2f\n",
+    MFB_LOGI(TEST_TAG, "- Scale X: %.2f, Scale Y: %.2f",
         scale_x,
         scale_y
     );
-    printf("- Params Scaled: Width: %d, Height: %d\n",
+    MFB_LOGI(TEST_TAG, "- Params Scaled: Width: %d, Height: %d",
         (uint32_t) (width  * scale_x),
         (uint32_t) (height * scale_y)
     );
 
     uint32_t window_width  = mfb_get_window_width(window);
     uint32_t window_height = mfb_get_window_height(window);
-    printf("- Window: Width: %d, Height: %d\n",
+    MFB_LOGI(TEST_TAG, "- Window: Width: %d, Height: %d",
         window_width,
         window_height
     );
@@ -40,7 +42,7 @@ resize(struct mfb_window *window, int width, int height) {
     uint32_t offset_y    = mfb_get_drawable_offset_y(window);
     uint32_t draw_width  = mfb_get_drawable_width(window);
     uint32_t draw_height = mfb_get_drawable_height(window);
-    printf("- Draw Area: x: %d, y: %d, Width: %d (%d), Height: %d (%d)\n",
+    MFB_LOGI(TEST_TAG, "- Draw Area: x: %d, y: %d, Width: %d (%d), Height: %d (%d)",
         offset_x,
         offset_y,
         draw_width,
@@ -54,7 +56,7 @@ resize(struct mfb_window *window, int width, int height) {
         g_height = draw_height;
         g_buffer = realloc(g_buffer, g_width * g_height * 4);
     }
-    printf("----\n");
+    MFB_LOGI(TEST_TAG, "----");
 }
 
 //-------------------------------------

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define TEST_TAG        "timer"
+
 //-------------------------------------
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
@@ -60,7 +62,7 @@ main() {
         time += mfb_timer_delta(timer);
         ++frames;
         if (frames >= 60) {
-            printf("FPS: %.3f\n", (frames / time));
+            MFB_LOGI(TEST_TAG, "FPS: %.3f", (frames / time));
             frames = 0;
             time = 0;
 
