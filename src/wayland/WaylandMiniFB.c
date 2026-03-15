@@ -571,7 +571,7 @@ wl_keyboard_listener keyboard_listener = {
     .leave       = keyboard_leave,
     .key         = keyboard_key,
     .modifiers   = keyboard_modifiers,
-    .repeat_info = NULL,
+    .repeat_info = keyboard_repeat_info,
 };
 
 //-------------------------------------
@@ -790,10 +790,10 @@ wl_pointer_listener pointer_listener = {
     .motion        = pointer_motion,
     .button        = pointer_button,
     .axis          = pointer_axis,
-    .frame         = NULL,
-    .axis_source   = NULL,
-    .axis_stop     = NULL,
-    .axis_discrete = NULL,
+    .frame         = frame,
+    .axis_source   = axis_source,
+    .axis_stop     = axis_stop,
+    .axis_discrete = axis_discrete,
 };
 
 //-------------------------------------
@@ -836,7 +836,7 @@ seat_name(void *data, struct wl_seat *seat, const char *name) {
 static const struct
 wl_seat_listener seat_listener = {
     .capabilities = seat_capabilities,
-    .name         = NULL,
+    .name         = seat_name,
 };
 
 //-------------------------------------
@@ -1128,10 +1128,18 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
 }
 
 //-------------------------------------
+static void
+registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
+    kUnused(data);
+    kUnused(registry);
+    kUnused(name);
+}
+
+//-------------------------------------
 static const struct
 wl_registry_listener registry_listener = {
     .global        = registry_global,
-    .global_remove = NULL,
+    .global_remove = registry_global_remove,
 };
 
 //-------------------------------------
@@ -2056,7 +2064,7 @@ init_keycodes(void) {
     g_keycodes[KEY_F23]        = MFB_KB_KEY_F23;
     g_keycodes[KEY_F24]        = MFB_KB_KEY_F24;
     g_keycodes[KEY_KPSLASH]    = MFB_KB_KEY_KP_DIVIDE;
-    g_keycodes[KEY_KPDOT]      = MFB_KB_KEY_KP_MULTIPLY;
+    g_keycodes[KEY_KPDOT]      = MFB_KB_KEY_KP_DECIMAL;
     g_keycodes[KEY_KPMINUS]    = MFB_KB_KEY_KP_SUBTRACT;
     g_keycodes[KEY_KPPLUS]     = MFB_KB_KEY_KP_ADD;
     g_keycodes[KEY_KP0]        = MFB_KB_KEY_KP_0;

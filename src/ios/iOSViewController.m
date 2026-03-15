@@ -111,6 +111,11 @@
     // Probably the window was created automatically by an storyboard or similar
     if(window_data == 0x0) {
         mfb_log(MFB_LOG_ERROR, "iOSViewController: window_data is null in loadView!");
+        [self setView:view];
+#if !__has_feature(objc_arc)
+        [view release];
+#endif
+        return;
     }
     view->window_data = window_data;
     view.userInteractionEnabled = true;

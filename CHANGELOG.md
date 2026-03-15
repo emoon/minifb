@@ -2,6 +2,55 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.10.0]
+
+### Added
+
+- **Logging API**: `mfb_set_logger`, `mfb_set_log_level`, and `mfb_log_level` enum for runtime log control. All backends now use `mfb_log` instead of raw `fprintf`/`NSLog`.
+- **Display inset APIs**: `mfb_get_display_cutout_insets` and `mfb_get_display_safe_insets` for mobile-safe layouts (Android API 28+, iOS, desktop stubs return zeros).
+- **Touch pointer decoding**: `mfb_split_pos_id` to decode packed pointer id/position values from mobile mouse getters.
+- **Monitor scale**: implemented `mfb_get_monitor_scale` for Web (`devicePixelRatio`) and Android.
+- **Cursor control**: implemented `mfb_show_cursor` for Web.
+- **X11 scale detection**: layered fallbacks (XSettings, Xresources, XRandR, physical DPI).
+- **DOS viewport**: basic viewport support for the MS-DOS backend.
+- **Android `mfb_update_events`**: event-only pump without rendering, matching other backends.
+- **Android example**: new test project using Android Studio Narwhal (native2026).
+- **New headers**: `MiniFB_macros.h` (deprecation/pixel macros), `MiniFB_types.h` (callback typedefs), `WindowData_Web.h`.
+- **Internal helpers**: `calculate_buffer_layout` (overflow-safe buffer validation) and `mfb_validate_viewport` (unified viewport checks), used by all backends.
+
+### Changed
+
+- Standardized public enum naming to `MFB_*` prefixes across states, keys, modifiers, mouse buttons, and window flags.
+- Unified `mfb_open_ex` behavior across backends: consistent flag handling, `NULL`/empty title defaults to `"minifb"`, mutually-exclusive fullscreen flags logged.
+- Unified `mfb_set_viewport` to use pixel coordinates on all backends.
+- Unified `mfb_get_monitor_scale` to return `1.0` when `window == NULL` on all backends.
+- Unified mouse wheel reset (`mouse_wheel_x/y = 0`) on every update across all backends.
+- Web backend: auto-creates missing canvas element; pumps events in `mfb_wait_sync`.
+- Moved `accumulated_error_ticks` into the timer struct (was static).
+- Replaced deprecated Android API `ALooper_pollAll` with `ALooper_pollOnce`.
+- Callback parameter names unified (`is_active`, `is_pressed`, `delta_x`, `delta_y`).
+- Reorganized Android tests into `native2021`/`native2026` folders.
+- Moved DOS tools to `tools/dos/`, Wayland protocol generator to `tools/wayland/`.
+- Updated DJGPP GCC toolchain to 12.2.0.
+- Normalized line endings with `.gitattributes`.
+
+### Deprecated
+
+- All non-prefixed enum constants (`STATE_*`, `KB_*`, `MOUSE_*`, `WF_*`) in favor of `MFB_*` equivalents. Old names remain as deprecated aliases with compiler warnings.
+
+### Fixed
+
+- Fixed `MFB_ARGB` macro on Android little-endian (had 3 parameters instead of 4).
+- Fixed Web `mfb_update_ex` not updating `buffer_width`/`buffer_height`/`buffer_stride`.
+- Fixed integer overflow potential in buffer size calculations across all backends.
+- Fixed iOS: Metal safety, content scale, touch coordinates, window lookup, and active/close event management.
+- Fixed Android: API 32-34 display cutout handling; surface transition and rotation edge cases.
+- Fixed macOS: improved robustness and replaced `NSLog` with `mfb_log`.
+- Fixed Web: initialization/teardown robustness when `document.body` is not yet available.
+- Fixed Wayland: dynamic resize and resource reallocation paths.
+- Fixed MS-DOS: multiple rendering and input handling issues.
+- Fixed multiple lifecycle and event-loop edge cases across all backends.
+
 ## [0.9.3]
 
 ### Changed

@@ -357,16 +357,19 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 int          is_pressed = 0;
 
                 switch(message) {
+                    case WM_LBUTTONDBLCLK:
                     case WM_LBUTTONDOWN:
                         is_pressed = 1;
                     case WM_LBUTTONUP:
                         button = MFB_MOUSE_BTN_1;
                         break;
+                    case WM_RBUTTONDBLCLK:
                     case WM_RBUTTONDOWN:
                         is_pressed = 1;
                     case WM_RBUTTONUP:
                         button = MFB_MOUSE_BTN_2;
                         break;
+                    case WM_MBUTTONDBLCLK:
                     case WM_MBUTTONDOWN:
                         is_pressed = 1;
                     case WM_MBUTTONUP:
@@ -608,8 +611,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             rect.left = 0;
         }
         if (rect.bottom > (LONG) height) {
-            height -= (rect.bottom - height);
-            rect.bottom += (rect.bottom - height);
+            LONG delta = rect.bottom - (LONG) height;
+            height -= delta;
+            rect.bottom -= delta;
             rect.top = 0;
         }
     }

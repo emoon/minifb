@@ -1096,9 +1096,15 @@ EM_JS(double, mfb_device_pixel_ratio_js, (), {
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    kUnused(window);
-    float scale = (float) mfb_device_pixel_ratio_js();
-    if (scale <= 0.0f) scale = 1.0f;
+    float scale = 1.0f;
+
+    if (window != NULL) {
+        scale = (float) mfb_device_pixel_ratio_js();
+    }
+
+    if (scale <= 0.0f) {
+        scale = 1.0f;
+    }
 
     if (scale_x) {
         *scale_x = scale;

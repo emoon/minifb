@@ -33,6 +33,9 @@ template <class T>
 void mfb_set_resize_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, int, int));
 
 template <class T>
+void mfb_set_close_callback(struct mfb_window *window, T *obj, bool (T::*method)(struct mfb_window *));
+
+template <class T>
 void mfb_set_keyboard_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_key, mfb_key_mod, bool));
 
 template <class T>
@@ -69,8 +72,6 @@ class mfb_stub {
     friend void mfb_set_resize_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, int, int));
     template <class T>
     friend void mfb_set_close_callback(struct mfb_window *window, T *obj, bool (T::*method)(struct mfb_window *));
-    template <class T>
-    friend void mfb_set_mouse_button_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_mouse_button, mfb_key_mod, bool));
     template <class T>
     friend void mfb_set_keyboard_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_key, mfb_key_mod, bool));
     template <class T>

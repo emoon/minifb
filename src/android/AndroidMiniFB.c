@@ -968,28 +968,71 @@ static jobject
 jni_get_root_window_insets(JNIEnv *env, jobject activity_obj) {
     // activity.getWindow()
     jclass  activity_class = (*env)->GetObjectClass(env, activity_obj);
-    if (!activity_class) return NULL;
+    if (!activity_class) {
+        return NULL;
+    }
+
     jmethodID get_window = (*env)->GetMethodID(env, activity_class, "getWindow", "()Landroid/view/Window;");
-    if (!get_window) { jni_clear_exception(env); return NULL; }
+    (*env)->DeleteLocalRef(env, activity_class);
+    if (!get_window) {
+        jni_clear_exception(env);
+        return NULL;
+    }
+
     jobject window_obj = (*env)->CallObjectMethod(env, activity_obj, get_window);
-    if (!window_obj || (*env)->ExceptionCheck(env)) { jni_clear_exception(env); return NULL; }
+    if (!window_obj || (*env)->ExceptionCheck(env)) {
+        jni_clear_exception(env);
+        if (window_obj) (*env)->DeleteLocalRef(env, window_obj);
+        return NULL;
+    }
 
     // window.getDecorView()
     jclass  window_class = (*env)->GetObjectClass(env, window_obj);
-    if (!window_class) return NULL;
+    if (!window_class) {
+        (*env)->DeleteLocalRef(env, window_obj);
+        return NULL;
+    }
+
     jmethodID get_decor = (*env)->GetMethodID(env, window_class, "getDecorView", "()Landroid/view/View;");
-    if (!get_decor) { jni_clear_exception(env); return NULL; }
+    (*env)->DeleteLocalRef(env, window_class);
+    if (!get_decor) {
+        jni_clear_exception(env);
+        (*env)->DeleteLocalRef(env, window_obj);
+        return NULL;
+    }
+
     jobject decor_view = (*env)->CallObjectMethod(env, window_obj, get_decor);
-    if (!decor_view || (*env)->ExceptionCheck(env)) { jni_clear_exception(env); return NULL; }
+    (*env)->DeleteLocalRef(env, window_obj);
+    if (!decor_view || (*env)->ExceptionCheck(env)) {
+        jni_clear_exception(env);
+        if (decor_view) (*env)->DeleteLocalRef(env, decor_view);
+        return NULL;
+    }
 
     // decorView.getRootWindowInsets()
     jclass  view_class = (*env)->GetObjectClass(env, decor_view);
-    if (!view_class) return NULL;
+    if (!view_class) {
+        (*env)->DeleteLocalRef(env, decor_view);
+        return NULL;
+    }
+
     jmethodID get_insets = (*env)->GetMethodID(env, view_class, "getRootWindowInsets", "()Landroid/view/WindowInsets;");
-    if (!get_insets) { jni_clear_exception(env); return NULL; }
+    (*env)->DeleteLocalRef(env, view_class);
+    if (!get_insets) {
+        jni_clear_exception(env);
+        (*env)->DeleteLocalRef(env, decor_view);
+        return NULL;
+    }
+
     jobject insets = (*env)->CallObjectMethod(env, decor_view, get_insets);
-    if ((*env)->ExceptionCheck(env)) { jni_clear_exception(env); return NULL; }
-    return insets; // may be NULL (view not yet attached)
+    (*env)->DeleteLocalRef(env, decor_view);
+    if ((*env)->ExceptionCheck(env)) {
+        jni_clear_exception(env);
+        if (insets) (*env)->DeleteLocalRef(env, insets);
+        return NULL;
+    }
+
+    return insets; // may be NULL (view not yet attached) -- caller owns this ref
 }
 
 //-------------------------------------
@@ -1023,72 +1066,77 @@ mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, in
     if (right)  *right  = 0;
     if (bottom) *bottom = 0;
 
-    JNIEnv  *env      = NULL;
-    jobject  insets   = NULL;
-    bool     attached = false;
+    JNIEnv  *env            = NULL;
+    jobject  insets          = NULL;
+    bool     attached        = false;
+    bool     result          = false;
+    jclass   insets_class    = NULL;
+    jobject  display_cutout  = NULL;
+    jclass   cutout_class    = NULL;
 
-    if (!insets_setup(window, &env, &insets, &attached)) goto done;
+    if (!insets_setup(window, &env, &insets, &attached))
+        goto cleanup;
 
-    {
-        // windowInsets.getDisplayCutout() - API 28+
-        jclass    insets_class = (*env)->GetObjectClass(env, insets);
-        jmethodID get_cutout   = (*env)->GetMethodID(env, insets_class, "getDisplayCutout", "()Landroid/view/DisplayCutout;");
-        if (!get_cutout) {
-            jni_clear_exception(env);
-            goto done;
-        }
-
-        jobject display_cutout = (*env)->CallObjectMethod(env, insets, get_cutout);
-        if ((*env)->ExceptionCheck(env)) {
-            jni_clear_exception(env);
-            goto done;
-        }
-
-        if (!display_cutout) {
-            // Device has no cutout - return true with zeros (valid answer).
-            if (attached) {
-                SWindowData         *wd  = (SWindowData *) window;
-                SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
-                (*wda->app->activity->vm)->DetachCurrentThread(wda->app->activity->vm);
-            }
-            return true;
-        }
-
-        jclass cutout_class = (*env)->GetObjectClass(env, display_cutout);
-
-#define READ_INSET(field, method_name)                                                      \
-        if (field) {                                                                        \
-            jmethodID m = (*env)->GetMethodID(env, cutout_class, method_name, "()I");       \
-            if (m) { *field = (int) (*env)->CallIntMethod(env, display_cutout, m); }        \
-            jni_clear_exception(env);                                                       \
-        }
-
-        READ_INSET(left,   "getSafeInsetLeft")
-        READ_INSET(top,    "getSafeInsetTop")
-        READ_INSET(right,  "getSafeInsetRight")
-        READ_INSET(bottom, "getSafeInsetBottom")
-
-#undef READ_INSET
+    // windowInsets.getDisplayCutout() - API 28+
+    insets_class = (*env)->GetObjectClass(env, insets);
+    jmethodID get_cutout = (*env)->GetMethodID(env, insets_class, "getDisplayCutout", "()Landroid/view/DisplayCutout;");
+    if (!get_cutout) {
+        jni_clear_exception(env);
+        goto cleanup;
     }
 
+    display_cutout = (*env)->CallObjectMethod(env, insets, get_cutout);
+    if ((*env)->ExceptionCheck(env)) {
+        jni_clear_exception(env);
+        goto cleanup;
+    }
+
+    if (!display_cutout) {
+        // Device has no cutout - return true with zeros (valid answer).
+        result = true;
+        goto cleanup;
+    }
+
+    cutout_class = (*env)->GetObjectClass(env, display_cutout);
+    if (!cutout_class) {
+        jni_clear_exception(env);
+        goto cleanup;
+    }
+
+#define READ_INSET(field, method_name)                                                      \
+    if (field) {                                                                            \
+        jmethodID m = (*env)->GetMethodID(env, cutout_class, method_name, "()I");           \
+        if (m) {                                                                            \
+            *field = (int) (*env)->CallIntMethod(env, display_cutout, m);                   \
+            jni_clear_exception(env);                                                       \
+        }                                                                                   \
+        else {                                                                              \
+            jni_clear_exception(env);                                                       \
+        }                                                                                   \
+    }
+
+    READ_INSET(left,   "getSafeInsetLeft")
+    READ_INSET(top,    "getSafeInsetTop")
+    READ_INSET(right,  "getSafeInsetRight")
+    READ_INSET(bottom, "getSafeInsetBottom")
+
+#undef READ_INSET
+
+    result = true;
+
+cleanup:
+    if (env) {
+        if (cutout_class)   (*env)->DeleteLocalRef(env, cutout_class);
+        if (display_cutout) (*env)->DeleteLocalRef(env, display_cutout);
+        if (insets_class)   (*env)->DeleteLocalRef(env, insets_class);
+        if (insets)         (*env)->DeleteLocalRef(env, insets);
+    }
     if (attached) {
         SWindowData         *wd  = (SWindowData *) window;
         SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
         (*wda->app->activity->vm)->DetachCurrentThread(wda->app->activity->vm);
     }
-
-    return true;
-
-done:
-    if (attached && window) {
-        SWindowData         *wd  = (SWindowData *) window;
-        SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
-        if (wda && wda->app && wda->app->activity) {
-            (*wda->app->activity->vm)->DetachCurrentThread(wda->app->activity->vm);
-        }
-    }
-
-    return false;
+    return result;
 }
 
 //-------------------------------------
@@ -1099,85 +1147,84 @@ mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int 
     if (right)  *right  = 0;
     if (bottom) *bottom = 0;
 
-    JNIEnv  *env      = NULL;
-    jobject  insets   = NULL;
-    bool     attached = false;
+    JNIEnv  *env              = NULL;
+    jobject  insets            = NULL;
+    bool     attached          = false;
+    bool     result            = false;
+    jclass   insets_class      = NULL;
+    jobject  insets_obj        = NULL;
+    jclass   insets_obj_class  = NULL;
 
     if (!insets_setup(window, &env, &insets, &attached))
-        goto done;
+        goto cleanup;
 
-    {
-        jclass    insets_class = (*env)->GetObjectClass(env, insets);
-        bool      got_values   = false;
+    insets_class = (*env)->GetObjectClass(env, insets);
+    bool got_values = false;
 
-        // ----------------------------------------------------------------
-        // API 30+: WindowInsets.getInsets(type) returns android.graphics.Insets.
-        // Type constants (android.view.WindowInsets.Type, API 30+):
-        //   statusBars()    = 1  (0x01)
-        //   navigationBars()= 2  (0x02)
-        //   captionBar()    = 4  (0x04)   -> systemBars() = 1|2|4 = 7
-        //   displayCutout() = 128 (0x80)
-        //   combined        = 7 | 128     = 135 (0x87)
-        // ----------------------------------------------------------------
-        jmethodID get_insets_m = (*env)->GetMethodID(env, insets_class, "getInsets", "(I)Landroid/graphics/Insets;");
-        if (get_insets_m) {
-            jint combined_type = 0x87; // systemBars() | displayCutout()
-            jobject insets_obj = (*env)->CallObjectMethod(env, insets, get_insets_m, combined_type);
-            if (!(*env)->ExceptionCheck(env) && insets_obj) {
-                jclass insets_obj_class = (*env)->GetObjectClass(env, insets_obj);
-                if (left)   { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "left",   "I"); if (f) *left   = (int) (*env)->GetIntField(env, insets_obj, f); }
-                if (top)    { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "top",    "I"); if (f) *top    = (int) (*env)->GetIntField(env, insets_obj, f); }
-                if (right)  { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "right",  "I"); if (f) *right  = (int) (*env)->GetIntField(env, insets_obj, f); }
-                if (bottom) { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "bottom", "I"); if (f) *bottom = (int) (*env)->GetIntField(env, insets_obj, f); }
-                got_values = true;
-            }
-            jni_clear_exception(env);
+    // ----------------------------------------------------------------
+    // API 30+: WindowInsets.getInsets(type) returns android.graphics.Insets.
+    // Type constants (android.view.WindowInsets.Type, API 30+):
+    //   statusBars()    = 1  (0x01)
+    //   navigationBars()= 2  (0x02)
+    //   captionBar()    = 4  (0x04)   -> systemBars() = 1|2|4 = 7
+    //   displayCutout() = 128 (0x80)
+    //   combined        = 7 | 128     = 135 (0x87)
+    // ----------------------------------------------------------------
+    jmethodID get_insets_m = (*env)->GetMethodID(env, insets_class, "getInsets", "(I)Landroid/graphics/Insets;");
+    if (get_insets_m) {
+        jint combined_type = 0x87; // systemBars() | displayCutout()
+        insets_obj = (*env)->CallObjectMethod(env, insets, get_insets_m, combined_type);
+        if (!(*env)->ExceptionCheck(env) && insets_obj) {
+            insets_obj_class = (*env)->GetObjectClass(env, insets_obj);
+            if (left)   { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "left",   "I"); if (f) *left   = (int) (*env)->GetIntField(env, insets_obj, f); else jni_clear_exception(env); }
+            if (top)    { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "top",    "I"); if (f) *top    = (int) (*env)->GetIntField(env, insets_obj, f); else jni_clear_exception(env); }
+            if (right)  { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "right",  "I"); if (f) *right  = (int) (*env)->GetIntField(env, insets_obj, f); else jni_clear_exception(env); }
+            if (bottom) { jfieldID f = (*env)->GetFieldID(env, insets_obj_class, "bottom", "I"); if (f) *bottom = (int) (*env)->GetIntField(env, insets_obj, f); else jni_clear_exception(env); }
+            got_values = true;
         }
-        else {
-            jni_clear_exception(env);
-        }
-
-        // ----------------------------------------------------------------
-        // API 24-29 fallback: individual getSystemWindowInset{Top, Right, Bottom, Left}()
-        // methods each return int directly and are available from API 20.
-        // (getSystemWindowInsets() returning android.graphics.Insets is API 30+ only.)
-        // ----------------------------------------------------------------
-        if (!got_values) {
-            jmethodID get_left   = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetLeft",   "()I");
-            jmethodID get_top    = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetTop",    "()I");
-            jmethodID get_right  = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetRight",  "()I");
-            jmethodID get_bottom = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetBottom", "()I");
-            jni_clear_exception(env);
-            if (get_left && get_right && get_top && get_bottom) {
-                if (left)   *left   = (int) (*env)->CallIntMethod(env, insets, get_left);
-                if (top)    *top    = (int) (*env)->CallIntMethod(env, insets, get_top);
-                if (right)  *right  = (int) (*env)->CallIntMethod(env, insets, get_right);
-                if (bottom) *bottom = (int) (*env)->CallIntMethod(env, insets, get_bottom);
-                jni_clear_exception(env);
-                got_values = true;
-            }
-        }
-
-        if (!got_values)
-            goto done;
+        jni_clear_exception(env);
+    }
+    else {
+        jni_clear_exception(env);
     }
 
+    // ----------------------------------------------------------------
+    // API 24-29 fallback: individual getSystemWindowInset{Top, Right, Bottom, Left}()
+    // methods each return int directly and are available from API 20.
+    // (getSystemWindowInsets() returning android.graphics.Insets is API 30+ only.)
+    // ----------------------------------------------------------------
+    if (!got_values) {
+        jmethodID get_left   = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetLeft",   "()I");
+        jni_clear_exception(env);
+        jmethodID get_top    = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetTop",    "()I");
+        jni_clear_exception(env);
+        jmethodID get_right  = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetRight",  "()I");
+        jni_clear_exception(env);
+        jmethodID get_bottom = (*env)->GetMethodID(env, insets_class, "getSystemWindowInsetBottom", "()I");
+        jni_clear_exception(env);
+        if (get_left && get_right && get_top && get_bottom) {
+            if (left)   { *left   = (int) (*env)->CallIntMethod(env, insets, get_left);    jni_clear_exception(env); }
+            if (top)    { *top    = (int) (*env)->CallIntMethod(env, insets, get_top);     jni_clear_exception(env); }
+            if (right)  { *right  = (int) (*env)->CallIntMethod(env, insets, get_right);   jni_clear_exception(env); }
+            if (bottom) { *bottom = (int) (*env)->CallIntMethod(env, insets, get_bottom);  jni_clear_exception(env); }
+            got_values = true;
+        }
+    }
+
+    if (got_values)
+        result = true;
+
+cleanup:
+    if (env) {
+        if (insets_obj_class) (*env)->DeleteLocalRef(env, insets_obj_class);
+        if (insets_obj)       (*env)->DeleteLocalRef(env, insets_obj);
+        if (insets_class)     (*env)->DeleteLocalRef(env, insets_class);
+        if (insets)           (*env)->DeleteLocalRef(env, insets);
+    }
     if (attached) {
         SWindowData         *wd  = (SWindowData *) window;
         SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
         (*wda->app->activity->vm)->DetachCurrentThread(wda->app->activity->vm);
     }
-
-    return true;
-
-done:
-    if (attached && window) {
-        SWindowData         *wd  = (SWindowData *) window;
-        SWindowData_Android *wda = (SWindowData_Android *) wd->specific;
-        if (wda && wda->app && wda->app->activity) {
-            (*wda->app->activity->vm)->DetachCurrentThread(wda->app->activity->vm);
-        }
-    }
-
-    return false;
+    return result;
 }

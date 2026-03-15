@@ -23,31 +23,31 @@
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
 
+static const char *g_gl_extensions = NULL;
+
 //-------------------------------------
 static bool
 check_GL_extension(const char *name) {
-    static const char *extensions = NULL;
-
-    if (extensions == NULL) {
+    if (g_gl_extensions == NULL) {
 #if defined(_WIN32) || defined(WIN32)
         // TODO: This is deprecated on OpenGL 3+.
         // Use glGetIntegerv(GL_NUM_EXTENSIONS, &n) and glGetStringi(GL_EXTENSIONS, index)
-        extensions = (const char *) glGetString(GL_EXTENSIONS);
+        g_gl_extensions = (const char *) glGetString(GL_EXTENSIONS);
 #elif defined(__linux__) || defined(linux)
         Display *display = glXGetCurrentDisplay();
         if (display == NULL) {
             return false;
         }
 
-        extensions = glXQueryExtensionsString(display, DefaultScreen(display));
+        g_gl_extensions = glXQueryExtensionsString(display, DefaultScreen(display));
 #endif
     }
 
-    if (extensions == NULL) {
+    if (g_gl_extensions == NULL) {
         return false;
     }
 
-    const char *start = extensions;
+    const char *start = g_gl_extensions;
     const char *end, *where;
     while (1) {
         where = strstr(start, name);
@@ -267,6 +267,8 @@ destroy_GL_context(SWindowData *window_data) {
     }
 
 #endif
+
+    g_gl_extensions = NULL;
 }
 
 //-------------------------------------

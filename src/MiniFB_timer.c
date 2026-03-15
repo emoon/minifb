@@ -16,7 +16,7 @@ extern void     mfb_timer_init(void);
 //-------------------------------------
 void
 mfb_set_target_fps(uint32_t fps) {
-    if (fps <= 0) {
+    if (fps == 0) {
         g_time_for_frame  = 0;
     }
     else {
@@ -144,7 +144,7 @@ void
 mfb_timer_compensated_reset(struct mfb_timer *tmr) {
     static const double ERROR_THRESHOLD    = 0.01; // % threshold
     static const double MAX_CORRECTION     = 0.50; // % max correction
-    static const double MAX_FRAME_TIME     = 2.0;  // 5x target frame time = fallback threshold
+    static const double MAX_FRAME_TIME     = 2.0;  // 2x target frame time = fallback threshold
 
     if (g_time_for_frame == 0) {
         mfb_timer_reset(tmr);

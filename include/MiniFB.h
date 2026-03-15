@@ -55,7 +55,7 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale
-__MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead")
+MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead")
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
 // Use this instead.
 // Returns monitor/content scale as multipliers (1.0 = 100%).
