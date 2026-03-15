@@ -234,7 +234,7 @@ dispatch_text_input(SWindowData *window_data, SWindowData_X11 *window_data_speci
             text_capacity = text_size + 1;
             text_buffer = (char *) malloc((size_t) text_capacity);
             if (text_buffer == NULL) {
-                mfb_log(MFB_LOG_WARNING, "X11MiniFB: failed to allocate buffer for Xutf8LookupString.");
+                MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: failed to allocate buffer for Xutf8LookupString.");
                 return;
             }
 
@@ -455,7 +455,7 @@ process_event(SWindowData *window_data, XEvent *event) {
 #if defined(MINIFB_HAS_XRANDR)
     // XRandR events have dynamic type IDs, must check with event_base
     if (s_xrr_event_base >= 0 && event->type == (s_xrr_event_base + RRScreenChangeNotify)) {
-        mfb_log(MFB_LOG_TRACE, "XRRScreenChangeNotify event received");
+        MFB_LOG(MFB_LOG_TRACE, "XRRScreenChangeNotify event received");
         // Scale will be refreshed on next mfb_get_monitor_scale() call
     }
 #endif
@@ -491,34 +491,34 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     uint32_t buffer_stride = 0;
 
     if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid window size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL) ||
         buffer_stride > (uint32_t) INT_MAX) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: window size %ux%u is too large for X11 image layout.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: window size %ux%u is too large for X11 image layout.", width, height);
         return NULL;
     }
 
     if ((effective_flags & ~known_flags) != 0u) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
     }
 
     if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
         effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
     }
 
     SWindowData *window_data = (SWindowData *) malloc(sizeof(SWindowData));
     if (!window_data) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: failed to allocate SWindowData.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
     if (!window_data_specific) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: failed to allocate SWindowData_X11.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: failed to allocate SWindowData_X11.");
         free(window_data);
         return NULL;
     }
@@ -527,7 +527,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->display = XOpenDisplay(0);
     if (!window_data_specific->display) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: XOpenDisplay failed.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XOpenDisplay failed.");
         free(window_data);
         free(window_data_specific);
         return NULL;
@@ -538,9 +538,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (s_xrr_event_base < 0) {
         int error_base = 0;
         if (XRRQueryExtension(window_data_specific->display, &s_xrr_event_base, &error_base)) {
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR event base = %d", s_xrr_event_base);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR event base = %d", s_xrr_event_base);
         } else {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: XRRQueryExtension failed; XRandR events unavailable.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XRRQueryExtension failed; XRandR events unavailable.");
             s_xrr_event_base = -1;
         }
     }
@@ -549,13 +549,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (!s_x11_locale_checked) {
         const char *locale = setlocale(LC_CTYPE, NULL);
         if (locale == NULL || strcmp(locale, "C") == 0 || strcmp(locale, "POSIX") == 0) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: LC_CTYPE locale is not configured for UTF-8; IME/dead-key input may be limited.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: LC_CTYPE locale is not configured for UTF-8; IME/dead-key input may be limited.");
         }
         s_x11_locale_checked = true;
     }
 
     if (XSetLocaleModifiers("") == NULL) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: XSetLocaleModifiers failed; input method support may be limited.");
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XSetLocaleModifiers failed; input method support may be limited.");
     }
 
     init_keycodes(window_data_specific);
@@ -566,7 +566,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     formats  = XListPixmapFormats(window_data_specific->display, &format_count);
     depth    = DefaultDepth(window_data_specific->display, window_data_specific->screen);
     if (formats == NULL || format_count <= 0) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: XListPixmapFormats returned no formats.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XListPixmapFormats returned no formats.");
         XCloseDisplay(window_data_specific->display);
         free(window_data_specific);
         free(window_data);
@@ -586,7 +586,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     // We only support 32-bit right now
     if (conv_depth != 32) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: unsupported visual depth conversion (%d bpp), expected 32 bpp.", conv_depth);
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: unsupported visual depth conversion (%d bpp), expected 32 bpp.", conv_depth);
         XCloseDisplay(window_data_specific->display);
         free(window_data_specific);
         free(window_data);
@@ -636,7 +636,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
                     CWBackPixel | CWBorderPixel | CWBackingStore,
                     &window_attributes);
     if (!window_data_specific->window) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: XCreateWindow failed.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XCreateWindow failed.");
         XCloseDisplay(window_data_specific->display);
         free(window_data_specific);
         free(window_data);
@@ -657,13 +657,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         XRRSelectInput(window_data_specific->display, default_root_window,
             RRScreenChangeNotifyMask
         );
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRRSelectInput registered for RRScreenChangeNotifyMask");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRRSelectInput registered for RRScreenChangeNotifyMask");
     }
 #endif
 
     window_data_specific->im = XOpenIM(window_data_specific->display, NULL, NULL, NULL);
     if (window_data_specific->im == NULL) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: XOpenIM failed; falling back to basic keysym text input.");
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XOpenIM failed; falling back to basic keysym text input.");
     }
     else {
         window_data_specific->ic = XCreateIC(window_data_specific->im,
@@ -672,7 +672,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
                                              XNFocusWindow, window_data_specific->window,
                                              NULL);
         if (window_data_specific->ic == NULL) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: XCreateIC failed; falling back to basic keysym text input.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XCreateIC failed; falling back to basic keysym text input.");
             XCloseIM(window_data_specific->im);
             window_data_specific->im = NULL;
         }
@@ -696,7 +696,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         };
         Atom sh_p = XInternAtom(window_data_specific->display, "_MOTIF_WM_HINTS", True);
         if (sh_p == None) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: _MOTIF_WM_HINTS atom is unavailable; borderless hint may be ignored.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: _MOTIF_WM_HINTS atom is unavailable; borderless hint may be ignored.");
         }
         else {
             XChangeProperty(window_data_specific->display, window_data_specific->window, sh_p, sh_p, 32, PropModeReplace, (unsigned char *) &sh, 5);
@@ -707,7 +707,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         Atom sa_p = XInternAtom(window_data_specific->display, "_NET_WM_STATE_ABOVE", False);
         Atom state_atom = XInternAtom(window_data_specific->display, "_NET_WM_STATE", False);
         if (sa_p == None || state_atom == None) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: always-on-top WM atoms are unavailable; request may be ignored.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: always-on-top WM atoms are unavailable; request may be ignored.");
         }
         else {
             XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char *)&sa_p, 1);
@@ -718,7 +718,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         Atom sf_p = XInternAtom(window_data_specific->display, "_NET_WM_STATE_FULLSCREEN", True);
         Atom state_atom = XInternAtom(window_data_specific->display, "_NET_WM_STATE", True);
         if (sf_p == None || state_atom == None) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: fullscreen WM atoms are unavailable; fullscreen request may be ignored.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: fullscreen WM atoms are unavailable; fullscreen request may be ignored.");
         }
         else {
             XChangeProperty(window_data_specific->display, window_data_specific->window, state_atom, XA_ATOM, 32, PropModeReplace, (unsigned char *) &sf_p, 1);
@@ -729,7 +729,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         Atom max_horz = XInternAtom(window_data_specific->display, "_NET_WM_STATE_MAXIMIZED_HORZ", True);
         Atom max_vert = XInternAtom(window_data_specific->display, "_NET_WM_STATE_MAXIMIZED_VERT", True);
         if (state_atom == None || max_horz == None || max_vert == None) {
-            mfb_log(MFB_LOG_WARNING, "X11MiniFB: maximized WM atoms are unavailable; fullscreen-desktop may not behave like a maximized window.");
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: maximized WM atoms are unavailable; fullscreen-desktop may not behave like a maximized window.");
         }
         else {
             Atom maximized_atoms[2] = { max_horz, max_vert };
@@ -761,7 +761,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     s_delete_window_atom = XInternAtom(window_data_specific->display, "WM_DELETE_WINDOW", False);
     if (s_delete_window_atom == None) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: WM_DELETE_WINDOW atom unavailable; close requests may not be delivered.");
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: WM_DELETE_WINDOW atom unavailable; close requests may not be delivered.");
     }
     else {
         XSetWMProtocols(window_data_specific->display, window_data_specific->window, &s_delete_window_atom, 1);
@@ -769,7 +769,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #if defined(USE_OPENGL_API)
     if (create_GL_context(window_data) == false) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: create_GL_context failed.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: create_GL_context failed.");
         destroy_window_data(window_data);
         return NULL;
     }
@@ -777,7 +777,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 #else
     window_data_specific->image = XCreateImage(window_data_specific->display, CopyFromParent, depth, ZPixmap, 0, NULL, width, height, 32, (int) buffer_stride);
     if (window_data_specific->image == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: XCreateImage failed.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XCreateImage failed.");
         destroy_window_data(window_data);
         return NULL;
     }
@@ -792,7 +792,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->timer = mfb_timer_create();
     if (window_data_specific->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_timer_create failed.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_timer_create failed.");
         destroy_window_data(window_data);
         return NULL;
     }
@@ -800,15 +800,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->is_cursor_visible = true;
     window_data_specific->invis_cursor = create_blank_cursor(window_data_specific->display, window_data_specific->window);
     if (window_data_specific->invis_cursor == None) {
-        mfb_log(MFB_LOG_WARNING, "X11MiniFB: failed to create invisible cursor; cursor hiding may not work.");
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: failed to create invisible cursor; cursor hiding may not work.");
     }
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
     #if defined(USE_OPENGL_API)
-        mfb_log(MFB_LOG_DEBUG, "Window created using OpenGL API");
+        MFB_LOG(MFB_LOG_DEBUG, "Window created using OpenGL API");
     #else
-        mfb_log(MFB_LOG_DEBUG, "Window created using X11 API");
+        MFB_LOG(MFB_LOG_DEBUG, "Window created using X11 API");
     #endif
 
     window_data->is_initialized = true;
@@ -821,36 +821,36 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     uint32_t buffer_stride = 0;
     SWindowData *window_data = (SWindowData *) window;
     if (window_data ==  NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window requested close");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: window requested close");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     if (buffer == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
         return MFB_STATE_INVALID_BUFFER;
     }
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific ==  NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     Display *display = window_data_specific->display;
     if (display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: missing X11 display in mfb_update_ex.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: missing X11 display in mfb_update_ex.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
@@ -860,7 +860,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
         if (buffer_stride > (uint32_t) INT_MAX) {
-            mfb_log(MFB_LOG_ERROR, "X11MiniFB: buffer stride for size %ux%u exceeds XImage limit.", width, height);
+            MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: buffer stride for size %ux%u exceeds XImage limit.", width, height);
             return MFB_STATE_INVALID_BUFFER;
         }
         window_data->buffer_width  = width;
@@ -888,20 +888,20 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             size_t scaler_size = 0;
             if (!calculate_buffer_layout(window_data->dst_width, window_data->dst_height, &scaler_stride, &scaler_size) ||
                 scaler_stride > (uint32_t) INT_MAX) {
-                mfb_log(MFB_LOG_ERROR, "X11MiniFB: invalid scaler layout for size %ux%u.", window_data->dst_width, window_data->dst_height);
+                MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: invalid scaler layout for size %ux%u.", window_data->dst_width, window_data->dst_height);
                 return MFB_STATE_INTERNAL_ERROR;
             }
 
             window_data_specific->image_buffer = malloc(scaler_size);
             if (window_data_specific->image_buffer == NULL) {
-                mfb_log(MFB_LOG_ERROR, "X11MiniFB: failed to allocate image scaler buffer.");
+                MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: failed to allocate image scaler buffer.");
                 return MFB_STATE_INTERNAL_ERROR;
             }
             window_data_specific->image_scaler_width  = window_data->dst_width;
             window_data_specific->image_scaler_height = window_data->dst_height;
             window_data_specific->image_scaler = XCreateImage(display, CopyFromParent, depth, ZPixmap, 0, NULL, window_data_specific->image_scaler_width, window_data_specific->image_scaler_height, 32, (int) scaler_stride);
             if (window_data_specific->image_scaler == NULL) {
-                mfb_log(MFB_LOG_ERROR, "X11MiniFB: XCreateImage failed for scaler image.");
+                MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XCreateImage failed for scaler image.");
                 free(window_data_specific->image_buffer);
                 window_data_specific->image_buffer = NULL;
                 window_data_specific->image_scaler_width  = 0;
@@ -919,7 +919,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
     else {
         if (window_data_specific->image == NULL) {
-            mfb_log(MFB_LOG_ERROR, "X11MiniFB: missing base XImage in mfb_update_ex.");
+            MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: missing base XImage in mfb_update_ex.");
             return MFB_STATE_INTERNAL_ERROR;
         }
         window_data_specific->image->data = (char *) buffer;
@@ -935,7 +935,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     XFlush(display);
     update_events(window_data, display);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: window closed after event processing");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: window closed after event processing");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -948,33 +948,33 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data ==  NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window requested close");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_events: window requested close");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific ==  NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window specific data");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_events: invalid window specific data");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     Display *display = window_data_specific->display;
     if (display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: missing X11 display in mfb_update_events.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: missing X11 display in mfb_update_events.");
         return MFB_STATE_INVALID_WINDOW;
     }
     XFlush(display);
 
     update_events(window_data, display);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_update_events: window closed after event processing");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_update_events: window closed after event processing");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -991,26 +991,26 @@ bool
 mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
         return false;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window requested close");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: window requested close");
         destroy_window_data(window_data);
         return false;
     }
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window specific data");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window specific data");
         return false;
     }
     if (window_data_specific->display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync has a null X11 display handle.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync has a null X11 display handle.");
         return false;
     }
     if (window_data_specific->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync missing frame timer state.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
 
@@ -1021,7 +1021,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     update_events(window_data, display);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed after event processing");
+        MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: window closed after event processing");
         destroy_window_data(window_data);
         return false;
     }
@@ -1051,7 +1051,7 @@ mfb_wait_sync(struct mfb_window *window) {
             pfd.revents = 0;
 
             if (poll(&pfd, 1, timeout_ms) < 0 && errno != EINTR) {
-                mfb_log(MFB_LOG_ERROR, "X11MiniFB: poll failed in mfb_wait_sync (%s).", strerror(errno));
+                MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: poll failed in mfb_wait_sync (%s).", strerror(errno));
                 return false;
             }
         }
@@ -1062,7 +1062,7 @@ mfb_wait_sync(struct mfb_window *window) {
         update_events(window_data, display);
 
         if (window_data->close) {
-            mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while waiting for frame sync");
+            MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: window closed while waiting for frame sync");
             destroy_window_data(window_data);
             return false;
         }
@@ -1432,17 +1432,17 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
             if (screen < 0) {
                 screen = DefaultScreen(display);
             }
-            mfb_log(MFB_LOG_TRACE,
+            MFB_LOG(MFB_LOG_TRACE,
                     "X11MiniFB: monitor_scale begin window=%lu screen=%d.",
                     (unsigned long) window_data_specific->window,
                     screen);
 
             mfb_x11_query_scale_methods(display, window_data_specific->window, screen, &methods);
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xresources ok=%d scale=%.6f,%.6f.", methods.has_xresources ? 1 : 0, methods.x_xresources, methods.y_xresources);
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xsettings ok=%d scale=%.6f,%.6f.", methods.has_xsettings ? 1 : 0, methods.x_xsettings, methods.y_xsettings);
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-window ok=%d scale=%.6f,%.6f.", methods.has_xrandr_window ? 1 : 0, methods.x_xrandr_window, methods.y_xrandr_window);
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-any ok=%d scale=%.6f,%.6f.", methods.has_xrandr_any ? 1 : 0, methods.x_xrandr_any, methods.y_xrandr_any);
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: scale method display-mm ok=%d scale=%.6f,%.6f.", methods.has_display_mm ? 1 : 0, methods.x_display_mm, methods.y_display_mm);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xresources ok=%d scale=%.6f,%.6f.", methods.has_xresources ? 1 : 0, methods.x_xresources, methods.y_xresources);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xsettings ok=%d scale=%.6f,%.6f.", methods.has_xsettings ? 1 : 0, methods.x_xsettings, methods.y_xsettings);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-window ok=%d scale=%.6f,%.6f.", methods.has_xrandr_window ? 1 : 0, methods.x_xrandr_window, methods.y_xrandr_window);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-any ok=%d scale=%.6f,%.6f.", methods.has_xrandr_any ? 1 : 0, methods.x_xrandr_any, methods.y_xrandr_any);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method display-mm ok=%d scale=%.6f,%.6f.", methods.has_display_mm ? 1 : 0, methods.x_display_mm, methods.y_display_mm);
 
             // Stable policy for desktop X11:
             // 1) Xsettings (desktop settings protocol)
@@ -1475,7 +1475,7 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
                 y = methods.y_display_mm;
                 scale_source = "display-mm";
             }
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: monitor_scale resolved source=%s scale_x=%.3f scale_y=%.3f.", scale_source, x, y);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: monitor_scale resolved source=%s scale_x=%.3f scale_y=%.3f.", scale_source, x, y);
         }
     }
 
@@ -1512,18 +1512,18 @@ void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor called with a null window pointer.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor called with a null window pointer.");
         return;
     }
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor missing X11-specific window data.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor missing X11-specific window data.");
         return;
     }
 
     if (window_data_specific->display == NULL) {
-        mfb_log(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor has a null X11 display handle.");
+        MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_show_cursor has a null X11 display handle.");
         return;
     }
 

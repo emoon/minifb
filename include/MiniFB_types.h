@@ -20,4 +20,11 @@ typedef void(*mfb_mouse_scroll_func)(struct mfb_window *window, mfb_key_mod mod,
 
 // Log
 //-------------------------------------
-typedef void (*mfb_log_func)(mfb_log_level level, const char *message);
+typedef struct {
+    mfb_log_level level;
+    const char   *file;
+    const char   *func;
+    int           line;
+} mfb_log_info;
+
+typedef void (*mfb_log_func)(const mfb_log_info *info, const char *tag, const char *message);

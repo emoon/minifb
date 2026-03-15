@@ -66,7 +66,7 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (id) initWithWindowData:(SWindowData *) windowData {
     if (windowData == NULL || windowData->specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: initWithWindowData called with invalid window data.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: initWithWindowData called with invalid window data.");
         return nil;
     }
 
@@ -78,7 +78,7 @@ NSString *g_shader_src = kShader(
 
         metal_device = MTLCreateSystemDefaultDevice();
         if (!metal_device) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: Metal is not supported on this device.");
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: Metal is not supported on this device.");
             [self release];
             return nil;
         }
@@ -86,7 +86,7 @@ NSString *g_shader_src = kShader(
         // Used for syncing the CPU and GPU
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
         if (!semaphore) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal frame semaphore.");
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal frame semaphore.");
             [self release];
             return nil;
         }
@@ -94,7 +94,7 @@ NSString *g_shader_src = kShader(
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
         if (!command_queue) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal command queue.");
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal command queue.");
             [self release];
             return nil;
         }
@@ -129,20 +129,20 @@ NSString *g_shader_src = kShader(
     ];
     [options release];
     if (error || !metal_library) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create shaders (%s).",
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create shaders (%s).",
                 (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
         return false;
     }
 
     id<MTLFunction> vertex_shader_func = [metal_library newFunctionWithName:@"vertFunc"];
     if (!vertex_shader_func) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to get vertex shader function 'vertFunc'.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to get vertex shader function 'vertFunc'.");
         return false;
     }
 
     id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
     if (!fragment_shader_func) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to get fragment shader function 'fragFunc'.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to get fragment shader function 'fragFunc'.");
         [vertex_shader_func release];
         return false;
     }
@@ -159,7 +159,7 @@ NSString *g_shader_src = kShader(
     [vertex_shader_func release];
     [fragment_shader_func release];
     if (!pipeline_state) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: failed to create pipeline state (%s).",
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: failed to create pipeline state (%s).",
                 (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
         return false;
     }
@@ -170,7 +170,7 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (bool) _createAssets {
     if (window_data == NULL || window_data_osx == NULL) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: invalid window state while creating assets.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: invalid window state while creating assets.");
         return false;
     }
 
@@ -192,7 +192,7 @@ NSString *g_shader_src = kShader(
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
         texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
         if (texture_buffers[i] == nil) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal texture buffer %zu.", i);
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal texture buffer %zu.", i);
             for (size_t j = 0; j < i; ++j) {
                 [texture_buffers[j] release];
                 texture_buffers[j] = nil;
@@ -207,7 +207,7 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (bool) resizeTextures {
     if (window_data == NULL || metal_device == nil) {
-        mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: resizeTextures called with invalid window state.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: resizeTextures called with invalid window state.");
         return false;
     }
 
@@ -223,7 +223,7 @@ NSString *g_shader_src = kShader(
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
         new_textures[i] = [metal_device newTextureWithDescriptor:td];
         if (new_textures[i] == nil) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: unable to resize Metal texture buffer %zu.", i);
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to resize Metal texture buffer %zu.", i);
             for (size_t j = 0; j < i; ++j) {
                 [new_textures[j] release];
                 new_textures[j] = nil;
@@ -271,7 +271,7 @@ NSString *g_shader_src = kShader(
     // Create a new command buffer for each render pass to the current drawable
     id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
     if (commandBuffer == nil || texture_buffers[current_buffer] == nil) {
-        mfb_log(MFB_LOG_WARNING, "OSXViewDelegate: skipping frame because command buffer or texture is unavailable.");
+        MFB_LOG(MFB_LOG_WARNING, "OSXViewDelegate: skipping frame because command buffer or texture is unavailable.");
         dispatch_semaphore_signal(semaphore);
         return;
     }
@@ -301,7 +301,7 @@ NSString *g_shader_src = kShader(
         // Create a render command encoder so we can render into something
         id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         if (renderEncoder == nil) {
-            mfb_log(MFB_LOG_ERROR, "OSXViewDelegate: failed to create Metal render encoder.");
+            MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: failed to create Metal render encoder.");
             [commandBuffer commit];
             return;
         }
@@ -327,7 +327,7 @@ NSString *g_shader_src = kShader(
         //else {
             id<CAMetalDrawable> drawable = view.currentDrawable;
             if (drawable == nil) {
-                mfb_log(MFB_LOG_WARNING, "OSXViewDelegate: skipping present because currentDrawable is nil.");
+                MFB_LOG(MFB_LOG_WARNING, "OSXViewDelegate: skipping present because currentDrawable is nil.");
             }
             else {
                 [commandBuffer presentDrawable:drawable];

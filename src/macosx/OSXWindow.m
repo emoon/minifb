@@ -51,7 +51,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
         ((OSXView *) frame_view)->window_data = window_data;
     }
     else {
-        mfb_log(MFB_LOG_WARNING, "OSXWindow: root content view is not an OSXView instance.");
+        MFB_LOG(MFB_LOG_WARNING, "OSXWindow: root content view is not an OSXView instance.");
     }
 }
 
@@ -301,7 +301,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     }
 
     if (!destroy) {
-        mfb_log(MFB_LOG_DEBUG, "OSXWindow: close request was rejected by close callback.");
+        MFB_LOG(MFB_LOG_DEBUG, "OSXWindow: close request was rejected by close callback.");
     }
 
     return destroy;

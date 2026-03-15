@@ -57,6 +57,15 @@
 #endif
 
 //-------------------------------------
+#if defined(_MSC_VER)
+    #define MFB_FUNC_NAME __FUNCTION__
+#else
+    #define MFB_FUNC_NAME __func__
+#endif
+
+#define MFB_LOG(tag, level, ...) mfb_log(&(mfb_log_info){ level, __FILE__, MFB_FUNC_NAME, __LINE__ }, tag, __VA_ARGS__)
+
+//-------------------------------------
 #if !defined(__ANDROID__)
     #define MFB_RGB(r, g, b)         ((((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))
     #define MFB_ARGB(a, r, g, b)     ((((uint32_t) (a)) << 24) | (((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))

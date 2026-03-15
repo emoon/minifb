@@ -403,18 +403,29 @@ mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned 
 
 //-------------------------------------
 void
-mfb_log_default(mfb_log_level level, const char *message) {
+mfb_log_default(const mfb_log_info *info, const char *tag, const char *message) {
     static const char *level_str[] = { "TRACE", "DEBUG", "INFO", "WARNING", "ERROR" };
 
+    mfb_log_level level = info->level;
     const char *level_aux = (level >= 0 && level < (int)(sizeof(level_str) / sizeof(level_str[0])))
                           ? level_str[level]
                           : "UNKNOWN";
 
-    if (level < MFB_LOG_WARNING) {
-        fprintf(stdout, "[MiniFB (%s)] %s\n", level_aux, message);
+    FILE *out = (level < MFB_LOG_WARNING) ? stdout : stderr;
+
+    if (info->file != NULL && info->file[0] != '\0') {
+        const char *file = info->file;
+        const char *slash = strrchr(file, '/');
+        if (slash == NULL) {
+            slash = strrchr(file, '\\');
+        }
+        if (slash != NULL) {
+            file = slash + 1;
+        }
+        fprintf(out, "[%s] %s: %s:%d (%s): %s\n", tag, level_aux, file, info->line, info->func, message);
     }
     else {
-        fprintf(stderr, "[MiniFB (%s)] %s\n", level_aux, message);
+        fprintf(out, "[%s] %s: %s\n", tag, level_aux, message);
     }
 }
 
@@ -424,10 +435,10 @@ static mfb_log_func mfb_log_sink = &mfb_log_default;
 
 //-------------------------------------
 void
-mfb_log(mfb_log_level level, const char *message, ...) {
+mfb_log(const mfb_log_info *info, const char *tag, const char *message, ...) {
     char buffer[1024];
 
-    if (level < g_mfb_log_level) {
+    if (info->level < g_mfb_log_level) {
         return;
     }
 
@@ -436,7 +447,7 @@ mfb_log(mfb_log_level level, const char *message, ...) {
     vsnprintf(buffer, sizeof(buffer), message, args);
     va_end(args);
 
-    mfb_log_sink(level, buffer);
+    mfb_log_sink(info, tag, buffer);
 }
 
 //-------------------------------------

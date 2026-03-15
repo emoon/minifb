@@ -67,7 +67,7 @@
     }
 
     if(!metal_view.device) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewController: Metal is not supported on this device.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewController: Metal is not supported on this device.");
         UIView *fallback = [[UIView alloc] initWithFrame:self.view.frame];
         self.view = fallback;
 #if !__has_feature(objc_arc)
@@ -77,7 +77,7 @@
     }
 
     if (window_data == NULL || window_data->specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewController: window_data is null in setupRendererIfPossible.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewController: window_data is null in setupRendererIfPossible.");
         return;
     }
 
@@ -86,7 +86,7 @@
         window_data_ios->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
     }
     if (window_data_ios->view_delegate == nil) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewController: failed to initialize iOSViewDelegate.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewController: failed to initialize iOSViewDelegate.");
         return;
     }
 
@@ -110,7 +110,7 @@
     iOSView *view = [[iOSView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     // Probably the window was created automatically by an storyboard or similar
     if(window_data == 0x0) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewController: window_data is null in loadView!");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewController: window_data is null in loadView!");
         [self setView:view];
 #if !__has_feature(objc_arc)
         [view release];

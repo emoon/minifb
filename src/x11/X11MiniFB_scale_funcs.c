@@ -169,14 +169,14 @@ get_scale_from_xsettings(Display *display, int screen, float *scale_x, float *sc
     if (xft_scale > 0.0f) {
         *scale_x = xft_scale;
         *scale_y = xft_scale;
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XSettings scale from Xft/DPI = %.6f.", xft_scale);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XSettings scale from Xft/DPI = %.6f.", xft_scale);
         return true;
     }
 
     if (gdk_scale > 0.0f) {
         *scale_x = gdk_scale;
         *scale_y = gdk_scale;
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XSettings scale from Gdk/WindowScalingFactor = %.6f.", gdk_scale);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XSettings scale from Gdk/WindowScalingFactor = %.6f.", gdk_scale);
         return true;
     }
 
@@ -216,26 +216,26 @@ get_window_center_in_root(Display *display, Window window, int screen, int *cent
 static bool
 get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_x, float *scale_y) {
     if (display == NULL || window == None || scale_x == NULL || scale_y == NULL) {
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR query skipped due to invalid arguments.");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR query skipped due to invalid arguments.");
         return false;
     }
 
     int event_base = 0;
     int error_base = 0;
     if (!XRRQueryExtension(display, &event_base, &error_base)) {
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR extension not available on this display.");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR extension not available on this display.");
         return false;
     }
 
     Window root = RootWindow(display, screen);
     if (root == None) {
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR root window is invalid.");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR root window is invalid.");
         return false;
     }
 
     XRRScreenResources *resources = XRRGetScreenResourcesCurrent(display, root);
     if (resources == NULL) {
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRRGetScreenResourcesCurrent returned NULL.");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRRGetScreenResourcesCurrent returned NULL.");
         return false;
     }
 
@@ -257,11 +257,11 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
     for (int i = 0; i < resources->noutput; ++i) {
         XRROutputInfo *output = XRRGetOutputInfo(display, resources, resources->outputs[i]);
         if (output == NULL) {
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] info is NULL.", i);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] info is NULL.", i);
             continue;
         }
 
-        mfb_log(MFB_LOG_TRACE,
+        MFB_LOG(MFB_LOG_TRACE,
                 "X11MiniFB: XRandR output[%d] name=%s connection=%d crtc=%lu mm=%ldx%ld.",
                 i,
                 output->name ? output->name : "(null)",
@@ -284,7 +284,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
 
         XRRCrtcInfo *crtc = XRRGetCrtcInfo(display, resources, output->crtc);
         if (crtc == NULL || crtc->width <= 0 || crtc->height <= 0) {
-            mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] has invalid CRTC info.", i);
+            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] has invalid CRTC info.", i);
             if (crtc != NULL) {
                 XRRFreeCrtcInfo(crtc);
             }
@@ -297,7 +297,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
             inside = (center_x >= crtc->x && center_x < (crtc->x + (int) crtc->width) &&
                       center_y >= crtc->y && center_y < (crtc->y + (int) crtc->height));
         }
-        mfb_log(MFB_LOG_TRACE,
+        MFB_LOG(MFB_LOG_TRACE,
                 "X11MiniFB: XRandR output[%d] crtc pos=%d,%d size=%ux%u window_center=%d,%d inside=%d.",
                 i, crtc->x, crtc->y, crtc->width, crtc->height, center_x, center_y, inside ? 1 : 0);
 
@@ -310,7 +310,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
                 float dpi_y = ((float) crtc->height * 25.4f) / (float) output->mm_height;
                 if (dpi_x > 0.0f && dpi_y > 0.0f) {
                     outputs_with_mm++;
-                    mfb_log(MFB_LOG_TRACE,
+                    MFB_LOG(MFB_LOG_TRACE,
                             "X11MiniFB: XRandR output[%d] physical dpi=%.2f,%.2f scale=%.2f,%.2f.",
                             i, dpi_x, dpi_y, dpi_x / 96.0f, dpi_y / 96.0f);
                     if (!found_mm || area < best_mm_area) {
@@ -330,7 +330,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
                 float m11 = (float) transform->currentTransform.matrix[1][1] / 65536.0f;
                 float sx = sqrtf((m00 * m00) + (m01 * m01));
                 float sy = sqrtf((m10 * m10) + (m11 * m11));
-                mfb_log(MFB_LOG_TRACE,
+                MFB_LOG(MFB_LOG_TRACE,
                         "X11MiniFB: XRandR output[%d] transform matrix [[%.4f %.4f][%.4f %.4f]] scale=%.4f,%.4f.",
                         i, m00, m01, m10, m11, sx, sy);
 
@@ -346,7 +346,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
                 XFree(transform);
             }
             else {
-                mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] has no transform attributes.", i);
+                MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR output[%d] has no transform attributes.", i);
             }
         }
 
@@ -359,7 +359,7 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
     if (found_mm) {
         *scale_x = best_mm_x;
         *scale_y = best_mm_y;
-        mfb_log(MFB_LOG_TRACE,
+        MFB_LOG(MFB_LOG_TRACE,
                 "X11MiniFB: XRandR scale from physical DPI (outputs=%d connected=%d crtc=%d inside=%d with_mm=%d scale_x=%.2f scale_y=%.2f).",
                 outputs_total, outputs_connected, outputs_with_crtc, outputs_inside, outputs_with_mm, *scale_x, *scale_y);
         return true;
@@ -368,16 +368,16 @@ get_scale_from_xrandr(Display *display, Window window, int screen, float *scale_
     if (found_transform) {
         *scale_x = best_transform_x;
         *scale_y = best_transform_y;
-        mfb_log(MFB_LOG_TRACE,
+        MFB_LOG(MFB_LOG_TRACE,
                 "X11MiniFB: XRandR scale from CRTC transform (outputs=%d connected=%d crtc=%d inside=%d with_transform=%d scale_x=%.2f scale_y=%.2f).",
                 outputs_total, outputs_connected, outputs_with_crtc, outputs_inside, outputs_with_transform, *scale_x, *scale_y);
         return true;
     }
 
     if (!have_center) {
-        mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR could not map window to root coordinates.");
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR could not map window to root coordinates.");
     }
-    mfb_log(MFB_LOG_TRACE,
+    MFB_LOG(MFB_LOG_TRACE,
             "X11MiniFB: XRandR scale unavailable (outputs=%d connected=%d crtc=%d inside=%d with_mm=%d with_transform=%d).",
             outputs_total, outputs_connected, outputs_with_crtc, outputs_inside, outputs_with_mm, outputs_with_transform);
     return false;
@@ -409,7 +409,7 @@ get_scale_from_xrandr_any_output(Display *display, int screen, float *scale_x, f
         if (output == NULL) {
             continue;
         }
-        mfb_log(MFB_LOG_TRACE,
+        MFB_LOG(MFB_LOG_TRACE,
                 "X11MiniFB: XRandR-any output[%d] name=%s connection=%d crtc=%lu mm=%ldx%ld.",
                 i,
                 output->name ? output->name : "(null)",
@@ -456,7 +456,7 @@ get_scale_from_xrandr_any_output(Display *display, int screen, float *scale_x, f
 
     *scale_x = best_mm_x;
     *scale_y = best_mm_y;
-    mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR fallback picked any connected output (scale_x=%.2f, scale_y=%.2f).", *scale_x, *scale_y);
+    MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR fallback picked any connected output (scale_x=%.2f, scale_y=%.2f).", *scale_x, *scale_y);
     return true;
 }
 #endif
@@ -566,6 +566,6 @@ mfb_x11_query_scale_methods(Display *display, Window window, int screen, SX11Sca
     methods->has_xrandr_window = get_scale_from_xrandr(display, window, screen, &methods->x_xrandr_window, &methods->y_xrandr_window);
     methods->has_xrandr_any = get_scale_from_xrandr_any_output(display, screen, &methods->x_xrandr_any, &methods->y_xrandr_any);
     #else
-    mfb_log(MFB_LOG_TRACE, "X11MiniFB: XRandR support not available at compile time.");
+    MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR support not available at compile time.");
     #endif
 }

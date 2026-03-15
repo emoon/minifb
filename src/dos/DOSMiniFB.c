@@ -218,7 +218,7 @@ init_mouse(SWindowData *window_data) {
   regs.x.ax = 0;
   __dpmi_int(0x33, &regs);
   if (regs.x.ax == 0) {
-    mfb_log(MFB_LOG_WARNING, "No mouse driver detected, mouse support disabled");
+    MFB_LOG(MFB_LOG_WARNING, "No mouse driver detected, mouse support disabled");
     return;
   }
   g_mouse_present = true;
@@ -271,7 +271,7 @@ static mfb_update_state
 check_window_closed(SWindowData *window_data) {
   if (window_data->close) {
     if (window_data->specific) {
-      mfb_log(MFB_LOG_DEBUG, "mfb window requested close");
+      MFB_LOG(MFB_LOG_DEBUG, "mfb window requested close");
       g_window = NULL;
       vesa_dispose();
       SWindowData_DOS *dos_window_data = window_data->specific;
@@ -283,7 +283,7 @@ check_window_closed(SWindowData *window_data) {
       return MFB_STATE_EXIT;
     }
     else {
-      mfb_log(MFB_LOG_DEBUG, "mfb window close requested but specific data is NULL");
+      MFB_LOG(MFB_LOG_DEBUG, "mfb window close requested but specific data is NULL");
       return MFB_STATE_INVALID_WINDOW;
     }
   }
@@ -298,22 +298,22 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   uint32_t buffer_stride = 0;
 
   if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-    mfb_log(MFB_LOG_ERROR, "DOSMiniFB: invalid window size %ux%u", width, height);
+    MFB_LOG(MFB_LOG_ERROR, "DOSMiniFB: invalid window size %ux%u", width, height);
     return NULL;
   }
 
   if (flags != 0u) {
-    mfb_log(MFB_LOG_WARNING, "DOSMiniFB: window flags 0x%x are ignored by the DOS backend", flags);
+    MFB_LOG(MFB_LOG_WARNING, "DOSMiniFB: window flags 0x%x are ignored by the DOS backend", flags);
   }
 
   if (g_window) {
-    mfb_log(MFB_LOG_WARNING, "mfb_open_ex called while DOS backend window is already open");
+    MFB_LOG(MFB_LOG_WARNING, "mfb_open_ex called while DOS backend window is already open");
     return NULL;
   }
 
   uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
   if (!vesa_init(width, height, &actual_width, &actual_height, &actual_bpp, &bytes_per_scanline)) {
-    mfb_log(MFB_LOG_ERROR, "Couldn't set VESA mode %ux%u", width, height);
+    MFB_LOG(MFB_LOG_ERROR, "Couldn't set VESA mode %ux%u", width, height);
     return NULL;
   }
 
@@ -321,7 +321,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   window_data = malloc(sizeof(SWindowData));
   if (window_data == NULL) {
-    mfb_log(MFB_LOG_ERROR, "Cannot allocate window data");
+    MFB_LOG(MFB_LOG_ERROR, "Cannot allocate window data");
     vesa_dispose();
     return NULL;
   }
@@ -339,7 +339,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   SWindowData_DOS *specific = malloc(sizeof(SWindowData_DOS));
   if (!specific) {
-    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS window data");
+    MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS window data");
     free(window_data);
     vesa_dispose();
     return NULL;
@@ -355,7 +355,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
           : NULL;
 
   if (!specific->scale_buffer) {
-    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
+    MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
     free(specific);
     free(window_data);
     vesa_dispose();
@@ -363,7 +363,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   }
 
   if ((actual_bpp != 32 || bytes_per_scanline != width << 2) && !specific->scanline_buffer) {
-    mfb_log(MFB_LOG_ERROR, "Cannot allocate DOS scanline buffer");
+    MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scanline buffer");
     free(specific->scale_buffer);
     free(specific);
     free(window_data);
@@ -395,7 +395,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
   }
 
-  mfb_log(MFB_LOG_DEBUG,
+  MFB_LOG(MFB_LOG_DEBUG,
           "DOS window created (%ux%u, actual %ux%u, bpp=%u, pitch=%u)", width,
           height, actual_width, actual_height, actual_bpp, bytes_per_scanline);
 
@@ -506,7 +506,7 @@ update_keyboard(SWindowData *window_data) {
       ascii = use_shift ? scancode_to_ascii_shift[scancode] : base_ascii;
     }
 
-    //mfb_log(MFB_LOG_TRACE, "scancode=%u key=%s ascii=%u pressed=%u",
+    //MFB_LOG(MFB_LOG_TRACE, "scancode=%u key=%s ascii=%u pressed=%u",
     //        (unsigned) scancode, mfb_get_key_name((mfb_key) key_code),
     //        (unsigned)(uint8_t) ascii, (unsigned) pressed);
 
@@ -562,7 +562,7 @@ update_keyboard(SWindowData *window_data) {
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
   if (!window) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_update_events: invalid window");
     return MFB_STATE_INVALID_WINDOW;
   }
 
@@ -590,17 +590,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   uint32_t buffer_stride = 0;
 
   if (!window) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid window");
     return MFB_STATE_INVALID_WINDOW;
   }
 
   if (!buffer) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer");
     return MFB_STATE_INVALID_BUFFER;
   }
 
   if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid buffer size %ux%u", width, height);
     return MFB_STATE_INVALID_BUFFER;
   }
 
@@ -611,7 +611,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
   SWindowData_DOS *dos_window_data = window_data->specific;
   if (!dos_window_data) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
     return MFB_STATE_INVALID_WINDOW;
   }
 
@@ -746,7 +746,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 bool
 mfb_wait_sync(struct mfb_window *window) {
   if (!window) {
-    mfb_log(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
+    MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window");
     return false;
   }
 

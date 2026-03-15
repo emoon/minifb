@@ -29,13 +29,13 @@ create_window_data(unsigned width, unsigned height) {
     size_t buffer_total_bytes = 0;
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: invalid window buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: invalid window buffer size %ux%u.", width, height);
         return NULL;
     }
 
     window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
@@ -43,7 +43,7 @@ create_window_data(unsigned width, unsigned height) {
     SWindowData_OSX *window_data_specific = malloc(sizeof(SWindowData_OSX));
     if (window_data_specific == NULL) {
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData_OSX.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData_OSX.");
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_OSX));
@@ -59,7 +59,7 @@ create_window_data(unsigned width, unsigned height) {
     if (!window_data->draw_buffer) {
         free(window_data_specific);
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate draw buffer (%zu bytes).", buffer_total_bytes);
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate draw buffer (%zu bytes).", buffer_total_bytes);
         return NULL;
     }
     memset(window_data->draw_buffer, 0, buffer_total_bytes);
@@ -125,16 +125,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         const char *window_title_c = (title != NULL && title[0] != '\0') ? title : "minifb";
 
         if (width == 0 || height == 0) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: invalid window size %ux%u.", width, height);
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: invalid window size %ux%u.", width, height);
             return NULL;
         }
 
         if ((effective_flags & ~known_flags) != 0u) {
-            mfb_log(MFB_LOG_WARNING, "MacMiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
+            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: unknown window flags 0x%x will be ignored.", effective_flags & ~known_flags);
         }
 
         if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
-            mfb_log(MFB_LOG_WARNING, "MacMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
             effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
         }
 
@@ -167,7 +167,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             styles = NSWindowStyleMaskFullScreen;
             NSScreen *mainScreen = [NSScreen mainScreen];
             if (mainScreen == nil) {
-                mfb_log(MFB_LOG_WARNING, "MacMiniFB: main screen unavailable for MFB_WF_FULLSCREEN; using requested size %ux%u.", width, height);
+                MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: main screen unavailable for MFB_WF_FULLSCREEN; using requested size %ux%u.", width, height);
                 window_data->window_width  = width;
                 window_data->window_height = height;
             }
@@ -196,7 +196,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         window_data_specific->window = [[OSXWindow alloc] initWithContentRect:frameRect styleMask:styles backing:NSBackingStoreBuffered defer:NO windowData:window_data];
         if (!window_data_specific->window) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to create OSXWindow.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to create OSXWindow.");
             destroy_window_data(window_data);
             return NULL;
         }
@@ -208,20 +208,20 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #if defined(USE_METAL_API)
         window_data_specific->viewController = [[OSXViewDelegate alloc] initWithWindowData:window_data];
         if (window_data_specific->viewController == nil || window_data_specific->viewController->metal_device == nil) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to initialize Metal view controller.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to initialize Metal view controller.");
             destroy_window_data(window_data);
             return NULL;
         }
 
         MTKView* view = [[MTKView alloc] initWithFrame:rectangle];
         if (view == nil) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to create MTKView.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to create MTKView.");
             destroy_window_data(window_data);
             return NULL;
         }
         view.device   = window_data_specific->viewController->metal_device;
         if (view.device == nil) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: MTKView has no Metal device.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: MTKView has no Metal device.");
             [view release];
             destroy_window_data(window_data);
             return NULL;
@@ -236,7 +236,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         NSString *window_title = [NSString stringWithUTF8String:window_title_c];
         if (window_title == nil) {
-            mfb_log(MFB_LOG_WARNING, "MacMiniFB: window title is not valid UTF-8; falling back to default title.");
+            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: window title is not valid UTF-8; falling back to default title.");
             window_title = @"minifb";
         }
         [window_data_specific->window setTitle:window_title];
@@ -249,7 +249,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
         window_data_specific->timer = mfb_timer_create();
         if (window_data_specific->timer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to create frame timer.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to create frame timer.");
             destroy_window_data(window_data);
             return NULL;
         }
@@ -260,10 +260,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
 #if defined(USE_METAL_API)
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: window created using Metal API (title='%s', size=%ux%u, flags=0x%x).",
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: window created using Metal API (title='%s', size=%ux%u, flags=0x%x).",
                 window_title_c, width, height, flags);
 #else
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: window created using Cocoa API (title='%s', size=%ux%u, flags=0x%x).",
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: window created using Cocoa API (title='%s', size=%ux%u, flags=0x%x).",
                 window_title_c, width, height, flags);
 #endif
 
@@ -280,40 +280,40 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     size_t total_bytes = 0;
 
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     // Early exit
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     if (buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with a null buffer.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with a null buffer.");
         return MFB_STATE_INVALID_BUFFER;
     }
     if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
     if (window_data_specific ==  NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: missing macOS-specific window data in mfb_update_ex.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: missing macOS-specific window data in mfb_update_ex.");
         return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data_specific->window == nil) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex has a null OSXWindow handle.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_update_ex has a null OSXWindow handle.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
         void *new_draw_buffer = malloc(total_bytes);
         if (new_draw_buffer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to allocate resized draw buffer (%zu bytes).", total_bytes);
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate resized draw buffer (%zu bytes).", total_bytes);
             return MFB_STATE_INTERNAL_ERROR;
         }
 
@@ -327,7 +327,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = buffer_stride;
 
         if (window_data_specific->viewController == nil) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: Metal view controller is missing during buffer resize.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: Metal view controller is missing during buffer resize.");
             window_data->buffer_width  = previous_width;
             window_data->buffer_height = previous_height;
             window_data->buffer_stride = previous_stride;
@@ -335,7 +335,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             return MFB_STATE_INVALID_WINDOW;
         }
         if (![window_data_specific->viewController resizeTextures]) {
-            mfb_log(MFB_LOG_ERROR, "MacMiniFB: failed to resize Metal textures after framebuffer resize.");
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to resize Metal textures after framebuffer resize.");
             window_data->buffer_width  = previous_width;
             window_data->buffer_height = previous_height;
             window_data->buffer_stride = previous_stride;
@@ -355,14 +355,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if (window_data->draw_buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: internal draw buffer is null in mfb_update_ex.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: internal draw buffer is null in mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
     }
     memcpy(window_data->draw_buffer, buffer, total_bytes);
 
     update_events(window_data);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex detected close request after event processing.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_ex detected close request after event processing.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -385,18 +385,18 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     update_events(window_data);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events detected close request after event processing.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_update_events detected close request after event processing.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -404,7 +404,7 @@ mfb_update_events(struct mfb_window *window) {
 
     SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
     if (window_data_specific == NULL || window_data_specific->window == nil) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_update_events has invalid macOS window state.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_update_events has invalid macOS window state.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
@@ -429,28 +429,28 @@ bool
 mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync called with an invalid window.");
         return false;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return false;
     }
 
     SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
     if (window_data_specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing macOS-specific window data.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing macOS-specific window data.");
         return false;
     }
     if (window_data_specific->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing frame timer state.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
 
     update_events(window_data);
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request after event processing.");
+        MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request after event processing.");
         destroy_window_data(window_data);
         return false;
     }
@@ -483,7 +483,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
             update_events(window_data);
             if (window_data->close) {
-                mfb_log(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request while waiting for frame sync.");
+                MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: mfb_wait_sync detected close request while waiting for frame sync.");
                 destroy_window_data(window_data);
                 return false;
             }
@@ -686,7 +686,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 #if defined(USE_METAL_API)
     SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
     if (window_data_specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_set_viewport missing macOS-specific window data.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_set_viewport missing macOS-specific window data.");
         return false;
     }
 
@@ -723,7 +723,7 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
             scale = [window_data_specific->window backingScaleFactor];
         }
         else {
-            mfb_log(MFB_LOG_WARNING, "MacMiniFB: missing macOS window handle while querying monitor scale; falling back to 1.0.");
+            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: missing macOS window handle while querying monitor scale; falling back to 1.0.");
         }
     }
 
@@ -779,7 +779,7 @@ mfb_timer_init() {
 void mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_show_cursor called with a null window pointer.");
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_show_cursor called with a null window pointer.");
         return;
     }
 
@@ -794,7 +794,7 @@ void mfb_show_cursor(struct mfb_window *window, bool show) {
                 [window_data_osx->window performSelectorOnMainThread:@selector(updateCursorRects) withObject:nil waitUntilDone:YES];
             }
             else {
-                mfb_log(MFB_LOG_ERROR, "MacMiniFB: mfb_show_cursor cannot update cursor rects (missing macOS window state).");
+                MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_show_cursor cannot update cursor rects (missing macOS window state).");
             }
         }
     }

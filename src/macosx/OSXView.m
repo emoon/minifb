@@ -59,7 +59,7 @@
 
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
     if (space == NULL) {
-        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create RGB color space for drawRect.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXView: failed to create RGB color space for drawRect.");
         return;
     }
     CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
@@ -68,7 +68,7 @@
                                                               0x0
     );
     if (provider == NULL) {
-        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create CGDataProvider for drawRect.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXView: failed to create CGDataProvider for drawRect.");
         CGColorSpaceRelease(space);
         return;
     }
@@ -86,7 +86,7 @@
                                  , kCGRenderingIntentDefault
     );
     if (img == NULL) {
-        mfb_log(MFB_LOG_ERROR, "OSXView: failed to create CGImage for drawRect.");
+        MFB_LOG(MFB_LOG_ERROR, "OSXView: failed to create CGImage for drawRect.");
         CGDataProviderRelease(provider);
         CGColorSpaceRelease(space);
         return;
@@ -165,7 +165,7 @@
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
         if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
-            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
+            MFB_LOG(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
                     (unsigned) [event buttonNumber]);
             mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
         }
@@ -181,7 +181,7 @@
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
         if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
-            mfb_log(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
+            MFB_LOG(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
                     (unsigned) [event buttonNumber]);
             mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
         }

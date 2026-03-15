@@ -119,6 +119,7 @@ double              mfb_timer_get_resolution(void);
 // Logger
 void                mfb_set_logger(mfb_log_func user_logger);
 void                mfb_set_log_level(mfb_log_level level);
+void                mfb_log(const mfb_log_info *info, const char *tag, const char *message, ...);
 
 //-------------------------------------
 

@@ -40,30 +40,30 @@ mfb_validate_viewport(const SWindowData *window_data,
     const char *name = (backend_name != NULL) ? backend_name : "MiniFB";
 
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "%s: mfb_set_viewport called with a null window pointer.", name);
+        MFB_LOG(MFB_LOG_ERROR, "%s: mfb_set_viewport called with a null window pointer.", name);
         return false;
     }
 
     if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "%s: mfb_set_viewport called with zero viewport size (width=%u, height=%u).",
+        MFB_LOG(MFB_LOG_ERROR, "%s: mfb_set_viewport called with zero viewport size (width=%u, height=%u).",
                 name, width, height);
         return false;
     }
 
     if (window_data->window_width == 0 || window_data->window_height == 0) {
-        mfb_log(MFB_LOG_ERROR, "%s: mfb_set_viewport called with invalid window dimensions %ux%u.",
+        MFB_LOG(MFB_LOG_ERROR, "%s: mfb_set_viewport called with invalid window dimensions %ux%u.",
                 name, window_data->window_width, window_data->window_height);
         return false;
     }
 
     if (offset_x > window_data->window_width || width > window_data->window_width - offset_x) {
-        mfb_log(MFB_LOG_ERROR, "%s: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
+        MFB_LOG(MFB_LOG_ERROR, "%s: viewport exceeds window width (offset_x=%u, width=%u, window_width=%u).",
                 name, offset_x, width, window_data->window_width);
         return false;
     }
 
     if (offset_y > window_data->window_height || height > window_data->window_height - offset_y) {
-        mfb_log(MFB_LOG_ERROR, "%s: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
+        MFB_LOG(MFB_LOG_ERROR, "%s: viewport exceeds window height (offset_y=%u, height=%u, window_height=%u).",
                 name, offset_y, height, window_data->window_height);
         return false;
     }

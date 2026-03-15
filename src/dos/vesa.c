@@ -161,7 +161,7 @@ vesa_init(uint32_t width, uint32_t height,
       break;
 
     if (number_of_modes >= MAX_NUM_VESA_MODES) {
-      mfb_log(MFB_LOG_WARNING,
+      MFB_LOG(MFB_LOG_WARNING,
               "VESA mode list truncated at %d entries. Additional modes exist "
               "and were ignored.",
               number_of_modes);
@@ -171,18 +171,18 @@ vesa_init(uint32_t width, uint32_t height,
     mode_ptr += 2;
   }
 
-  mfb_log(MFB_LOG_TRACE, "VESA reported %d mode entries", number_of_modes);
+  MFB_LOG(MFB_LOG_TRACE, "VESA reported %d mode entries", number_of_modes);
 
   int found_mode = 0;
   mode_info_t found_mode_info = {0};
   for (int i = 0; i < number_of_modes; i++) {
     mode_info_t mode_info = {0};
     if (!get_mode_info(mode_list[i], &mode_info)) {
-      mfb_log(MFB_LOG_WARNING, "Couldn't get VESA mode info at index %d", i);
+      MFB_LOG(MFB_LOG_WARNING, "Couldn't get VESA mode info at index %d", i);
       continue;
     }
 
-    mfb_log(MFB_LOG_TRACE,
+    MFB_LOG(MFB_LOG_TRACE,
             "mode=%d res=%ux%u bpp=%u model=%u planes=%u bps=%u linear=%u",
             mode_list[i], (unsigned) mode_info.width, (unsigned) mode_info.height,
             (unsigned) mode_info.bits_per_pixel, (unsigned) mode_info.memory_model,
@@ -213,12 +213,12 @@ vesa_init(uint32_t width, uint32_t height,
   }
 
   if (!found_mode) {
-    mfb_log(MFB_LOG_ERROR, "Couldn't find fitting VESA mode for %ux%u", width,
+    MFB_LOG(MFB_LOG_ERROR, "Couldn't find fitting VESA mode for %ux%u", width,
             height);
     return false;
   }
 
-  mfb_log(MFB_LOG_TRACE, "Selected VESA mode=%d actual=%ux%u bpp=%u bps=%u",
+  MFB_LOG(MFB_LOG_TRACE, "Selected VESA mode=%d actual=%ux%u bpp=%u bps=%u",
           found_mode, (unsigned) found_mode_info.width,
           (unsigned) found_mode_info.height,
           (unsigned) found_mode_info.bits_per_pixel,
@@ -227,13 +227,13 @@ vesa_init(uint32_t width, uint32_t height,
   vesa_frame_buffer_mapping.address = found_mode_info.physical_base_ptr;
   vesa_frame_buffer_mapping.size = (uint32_t) vesa_info.total_memory << 16;
   if (__dpmi_physical_address_mapping(&vesa_frame_buffer_mapping) != 0) {
-    mfb_log(MFB_LOG_ERROR, "Couldn't create VESA frame buffer address mapping");
+    MFB_LOG(MFB_LOG_ERROR, "Couldn't create VESA frame buffer address mapping");
     return false;
   }
 
   vesa_frame_buffer_selector = __dpmi_allocate_ldt_descriptors(1);
   if (vesa_frame_buffer_selector < 0) {
-    mfb_log(MFB_LOG_ERROR, "Couldn't create VESA frame buffer selector");
+    MFB_LOG(MFB_LOG_ERROR, "Couldn't create VESA frame buffer selector");
     __dpmi_free_physical_address_mapping(&vesa_frame_buffer_mapping);
     return false;
   }
@@ -244,7 +244,7 @@ vesa_init(uint32_t width, uint32_t height,
                            vesa_frame_buffer_mapping.size - 1);
 
   if (!set_vesa_mode(found_mode | 0x4000)) {
-    mfb_log(MFB_LOG_ERROR, "Couldn't set VESA mode");
+    MFB_LOG(MFB_LOG_ERROR, "Couldn't set VESA mode");
     __dpmi_free_physical_address_mapping(&vesa_frame_buffer_mapping);
     __dpmi_free_ldt_descriptor(vesa_frame_buffer_selector);
     return false;

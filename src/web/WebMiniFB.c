@@ -33,13 +33,13 @@ mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned
     }
 
     if ((size_t) width > SIZE_MAX / (size_t) height) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: swizzle buffer size overflow for %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: swizzle buffer size overflow for %ux%u.", width, height);
         return NULL;
     }
 
     size_t pixels = (size_t) width * (size_t) height;
     if (pixels > SIZE_MAX / 4) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: swizzle buffer byte size overflow for %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: swizzle buffer byte size overflow for %ux%u.", width, height);
         return NULL;
     }
 
@@ -47,7 +47,7 @@ mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned
     if (required > window_data_web->swizzle_buffer_size) {
         uint8_t *swizzle_buffer = realloc(window_data_web->swizzle_buffer, required);
         if (swizzle_buffer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to allocate %zu bytes for swizzle buffer.", required);
+            MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate %zu bytes for swizzle buffer.", required);
             return NULL;
         }
         window_data_web->swizzle_buffer = swizzle_buffer;
@@ -262,7 +262,7 @@ window_data_set_buffer_size(SWindowData *window_data, unsigned width, unsigned h
 
     if (!window_data) return;
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: invalid buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: invalid buffer size %ux%u.", width, height);
         window_data->buffer_width = 0;
         window_data->buffer_height = 0;
         window_data->buffer_stride = 0;
@@ -763,22 +763,22 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     SWindowData *window_data;
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: invalid window size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
 
     if ((effective_flags & ~supported_flags) != 0u) {
-        mfb_log(MFB_LOG_WARNING, "WebMiniFB: window flags 0x%x are not supported by the web backend and will be ignored.", effective_flags & ~supported_flags);
+        MFB_LOG(MFB_LOG_WARNING, "WebMiniFB: window flags 0x%x are not supported by the web backend and will be ignored.", effective_flags & ~supported_flags);
     }
 
     if ((effective_flags & MFB_WF_FULLSCREEN) && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) {
-        mfb_log(MFB_LOG_WARNING, "WebMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
+        MFB_LOG(MFB_LOG_WARNING, "WebMiniFB: MFB_WF_FULLSCREEN and MFB_WF_FULLSCREEN_DESKTOP were both requested; MFB_WF_FULLSCREEN takes precedence.");
         effective_flags &= ~MFB_WF_FULLSCREEN_DESKTOP;
     }
 
     window_data = malloc(sizeof(SWindowData));
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
@@ -787,17 +787,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     int canvas_existed = mfb_canvas_exists_js(window_title);
     void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen);
     if (!specific) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);
         free(window_data);
         return NULL;
     }
     if (!canvas_existed) {
-        mfb_log(MFB_LOG_WARNING, "WebMiniFB: canvas with id '%s' was not found; created a new canvas and appended it to the document.", window_title);
+        MFB_LOG(MFB_LOG_WARNING, "WebMiniFB: canvas with id '%s' was not found; created a new canvas and appended it to the document.", window_title);
     }
 
     SWindowData_Web *window_data_web = malloc(sizeof(SWindowData_Web));
     if (window_data_web == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData_Web.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData_Web.");
         mfb_close_js((uintptr_t) specific);
         free(window_data);
         return NULL;
@@ -829,7 +829,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->is_initialized = true;
     window_data->is_cursor_visible = true;
 
-    mfb_log(MFB_LOG_DEBUG, "WebMiniFB: window created using Web API (title='%s', size=%ux%u, flags=0x%x).",
+    MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: window created using Web API (title='%s', size=%ux%u, flags=0x%x).",
             window_title, width, height, flags);
     return (struct mfb_window *) window_data;
 }
@@ -892,11 +892,11 @@ mfb_update_state
 mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -906,15 +906,15 @@ mfb_update_events(struct mfb_window *window) {
 
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events detected close request after event processing.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events detected close request after event processing.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window.");
     }
     else if (state == MFB_STATE_INTERNAL_ERROR) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error.");
     }
 
     return state;
@@ -986,23 +986,23 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     if (buffer == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
         return MFB_STATE_INVALID_BUFFER;
     }
 
     uint32_t buffer_stride;
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
 
@@ -1013,19 +1013,19 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     mfb_update_state state = mfb_update_js(window, buffer, width, height);
     if (state == MFB_STATE_EXIT) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after frame update.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after frame update.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state != MFB_STATE_OK) {
         if (state == MFB_STATE_INVALID_BUFFER) {
-            mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
+            MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex called with an invalid buffer.");
         }
         else if (state == MFB_STATE_INVALID_WINDOW) {
-            mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported invalid window.");
+            MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported invalid window.");
         }
         else if (state == MFB_STATE_INTERNAL_ERROR) {
-            mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported internal error.");
+            MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_js reported internal error.");
         }
         return state;
     }
@@ -1035,15 +1035,15 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after event processing.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after event processing.");
         mfb_destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window after frame update.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned invalid window after frame update.");
     }
     else if (state == MFB_STATE_INTERNAL_ERROR) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error after frame update.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_update_events_js returned internal error after frame update.");
     }
 
     return state;
@@ -1054,11 +1054,11 @@ bool
 mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync called with an invalid window.");
         return false;
     }
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync aborted because the window is marked for close.");
         mfb_destroy_window_data(window_data);
         return false;
     }
@@ -1070,16 +1070,16 @@ mfb_wait_sync(struct mfb_window *window) {
 
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT || window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
+        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
         mfb_destroy_window_data(window_data);
         return false;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned invalid window.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned invalid window.");
         return false;
     }
     if (state == MFB_STATE_INTERNAL_ERROR) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned internal error.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned internal error.");
         return false;
     }
 
@@ -1149,7 +1149,7 @@ void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     SWindowData *window_data = (SWindowData *) window;
     if (window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor called with a null window pointer.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor called with a null window pointer.");
         return;
     }
 
@@ -1157,7 +1157,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
 
     SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
     if (window_data_web == NULL) {
-        mfb_log(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor missing web-specific window data.");
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor missing web-specific window data.");
         return;
     }
 

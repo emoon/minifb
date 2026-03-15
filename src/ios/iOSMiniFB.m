@@ -78,13 +78,13 @@ create_window_data(unsigned width, unsigned height) {
     size_t   total_bytes = 0;
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: invalid window buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: invalid window buffer size %ux%u.", width, height);
         return NULL;
     }
 
     SWindowData *window_data = malloc(sizeof(SWindowData));
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate SWindowData.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate SWindowData.");
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
@@ -92,7 +92,7 @@ create_window_data(unsigned width, unsigned height) {
     SWindowData_IOS *window_data_ios = malloc(sizeof(SWindowData_IOS));
     if(window_data_ios == NULL) {
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate SWindowData_IOS.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate SWindowData_IOS.");
         return NULL;
     }
     memset((void *) window_data_ios, 0, sizeof(SWindowData_IOS));
@@ -116,7 +116,7 @@ create_window_data(unsigned width, unsigned height) {
     if (!window_data->draw_buffer) {
         free(window_data_ios);
         free(window_data);
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate draw buffer (%zu bytes).", total_bytes);
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate draw buffer (%zu bytes).", total_bytes);
         return NULL;
     }
     memset(window_data->draw_buffer, 0, total_bytes);
@@ -132,12 +132,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     kUnused(title);
 
     if (width == 0 || height == 0) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: invalid window size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
     }
 
     if (flags != 0u) {
-        mfb_log(MFB_LOG_WARNING, "iOSMiniFB: window flags 0x%x are ignored by the iOS backend.", flags);
+        MFB_LOG(MFB_LOG_WARNING, "iOSMiniFB: window flags 0x%x are ignored by the iOS backend.", flags);
     }
 
     @autoreleasepool {
@@ -150,7 +150,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         window_data_ios->timer = mfb_timer_create();
         if (window_data_ios->timer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to create frame timer.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to create frame timer.");
             free(window_data->draw_buffer);
             free(window_data_ios);
             free(window_data);
@@ -163,7 +163,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
             // project > executable > general
             // to get the real size with [UIScreen mainScreen].bounds].
             window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-            mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: UIApplication has no window, creating one (%f x %f).",
+            MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: UIApplication has no window, creating one (%f x %f).",
                     [UIScreen mainScreen].bounds.size.width,
                     [UIScreen mainScreen].bounds.size.height);
         }
@@ -188,7 +188,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
         window_data->is_initialized = true;
 
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: window created (size=%ux%u, screen=%.0fx%.0f, scale=%.1f).",
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: window created (size=%ux%u, screen=%.0fx%.0f, scale=%.1f).",
                 width, height,
                 [UIScreen mainScreen].bounds.size.width,
                 [UIScreen mainScreen].bounds.size.height,
@@ -240,36 +240,36 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     size_t total_bytes = 0;
 
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     if(window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
     if(buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with a null buffer.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with a null buffer.");
         return MFB_STATE_INVALID_BUFFER;
     }
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, &total_bytes)) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: missing iOS-specific window data in mfb_update_ex.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: missing iOS-specific window data in mfb_update_ex.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     if(window_data->buffer_width != width || window_data->buffer_height != height) {
         void *new_draw_buffer = malloc(total_bytes);
         if (new_draw_buffer == NULL) {
-            mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate resized draw buffer (%zu bytes).", total_bytes);
+            MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate resized draw buffer (%zu bytes).", total_bytes);
             return MFB_STATE_INTERNAL_ERROR;
         }
 
@@ -282,7 +282,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = buffer_stride;
 
         if (window_data_ios->view_delegate == nil) {
-            mfb_log(MFB_LOG_ERROR, "iOSMiniFB: Metal view delegate is missing during buffer resize.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: Metal view delegate is missing during buffer resize.");
             window_data->buffer_width  = previous_width;
             window_data->buffer_height = previous_height;
             window_data->buffer_stride = previous_stride;
@@ -291,7 +291,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         }
 
         if (![window_data_ios->view_delegate resizeTextures]) {
-            mfb_log(MFB_LOG_ERROR, "iOSMiniFB: failed to resize Metal textures after framebuffer resize.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to resize Metal textures after framebuffer resize.");
             window_data->buffer_width  = previous_width;
             window_data->buffer_height = previous_height;
             window_data->buffer_stride = previous_stride;
@@ -304,14 +304,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if (window_data->draw_buffer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: internal draw buffer is null in mfb_update_ex.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: internal draw buffer is null in mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
     memcpy(window_data->draw_buffer, buffer, total_bytes);
 
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex detected close request.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex detected close request.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -330,12 +330,12 @@ mfb_update_events(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
 
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_events called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_events called with an invalid window.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_events aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
@@ -360,19 +360,19 @@ mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
 
     if(window_data == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync called with an invalid window.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync called with an invalid window.");
         return false;
     }
 
     if (window_data->close) {
-        mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync aborted because the window is marked for close.");
+        MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync aborted because the window is marked for close.");
         destroy_window_data(window_data);
         return false;
     }
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL || window_data_ios->timer == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_wait_sync missing iOS timer state.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_wait_sync missing iOS timer state.");
         return false;
     }
 
@@ -395,7 +395,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
 
         if (window_data->close) {
-            mfb_log(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync detected close request while waiting.");
+            MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_wait_sync detected close request while waiting.");
             destroy_window_data(window_data);
             return false;
         }
@@ -430,7 +430,7 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
     SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
     if (window_data_ios == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport missing iOS-specific window data.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport missing iOS-specific window data.");
         return false;
     }
 

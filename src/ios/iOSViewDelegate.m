@@ -143,7 +143,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 //-------------------------------------
 -(nonnull instancetype) initWithMetalKitView:(nonnull MTKView *) view windowData:(nonnull SWindowData *) windowData {
     if (view == nil || windowData == NULL || windowData->specific == NULL) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: initWithMetalKitView received invalid state.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: initWithMetalKitView received invalid state.");
         return nil;
     }
 
@@ -157,7 +157,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
         metal_device  = view.device;
         if (metal_device == nil) {
-            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: MTKView has no Metal device.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: MTKView has no Metal device.");
 #if !__has_feature(objc_arc)
             [self release];
 #endif
@@ -169,7 +169,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
         // Used for syncing the CPU and GPU
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
         if (semaphore == nil) {
-            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create frame semaphore.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: failed to create frame semaphore.");
 #if !__has_feature(objc_arc)
             [self release];
 #endif
@@ -179,7 +179,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
         // Setup command queue
         command_queue = [metal_device newCommandQueue];
         if (command_queue == nil) {
-            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create command queue.");
+            MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: failed to create command queue.");
 #if !__has_feature(objc_arc)
             [self release];
 #endif
@@ -219,7 +219,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 #endif
 
     if (error || !metal_library) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to create shaders: %s", get_metal_error_description(error));
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: unable to create shaders: %s", get_metal_error_description(error));
         return false;
     }
 
@@ -227,12 +227,12 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
     id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
 
     if (!vertex_shader_func) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to find vertex function 'vertFunc'.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: unable to find vertex function 'vertFunc'.");
         return false;
     }
 
     if (!fragment_shader_func) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: unable to find fragment function 'fragFunc'.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: unable to find fragment function 'fragFunc'.");
 
 #if !__has_feature(objc_arc)
         [vertex_shader_func release];
@@ -257,7 +257,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 #endif
 
     if (!pipeline_state) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create pipeline state: %s", get_metal_error_description(error));
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: failed to create pipeline state: %s", get_metal_error_description(error));
         return false;
     }
 
@@ -267,7 +267,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 //-------------------------------------
 - (bool) _createAssets {
     if (window_data == NULL || window_data_ios == NULL || metal_device == nil) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: invalid state while creating assets.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: invalid state while creating assets.");
         return false;
     }
 
@@ -283,7 +283,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
         texture_buffers[i] = [metal_device newTextureWithDescriptor:td];
         if (texture_buffers[i] == nil) {
-            mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: failed to create texture buffer %d.", i);
+            MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: failed to create texture buffer %d.", i);
 #if !__has_feature(objc_arc)
             for (int j = 0; j < i; ++j) {
                 [texture_buffers[j] release];
@@ -300,7 +300,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 //-------------------------------------
 - (bool) resizeTextures {
     if (window_data == NULL || metal_device == nil) {
-        mfb_log(MFB_LOG_ERROR, "iOSViewDelegate: resizeTextures called with invalid window state.");
+        MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: resizeTextures called with invalid window state.");
         return false;
     }
 
@@ -354,7 +354,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
     // Create a new command buffer for each render pass to the current drawable
     id<MTLCommandBuffer> commandBuffer = [command_queue commandBuffer];
     if (commandBuffer == nil || texture_buffers[current_buffer] == nil) {
-        mfb_log(MFB_LOG_WARNING, "iOSViewDelegate: skipping frame due to unavailable command buffer or texture.");
+        MFB_LOG(MFB_LOG_WARNING, "iOSViewDelegate: skipping frame due to unavailable command buffer or texture.");
         dispatch_semaphore_signal(semaphore);
         return;
     }
@@ -384,7 +384,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
         // Create a render command encoder so we can render into something
         id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         if (renderEncoder == nil) {
-            mfb_log(MFB_LOG_WARNING, "iOSViewDelegate: failed to create render encoder.");
+            MFB_LOG(MFB_LOG_WARNING, "iOSViewDelegate: failed to create render encoder.");
             [commandBuffer commit];
             return;
         }

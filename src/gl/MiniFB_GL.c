@@ -95,13 +95,13 @@ setup_pixel_format(HDC hDC) {
 
     pixelFormat = ChoosePixelFormat(hDC, &pfd);
     if (pixelFormat == 0) {
-        mfb_log(MFB_LOG_ERROR, "ChoosePixelFormat failed");
+        MFB_LOG(MFB_LOG_ERROR, "ChoosePixelFormat failed");
         MessageBox(WindowFromDC(hDC), "ChoosePixelFormat failed.", "Error", MB_ICONERROR | MB_OK);
         return false;
     }
 
     if (SetPixelFormat(hDC, pixelFormat, &pfd) != TRUE) {
-        mfb_log(MFB_LOG_ERROR, "SetPixelFormat failed");
+        MFB_LOG(MFB_LOG_ERROR, "SetPixelFormat failed");
         MessageBox(WindowFromDC(hDC), "SetPixelFormat failed.", "Error", MB_ICONERROR | MB_OK);
         return false;
     }
@@ -135,7 +135,7 @@ setup_pixel_format(SWindowData_X11 *window_data_specific) {
 
     XVisualInfo *visualInfo = glXChooseVisual(window_data_specific->display, window_data_specific->screen, glxAttribs);
     if (visualInfo == 0) {
-        mfb_log(MFB_LOG_ERROR, "Could not create a compatible X11 visual for OpenGL");
+        MFB_LOG(MFB_LOG_ERROR, "Could not create a compatible X11 visual for OpenGL");
         XCloseDisplay(window_data_specific->display);
         window_data_specific->display = NULL;
         return false;
@@ -144,7 +144,7 @@ setup_pixel_format(SWindowData_X11 *window_data_specific) {
     window_data_specific->context = glXCreateContext(window_data_specific->display, visualInfo, NULL, GL_TRUE);
     XFree(visualInfo);
     if (window_data_specific->context == NULL) {
-        mfb_log(MFB_LOG_ERROR, "glXCreateContext failed");
+        MFB_LOG(MFB_LOG_ERROR, "glXCreateContext failed");
         XCloseDisplay(window_data_specific->display);
         window_data_specific->display = NULL;
         return false;
@@ -169,24 +169,24 @@ create_GL_context(SWindowData *window_data) {
 
     window_data_specific->hGLRC = wglCreateContext(window_data_specific->hdc);
     if (window_data_specific->hGLRC == NULL) {
-        mfb_log(MFB_LOG_ERROR, "wglCreateContext failed");
+        MFB_LOG(MFB_LOG_ERROR, "wglCreateContext failed");
         return false;
     }
 
     if (wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC) == FALSE) {
-        mfb_log(MFB_LOG_ERROR, "wglMakeCurrent failed");
+        MFB_LOG(MFB_LOG_ERROR, "wglMakeCurrent failed");
         wglDeleteContext(window_data_specific->hGLRC);
         window_data_specific->hGLRC = 0;
         return false;
     }
 
-    mfb_log(MFB_LOG_DEBUG, "OpenGL context created (WGL)");
+    MFB_LOG(MFB_LOG_DEBUG, "OpenGL context created (WGL)");
     init_GL(window_data);
 
     SwapIntervalEXT    = (PFNWGLSWAPINTERVALEXTPROC)    wglGetProcAddress("wglSwapIntervalEXT");
     GetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC) wglGetProcAddress("wglGetSwapIntervalEXT");
     if (SwapIntervalEXT == NULL) {
-        mfb_log(MFB_LOG_DEBUG, "WGL swap control extension not available");
+        MFB_LOG(MFB_LOG_DEBUG, "WGL swap control extension not available");
     }
     set_target_fps_aux();
 
@@ -197,27 +197,27 @@ create_GL_context(SWindowData *window_data) {
 
     GLint majorGLX, minorGLX = 0;
     if (!glXQueryVersion(window_data_specific->display, &majorGLX, &minorGLX)) {
-        mfb_log(MFB_LOG_ERROR, "glXQueryVersion failed");
+        MFB_LOG(MFB_LOG_ERROR, "glXQueryVersion failed");
         XCloseDisplay(window_data_specific->display);
         window_data_specific->display = NULL;
         return false;
     }
 
     if (majorGLX <= 1 && minorGLX < 2) {
-        mfb_log(MFB_LOG_ERROR, "GLX 1.2 or greater is required");
+        MFB_LOG(MFB_LOG_ERROR, "GLX 1.2 or greater is required");
         XCloseDisplay(window_data_specific->display);
         window_data_specific->display = NULL;
         return false;
     }
     else {
-        mfb_log(MFB_LOG_DEBUG, "GLX version: %d.%d", majorGLX, minorGLX);
+        MFB_LOG(MFB_LOG_DEBUG, "GLX version: %d.%d", majorGLX, minorGLX);
     }
 
     if (setup_pixel_format(window_data_specific) == false)
         return false;
 
     if (!glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context)) {
-        mfb_log(MFB_LOG_ERROR, "glXMakeCurrent failed");
+        MFB_LOG(MFB_LOG_ERROR, "glXMakeCurrent failed");
         glXDestroyContext(window_data_specific->display, window_data_specific->context);
         window_data_specific->context = 0;
         XCloseDisplay(window_data_specific->display);
@@ -225,10 +225,10 @@ create_GL_context(SWindowData *window_data) {
         return false;
     }
 
-    mfb_log(MFB_LOG_DEBUG, "GL Vendor: %s", glGetString(GL_VENDOR) ? (const char *) glGetString(GL_VENDOR) : "unknown");
-    mfb_log(MFB_LOG_DEBUG, "GL Renderer: %s", glGetString(GL_RENDERER) ? (const char *) glGetString(GL_RENDERER) : "unknown");
-    mfb_log(MFB_LOG_DEBUG, "GL Version: %s", glGetString(GL_VERSION) ? (const char *) glGetString(GL_VERSION) : "unknown");
-    mfb_log(MFB_LOG_DEBUG, "GL Shading Language: %s", glGetString(GL_SHADING_LANGUAGE_VERSION) ? (const char *) glGetString(GL_SHADING_LANGUAGE_VERSION) : "unknown");
+    MFB_LOG(MFB_LOG_DEBUG, "GL Vendor: %s", glGetString(GL_VENDOR) ? (const char *) glGetString(GL_VENDOR) : "unknown");
+    MFB_LOG(MFB_LOG_DEBUG, "GL Renderer: %s", glGetString(GL_RENDERER) ? (const char *) glGetString(GL_RENDERER) : "unknown");
+    MFB_LOG(MFB_LOG_DEBUG, "GL Version: %s", glGetString(GL_VERSION) ? (const char *) glGetString(GL_VERSION) : "unknown");
+    MFB_LOG(MFB_LOG_DEBUG, "GL Shading Language: %s", glGetString(GL_SHADING_LANGUAGE_VERSION) ? (const char *) glGetString(GL_SHADING_LANGUAGE_VERSION) : "unknown");
 
     init_GL(window_data);
 
@@ -237,7 +237,7 @@ create_GL_context(SWindowData *window_data) {
         set_target_fps_aux();
     }
     else {
-        mfb_log(MFB_LOG_DEBUG, "GLX_EXT_swap_control not available");
+        MFB_LOG(MFB_LOG_DEBUG, "GLX_EXT_swap_control not available");
     }
 
     return true;
@@ -354,7 +354,7 @@ effective_resize_GL(SWindowData *window_data) {
 
         SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
         if (wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC) == FALSE) {
-            mfb_log(MFB_LOG_WARNING, "wglMakeCurrent failed during resize");
+            MFB_LOG(MFB_LOG_WARNING, "wglMakeCurrent failed during resize");
             return;
         }
 
@@ -362,7 +362,7 @@ effective_resize_GL(SWindowData *window_data) {
 
         SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
         if (!glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context)) {
-            mfb_log(MFB_LOG_WARNING, "glXMakeCurrent failed during resize");
+            MFB_LOG(MFB_LOG_WARNING, "glXMakeCurrent failed during resize");
             return;
         }
 
@@ -391,7 +391,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     GLenum format = BGRA;
 
     if (wglMakeCurrent(window_data_specific->hdc, window_data_specific->hGLRC) == FALSE) {
-        mfb_log(MFB_LOG_WARNING, "wglMakeCurrent failed during redraw");
+        MFB_LOG(MFB_LOG_WARNING, "wglMakeCurrent failed during redraw");
         return;
     }
 
@@ -401,7 +401,7 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     GLenum format = BGRA;
 
     if (!glXMakeCurrent(window_data_specific->display, window_data_specific->window, window_data_specific->context)) {
-        mfb_log(MFB_LOG_WARNING, "glXMakeCurrent failed during redraw");
+        MFB_LOG(MFB_LOG_WARNING, "glXMakeCurrent failed during redraw");
         return;
     }
 
@@ -498,16 +498,16 @@ set_target_fps_aux() {
         if (GetSwapIntervalEXT != NULL) {
             int currentInterval = GetSwapIntervalEXT();
             if (interval != currentInterval) {
-                mfb_log(MFB_LOG_WARNING, "Cannot set target swap interval");
+                MFB_LOG(MFB_LOG_WARNING, "Cannot set target swap interval");
             }
             else if (currentInterval > 0) {
                 use_hardware_sync = true;
             }
-            mfb_log(MFB_LOG_DEBUG, "Current swap interval is %d", currentInterval);
+            MFB_LOG(MFB_LOG_DEBUG, "Current swap interval is %d", currentInterval);
         }
         else {
             if (!success) {
-                mfb_log(MFB_LOG_WARNING, "Cannot set target swap interval");
+                MFB_LOG(MFB_LOG_WARNING, "Cannot set target swap interval");
             }
             else if (interval > 0) {
                 use_hardware_sync = true;
@@ -516,21 +516,21 @@ set_target_fps_aux() {
 
         g_use_hardware_sync = use_hardware_sync;
         if (g_use_hardware_sync) {
-            mfb_log(MFB_LOG_DEBUG, "Hardware sync enabled via swap interval %d", interval);
+            MFB_LOG(MFB_LOG_DEBUG, "Hardware sync enabled via swap interval %d", interval);
         }
         else if (interval == 0) {
-            mfb_log(MFB_LOG_DEBUG, "VSync disabled (swap interval 0)");
+            MFB_LOG(MFB_LOG_DEBUG, "VSync disabled (swap interval 0)");
         }
         else {
-            mfb_log(MFB_LOG_DEBUG, "Using software pacing");
+            MFB_LOG(MFB_LOG_DEBUG, "Using software pacing");
         }
     }
     else {
         if (interval > 0) {
-            mfb_log(MFB_LOG_DEBUG, "Swap interval extension not available; using software pacing");
+            MFB_LOG(MFB_LOG_DEBUG, "Swap interval extension not available; using software pacing");
         }
         else {
-            mfb_log(MFB_LOG_DEBUG, "Swap interval extension not available; VSync disabled");
+            MFB_LOG(MFB_LOG_DEBUG, "Swap interval extension not available; VSync disabled");
         }
     }
 
@@ -545,14 +545,14 @@ set_target_fps_aux() {
         unsigned int    currentInterval, maxInterval;
 
         if (dpy == NULL || drawable == 0) {
-            mfb_log(MFB_LOG_WARNING, "Cannot set target swap interval. No current GLX drawable");
+            MFB_LOG(MFB_LOG_WARNING, "Cannot set target swap interval. No current GLX drawable");
         }
         else {
             SwapIntervalEXT(dpy, drawable, interval);
             glXQueryDrawable(dpy, drawable, kGLX_SWAP_INTERVAL_EXT, &currentInterval);
             if (interval != (int) currentInterval) {
                 glXQueryDrawable(dpy, drawable, kGLX_MAX_SWAP_INTERVAL_EXT, &maxInterval);
-                mfb_log(MFB_LOG_WARNING, "Cannot set target swap interval. Current swap interval is %u (max: %u)", currentInterval, maxInterval);
+                MFB_LOG(MFB_LOG_WARNING, "Cannot set target swap interval. Current swap interval is %u (max: %u)", currentInterval, maxInterval);
             }
             else if (currentInterval > 0) {
                 use_hardware_sync = true;
@@ -561,21 +561,21 @@ set_target_fps_aux() {
 
         g_use_hardware_sync = use_hardware_sync;
         if (g_use_hardware_sync) {
-            mfb_log(MFB_LOG_DEBUG, "Hardware sync enabled via swap interval %d", interval);
+            MFB_LOG(MFB_LOG_DEBUG, "Hardware sync enabled via swap interval %d", interval);
         }
         else if (interval == 0) {
-            mfb_log(MFB_LOG_DEBUG, "VSync disabled (swap interval 0)");
+            MFB_LOG(MFB_LOG_DEBUG, "VSync disabled (swap interval 0)");
         }
         else {
-            mfb_log(MFB_LOG_DEBUG, "Using software pacing");
+            MFB_LOG(MFB_LOG_DEBUG, "Using software pacing");
         }
     }
     else {
         if (interval > 0) {
-            mfb_log(MFB_LOG_DEBUG, "Swap interval extension not available; using software pacing");
+            MFB_LOG(MFB_LOG_DEBUG, "Swap interval extension not available; using software pacing");
         }
         else {
-            mfb_log(MFB_LOG_DEBUG, "Swap interval extension not available; VSync disabled");
+            MFB_LOG(MFB_LOG_DEBUG, "Swap interval extension not available; VSync disabled");
         }
     }
 

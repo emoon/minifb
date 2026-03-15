@@ -112,8 +112,6 @@ active(struct mfb_window *window, bool is_active) {
 //-------------------------------------
 static void
 resize(struct mfb_window *window, int width, int height) {
-    uint32_t x = 0;
-    uint32_t y = 0;
     const char *window_title = "";
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
@@ -218,7 +216,8 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
 //-------------------------------------
 int
 main() {
-    int noise, carry, seed = 0xbeef;
+    int32_t noise, carry, seed = 0xbeef;
+
     g_buffer = (uint32_t *) malloc(g_width * g_height * sizeof(uint32_t));
     if (!g_buffer) {
         fprintf(stderr, "malloc failed (%u x %u)\n", g_width, g_height);
@@ -250,10 +249,10 @@ main() {
     mfb_set_viewport(window, 10, 10, g_width-20, g_height-20);
     print_getters(window);
 
-    do {
-        int              i;
-        mfb_update_state state;
+    uint32_t         i;
+    mfb_update_state state;
 
+    do {
         if (g_active) {
             for (i = 0; i < g_width * g_height; ++i) {
                 noise = seed;
