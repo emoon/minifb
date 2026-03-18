@@ -447,7 +447,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 - (void) mtkView:(nonnull MTKView *)view drawableSizeWillChange:(CGSize)size {
     (void) view;
     // size is already in PIXELS (Metal drawable size, not logical points).
-    // Do NOT multiply by screen scale here — that would double the value.
+    // Do NOT multiply by screen scale here - that would double the value.
     uint32_t drawable_width  = (uint32_t) lround(size.width);
     uint32_t drawable_height = (uint32_t) lround(size.height);
 

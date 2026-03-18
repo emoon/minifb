@@ -136,7 +136,7 @@ input_scale_for_view(iOSView *view) {
             int32_t y = (int32_t) lround(point.y * scale);
             window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) button_number);
             window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) button_number);
-            // button_status does not change on move — touch is still pressed
+            // button_status does not change on move - touch is still pressed
             kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
         }
     }

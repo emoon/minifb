@@ -1419,63 +1419,84 @@ void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 1.0f, y = 1.0f;
 
+    Display *display         = NULL;
+    Window   target_window   = 0;
+    int      screen          = -1;
+    bool     temp_display    = false;
+
     if (window != NULL) {
         SWindowData     *window_data = (SWindowData *) window;
         SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
 
         if (window_data_specific != NULL && window_data_specific->display != NULL) {
-            Display *display = window_data_specific->display;
-            int      screen  = window_data_specific->screen;
-            const char *scale_source = "default";
-            SX11ScaleMethods methods;
+            display       = window_data_specific->display;
+            target_window = window_data_specific->window;
+            screen        = window_data_specific->screen;
+        }
+    }
+    else {
+        display = XOpenDisplay(NULL);
+        if (display != NULL) {
+            temp_display  = true;
+            screen        = DefaultScreen(display);
+            target_window = DefaultRootWindow(display);
+        }
+    }
 
-            if (screen < 0) {
-                screen = DefaultScreen(display);
-            }
-            MFB_LOG(MFB_LOG_TRACE,
-                    "X11MiniFB: monitor_scale begin window=%lu screen=%d.",
-                    (unsigned long) window_data_specific->window,
-                    screen);
+    if (display != NULL) {
+        const char *scale_source = "default";
+        SX11ScaleMethods methods;
 
-            mfb_x11_query_scale_methods(display, window_data_specific->window, screen, &methods);
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xresources ok=%d scale=%.6f,%.6f.", methods.has_xresources ? 1 : 0, methods.x_xresources, methods.y_xresources);
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xsettings ok=%d scale=%.6f,%.6f.", methods.has_xsettings ? 1 : 0, methods.x_xsettings, methods.y_xsettings);
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-window ok=%d scale=%.6f,%.6f.", methods.has_xrandr_window ? 1 : 0, methods.x_xrandr_window, methods.y_xrandr_window);
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-any ok=%d scale=%.6f,%.6f.", methods.has_xrandr_any ? 1 : 0, methods.x_xrandr_any, methods.y_xrandr_any);
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method display-mm ok=%d scale=%.6f,%.6f.", methods.has_display_mm ? 1 : 0, methods.x_display_mm, methods.y_display_mm);
+        if (screen < 0) {
+            screen = DefaultScreen(display);
+        }
+        MFB_LOG(MFB_LOG_TRACE,
+                "X11MiniFB: monitor_scale begin window=%lu screen=%d.",
+                (unsigned long) target_window,
+                screen);
 
-            // Stable policy for desktop X11:
-            // 1) Xsettings (desktop settings protocol)
-            // 2) Xresources (logical DPI)
-            // 3) XRandR by current window
-            // 4) XRandR any output
-            // 5) Physical DPI from DisplayWidthMM/HeightMM
-            if (methods.has_xsettings) {
-                x = methods.x_xsettings;
-                y = methods.y_xsettings;
-                scale_source = "xsettings";
-            }
-            else if (methods.has_xresources) {
-                x = methods.x_xresources;
-                y = methods.y_xresources;
-                scale_source = "xresources";
-            }
-            else if (methods.has_xrandr_window) {
-                x = methods.x_xrandr_window;
-                y = methods.y_xrandr_window;
-                scale_source = "xrandr-window";
-            }
-            else if (methods.has_xrandr_any) {
-                x = methods.x_xrandr_any;
-                y = methods.y_xrandr_any;
-                scale_source = "xrandr-any";
-            }
-            else if (methods.has_display_mm) {
-                x = methods.x_display_mm;
-                y = methods.y_display_mm;
-                scale_source = "display-mm";
-            }
-            MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: monitor_scale resolved source=%s scale_x=%.3f scale_y=%.3f.", scale_source, x, y);
+        mfb_x11_query_scale_methods(display, target_window, screen, &methods);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xresources ok=%d scale=%.6f,%.6f.", methods.has_xresources ? 1 : 0, methods.x_xresources, methods.y_xresources);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xsettings ok=%d scale=%.6f,%.6f.", methods.has_xsettings ? 1 : 0, methods.x_xsettings, methods.y_xsettings);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-window ok=%d scale=%.6f,%.6f.", methods.has_xrandr_window ? 1 : 0, methods.x_xrandr_window, methods.y_xrandr_window);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method xrandr-any ok=%d scale=%.6f,%.6f.", methods.has_xrandr_any ? 1 : 0, methods.x_xrandr_any, methods.y_xrandr_any);
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: scale method display-mm ok=%d scale=%.6f,%.6f.", methods.has_display_mm ? 1 : 0, methods.x_display_mm, methods.y_display_mm);
+
+        // Stable policy for desktop X11:
+        // 1) Xsettings (desktop settings protocol)
+        // 2) Xresources (logical DPI)
+        // 3) XRandR by current window
+        // 4) XRandR any output
+        // 5) Physical DPI from DisplayWidthMM/HeightMM
+        if (methods.has_xsettings) {
+            x = methods.x_xsettings;
+            y = methods.y_xsettings;
+            scale_source = "xsettings";
+        }
+        else if (methods.has_xresources) {
+            x = methods.x_xresources;
+            y = methods.y_xresources;
+            scale_source = "xresources";
+        }
+        else if (methods.has_xrandr_window) {
+            x = methods.x_xrandr_window;
+            y = methods.y_xrandr_window;
+            scale_source = "xrandr-window";
+        }
+        else if (methods.has_xrandr_any) {
+            x = methods.x_xrandr_any;
+            y = methods.y_xrandr_any;
+            scale_source = "xrandr-any";
+        }
+        else if (methods.has_display_mm) {
+            x = methods.x_display_mm;
+            y = methods.y_display_mm;
+            scale_source = "display-mm";
+        }
+        MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: monitor_scale resolved source=%s scale_x=%.3f scale_y=%.3f.", scale_source, x, y);
+
+        if (temp_display) {
+            XCloseDisplay(display);
         }
     }
 

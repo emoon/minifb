@@ -59,7 +59,9 @@ MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instea
 void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x, float *dpi_y);
 // Use this instead.
 // Returns monitor/content scale as multipliers (1.0 = 100%).
-// If scale is unavailable, or window is NULL, backends return a safe fallback (1.0).
+// If window is non-NULL, returns the scale of the monitor containing that window.
+// If window is NULL, returns the primary monitor scale on platforms that support it
+// (macOS, Windows, X11, iOS, Web, Android), or 1.0 otherwise (Wayland, DOS).
 // Output pointers may be NULL.
 void                mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y);
 

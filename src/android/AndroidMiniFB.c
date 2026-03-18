@@ -877,23 +877,31 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
     float x = 1.0f;
     float y = 1.0f;
 
+    AConfiguration *config = NULL;
+
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
         SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
 
         if (window_data_specific != NULL &&
-            window_data_specific->app != NULL &&
-            window_data_specific->app->config != NULL) {
-            int32_t density = AConfiguration_getDensity(window_data_specific->app->config);
+            window_data_specific->app != NULL) {
+            config = window_data_specific->app->config;
+        }
+    }
+    else if (gApplication != NULL) {
+        config = gApplication->config;
+    }
 
-            if (density > 0 &&
-                density != ACONFIGURATION_DENSITY_ANY &&
-                density != ACONFIGURATION_DENSITY_NONE) {
-                float scale = (float) density / (float) ACONFIGURATION_DENSITY_DEFAULT;
-                if (scale > 0.0f) {
-                    x = scale;
-                    y = scale;
-                }
+    if (config != NULL) {
+        int32_t density = AConfiguration_getDensity(config);
+
+        if (density > 0 &&
+            density != ACONFIGURATION_DENSITY_ANY &&
+            density != ACONFIGURATION_DENSITY_NONE) {
+            float scale = (float) density / (float) ACONFIGURATION_DENSITY_DEFAULT;
+            if (scale > 0.0f) {
+                x = scale;
+                y = scale;
             }
         }
     }

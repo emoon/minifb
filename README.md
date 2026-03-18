@@ -731,7 +731,7 @@ differs between Android and desktop/iOS:
 | **Android** | **R · G · B · X** | **`0x00BBGGRR`** |
 
 **You do not need to think about this** as long as you construct pixels with the
-`MFB_RGB` / `MFB_ARGB` macros — they expand to the correct bit layout automatically
+`MFB_RGB` / `MFB_ARGB` macros, they expand to the correct bit layout automatically
 on every platform:
 
 ```c
@@ -748,13 +748,13 @@ be swapped on desktop/iOS** (and vice-versa if you adapt for desktop).
 // stb_image / libpng give RGBA bytes in memory:
 //   byte[0]=R  byte[1]=G  byte[2]=B  byte[3]=A
 
-// On Android this is exactly what ANativeWindow expects — pass as-is.
+// On Android this is exactly what ANativeWindow expects, pass as-is.
 // On desktop/iOS you must swap R <-> B before calling mfb_update_ex.
 ```
 
 **Why can't Android just accept the same format as desktop?**
 `ANativeWindow` (the Android NDK surface API) does not expose a BGRA format in its
-public interface — only `WINDOW_FORMAT_RGBX_8888` (RGBA bytes) and `WINDOW_FORMAT_RGB_565`
+public interface, only `WINDOW_FORMAT_RGBX_8888` (RGBA bytes) and `WINDOW_FORMAT_RGB_565`
 are guaranteed on all devices. Doing a full-buffer swizzle per frame inside the library
 would add CPU cost for every rendered frame. The current design avoids that cost by
 adjusting the macro at compile time instead.

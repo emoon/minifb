@@ -723,8 +723,12 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
             scale = [window_data_specific->window backingScaleFactor];
         }
         else {
-            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: missing macOS window handle while querying monitor scale; falling back to 1.0.");
+            MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: missing macOS window handle; falling back to main screen scale.");
+            scale = [[NSScreen mainScreen] backingScaleFactor];
         }
+    }
+    else {
+        scale = [[NSScreen mainScreen] backingScaleFactor];
     }
 
     if (scale_x) {

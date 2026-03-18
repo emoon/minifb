@@ -482,10 +482,8 @@ mfb_timer_init() {
 //-------------------------------------
 void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
-    float scale = 1.0f;
-    if (window != NULL) {
-        scale = [[UIScreen mainScreen] scale];
-    }
+    kUnused(window);
+    float scale = [[UIScreen mainScreen] scale];
 
     if (scale_x) {
         *scale_x = (scale != 0.0f) ? scale : 1.0f;

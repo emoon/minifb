@@ -1195,9 +1195,9 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
         SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
         if (window_data_specific != NULL) {
             hWnd = window_data_specific->window;
-            get_monitor_scale(hWnd, &x, &y);
         }
     }
+    get_monitor_scale(hWnd, &x, &y);
 
     if (scale_x) {
         *scale_x = x;
