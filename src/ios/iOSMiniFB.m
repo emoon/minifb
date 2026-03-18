@@ -480,6 +480,22 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
 }
 
 //-------------------------------------
+static BOOL
+has_launch_screen(void) {
+    static BOOL cached = NO;
+    static BOOL checked = NO;
+
+    if (!checked) {
+        cached =
+            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchStoryboardName"] != nil ||
+            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"UILaunchScreen"] != nil;
+        checked = YES;
+    }
+
+    return cached;
+}
+
+//-------------------------------------
 bool
 mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, int *right, int *bottom) {
     if (left)   *left   = 0;
@@ -494,6 +510,14 @@ mfb_get_display_cutout_insets(struct mfb_window *window, int *left, int *top, in
     UIWindow *app_window = get_application_window();
     if (app_window == nil) {
         return false;
+    }
+
+    // Without a launch screen (UILaunchStoryboardName / UILaunchScreen) iOS may run
+    // the app in compatibility mode: the window coordinate space can differ from the
+    // physical screen, making safeAreaInsets unreliable for cutout detection.
+    if (!has_launch_screen()) {
+        MFB_LOG(MFB_LOG_WARNING, "mfb_get_display_cutout_insets: no launch screen configured — insets are unreliable in compatibility mode.");
+        return true; // valid call, but all insets remain 0
     }
 
     UIEdgeInsets insets = app_window.safeAreaInsets;
@@ -534,6 +558,11 @@ mfb_get_display_safe_insets(struct mfb_window *window, int *left, int *top, int 
     UIWindow *app_window = get_application_window();
     if (app_window == nil) {
         return false;
+    }
+
+    if (!has_launch_screen()) {
+        MFB_LOG(MFB_LOG_WARNING, "mfb_get_display_safe_insets: no launch screen configured — insets are unreliable in compatibility mode.");
+        return true; // valid call, but all insets remain 0
     }
 
     UIEdgeInsets insets = app_window.safeAreaInsets;

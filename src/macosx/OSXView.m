@@ -236,7 +236,7 @@
 //-------------------------------------
 - (void)mouseExited:(NSEvent *)event {
     (void)event;
-    //printf("mouse exit\n");
+    MFB_LOG(MFB_LOG_TRACE, "mouse exit");
     // On mouse exit, refresh cursor rects so the window-specific cursor state is applied.
     if (window_data != 0x0 && window_data->is_cursor_visible == false) {
         OSXWindow *window = (OSXWindow *)[self window];
@@ -249,7 +249,7 @@
 //-------------------------------------
 - (void)mouseEntered:(NSEvent *)event {
     (void)event;
-    //printf("mouse enter\n");
+    MFB_LOG(MFB_LOG_TRACE, "mouse enter");
     // On mouse enter, refresh cursor rects so the window-specific cursor state is applied.
     if (window_data != 0x0 && window_data->is_cursor_visible == false) {
         OSXWindow *window = (OSXWindow *)[self window];
