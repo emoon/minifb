@@ -196,8 +196,8 @@ EM_ASYNC_JS(void, setup_web_mfb, (), {
 //-------------------------------------
 EM_EXPORT void
 reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
-    int32_t num_pixels = (width * height) << 2;
-    for (int i = 0; i < num_pixels; i += 4) {
+    size_t num_bytes = (size_t) width * (size_t) height * 4;
+    for (size_t i = 0; i < num_bytes; i += 4) {
         uint8_t b = src[i];
         uint8_t g = src[i + 1];
         uint8_t r = src[i + 2];

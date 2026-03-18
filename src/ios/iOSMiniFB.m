@@ -423,29 +423,6 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
     window_data->dst_height   = height;
     calc_dst_factor(window_data, window_data->window_width, window_data->window_height);
 
-    float x1 =  ((float) offset_x          / window_data->window_width)  * 2.0f - 1.0f;
-    float x2 = (((float) offset_x + width) / window_data->window_width)  * 2.0f - 1.0f;
-    float y1 =  ((float) offset_y          / window_data->window_height) * 2.0f - 1.0f;
-    float y2 = (((float) offset_y + height) / window_data->window_height) * 2.0f - 1.0f;
-
-    SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
-    if (window_data_specific == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_viewport missing iOS-specific window data.");
-        return false;
-    }
-
-    window_data_specific->vertices[0].x = x1;
-    window_data_specific->vertices[0].y = y1;
-
-    window_data_specific->vertices[1].x = x1;
-    window_data_specific->vertices[1].y = y2;
-
-    window_data_specific->vertices[2].x = x2;
-    window_data_specific->vertices[2].y = y1;
-
-    window_data_specific->vertices[3].x = x2;
-    window_data_specific->vertices[3].y = y2;
-
     return true;
 }
 

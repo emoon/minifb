@@ -358,6 +358,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: internal draw buffer is null in mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
     }
+    // NOTE: The non-Metal path used to do zero-copy (draw_buffer = buffer), but memcpy is
+    // intentional: drawRect: reads draw_buffer asynchronously via CGDataProvider, so we need
+    // our own copy to avoid tearing or use-after-free on the user's buffer.
     memcpy(window_data->draw_buffer, buffer, total_bytes);
 
     update_events(window_data);

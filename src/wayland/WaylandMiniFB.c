@@ -597,7 +597,11 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     struct wl_cursor_image *image;
 
     SWindowData *window_data = (SWindowData *) data;
+    if (window_data == NULL)
+        return;
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL)
+        return;
     window_data_specific->pointer_serial = serial;
     window_data_specific->pointer_serial_valid = 1;
 
@@ -2064,6 +2068,7 @@ init_keycodes(void) {
     g_keycodes[KEY_F23]        = MFB_KB_KEY_F23;
     g_keycodes[KEY_F24]        = MFB_KB_KEY_F24;
     g_keycodes[KEY_KPSLASH]    = MFB_KB_KEY_KP_DIVIDE;
+    g_keycodes[KEY_KPASTERISK] = MFB_KB_KEY_KP_MULTIPLY;
     g_keycodes[KEY_KPDOT]      = MFB_KB_KEY_KP_DECIMAL;
     g_keycodes[KEY_KPMINUS]    = MFB_KB_KEY_KP_SUBTRACT;
     g_keycodes[KEY_KPPLUS]     = MFB_KB_KEY_KP_ADD;

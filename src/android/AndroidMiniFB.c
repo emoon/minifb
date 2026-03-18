@@ -137,7 +137,7 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
         window_data->buffer_width  == native_w && dst_w == native_w &&
         window_data->buffer_height == native_h && dst_h == native_h) {
         if (window_data->buffer_stride == (uint32_t) window_buffer->stride * 4) {
-            memcpy(window_buffer->bits, window_data->draw_buffer, window_data->buffer_width * window_data->buffer_height * 4);
+            memcpy(window_buffer->bits, window_data->draw_buffer, (size_t) window_data->buffer_width * window_data->buffer_height * 4);
         }
         else {
             uint8_t  *src = window_data->draw_buffer;
@@ -866,7 +866,7 @@ mfb_wait_sync(struct mfb_window *window) {
             break;
         }
     }
-    mfb_timer_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data_specific->timer);
 
     return true;
 }

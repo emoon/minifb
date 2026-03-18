@@ -347,7 +347,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   specific->actual_height = actual_height;
   specific->actual_bpp = actual_bpp;
   specific->bytes_per_scanline = bytes_per_scanline;
-  specific->scale_buffer = (uint32_t *) malloc(actual_width * actual_height * sizeof(uint32_t));
+  specific->scale_buffer = (uint32_t *) malloc((size_t) actual_width * actual_height * sizeof(uint32_t));
   specific->scanline_buffer =
       actual_bpp != 32 || bytes_per_scanline != width << 2
           ? (uint8_t *) malloc(actual_height * bytes_per_scanline)
