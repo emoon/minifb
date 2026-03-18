@@ -197,6 +197,8 @@ main(int argc, char *argv[]) {
     mfb_set_mouse_move_callback(window, mouse_move);
     mfb_set_mouse_scroll_callback(window, mouse_scroll);    // not working
 
+    mfb_set_viewport(window, 20, 20, g_width - 40, g_height - 40);
+
     print_getters(window);
 
     g_buffer = (uint32_t *) malloc(g_width * g_height * 4);

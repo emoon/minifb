@@ -274,9 +274,9 @@ check_window_closed(SWindowData *window_data) {
       MFB_LOG(MFB_LOG_DEBUG, "mfb window requested close");
       g_window = NULL;
       vesa_dispose();
-      SWindowData_DOS *dos_window_data = window_data->specific;
-      free(dos_window_data->scale_buffer);
-      free(dos_window_data->scanline_buffer);
+      SWindowData_DOS *window_data_specific = window_data->specific;
+      free(window_data_specific->scale_buffer);
+      free(window_data_specific->scanline_buffer);
       free(window_data->specific);
       window_data->specific = NULL;
       return MFB_STATE_EXIT;
@@ -608,8 +608,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   if (state)
     return state;
 
-  SWindowData_DOS *dos_window_data = window_data->specific;
-  if (!dos_window_data) {
+  SWindowData_DOS *window_data_specific = window_data->specific;
+  if (!window_data_specific) {
     MFB_LOG(MFB_LOG_DEBUG, "mfb_update_ex: invalid window specific data");
     return MFB_STATE_INVALID_WINDOW;
   }
@@ -618,12 +618,12 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   window_data->buffer_height = height;
   window_data->buffer_stride = buffer_stride;
 
-  uint32_t *scale_buffer        = dos_window_data->scale_buffer;
-  uint8_t  *scanline_buffer     = dos_window_data->scanline_buffer;
-  uint32_t a_width              = dos_window_data->actual_width;
-  uint32_t a_height             = dos_window_data->actual_height;
-  uint32_t a_bpp                = dos_window_data->actual_bpp;
-  uint32_t a_bytes_per_scanline = dos_window_data->bytes_per_scanline;
+  uint32_t *scale_buffer        = window_data_specific->scale_buffer;
+  uint8_t  *scanline_buffer     = window_data_specific->scanline_buffer;
+  uint32_t a_width              = window_data_specific->actual_width;
+  uint32_t a_height             = window_data_specific->actual_height;
+  uint32_t a_bpp                = window_data_specific->actual_bpp;
+  uint32_t a_bytes_per_scanline = window_data_specific->bytes_per_scanline;
   bool has_viewport             = window_data->dst_offset_x != 0 || window_data->dst_offset_y != 0 ||
                                   window_data->dst_width != window_data->window_width ||
                                   window_data->dst_height != window_data->window_height;
