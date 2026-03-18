@@ -45,6 +45,15 @@ resize(struct mfb_window *window, int width, int height) {
     g_width  = (width  >> 1);
     g_height = (height >> 1);
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
+
+    float scale = 1.0f;
+    mfb_get_monitor_scale(window, &scale, NULL);
+    int32_t viewport_x = (int32_t) (20 * scale);
+    int32_t viewport_y = (int32_t) (20 * scale);
+    int32_t viewport_width  = width - 2 * viewport_x;
+    int32_t viewport_height = height - 2 * viewport_y;
+
+    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
 }
 
 //-------------------------------------
@@ -107,6 +116,15 @@ main(int argc, char *argv[]) {
     mfb_set_mouse_button_callback(window, mouse_btn);
     mfb_set_mouse_move_callback(window, mouse_move);
     mfb_set_mouse_scroll_callback(window, mouse_scroll);    // not working
+
+    float scale = 1.0f;
+    mfb_get_monitor_scale(window, &scale, NULL);
+    int32_t viewport_x = (int32_t) (20 * scale);
+    int32_t viewport_y = (int32_t) (20 * scale);
+    int32_t viewport_width  = g_width  - 2 * viewport_x;
+    int32_t viewport_height = g_height - 2 * viewport_y;
+
+    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
 
     g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
 
