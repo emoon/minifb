@@ -126,7 +126,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 //-------------------------------------
 @implementation iOSViewDelegate {
     SWindowData                 *window_data;
-    SWindowData_IOS             *window_data_ios;
+    SWindowData_IOS             *window_data_specific;
 
     id<MTLDevice>               metal_device;
     id<MTLLibrary>              metal_library;
@@ -150,7 +150,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
     self = [super init];
     if (self) {
         window_data     = windowData;
-        window_data_ios = (SWindowData_IOS *) windowData->specific;
+        window_data_specific = (SWindowData_IOS *) windowData->specific;
 
         view.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
         view.sampleCount      = 1;
@@ -266,12 +266,12 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
 //-------------------------------------
 - (bool) _createAssets {
-    if (window_data == NULL || window_data_ios == NULL || metal_device == nil) {
+    if (window_data == NULL || window_data_specific == NULL || metal_device == nil) {
         MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: invalid state while creating assets.");
         return false;
     }
 
-    build_viewport_vertices(window_data, window_data_ios->vertices);
+    build_viewport_vertices(window_data, window_data_specific->vertices);
 
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
@@ -337,7 +337,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
-    if (window_data == NULL || window_data_ios == NULL ||
+    if (window_data == NULL || window_data_specific == NULL ||
         window_data->draw_buffer == NULL || window_data->buffer_width == 0 || window_data->buffer_height == 0 ||
         command_queue == nil || pipeline_state == nil) {
         return;
@@ -454,7 +454,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
     window_data->window_width  = drawable_width;
     window_data->window_height = drawable_height;
     resize_dst(window_data, drawable_width, drawable_height);
-    build_viewport_vertices(window_data, window_data_ios->vertices);
+    build_viewport_vertices(window_data, window_data_specific->vertices);
 
     // Defer the resize callback to the main thread via mfb_update_ex / mfb_update_events,
     // which are called from user code. This avoids invoking the callback from the

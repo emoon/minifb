@@ -13,8 +13,8 @@ update_metal_viewport_vertices(SWindowData *window_data) {
         return;
     }
 
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-    if (window_data_osx == NULL) {
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (window_data_specific == NULL) {
         return;
     }
 
@@ -26,17 +26,17 @@ update_metal_viewport_vertices(SWindowData *window_data) {
     float y1 = ((float) window_data->dst_offset_y * inv_height) * 2.0f - 1.0f;
     float y2 = ((float) (window_data->dst_offset_y + window_data->dst_height) * inv_height) * 2.0f - 1.0f;
 
-    window_data_osx->metal.vertices[0].x = x1;
-    window_data_osx->metal.vertices[0].y = y1;
+    window_data_specific->metal.vertices[0].x = x1;
+    window_data_specific->metal.vertices[0].y = y1;
 
-    window_data_osx->metal.vertices[1].x = x1;
-    window_data_osx->metal.vertices[1].y = y2;
+    window_data_specific->metal.vertices[1].x = x1;
+    window_data_specific->metal.vertices[1].y = y2;
 
-    window_data_osx->metal.vertices[2].x = x2;
-    window_data_osx->metal.vertices[2].y = y1;
+    window_data_specific->metal.vertices[2].x = x2;
+    window_data_specific->metal.vertices[2].y = y1;
 
-    window_data_osx->metal.vertices[3].x = x2;
-    window_data_osx->metal.vertices[3].y = y2;
+    window_data_specific->metal.vertices[3].x = x2;
+    window_data_specific->metal.vertices[3].y = y2;
 }
 #endif
 

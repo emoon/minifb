@@ -96,13 +96,13 @@ destroy_window_data(SWindowData *window_data) {
         return;
     }
 
-    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
-    if (window_data_android != NULL) {
-        if (window_data_android->timer != NULL) {
-            mfb_timer_destroy(window_data_android->timer);
-            window_data_android->timer = NULL;
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific != NULL) {
+        if (window_data_specific->timer != NULL) {
+            mfb_timer_destroy(window_data_specific->timer);
+            window_data_specific->timer = NULL;
         }
-        free(window_data_android);
+        free(window_data_specific);
         window_data->specific = NULL;
     }
 
@@ -323,11 +323,11 @@ handle_cmd(struct android_app *app, int32_t cmd) {
     }
 
     SWindowData         *window_data;
-    SWindowData_Android *window_data_android = NULL;
+    SWindowData_Android *window_data_specific = NULL;
 
     window_data = (SWindowData *) app->userData;
     if (window_data != NULL) {
-        window_data_android = (SWindowData_Android *) window_data->specific;
+        window_data_specific = (SWindowData_Android *) window_data->specific;
     }
 
     MFB_LOG(MFB_LOG_TRACE, "AndroidMiniFB: lifecycle command %s (%d).", app_cmd_name(cmd), cmd);
@@ -374,7 +374,7 @@ handle_cmd(struct android_app *app, int32_t cmd) {
                 if (lock_result < 0) {
                     MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: ANativeWindow_setBuffersGeometry failed on init (%d).", lock_result);
                 }
-                //engine_draw_frame(window_data_android);
+                //engine_draw_frame(window_data_specific);
             }
             else {
                 MFB_LOG(MFB_LOG_WARNING, "AndroidMiniFB: APP_CMD_INIT_WINDOW received with a null ANativeWindow.");
@@ -388,14 +388,14 @@ handle_cmd(struct android_app *app, int32_t cmd) {
         // The content area of the window has changed, such as from the soft input window being shown or hidden.
         // You can find the new content rect in android_app::contentRect.
         case APP_CMD_CONTENT_RECT_CHANGED:
-            if (window_data_android != NULL) {
+            if (window_data_specific != NULL) {
                 if (app->window == NULL) {
                     MFB_LOG(MFB_LOG_WARNING, "AndroidMiniFB: content rect changed but ANativeWindow is null.");
                     break;
                 }
                 // This does not work
-                //int32_t width  = window_data_android->app->contentRect.right  - window_data_android->app->contentRect.left;
-                //int32_t height = window_data_android->app->contentRect.bottom - window_data_android->app->contentRect.top;
+                //int32_t width  = window_data_specific->app->contentRect.right  - window_data_specific->app->contentRect.left;
+                //int32_t height = window_data_specific->app->contentRect.bottom - window_data_specific->app->contentRect.top;
                 // TODO: Check the DPI?
                 if (window_data != NULL) {
                     window_data->window_width  = ANativeWindow_getWidth(app->window);
@@ -434,7 +434,7 @@ handle_cmd(struct android_app *app, int32_t cmd) {
         case APP_CMD_LOST_FOCUS:
             if (window_data != NULL) {
                 window_data->is_active = false;
-                //engine_draw_frame(window_data_android);
+                //engine_draw_frame(window_data_specific);
             }
             kCall(active_func, false);
             break;
@@ -504,8 +504,8 @@ process_events(SWindowData *window_data, int timeout_ms) {
         return MFB_STATE_EXIT;
     }
 
-    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
-    if (window_data_android == NULL || window_data_android->app == NULL) {
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific == NULL || window_data_specific->app == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: process_events missing Android window state.");
         return MFB_STATE_INVALID_WINDOW;
     }
@@ -521,10 +521,10 @@ process_events(SWindowData *window_data, int timeout_ms) {
     int poll_timeout_ms = timeout_ms;
     while ((ident = ALooper_pollOnce(poll_timeout_ms, NULL, &events, (void **) &source)) >= 0) {
         if (source != NULL) {
-            source->process(window_data_android->app, source);
+            source->process(window_data_specific->app, source);
         }
 
-        if (window_data_android->app->destroyRequested != 0) {
+        if (window_data_specific->app->destroyRequested != 0) {
             MFB_LOG(MFB_LOG_DEBUG, "AndroidMiniFB: engine thread destroy requested.");
             window_data->is_active = false;
             window_data->close = true;
@@ -633,23 +633,23 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Android *window_data_android = malloc(sizeof(SWindowData_Android));
-    if (window_data_android == NULL) {
+    SWindowData_Android *window_data_specific = malloc(sizeof(SWindowData_Android));
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: failed to allocate SWindowData_Android.");
         free(window_data);
         return NULL;
     }
-    memset(window_data_android, 0, sizeof(SWindowData_Android));
-    window_data->specific = window_data_android;
+    memset(window_data_specific, 0, sizeof(SWindowData_Android));
+    window_data->specific = window_data_specific;
 
     window_data->is_active         = true;
     window_data->is_cursor_visible = false;
 
-    window_data_android->app       = gApplication;
-    window_data_android->timer     = mfb_timer_create();
-    if (window_data_android->timer == NULL) {
+    window_data_specific->app       = gApplication;
+    window_data_specific->timer     = mfb_timer_create();
+    if (window_data_specific->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: mfb_timer_create failed.");
-        free(window_data_android);
+        free(window_data_specific);
         free(window_data);
         return NULL;
     }
@@ -717,8 +717,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     window_data->buffer_stride = buffer_stride;
     window_data->buffer_height = height;
 
-    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
-    if (window_data_android == NULL || window_data_android->app == NULL) {
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific == NULL || window_data_specific->app == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: missing Android window state in mfb_update_ex.");
         return MFB_STATE_INVALID_WINDOW;
     }
@@ -726,13 +726,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     // During Android lifecycle transitions (pause/term window), the native window
     // can be temporarily NULL. This is not a terminal window error: skip rendering
     // and let mfb_wait_sync block until the app becomes drawable again.
-    if (window_data_android->app->window == NULL) {
+    if (window_data_specific->app->window == NULL) {
         MFB_LOG(MFB_LOG_TRACE, "AndroidMiniFB: skipping frame because ANativeWindow is temporarily unavailable.");
         return MFB_STATE_OK;
     }
 
     ANativeWindow_Buffer native_buffer;
-    int lock_result = ANativeWindow_lock(window_data_android->app->window, &native_buffer, NULL);
+    int lock_result = ANativeWindow_lock(window_data_specific->app->window, &native_buffer, NULL);
     if (lock_result < 0) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: ANativeWindow_lock failed (%d).", lock_result);
         return MFB_STATE_INTERNAL_ERROR;
@@ -740,7 +740,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     draw(window_data, &native_buffer);
 
-    int post_result = ANativeWindow_unlockAndPost(window_data_android->app->window);
+    int post_result = ANativeWindow_unlockAndPost(window_data_specific->app->window);
     if (post_result < 0) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: ANativeWindow_unlockAndPost failed (%d).", post_result);
         return MFB_STATE_INTERNAL_ERROR;
@@ -811,18 +811,18 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
-    if (window_data_android == NULL) {
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_DEBUG, "mfb_wait_sync: invalid window specific data");
         return false;
     }
 
-    if (window_data_android->app == NULL) {
+    if (window_data_specific->app == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: mfb_wait_sync has a null android_app handle.");
         return false;
     }
 
-    if (window_data_android->timer == NULL) {
+    if (window_data_specific->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -831,8 +831,8 @@ mfb_wait_sync(struct mfb_window *window) {
 
     while (1) {
         int timeout_ms;
-        if (window_data->is_active && window_data_android->app->window != NULL) {
-            current = mfb_timer_now(window_data_android->timer);
+        if (window_data->is_active && window_data_specific->app->window != NULL) {
+            current = mfb_timer_now(window_data_specific->timer);
             timeout_ms = timeout_ms_from_remaining_seconds(g_time_for_frame - current);
         }
         else {
@@ -857,16 +857,16 @@ mfb_wait_sync(struct mfb_window *window) {
 
         // While paused or without a surface, keep waiting for lifecycle events and
         // do not advance frame timing.
-        if (!window_data->is_active || window_data_android->app->window == NULL) {
+        if (!window_data->is_active || window_data_specific->app->window == NULL) {
             continue;
         }
 
-        current = mfb_timer_now(window_data_android->timer);
+        current = mfb_timer_now(window_data_specific->timer);
         if (current >= g_time_for_frame) {
             break;
         }
     }
-    mfb_timer_reset(window_data_android->timer);
+    mfb_timer_reset(window_data_specific->timer);
 
     return true;
 }
@@ -879,12 +879,12 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
-        SWindowData_Android *window_data_android = (SWindowData_Android *) window_data->specific;
+        SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
 
-        if (window_data_android != NULL &&
-            window_data_android->app != NULL &&
-            window_data_android->app->config != NULL) {
-            int32_t density = AConfiguration_getDensity(window_data_android->app->config);
+        if (window_data_specific != NULL &&
+            window_data_specific->app != NULL &&
+            window_data_specific->app->config != NULL) {
+            int32_t density = AConfiguration_getDensity(window_data_specific->app->config);
 
             if (density > 0 &&
                 density != ACONFIGURATION_DENSITY_ANY &&

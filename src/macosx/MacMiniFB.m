@@ -789,9 +789,9 @@ void mfb_show_cursor(struct mfb_window *window, bool show) {
 
             // Update cursor rects on the window so we can use a per-window
             // invisible cursor instead of hiding the global cursor.
-            SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-            if (window_data_osx && window_data_osx->window) {
-                [window_data_osx->window performSelectorOnMainThread:@selector(updateCursorRects) withObject:nil waitUntilDone:YES];
+            SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+            if (window_data_specific && window_data_specific->window) {
+                [window_data_specific->window performSelectorOnMainThread:@selector(updateCursorRects) withObject:nil waitUntilDone:YES];
             }
             else {
                 MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_show_cursor cannot update cursor rects (missing macOS window state).");

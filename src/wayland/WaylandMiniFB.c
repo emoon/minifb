@@ -51,25 +51,25 @@ void init_keycodes();
 
 //-------------------------------------
 static void
-update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_way) {
-    if (window_data == NULL || window_data_way == NULL || window_data_way->xkb_state == NULL) {
+update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    if (window_data == NULL || window_data_specific == NULL || window_data_specific->xkb_state == NULL) {
         return;
     }
 
     window_data->mod_keys = 0;
-    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= MFB_KB_MOD_SHIFT;
     }
 
-    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= MFB_KB_MOD_CONTROL;
     }
 
-    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_ALT, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= MFB_KB_MOD_ALT;
     }
 
-    if (xkb_state_mod_name_is_active(window_data_way->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= MFB_KB_MOD_SUPER;
     }
 }
@@ -87,29 +87,29 @@ destroy_window_data(SWindowData *window_data) {
         window_data->draw_buffer = NULL;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way != NULL) {
-        if (window_data_way->shm_ptr && window_data_way->shm_ptr != MAP_FAILED && window_data_way->shm_length > 0) {
-            munmap(window_data_way->shm_ptr, window_data_way->shm_length);
-            window_data_way->shm_ptr = NULL;
-            window_data_way->shm_length = 0;
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific != NULL) {
+        if (window_data_specific->shm_ptr && window_data_specific->shm_ptr != MAP_FAILED && window_data_specific->shm_length > 0) {
+            munmap(window_data_specific->shm_ptr, window_data_specific->shm_length);
+            window_data_specific->shm_ptr = NULL;
+            window_data_specific->shm_length = 0;
         }
 
-        if (window_data_way->xkb_state) {
-            xkb_state_unref(window_data_way->xkb_state);
+        if (window_data_specific->xkb_state) {
+            xkb_state_unref(window_data_specific->xkb_state);
         }
 
-        if (window_data_way->xkb_keymap) {
-            xkb_keymap_unref(window_data_way->xkb_keymap);
+        if (window_data_specific->xkb_keymap) {
+            xkb_keymap_unref(window_data_specific->xkb_keymap);
         }
 
-        if (window_data_way->xkb_context) {
-            xkb_context_unref(window_data_way->xkb_context);
+        if (window_data_specific->xkb_context) {
+            xkb_context_unref(window_data_specific->xkb_context);
         }
 
-        mfb_timer_destroy(window_data_way->timer);
-        memset(window_data_way, 0, sizeof(SWindowData_Way));
-        free(window_data_way);
+        mfb_timer_destroy(window_data_specific->timer);
+        memset(window_data_specific, 0, sizeof(SWindowData_Way));
+        free(window_data_specific);
     }
     memset(window_data, 0, sizeof(SWindowData));
     free(window_data);
@@ -123,109 +123,109 @@ destroy(SWindowData *window_data) {
         return;
     }
 
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == NULL || window_data_way->display == NULL) {
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL || window_data_specific->display == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland display state during destroy, forcing local cleanup.");
-        if (window_data_way) {
-            if (window_data_way->toplevel_decoration) {
-                zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
-                window_data_way->toplevel_decoration = NULL;
+        if (window_data_specific) {
+            if (window_data_specific->toplevel_decoration) {
+                zxdg_toplevel_decoration_v1_destroy(window_data_specific->toplevel_decoration);
+                window_data_specific->toplevel_decoration = NULL;
             }
 
-            if (window_data_way->toplevel) {
-                xdg_toplevel_destroy(window_data_way->toplevel);
-                window_data_way->toplevel = NULL;
+            if (window_data_specific->toplevel) {
+                xdg_toplevel_destroy(window_data_specific->toplevel);
+                window_data_specific->toplevel = NULL;
             }
 
-            if (window_data_way->shell_surface) {
-                xdg_surface_destroy(window_data_way->shell_surface);
-                window_data_way->shell_surface = NULL;
+            if (window_data_specific->shell_surface) {
+                xdg_surface_destroy(window_data_specific->shell_surface);
+                window_data_specific->shell_surface = NULL;
             }
 
-            if (window_data_way->shell) {
-                xdg_wm_base_destroy(window_data_way->shell);
-                window_data_way->shell = NULL;
+            if (window_data_specific->shell) {
+                xdg_wm_base_destroy(window_data_specific->shell);
+                window_data_specific->shell = NULL;
             }
 
-            if (window_data_way->decoration_manager) {
-                zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
-                window_data_way->decoration_manager = NULL;
+            if (window_data_specific->decoration_manager) {
+                zxdg_decoration_manager_v1_destroy(window_data_specific->decoration_manager);
+                window_data_specific->decoration_manager = NULL;
             }
 
-            if (window_data_way->fractional_scale) {
-                wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
-                window_data_way->fractional_scale = NULL;
+            if (window_data_specific->fractional_scale) {
+                wp_fractional_scale_v1_destroy(window_data_specific->fractional_scale);
+                window_data_specific->fractional_scale = NULL;
             }
 
-            if (window_data_way->fractional_scale_manager) {
-                wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
-                window_data_way->fractional_scale_manager = NULL;
+            if (window_data_specific->fractional_scale_manager) {
+                wp_fractional_scale_manager_v1_destroy(window_data_specific->fractional_scale_manager);
+                window_data_specific->fractional_scale_manager = NULL;
             }
 
-            if (window_data_way->surface) {
-                wl_surface_destroy(window_data_way->surface);
-                window_data_way->surface = NULL;
+            if (window_data_specific->surface) {
+                wl_surface_destroy(window_data_specific->surface);
+                window_data_specific->surface = NULL;
             }
 
-            if (window_data_way->cursor_surface) {
-                wl_surface_destroy(window_data_way->cursor_surface);
-                window_data_way->cursor_surface = NULL;
+            if (window_data_specific->cursor_surface) {
+                wl_surface_destroy(window_data_specific->cursor_surface);
+                window_data_specific->cursor_surface = NULL;
             }
 
-            if (window_data_way->cursor_theme) {
-                wl_cursor_theme_destroy(window_data_way->cursor_theme);
-                window_data_way->cursor_theme = NULL;
+            if (window_data_specific->cursor_theme) {
+                wl_cursor_theme_destroy(window_data_specific->cursor_theme);
+                window_data_specific->cursor_theme = NULL;
             }
 
-            if (window_data_way->shm_pool) {
-                wl_shm_pool_destroy(window_data_way->shm_pool);
-                window_data_way->shm_pool = NULL;
+            if (window_data_specific->shm_pool) {
+                wl_shm_pool_destroy(window_data_specific->shm_pool);
+                window_data_specific->shm_pool = NULL;
             }
 
-            if (window_data_way->shm) {
-                wl_shm_destroy(window_data_way->shm);
-                window_data_way->shm = NULL;
+            if (window_data_specific->shm) {
+                wl_shm_destroy(window_data_specific->shm);
+                window_data_specific->shm = NULL;
             }
 
-            for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
-                if (window_data_way->outputs[i]) {
-                    wl_output_destroy(window_data_way->outputs[i]);
-                    window_data_way->outputs[i] = NULL;
+            for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
+                if (window_data_specific->outputs[i]) {
+                    wl_output_destroy(window_data_specific->outputs[i]);
+                    window_data_specific->outputs[i] = NULL;
                 }
             }
 
-            window_data_way->output_count = 0;
-            window_data_way->current_output = NULL;
-            window_data_way->current_output_scale = 1;
+            window_data_specific->output_count = 0;
+            window_data_specific->current_output = NULL;
+            window_data_specific->current_output_scale = 1;
 
-            if (window_data_way->compositor) {
-                wl_compositor_destroy(window_data_way->compositor);
-                window_data_way->compositor = NULL;
+            if (window_data_specific->compositor) {
+                wl_compositor_destroy(window_data_specific->compositor);
+                window_data_specific->compositor = NULL;
             }
 
-            if (window_data_way->keyboard) {
-                wl_keyboard_destroy(window_data_way->keyboard);
-                window_data_way->keyboard = NULL;
+            if (window_data_specific->keyboard) {
+                wl_keyboard_destroy(window_data_specific->keyboard);
+                window_data_specific->keyboard = NULL;
             }
 
-            if (window_data_way->pointer) {
-                wl_pointer_destroy(window_data_way->pointer);
-                window_data_way->pointer = NULL;
+            if (window_data_specific->pointer) {
+                wl_pointer_destroy(window_data_specific->pointer);
+                window_data_specific->pointer = NULL;
             }
 
-            if (window_data_way->seat) {
-                wl_seat_destroy(window_data_way->seat);
-                window_data_way->seat = NULL;
+            if (window_data_specific->seat) {
+                wl_seat_destroy(window_data_specific->seat);
+                window_data_specific->seat = NULL;
             }
 
-            if (window_data_way->registry) {
-                wl_registry_destroy(window_data_way->registry);
-                window_data_way->registry = NULL;
+            if (window_data_specific->registry) {
+                wl_registry_destroy(window_data_specific->registry);
+                window_data_specific->registry = NULL;
             }
 
-            if (window_data_way->fd >= 0) {
-                close(window_data_way->fd);
-                window_data_way->fd = -1;
+            if (window_data_specific->fd >= 0) {
+                close(window_data_specific->fd);
+                window_data_specific->fd = -1;
             }
         }
 
@@ -234,53 +234,53 @@ destroy(SWindowData *window_data) {
     }
 
     // Destroy XDG objects with correct functions
-    if (window_data_way->toplevel_decoration) {
-        zxdg_toplevel_decoration_v1_destroy(window_data_way->toplevel_decoration);
-        window_data_way->toplevel_decoration = NULL;
+    if (window_data_specific->toplevel_decoration) {
+        zxdg_toplevel_decoration_v1_destroy(window_data_specific->toplevel_decoration);
+        window_data_specific->toplevel_decoration = NULL;
     }
 
-    if (window_data_way->toplevel) {
-        xdg_toplevel_destroy(window_data_way->toplevel);
-        window_data_way->toplevel = NULL;
+    if (window_data_specific->toplevel) {
+        xdg_toplevel_destroy(window_data_specific->toplevel);
+        window_data_specific->toplevel = NULL;
     }
 
-    if (window_data_way->shell_surface) {
-        xdg_surface_destroy(window_data_way->shell_surface);
-        window_data_way->shell_surface = NULL;
+    if (window_data_specific->shell_surface) {
+        xdg_surface_destroy(window_data_specific->shell_surface);
+        window_data_specific->shell_surface = NULL;
     }
 
-    if (window_data_way->shell) {
-        xdg_wm_base_destroy(window_data_way->shell);
-        window_data_way->shell = NULL;
+    if (window_data_specific->shell) {
+        xdg_wm_base_destroy(window_data_specific->shell);
+        window_data_specific->shell = NULL;
     }
 
-    if (window_data_way->decoration_manager) {
-        zxdg_decoration_manager_v1_destroy(window_data_way->decoration_manager);
-        window_data_way->decoration_manager = NULL;
+    if (window_data_specific->decoration_manager) {
+        zxdg_decoration_manager_v1_destroy(window_data_specific->decoration_manager);
+        window_data_specific->decoration_manager = NULL;
     }
 
-    if (window_data_way->fractional_scale) {
-        wp_fractional_scale_v1_destroy(window_data_way->fractional_scale);
-        window_data_way->fractional_scale = NULL;
+    if (window_data_specific->fractional_scale) {
+        wp_fractional_scale_v1_destroy(window_data_specific->fractional_scale);
+        window_data_specific->fractional_scale = NULL;
     }
 
-    if (window_data_way->fractional_scale_manager) {
-        wp_fractional_scale_manager_v1_destroy(window_data_way->fractional_scale_manager);
-        window_data_way->fractional_scale_manager = NULL;
+    if (window_data_specific->fractional_scale_manager) {
+        wp_fractional_scale_manager_v1_destroy(window_data_specific->fractional_scale_manager);
+        window_data_specific->fractional_scale_manager = NULL;
     }
 
-    if (window_data_way->surface) {
-        wl_surface_destroy(window_data_way->surface);
-        window_data_way->surface = NULL;
+    if (window_data_specific->surface) {
+        wl_surface_destroy(window_data_specific->surface);
+        window_data_specific->surface = NULL;
     }
 
     // Restore KILL macro for remaining Wayland objects
 #define KILL(NAME)                                      \
     do                                                  \
     {                                                   \
-        if (window_data_way->NAME)                      \
-            wl_##NAME##_destroy(window_data_way->NAME); \
-        window_data_way->NAME = NULL;                   \
+        if (window_data_specific->NAME)                      \
+            wl_##NAME##_destroy(window_data_specific->NAME); \
+        window_data_specific->NAME = NULL;                   \
     } while (0)
 
     //KILL(buffer);
@@ -290,41 +290,41 @@ destroy(SWindowData *window_data) {
     }
 
     // Clean up cursor objects
-    if (window_data_way->cursor_surface) {
-        wl_surface_destroy(window_data_way->cursor_surface);
-        window_data_way->cursor_surface = NULL;
+    if (window_data_specific->cursor_surface) {
+        wl_surface_destroy(window_data_specific->cursor_surface);
+        window_data_specific->cursor_surface = NULL;
     }
 
-    if (window_data_way->cursor_theme) {
-        wl_cursor_theme_destroy(window_data_way->cursor_theme);
-        window_data_way->cursor_theme = NULL;
+    if (window_data_specific->cursor_theme) {
+        wl_cursor_theme_destroy(window_data_specific->cursor_theme);
+        window_data_specific->cursor_theme = NULL;
     }
 
     KILL(shm_pool);
     KILL(shm);
-    for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
-        if (window_data_way->outputs[i]) {
-            wl_output_destroy(window_data_way->outputs[i]);
-            window_data_way->outputs[i] = NULL;
+    for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
+        if (window_data_specific->outputs[i]) {
+            wl_output_destroy(window_data_specific->outputs[i]);
+            window_data_specific->outputs[i] = NULL;
         }
     }
 
-    window_data_way->output_count = 0;
-    window_data_way->current_output = NULL;
-    window_data_way->current_output_scale = 1;
+    window_data_specific->output_count = 0;
+    window_data_specific->current_output = NULL;
+    window_data_specific->current_output_scale = 1;
     KILL(compositor);
     KILL(keyboard);
-    if (window_data_way->pointer) {
-        wl_pointer_destroy(window_data_way->pointer);
-        window_data_way->pointer = NULL;
+    if (window_data_specific->pointer) {
+        wl_pointer_destroy(window_data_specific->pointer);
+        window_data_specific->pointer = NULL;
     }
     KILL(seat);
     KILL(registry);
-    wl_display_disconnect(window_data_way->display);
+    wl_display_disconnect(window_data_specific->display);
 
-    if (window_data_way->fd >= 0) {
-        close(window_data_way->fd);
-        window_data_way->fd = -1;
+    if (window_data_specific->fd >= 0) {
+        close(window_data_specific->fd);
+        window_data_specific->fd = -1;
     }
 
     destroy_window_data(window_data);
@@ -354,10 +354,10 @@ static struct xdg_wm_base_listener shell_listener = {
 static void
 keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size) {
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     kUnused(keyboard);
 
-    if (window_data_way == NULL) {
+    if (window_data_specific == NULL) {
         if (fd >= 0) {
             close(fd);
         }
@@ -380,16 +380,16 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         return;
     }
 
-    if (window_data_way->xkb_context == NULL) {
-        window_data_way->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-        if (window_data_way->xkb_context == NULL) {
+    if (window_data_specific->xkb_context == NULL) {
+        window_data_specific->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        if (window_data_specific->xkb_context == NULL) {
             munmap(keymap_data, size);
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: xkb_context_new failed.");
             return;
         }
     }
 
-    struct xkb_keymap *keymap = xkb_keymap_new_from_string(window_data_way->xkb_context,
+    struct xkb_keymap *keymap = xkb_keymap_new_from_string(window_data_specific->xkb_context,
                                                             keymap_data,
                                                             XKB_KEYMAP_FORMAT_TEXT_V1,
                                                             XKB_KEYMAP_COMPILE_NO_FLAGS);
@@ -406,15 +406,15 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         return;
     }
 
-    if (window_data_way->xkb_state) {
-        xkb_state_unref(window_data_way->xkb_state);
+    if (window_data_specific->xkb_state) {
+        xkb_state_unref(window_data_specific->xkb_state);
     }
-    if (window_data_way->xkb_keymap) {
-        xkb_keymap_unref(window_data_way->xkb_keymap);
+    if (window_data_specific->xkb_keymap) {
+        xkb_keymap_unref(window_data_specific->xkb_keymap);
     }
 
-    window_data_way->xkb_keymap = keymap;
-    window_data_way->xkb_state = state;
+    window_data_specific->xkb_keymap = keymap;
+    window_data_specific->xkb_state = state;
 }
 
 //-------------------------------------
@@ -466,16 +466,16 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     kUnused(time);
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (key < 512) {
         mfb_key key_code = (mfb_key) g_keycodes[key];
         bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        if (window_data_way && window_data_way->xkb_state) {
+        if (window_data_specific && window_data_specific->xkb_state) {
             xkb_keycode_t xkb_keycode = (xkb_keycode_t) key + 8;
-            xkb_state_update_key(window_data_way->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
-            update_mod_keys_from_xkb(window_data, window_data_way);
+            xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+            update_mod_keys_from_xkb(window_data, window_data_specific);
             if (is_pressed) {
-                uint32_t codepoint = xkb_state_key_get_utf32(window_data_way->xkb_state, xkb_keycode);
+                uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
                 if (codepoint != 0) {
                     kCall(char_input_func, codepoint);
                 }
@@ -538,15 +538,15 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
     kUnused(serial);
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way && window_data_way->xkb_state) {
-        xkb_state_update_mask(window_data_way->xkb_state,
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific && window_data_specific->xkb_state) {
+        xkb_state_update_mask(window_data_specific->xkb_state,
                               mods_depressed,
                               mods_latched,
                               mods_locked,
                               0, 0,
                               group);
-        update_mod_keys_from_xkb(window_data, window_data_way);
+        update_mod_keys_from_xkb(window_data, window_data_specific);
     }
 }
 
@@ -597,26 +597,26 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     struct wl_cursor_image *image;
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    window_data_way->pointer_serial = serial;
-    window_data_way->pointer_serial_valid = 1;
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    window_data_specific->pointer_serial = serial;
+    window_data_specific->pointer_serial_valid = 1;
 
     if (window_data->is_cursor_visible) {
-        if (window_data_way->default_cursor == NULL ||
-            window_data_way->default_cursor->image_count == 0 ||
-            window_data_way->cursor_surface == NULL) {
+        if (window_data_specific->default_cursor == NULL ||
+            window_data_specific->default_cursor->image_count == 0 ||
+            window_data_specific->cursor_surface == NULL) {
             return;
         }
-        image  = window_data_way->default_cursor->images[0];
+        image  = window_data_specific->default_cursor->images[0];
         buffer = wl_cursor_image_get_buffer(image);
         if (buffer == NULL) {
             return;
         }
 
-        wl_pointer_set_cursor(pointer, serial, window_data_way->cursor_surface, image->hotspot_x, image->hotspot_y);
-        wl_surface_attach(window_data_way->cursor_surface, buffer, 0, 0);
-        wl_surface_damage(window_data_way->cursor_surface, 0, 0, image->width, image->height);
-        wl_surface_commit(window_data_way->cursor_surface);
+        wl_pointer_set_cursor(pointer, serial, window_data_specific->cursor_surface, image->hotspot_x, image->hotspot_y);
+        wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
+        wl_surface_damage(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
+        wl_surface_commit(window_data_specific->cursor_surface);
     }
     else {
         wl_pointer_set_cursor(pointer, 0, NULL, 0, 0);
@@ -640,9 +640,9 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way) {
-        window_data_way->pointer_serial_valid = 0;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific) {
+        window_data_specific->pointer_serial_valid = 0;
     }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer left surface %p (serial: %d)", surface, serial);
@@ -698,10 +698,10 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer button '%d'(%d)", button, state);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way) {
-        window_data_way->pointer_serial = serial;
-        window_data_way->pointer_serial_valid = 1;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific) {
+        window_data_specific->pointer_serial = serial;
+        window_data_specific->pointer_serial_valid = 1;
     }
     window_data->mouse_button_status[(button - BTN_MOUSE + 1) & MFB_MAX_MOUSE_BUTTONS_MASK] = (state == 1);
     kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
@@ -802,24 +802,24 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     kUnused(data);
 
     SWindowData       *window_data     = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_way->keyboard) {
-        window_data_way->keyboard = wl_seat_get_keyboard(seat);
-        wl_keyboard_add_listener(window_data_way->keyboard, &keyboard_listener, window_data);
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_specific->keyboard) {
+        window_data_specific->keyboard = wl_seat_get_keyboard(seat);
+        wl_keyboard_add_listener(window_data_specific->keyboard, &keyboard_listener, window_data);
     }
 
-    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_way->keyboard) {
-        wl_keyboard_destroy(window_data_way->keyboard);
-        window_data_way->keyboard = NULL;
+    else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
+        wl_keyboard_destroy(window_data_specific->keyboard);
+        window_data_specific->keyboard = NULL;
     }
 
-    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_way->pointer) {
-        window_data_way->pointer = wl_seat_get_pointer(seat);
-        wl_pointer_add_listener(window_data_way->pointer, &pointer_listener, window_data);
+    if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_specific->pointer) {
+        window_data_specific->pointer = wl_seat_get_pointer(seat);
+        wl_pointer_add_listener(window_data_specific->pointer, &pointer_listener, window_data);
     }
-    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_way->pointer) {
-        wl_pointer_destroy(window_data_way->pointer);
-        window_data_way->pointer = NULL;
+    else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_specific->pointer) {
+        wl_pointer_destroy(window_data_specific->pointer);
+        window_data_specific->pointer = NULL;
     }
 }
 
@@ -852,13 +852,13 @@ shm_format(void *data, struct wl_shm *shm, uint32_t format) {
     kUnused(shm);
 
     SWindowData         *window_data     = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way->shm_format == -1u) {
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific->shm_format == -1u) {
         switch (format) {
             // We could do RGBA, but that would not be what is expected from minifb...
             // case WL_SHM_FORMAT_ARGB8888:
             case WL_SHM_FORMAT_XRGB8888:
-                window_data_way->shm_format = format;
+                window_data_specific->shm_format = format;
             break;
 
             default:
@@ -878,11 +878,11 @@ static void
 fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale) {
     kUnused(fractional_scale);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way == NULL) {
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
         return;
     }
-    window_data_way->preferred_scale_120 = scale;
+    window_data_specific->preferred_scale_120 = scale;
 }
 
 //-------------------------------------
@@ -892,13 +892,13 @@ static const struct wp_fractional_scale_v1_listener fractional_scale_listener = 
 
 //-------------------------------------
 static int
-find_output_index(SWindowData_Way *window_data_way, struct wl_output *output) {
-    if (window_data_way == NULL || output == NULL) {
+find_output_index(SWindowData_Way *window_data_specific, struct wl_output *output) {
+    if (window_data_specific == NULL || output == NULL) {
         return -1;
     }
 
-    for (uint32_t i = 0; i < window_data_way->output_count; ++i) {
-        if (window_data_way->outputs[i] == output) {
+    for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
+        if (window_data_specific->outputs[i] == output) {
             return (int) i;
         }
     }
@@ -943,20 +943,20 @@ output_done(void *data, struct wl_output *output) {
 static void
 output_scale(void *data, struct wl_output *output, int32_t factor) {
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way == NULL || output == NULL) {
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL || output == NULL) {
         return;
     }
 
-    int idx = find_output_index(window_data_way, output);
+    int idx = find_output_index(window_data_specific, output);
     if (idx < 0) {
         return;
     }
 
     uint32_t scale = (factor > 0) ? (uint32_t) factor : 1;
-    window_data_way->output_scales[idx] = scale;
-    if (window_data_way->current_output == output) {
-        window_data_way->current_output_scale = scale;
+    window_data_specific->output_scales[idx] = scale;
+    if (window_data_specific->current_output == output) {
+        window_data_specific->current_output_scale = scale;
     }
 }
 
@@ -1003,18 +1003,18 @@ static void
 surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way == NULL || output == NULL) {
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL || output == NULL) {
         return;
     }
 
-    window_data_way->current_output = output;
-    int idx = find_output_index(window_data_way, output);
-    if (idx >= 0 && window_data_way->output_scales[idx] > 0) {
-        window_data_way->current_output_scale = window_data_way->output_scales[idx];
+    window_data_specific->current_output = output;
+    int idx = find_output_index(window_data_specific, output);
+    if (idx >= 0 && window_data_specific->output_scales[idx] > 0) {
+        window_data_specific->current_output_scale = window_data_specific->output_scales[idx];
     }
     else {
-        window_data_way->current_output_scale = 1;
+        window_data_specific->current_output_scale = 1;
     }
 }
 
@@ -1023,14 +1023,14 @@ static void
 surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = window_data ? (SWindowData_Way *) window_data->specific : NULL;
-    if (window_data_way == NULL || output == NULL) {
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL || output == NULL) {
         return;
     }
 
-    if (window_data_way->current_output == output) {
-        window_data_way->current_output = NULL;
-        window_data_way->current_output_scale = 1;
+    if (window_data_specific->current_output == output) {
+        window_data_specific->current_output = NULL;
+        window_data_specific->current_output_scale = 1;
     }
 }
 
@@ -1057,20 +1057,20 @@ static const struct zxdg_toplevel_decoration_v1_listener toplevel_decoration_lis
 static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version) {
     SWindowData         *window_data     = (SWindowData *) data;
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (strcmp(iface, "wl_compositor") == 0) {
         // Use version 1 for compositor (stable)
-        window_data_way->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
+        window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
     }
 
     else if (strcmp(iface, "wl_shm") == 0) {
         // Use version 1 for shm (stable)
-        window_data_way->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
-        if (window_data_way->shm) {
-            wl_shm_add_listener(window_data_way->shm, &shm_listener, window_data);
-            window_data_way->cursor_theme = wl_cursor_theme_load(NULL, 32, window_data_way->shm);
-            if (window_data_way->cursor_theme) {
-                window_data_way->default_cursor = wl_cursor_theme_get_cursor(window_data_way->cursor_theme, "left_ptr");
+        window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
+        if (window_data_specific->shm) {
+            wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
+            window_data_specific->cursor_theme = wl_cursor_theme_load(NULL, 32, window_data_specific->shm);
+            if (window_data_specific->cursor_theme) {
+                window_data_specific->default_cursor = wl_cursor_theme_get_cursor(window_data_specific->cursor_theme, "left_ptr");
             }
         }
     }
@@ -1081,17 +1081,17 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         // events newer than the generated protocol code can decode.
         uint32_t client_version = (uint32_t) xdg_wm_base_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
-        window_data_way->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
-        if (window_data_way->shell) {
-            xdg_wm_base_add_listener(window_data_way->shell, &shell_listener, NULL);
+        window_data_specific->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
+        if (window_data_specific->shell) {
+            xdg_wm_base_add_listener(window_data_specific->shell, &shell_listener, NULL);
         }
     }
 
     else if (strcmp(iface, "wl_seat") == 0) {
         // Use version 1 for seat (stable)
-        window_data_way->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
-        if (window_data_way->seat) {
-            wl_seat_add_listener(window_data_way->seat, &seat_listener, window_data);
+        window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
+        if (window_data_specific->seat) {
+            wl_seat_add_listener(window_data_specific->seat, &seat_listener, window_data);
         }
     }
 
@@ -1101,10 +1101,10 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         struct wl_output *output = (struct wl_output *) wl_registry_bind(registry, id, &wl_output_interface, use_version);
         if (output) {
             wl_output_add_listener(output, &output_listener, window_data);
-            if (window_data_way->output_count < WAYLAND_MAX_OUTPUTS) {
-                uint32_t idx = window_data_way->output_count++;
-                window_data_way->outputs[idx] = output;
-                window_data_way->output_scales[idx] = 1;
+            if (window_data_specific->output_count < WAYLAND_MAX_OUTPUTS) {
+                uint32_t idx = window_data_specific->output_count++;
+                window_data_specific->outputs[idx] = output;
+                window_data_specific->output_scales[idx] = 1;
             }
             else {
                 wl_output_destroy(output);
@@ -1115,14 +1115,14 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0) {
         uint32_t client_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
-        window_data_way->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
+        window_data_specific->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
             wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
     }
 
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
         uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
-        window_data_way->decoration_manager = (struct zxdg_decoration_manager_v1 *)
+        window_data_specific->decoration_manager = (struct zxdg_decoration_manager_v1 *)
             wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
     }
 }
@@ -1146,31 +1146,31 @@ wl_registry_listener registry_listener = {
 static void
 handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial) {
     SWindowData *window_data = (SWindowData *) data;
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
     xdg_surface_ack_configure(shell_surface, serial);
 
     // Some compositors apply startup states (fullscreen/maximized) more reliably
     // when requested after the first configure handshake.
-    if (!window_data_way->startup_state_applied) {
-        if (window_data_way->request_fullscreen) {
-            xdg_toplevel_set_fullscreen(window_data_way->toplevel, NULL);
+    if (!window_data_specific->startup_state_applied) {
+        if (window_data_specific->request_fullscreen) {
+            xdg_toplevel_set_fullscreen(window_data_specific->toplevel, NULL);
         }
-        else if (window_data_way->request_maximized) {
-            xdg_toplevel_set_maximized(window_data_way->toplevel);
+        else if (window_data_specific->request_maximized) {
+            xdg_toplevel_set_maximized(window_data_specific->toplevel);
         }
-        window_data_way->startup_state_applied = 1;
+        window_data_specific->startup_state_applied = 1;
     }
 
     // On first configure, attach buffer and commit
     if (!window_data->is_initialized) {
-        wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer,
+        wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer,
                          window_data->dst_offset_x, window_data->dst_offset_y);
 
-        wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y,
+        wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y,
                          window_data->dst_width, window_data->dst_height);
 
-        wl_surface_commit(window_data_way->surface);
+        wl_surface_commit(window_data_specific->surface);
         window_data->is_initialized = true;
     }
 }
@@ -1288,64 +1288,64 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_Way *window_data_way = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
-    if (window_data_way == NULL) {
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData_Way.");
         free(window_data);
         return NULL;
     }
-    memset(window_data_way, 0, sizeof(SWindowData_Way));
-    window_data_way->fd = -1;
-    window_data_way->current_output_scale = 1;
-    window_data->specific = window_data_way;
+    memset(window_data_specific, 0, sizeof(SWindowData_Way));
+    window_data_specific->fd = -1;
+    window_data_specific->current_output_scale = 1;
+    window_data->specific = window_data_specific;
 
-    window_data_way->shm_format = -1u;
+    window_data_specific->shm_format = -1u;
 
-    window_data_way->display = wl_display_connect(NULL);
-    if (!window_data_way->display) {
+    window_data_specific->display = wl_display_connect(NULL);
+    if (!window_data_specific->display) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to connect to Wayland display.");
         free(window_data);
-        free(window_data_way);
+        free(window_data_specific);
         return NULL;
     }
-    window_data_way->registry = wl_display_get_registry(window_data_way->display);
-    if (!window_data_way->registry) {
+    window_data_specific->registry = wl_display_get_registry(window_data_specific->display);
+    if (!window_data_specific->registry) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_get_registry returned NULL.");
         goto out;
     }
-    wl_registry_add_listener(window_data_way->registry, &registry_listener, window_data);
+    wl_registry_add_listener(window_data_specific->registry, &registry_listener, window_data);
 
     init_keycodes();
 
-    if (wl_display_dispatch(window_data_way->display) == -1 ||
-        wl_display_roundtrip(window_data_way->display) == -1) {
+    if (wl_display_dispatch(window_data_specific->display) == -1 ||
+        wl_display_roundtrip(window_data_specific->display) == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to initialize Wayland globals (dispatch/roundtrip).");
         goto out;
     }
 
-    if (!window_data_way->decoration_manager) {
+    if (!window_data_specific->decoration_manager) {
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.");
     }
 
-    if (!window_data_way->fractional_scale_manager) {
+    if (!window_data_specific->fractional_scale_manager) {
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.");
     }
 
-    if (!window_data_way->seat) {
+    if (!window_data_specific->seat) {
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: wl_seat is unavailable; keyboard and pointer input will not be available.");
     }
 
-    if (window_data_way->output_count == 0) {
+    if (window_data_specific->output_count == 0) {
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: wl_output is unavailable; monitor scale tracking will use fallback values.");
     }
 
     // did not get a format we want... meh
-    if (window_data_way->shm_format == -1u) {
+    if (window_data_specific->shm_format == -1u) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: compositor does not expose a supported shared memory format.");
         goto out;
     }
 
-    if (!window_data_way->compositor) {
+    if (!window_data_specific->compositor) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: Wayland compositor interface is unavailable.");
         goto out;
     }
@@ -1363,8 +1363,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         goto out;
     }
 
-    window_data_way->fd = mkstemp(shmfile);
-    if (window_data_way->fd == -1) {
+    window_data_specific->fd = mkstemp(shmfile);
+    if (window_data_specific->fd == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mkstemp failed for shared memory file (%s).", strerror(errno));
         goto out;
     }
@@ -1378,19 +1378,19 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     int length = (int) length_sz;
 
-    if (ftruncate(window_data_way->fd, (off_t) length_sz) == -1) {
+    if (ftruncate(window_data_specific->fd, (off_t) length_sz) == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed for shared memory buffer (%s).", strerror(errno));
         goto out;
     }
 
-    window_data_way->shm_ptr = (uint32_t *) mmap(NULL, length_sz, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
-    if (window_data_way->shm_ptr == MAP_FAILED) {
+    window_data_specific->shm_ptr = (uint32_t *) mmap(NULL, length_sz, PROT_WRITE, MAP_SHARED, window_data_specific->fd, 0);
+    if (window_data_specific->shm_ptr == MAP_FAILED) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed for shared memory buffer (%s).", strerror(errno));
         goto out;
     }
 
-    window_data_way->shm_length = length_sz;
-    window_data_way->shm_pool_size = length_sz;
+    window_data_specific->shm_length = length_sz;
+    window_data_specific->shm_pool_size = length_sz;
 
     window_data->window_width  = width;
     window_data->window_height = height;
@@ -1401,107 +1401,107 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data->is_cursor_visible = true;
 
-    window_data_way->shm_pool  = wl_shm_create_pool(window_data_way->shm, window_data_way->fd, length);
-    if (window_data_way->shm_pool == NULL) {
+    window_data_specific->shm_pool  = wl_shm_create_pool(window_data_specific->shm, window_data_specific->fd, length);
+    if (window_data_specific->shm_pool == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_create_pool failed.");
         goto out;
     }
-    window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
+    window_data->draw_buffer   = wl_shm_pool_create_buffer(window_data_specific->shm_pool, 0,
                                     window_data->buffer_width, window_data->buffer_height,
-                                    window_data->buffer_stride, window_data_way->shm_format);
+                                    window_data->buffer_stride, window_data_specific->shm_format);
     if (window_data->draw_buffer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer failed.");
         goto out;
     }
 
-    window_data_way->surface = wl_compositor_create_surface(window_data_way->compositor);
-    if (!window_data_way->surface) {
+    window_data_specific->surface = wl_compositor_create_surface(window_data_specific->compositor);
+    if (!window_data_specific->surface) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create Wayland surface.");
         goto out;
     }
 
-    wl_surface_add_listener(window_data_way->surface, &surface_listener, window_data);
-    if (window_data_way->fractional_scale_manager) {
-        window_data_way->fractional_scale =
-            wp_fractional_scale_manager_v1_get_fractional_scale(window_data_way->fractional_scale_manager,
-                                                                window_data_way->surface);
-        if (window_data_way->fractional_scale) {
-            wp_fractional_scale_v1_add_listener(window_data_way->fractional_scale,
+    wl_surface_add_listener(window_data_specific->surface, &surface_listener, window_data);
+    if (window_data_specific->fractional_scale_manager) {
+        window_data_specific->fractional_scale =
+            wp_fractional_scale_manager_v1_get_fractional_scale(window_data_specific->fractional_scale_manager,
+                                                                window_data_specific->surface);
+        if (window_data_specific->fractional_scale) {
+            wp_fractional_scale_v1_add_listener(window_data_specific->fractional_scale,
                                                 &fractional_scale_listener,
                                                 window_data);
         }
     }
 
-    window_data_way->cursor_surface = wl_compositor_create_surface(window_data_way->compositor);
-    if (!window_data_way->cursor_surface) {
+    window_data_specific->cursor_surface = wl_compositor_create_surface(window_data_specific->compositor);
+    if (!window_data_specific->cursor_surface) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create Wayland cursor surface.");
         goto out;
     }
 
     // There should always be a shell, right?
-    if (window_data_way->shell) {
-        window_data_way->shell_surface = xdg_wm_base_get_xdg_surface(window_data_way->shell, window_data_way->surface);
-        if (!window_data_way->shell_surface) {
+    if (window_data_specific->shell) {
+        window_data_specific->shell_surface = xdg_wm_base_get_xdg_surface(window_data_specific->shell, window_data_specific->surface);
+        if (!window_data_specific->shell_surface) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create xdg_surface.");
             goto out;
         }
 
-        xdg_surface_add_listener(window_data_way->shell_surface, &shell_surface_listener, window_data);
+        xdg_surface_add_listener(window_data_specific->shell_surface, &shell_surface_listener, window_data);
 
-        window_data_way->toplevel = xdg_surface_get_toplevel(window_data_way->shell_surface);
-        if (!window_data_way->toplevel) {
+        window_data_specific->toplevel = xdg_surface_get_toplevel(window_data_specific->shell_surface);
+        if (!window_data_specific->toplevel) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create xdg_toplevel.");
             goto out;
         }
 
-        if (window_data_way->decoration_manager) {
-            window_data_way->toplevel_decoration =
-                zxdg_decoration_manager_v1_get_toplevel_decoration(window_data_way->decoration_manager, window_data_way->toplevel);
-            if (window_data_way->toplevel_decoration) {
-                zxdg_toplevel_decoration_v1_add_listener(window_data_way->toplevel_decoration,
+        if (window_data_specific->decoration_manager) {
+            window_data_specific->toplevel_decoration =
+                zxdg_decoration_manager_v1_get_toplevel_decoration(window_data_specific->decoration_manager, window_data_specific->toplevel);
+            if (window_data_specific->toplevel_decoration) {
+                zxdg_toplevel_decoration_v1_add_listener(window_data_specific->toplevel_decoration,
                                                          &toplevel_decoration_listener, window_data);
                 if (effective_flags & MFB_WF_BORDERLESS) {
-                    zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
+                    zxdg_toplevel_decoration_v1_set_mode(window_data_specific->toplevel_decoration,
                                                          ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
                 }
                 else {
-                    zxdg_toplevel_decoration_v1_set_mode(window_data_way->toplevel_decoration,
+                    zxdg_toplevel_decoration_v1_set_mode(window_data_specific->toplevel_decoration,
                                                          ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
                 }
             }
         }
 
-        window_data_way->request_fullscreen = (effective_flags & MFB_WF_FULLSCREEN) ? 1 : 0;
-        window_data_way->request_maximized =
-            (!window_data_way->request_fullscreen && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
-        window_data_way->startup_state_applied = 0;
+        window_data_specific->request_fullscreen = (effective_flags & MFB_WF_FULLSCREEN) ? 1 : 0;
+        window_data_specific->request_maximized =
+            (!window_data_specific->request_fullscreen && (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+        window_data_specific->startup_state_applied = 0;
 
-        if (window_data_way->request_fullscreen || window_data_way->request_maximized) {
-            xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
-            xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
+        if (window_data_specific->request_fullscreen || window_data_specific->request_maximized) {
+            xdg_toplevel_set_min_size(window_data_specific->toplevel, 0, 0);
+            xdg_toplevel_set_max_size(window_data_specific->toplevel, 0, 0);
         }
         else {
             if (effective_flags & MFB_WF_RESIZABLE) {
-                xdg_toplevel_set_min_size(window_data_way->toplevel, 0, 0);
-                xdg_toplevel_set_max_size(window_data_way->toplevel, 0, 0);
+                xdg_toplevel_set_min_size(window_data_specific->toplevel, 0, 0);
+                xdg_toplevel_set_max_size(window_data_specific->toplevel, 0, 0);
             }
             else {
-                xdg_toplevel_set_min_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
-                xdg_toplevel_set_max_size(window_data_way->toplevel, (int32_t) width, (int32_t) height);
+                xdg_toplevel_set_min_size(window_data_specific->toplevel, (int32_t) width, (int32_t) height);
+                xdg_toplevel_set_max_size(window_data_specific->toplevel, (int32_t) width, (int32_t) height);
             }
         }
 
-        xdg_toplevel_set_app_id(window_data_way->toplevel, MFB_STR(MFB_APP_ID));
+        xdg_toplevel_set_app_id(window_data_specific->toplevel, MFB_STR(MFB_APP_ID));
 
-        xdg_toplevel_set_title(window_data_way->toplevel, window_title);
-        xdg_toplevel_add_listener(window_data_way->toplevel, &toplevel_listener, window_data);
+        xdg_toplevel_set_title(window_data_specific->toplevel, window_title);
+        xdg_toplevel_add_listener(window_data_specific->toplevel, &toplevel_listener, window_data);
 
         // Commit without a buffer to trigger initial configure event
-        wl_surface_commit(window_data_way->surface);
+        wl_surface_commit(window_data_specific->surface);
 
         // Process events until we get the configure event and the surface is mapped
         while (!window_data->is_initialized) {
-            if (wl_display_dispatch(window_data_way->display) == -1) {
+            if (wl_display_dispatch(window_data_specific->display) == -1) {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch failed while waiting for initial configure event.");
                 goto out;
             }
@@ -1512,8 +1512,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         goto out;
     }
 
-    window_data_way->timer = mfb_timer_create();
-    if (window_data_way->timer == NULL) {
+    window_data_specific->timer = mfb_timer_create();
+    if (window_data_specific->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create frame timer.");
         goto out;
     }
@@ -1581,13 +1581,13 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == NULL) {
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_ex.");
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
+    if (!window_data_specific->display || wl_display_get_error(window_data_specific->display) != 0)
     {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
@@ -1605,16 +1605,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         int length_i = (int) length;
 
         // Wayland pools are grow-only: never call wl_shm_pool_resize with a smaller size.
-        if (length > window_data_way->shm_pool_size) {
-            if (ftruncate(window_data_way->fd, (off_t) length) == -1)
+        if (length > window_data_specific->shm_pool_size) {
+            if (ftruncate(window_data_specific->fd, (off_t) length) == -1)
             {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed while resizing shared memory buffer (%s).", strerror(errno));
                 return MFB_STATE_INTERNAL_ERROR;
             }
 
-            uint32_t *old_shm_ptr = window_data_way->shm_ptr;
-            size_t old_shm_length = window_data_way->shm_length;
-            uint32_t *new_shm_ptr = (uint32_t *) mmap(NULL, length, PROT_WRITE, MAP_SHARED, window_data_way->fd, 0);
+            uint32_t *old_shm_ptr = window_data_specific->shm_ptr;
+            size_t old_shm_length = window_data_specific->shm_length;
+            uint32_t *new_shm_ptr = (uint32_t *) mmap(NULL, length, PROT_WRITE, MAP_SHARED, window_data_specific->fd, 0);
             if (new_shm_ptr == MAP_FAILED)
             {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed while resizing shared memory buffer (%s).", strerror(errno));
@@ -1623,17 +1623,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             if (old_shm_ptr && old_shm_ptr != MAP_FAILED && old_shm_length > 0) {
                 munmap(old_shm_ptr, old_shm_length);
             }
-            window_data_way->shm_ptr = new_shm_ptr;
-            window_data_way->shm_length = length;
+            window_data_specific->shm_ptr = new_shm_ptr;
+            window_data_specific->shm_length = length;
 
-            wl_shm_pool_resize(window_data_way->shm_pool, length_i);
-            window_data_way->shm_pool_size = length;
+            wl_shm_pool_resize(window_data_specific->shm_pool, length_i);
+            window_data_specific->shm_pool_size = length;
         }
 
         unsigned new_buffer_stride = buffer_stride;
-        struct wl_buffer *new_draw_buffer = wl_shm_pool_create_buffer(window_data_way->shm_pool, 0,
+        struct wl_buffer *new_draw_buffer = wl_shm_pool_create_buffer(window_data_specific->shm_pool, 0,
                                         width, height,
-                                        new_buffer_stride, window_data_way->shm_format);
+                                        new_buffer_stride, window_data_specific->shm_format);
         if (new_draw_buffer == NULL) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer failed while resizing buffer.");
             window_data->buffer_width  = old_buffer_width;
@@ -1654,27 +1654,27 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     // update shm buffer
-    if (window_data_way->shm_ptr == NULL || window_data_way->shm_ptr == MAP_FAILED) {
+    if (window_data_specific->shm_ptr == NULL || window_data_specific->shm_ptr == MAP_FAILED) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: shared memory buffer is not mapped.");
         return MFB_STATE_INTERNAL_ERROR;
     }
-    memcpy(window_data_way->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
+    memcpy(window_data_specific->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
-    wl_surface_attach(window_data_way->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
-    wl_surface_damage(window_data_way->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
-    struct wl_callback *frame_callback = wl_surface_frame(window_data_way->surface);
+    wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
+    wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
+    struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
         return MFB_STATE_INTERNAL_ERROR;
     }
     wl_callback_add_listener(frame_callback, &frame_listener, &done);
-    wl_surface_commit(window_data_way->surface);
+    wl_surface_commit(window_data_specific->surface);
 
     window_data->mouse_wheel_x = 0.0f;
     window_data->mouse_wheel_y = 0.0f;
 
     while (!done && window_data->close == false) {
-        if (wl_display_dispatch(window_data_way->display) == -1 || wl_display_roundtrip(window_data_way->display) == -1) {
+        if (wl_display_dispatch(window_data_specific->display) == -1 || wl_display_roundtrip(window_data_specific->display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: display dispatch/roundtrip failed during frame wait.");
             if (!done) {
                 wl_callback_destroy(frame_callback);
@@ -1709,12 +1709,12 @@ mfb_update_events(struct mfb_window *window) {
         return MFB_STATE_EXIT;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == NULL) {
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_events.");
         return MFB_STATE_INVALID_WINDOW;
     }
-    if (!window_data_way->display || wl_display_get_error(window_data_way->display) != 0)
+    if (!window_data_specific->display || wl_display_get_error(window_data_specific->display) != 0)
     {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_events.");
         return MFB_STATE_INTERNAL_ERROR;
@@ -1724,27 +1724,27 @@ mfb_update_events(struct mfb_window *window) {
     window_data->mouse_wheel_y = 0.0f;
 
     // Process already queued events first.
-    if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+    if (wl_display_dispatch_pending(window_data_specific->display) == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_update_events.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
     // Non-blocking read/dispatch so mfb_update_events keeps X11-like behavior.
-    while (wl_display_prepare_read(window_data_way->display) != 0) {
-        if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+    while (wl_display_prepare_read(window_data_specific->display) != 0) {
+        if (wl_display_dispatch_pending(window_data_specific->display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed while preparing read in mfb_update_events.");
             return MFB_STATE_INTERNAL_ERROR;
         }
     }
 
-    if (wl_display_flush(window_data_way->display) == -1 && errno != EAGAIN) {
-        wl_display_cancel_read(window_data_way->display);
+    if (wl_display_flush(window_data_specific->display) == -1 && errno != EAGAIN) {
+        wl_display_cancel_read(window_data_specific->display);
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_flush failed in mfb_update_events.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
     struct pollfd pfd;
-    pfd.fd = wl_display_get_fd(window_data_way->display);
+    pfd.fd = wl_display_get_fd(window_data_specific->display);
     pfd.events = POLLIN;
     pfd.revents = 0;
 
@@ -1754,17 +1754,17 @@ mfb_update_events(struct mfb_window *window) {
     } while (rc < 0 && errno == EINTR);
 
     if (rc > 0) {
-        if (wl_display_read_events(window_data_way->display) == -1) {
+        if (wl_display_read_events(window_data_specific->display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_read_events failed in mfb_update_events.");
             return MFB_STATE_INTERNAL_ERROR;
         }
-        if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+        if (wl_display_dispatch_pending(window_data_specific->display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed after read in mfb_update_events.");
             return MFB_STATE_INTERNAL_ERROR;
         }
     }
     else {
-        wl_display_cancel_read(window_data_way->display);
+        wl_display_cancel_read(window_data_specific->display);
         if (rc < 0) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: poll failed in mfb_update_events (%s).", strerror(errno));
             return MFB_STATE_INTERNAL_ERROR;
@@ -1913,8 +1913,8 @@ mfb_wait_sync2(struct mfb_window *window) {
         return false;
     }
 
-    SWindowData_Way   *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == NULL || window_data_way->display == NULL || window_data_way->timer == NULL) {
+    SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL || window_data_specific->display == NULL || window_data_specific->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync2 missing Wayland display or timer state.");
         return false;
     }
@@ -1924,9 +1924,9 @@ mfb_wait_sync2(struct mfb_window *window) {
     window_data->mouse_wheel_x = 0.0f;
     window_data->mouse_wheel_y = 0.0f;
     while (1) {
-        current = mfb_timer_now(window_data_way->timer);
+        current = mfb_timer_now(window_data_specific->timer);
         if (current >= g_time_for_frame * 0.96) {
-            mfb_timer_reset(window_data_way->timer);
+            mfb_timer_reset(window_data_specific->timer);
             return true;
         }
         else if (current >= g_time_for_frame * 0.8) {
@@ -1937,7 +1937,7 @@ mfb_wait_sync2(struct mfb_window *window) {
         //sched_yield();
 
         if (millis == 1) {
-            if (wl_display_dispatch_pending(window_data_way->display) == -1) {
+            if (wl_display_dispatch_pending(window_data_specific->display) == -1) {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_wait_sync2.");
                 return false;
             }
@@ -2106,18 +2106,18 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
-        SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-        if (window_data_way) {
-            if (window_data_way->preferred_scale_120 > 0) {
-                float scale = (float) window_data_way->preferred_scale_120 / WAYLAND_FRACTIONAL_SCALE_DENOMINATOR;
+        SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+        if (window_data_specific) {
+            if (window_data_specific->preferred_scale_120 > 0) {
+                float scale = (float) window_data_specific->preferred_scale_120 / WAYLAND_FRACTIONAL_SCALE_DENOMINATOR;
                 if (scale > 0.0f) {
                     x = scale;
                     y = scale;
                 }
             }
-            else if (window_data_way->current_output_scale > 0) {
-                x = (float) window_data_way->current_output_scale;
-                y = (float) window_data_way->current_output_scale;
+            else if (window_data_specific->current_output_scale > 0) {
+                x = (float) window_data_specific->current_output_scale;
+                y = (float) window_data_specific->current_output_scale;
             }
         }
     }
@@ -2146,8 +2146,8 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
     }
 
-    SWindowData_Way *window_data_way = (SWindowData_Way *) window_data->specific;
-    if (window_data_way == NULL) {
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor missing Wayland-specific window data.");
         return;
     }
@@ -2155,20 +2155,20 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     // Keep requested visibility state even if we can't apply it immediately.
     window_data->is_cursor_visible = show;
 
-    struct wl_pointer *pointer = window_data_way->pointer;
-    struct wl_surface *cursor_surface = window_data_way->cursor_surface;
+    struct wl_pointer *pointer = window_data_specific->pointer;
+    struct wl_surface *cursor_surface = window_data_specific->cursor_surface;
     if (pointer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor cannot update cursor because wl_pointer is null.");
         return;
     }
 
-    if (!window_data_way->pointer_serial_valid) {
+    if (!window_data_specific->pointer_serial_valid) {
         return;
     }
 
-    uint32_t serial = window_data_way->pointer_serial;
+    uint32_t serial = window_data_specific->pointer_serial;
     if (show) {
-        struct wl_cursor *cursor = window_data_way->default_cursor;
+        struct wl_cursor *cursor = window_data_specific->default_cursor;
         if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: default cursor data is incomplete (cursor=%p, image_count=%u, cursor_surface=%p).",
                     (void *) cursor, cursor ? cursor->image_count : 0, (void *) cursor_surface);

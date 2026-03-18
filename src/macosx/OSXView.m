@@ -50,8 +50,8 @@
     if(window_data == 0x0)
         return;
 
-    SWindowData_OSX *window_data_osx = (SWindowData_OSX *) window_data->specific;
-    if (!window_data_osx || !window_data_osx->window || !window_data->draw_buffer || window_data->buffer_stride == 0 || window_data->buffer_height == 0)
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (!window_data_specific || !window_data_specific->window || !window_data->draw_buffer || window_data->buffer_stride == 0 || window_data->buffer_height == 0)
         return;
 
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];

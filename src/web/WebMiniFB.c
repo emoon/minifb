@@ -27,8 +27,8 @@ mfb_web_get_data(SWindowData *window_data) {
 //-------------------------------------
 static uint8_t *
 mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned height) {
-    SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
-    if (window_data_web == NULL || width == 0 || height == 0) {
+    SWindowData_Web *window_data_specific = mfb_web_get_data(window_data);
+    if (window_data_specific == NULL || width == 0 || height == 0) {
         return NULL;
     }
 
@@ -44,17 +44,17 @@ mfb_web_ensure_swizzle_buffer(SWindowData *window_data, unsigned width, unsigned
     }
 
     size_t required = pixels * 4;
-    if (required > window_data_web->swizzle_buffer_size) {
-        uint8_t *swizzle_buffer = realloc(window_data_web->swizzle_buffer, required);
+    if (required > window_data_specific->swizzle_buffer_size) {
+        uint8_t *swizzle_buffer = realloc(window_data_specific->swizzle_buffer, required);
         if (swizzle_buffer == NULL) {
             MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate %zu bytes for swizzle buffer.", required);
             return NULL;
         }
-        window_data_web->swizzle_buffer = swizzle_buffer;
-        window_data_web->swizzle_buffer_size = required;
+        window_data_specific->swizzle_buffer = swizzle_buffer;
+        window_data_specific->swizzle_buffer_size = required;
     }
 
-    return window_data_web->swizzle_buffer;
+    return window_data_specific->swizzle_buffer;
 }
 
 //-------------------------------------
@@ -301,9 +301,9 @@ window_data_update_window_size(SWindowData *window_data, unsigned width, unsigne
 //-------------------------------------
 EM_EXPORT void *
 window_data_get_specific(SWindowData *window_data) {
-    SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
-    if (window_data_web == NULL) return 0;
-    return (void *) window_data_web->window_id;
+    SWindowData_Web *window_data_specific = mfb_web_get_data(window_data);
+    if (window_data_specific == NULL) return 0;
+    return (void *) window_data_specific->window_id;
 }
 
 //-------------------------------------
@@ -736,17 +736,17 @@ mfb_destroy_window_data(SWindowData *window_data) {
         return;
     }
 
-    SWindowData_Web *window_data_web = (SWindowData_Web *) window_data->specific;
-    if (window_data_web != NULL) {
-        if (window_data_web->window_id != 0) {
-            mfb_close_js(window_data_web->window_id);
+    SWindowData_Web *window_data_specific = (SWindowData_Web *) window_data->specific;
+    if (window_data_specific != NULL) {
+        if (window_data_specific->window_id != 0) {
+            mfb_close_js(window_data_specific->window_id);
         }
 
-        free(window_data_web->swizzle_buffer);
-        window_data_web->swizzle_buffer = NULL;
-        window_data_web->swizzle_buffer_size = 0;
+        free(window_data_specific->swizzle_buffer);
+        window_data_specific->swizzle_buffer = NULL;
+        window_data_specific->swizzle_buffer_size = 0;
 
-        free(window_data_web);
+        free(window_data_specific);
         window_data->specific = NULL;
     }
 
@@ -795,16 +795,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_WARNING, "WebMiniFB: canvas with id '%s' was not found; created a new canvas and appended it to the document.", window_title);
     }
 
-    SWindowData_Web *window_data_web = malloc(sizeof(SWindowData_Web));
-    if (window_data_web == NULL) {
+    SWindowData_Web *window_data_specific = malloc(sizeof(SWindowData_Web));
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData_Web.");
         mfb_close_js((uintptr_t) specific);
         free(window_data);
         return NULL;
     }
-    memset(window_data_web, 0, sizeof(SWindowData_Web));
-    window_data_web->window_id = (uintptr_t) specific;
-    window_data->specific = window_data_web;
+    memset(window_data_specific, 0, sizeof(SWindowData_Web));
+    window_data_specific->window_id = (uintptr_t) specific;
+    window_data->specific = window_data_specific;
 
     // setup key map if not initialized yet
     if (!g_initialized) {
@@ -1155,11 +1155,11 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
 
     window_data->is_cursor_visible = show;
 
-    SWindowData_Web *window_data_web = mfb_web_get_data(window_data);
-    if (window_data_web == NULL) {
+    SWindowData_Web *window_data_specific = mfb_web_get_data(window_data);
+    if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_show_cursor missing web-specific window data.");
         return;
     }
 
-    mfb_show_cursor_js(window_data_web->window_id, show ? 1 : 0);
+    mfb_show_cursor_js(window_data_specific->window_id, show ? 1 : 0);
 }

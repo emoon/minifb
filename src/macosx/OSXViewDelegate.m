@@ -73,7 +73,7 @@ NSString *g_shader_src = kShader(
     self = [super init];
     if (self) {
         window_data     = windowData;
-        window_data_osx = (SWindowData_OSX *) windowData->specific;
+        window_data_specific = (SWindowData_OSX *) windowData->specific;
         current_buffer  = -1;
 
         metal_device = MTLCreateSystemDefaultDevice();
@@ -169,7 +169,7 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (bool) _createAssets {
-    if (window_data == NULL || window_data_osx == NULL) {
+    if (window_data == NULL || window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: invalid window state while creating assets.");
         return false;
     }
@@ -180,7 +180,7 @@ NSString *g_shader_src = kShader(
         { 1.0, -1.0, 0, 1},
         { 1.0,  1.0, 0, 1},
     };
-    memcpy(window_data_osx->metal.vertices, s_vertices, sizeof(s_vertices));
+    memcpy(window_data_specific->metal.vertices, s_vertices, sizeof(s_vertices));
 
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
@@ -242,7 +242,7 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (void) drawInMTKView:(nonnull MTKView *) view {
-    if (window_data == NULL || window_data_osx == NULL ||
+    if (window_data == NULL || window_data_specific == NULL ||
         window_data->draw_buffer == NULL || window_data->buffer_width == 0 || window_data->buffer_height == 0) {
         return;
     }
@@ -309,7 +309,7 @@ NSString *g_shader_src = kShader(
 
         // Set render command encoder state
         [renderEncoder setRenderPipelineState:pipeline_state];
-        [renderEncoder setVertexBytes:window_data_osx->metal.vertices length:sizeof(window_data_osx->metal.vertices) atIndex:0];
+        [renderEncoder setVertexBytes:window_data_specific->metal.vertices length:sizeof(window_data_specific->metal.vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
 

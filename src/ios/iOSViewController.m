@@ -81,11 +81,11 @@
         return;
     }
 
-    SWindowData_IOS *window_data_ios = (SWindowData_IOS *) window_data->specific;
-    if (window_data_ios->view_delegate == nil) {
-        window_data_ios->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
+    SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
+    if (window_data_specific->view_delegate == nil) {
+        window_data_specific->view_delegate = [[iOSViewDelegate alloc] initWithMetalKitView:metal_view windowData:window_data];
     }
-    if (window_data_ios->view_delegate == nil) {
+    if (window_data_specific->view_delegate == nil) {
         MFB_LOG(MFB_LOG_ERROR, "iOSViewController: failed to initialize iOSViewDelegate.");
         return;
     }
@@ -98,10 +98,10 @@
         pixelSize = CGSizeMake(metal_view.bounds.size.width  * scale,
                                metal_view.bounds.size.height * scale);
     }
-    [window_data_ios->view_delegate mtkView:metal_view drawableSizeWillChange:pixelSize];
+    [window_data_specific->view_delegate mtkView:metal_view drawableSizeWillChange:pixelSize];
 
-    if (metal_view.delegate != window_data_ios->view_delegate) {
-        metal_view.delegate = window_data_ios->view_delegate;
+    if (metal_view.delegate != window_data_specific->view_delegate) {
+        metal_view.delegate = window_data_specific->view_delegate;
     }
 }
 

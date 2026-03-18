@@ -13,7 +13,7 @@ enum { MaxBuffersInFlight = 3 };
 @interface OSXViewDelegate : NSViewController<MTKViewDelegate>
 {
     @public SWindowData         *window_data;
-    @public SWindowData_OSX     *window_data_osx;
+    @public SWindowData_OSX     *window_data_specific;
 
     id<MTLDevice>               metal_device;
     id<MTLLibrary>              metal_library;
