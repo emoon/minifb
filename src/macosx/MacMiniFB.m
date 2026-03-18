@@ -504,6 +504,20 @@ destroy_window_data(SWindowData *window_data) {
         SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
         if (window_data_specific != NULL) {
             OSXWindow   *window = window_data_specific->window;
+
+#if defined(USE_METAL_API)
+            // Nil the MTKView delegate before closing the window to prevent
+            // use-after-free if the display link fires during teardown.
+            if (window != nil && window_data_specific->viewController != nil) {
+                for (NSView *subview in window.contentView.subviews) {
+                    if ([subview isKindOfClass:[MTKView class]]) {
+                        ((MTKView *) subview).delegate = nil;
+                        break;
+                    }
+                }
+            }
+#endif
+
             if (window != nil) {
                 [window removeWindowData];
                 [window setDelegate:nil];

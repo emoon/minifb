@@ -136,8 +136,6 @@ setup_pixel_format(SWindowData_X11 *window_data_specific) {
     XVisualInfo *visualInfo = glXChooseVisual(window_data_specific->display, window_data_specific->screen, glxAttribs);
     if (visualInfo == 0) {
         MFB_LOG(MFB_LOG_ERROR, "Could not create a compatible X11 visual for OpenGL");
-        XCloseDisplay(window_data_specific->display);
-        window_data_specific->display = NULL;
         return false;
     }
 
@@ -145,8 +143,6 @@ setup_pixel_format(SWindowData_X11 *window_data_specific) {
     XFree(visualInfo);
     if (window_data_specific->context == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "glXCreateContext failed");
-        XCloseDisplay(window_data_specific->display);
-        window_data_specific->display = NULL;
         return false;
     }
 
@@ -198,15 +194,11 @@ create_GL_context(SWindowData *window_data) {
     GLint majorGLX, minorGLX = 0;
     if (!glXQueryVersion(window_data_specific->display, &majorGLX, &minorGLX)) {
         MFB_LOG(MFB_LOG_ERROR, "glXQueryVersion failed");
-        XCloseDisplay(window_data_specific->display);
-        window_data_specific->display = NULL;
         return false;
     }
 
     if (majorGLX <= 1 && minorGLX < 2) {
         MFB_LOG(MFB_LOG_ERROR, "GLX 1.2 or greater is required");
-        XCloseDisplay(window_data_specific->display);
-        window_data_specific->display = NULL;
         return false;
     }
     else {
@@ -220,8 +212,6 @@ create_GL_context(SWindowData *window_data) {
         MFB_LOG(MFB_LOG_ERROR, "glXMakeCurrent failed");
         glXDestroyContext(window_data_specific->display, window_data_specific->context);
         window_data_specific->context = 0;
-        XCloseDisplay(window_data_specific->display);
-        window_data_specific->display = NULL;
         return false;
     }
 

@@ -279,7 +279,6 @@ check_window_closed(SWindowData *window_data) {
       free(dos_window_data->scanline_buffer);
       free(window_data->specific);
       window_data->specific = NULL;
-      free(window_data);
       return MFB_STATE_EXIT;
     }
     else {
