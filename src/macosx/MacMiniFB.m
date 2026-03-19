@@ -322,32 +322,52 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         unsigned previous_height = window_data->buffer_height;
         uint32_t previous_stride = window_data->buffer_stride;
 
+        if (window_data_specific->viewController == nil) {
+            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: Metal view controller is missing during buffer resize.");
+            free(new_draw_buffer);
+            return MFB_STATE_INVALID_WINDOW;
+        }
+
+        // Pause the MTKView to stop CVDisplayLink callbacks while we
+        // replace the draw buffer and update dimensions.
+        MTKView *mtkView = nil;
+        OSXWindow *window = window_data_specific->window;
+        if (window != nil) {
+            for (NSView *subview in window.contentView.subviews) {
+                if ([subview isKindOfClass:[MTKView class]]) {
+                    mtkView = (MTKView *) subview;
+                    mtkView.paused = YES;
+                    break;
+                }
+            }
+        }
+
         window_data->buffer_width  = width;
         window_data->buffer_height = height;
         window_data->buffer_stride = buffer_stride;
 
-        if (window_data_specific->viewController == nil) {
-            MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: Metal view controller is missing during buffer resize.");
-            window_data->buffer_width  = previous_width;
-            window_data->buffer_height = previous_height;
-            window_data->buffer_stride = previous_stride;
-            free(new_draw_buffer);
-            return MFB_STATE_INVALID_WINDOW;
-        }
         if (![window_data_specific->viewController resizeTextures]) {
             MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to resize Metal textures after framebuffer resize.");
             window_data->buffer_width  = previous_width;
             window_data->buffer_height = previous_height;
             window_data->buffer_stride = previous_stride;
+            if (mtkView != nil) {
+                mtkView.paused = NO;
+            }
             free(new_draw_buffer);
             return MFB_STATE_INTERNAL_ERROR;
         }
-#endif
 
         free(window_data->draw_buffer);
         window_data->draw_buffer = new_draw_buffer;
 
-#if !defined(USE_METAL_API)
+        if (mtkView != nil) {
+            mtkView.paused = NO;
+        }
+#else
+        free(window_data->draw_buffer);
+        window_data->draw_buffer = new_draw_buffer;
+
         window_data->buffer_width  = width;
         window_data->buffer_stride = buffer_stride;
         window_data->buffer_height = height;
@@ -514,7 +534,9 @@ destroy_window_data(SWindowData *window_data) {
             if (window != nil && window_data_specific->viewController != nil) {
                 for (NSView *subview in window.contentView.subviews) {
                     if ([subview isKindOfClass:[MTKView class]]) {
-                        ((MTKView *) subview).delegate = nil;
+                        MTKView *mtkView = (MTKView *) subview;
+                        mtkView.paused = YES;
+                        mtkView.delegate = nil;
                         break;
                     }
                 }
