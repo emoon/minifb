@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- **Logging API**: `mfb_set_logger`, `mfb_set_log_level`, and `mfb_log_level` enum for runtime log control. All backends now use `mfb_log` instead of raw `fprintf`/`NSLog`.
+- **Logging API**: `mfb_set_logger`, `mfb_set_log_level`, `mfb_log`, `mfb_log_level`, `mfb_log_info`, and `MFB_LOG*` helper macros for runtime log control and source-location-aware diagnostics. Backend messages now route through the shared logger instead of ad-hoc `fprintf`/`NSLog`.
 - **Display inset APIs**: `mfb_get_display_cutout_insets` and `mfb_get_display_safe_insets` for mobile-safe layouts (Android API 28+, iOS, desktop stubs return zeros).
 - **Touch pointer decoding**: `mfb_split_pos_id` to decode packed pointer id/position values from mobile mouse getters.
 - **Monitor scale**: implemented `mfb_get_monitor_scale` for Web (`devicePixelRatio`) and Android.
@@ -15,15 +15,15 @@ All notable changes to this project are documented in this file.
 - **DOS viewport**: basic viewport support for the MS-DOS backend.
 - **Android `mfb_update_events`**: event-only pump without rendering, matching other backends.
 - **Android example**: new test project using Android Studio Narwhal (native2026).
-- **New headers**: `MiniFB_macros.h` (deprecation/pixel macros), `MiniFB_types.h` (callback typedefs), `WindowData_Web.h`.
+- **New headers**: `MiniFB_macros.h` (deprecation/pixel/logging macros), `MiniFB_types.h` (callback and logging typedefs), `WindowData_Web.h`.
 - **Internal helpers**: `calculate_buffer_layout` (overflow-safe buffer validation) and `mfb_validate_viewport` (unified viewport checks), used by all backends.
 
 ### Changed
 
 - Standardized public enum naming to `MFB_*` prefixes across states, keys, modifiers, mouse buttons, and window flags.
 - Unified `mfb_open_ex` behavior across backends: consistent flag handling, `NULL`/empty title defaults to `"minifb"`, mutually-exclusive fullscreen flags logged.
-- Unified `mfb_set_viewport` to use pixel coordinates on all backends.
-- Unified `mfb_get_monitor_scale` to return `1.0` when `window == NULL` on all backends.
+- Unified `mfb_set_viewport` behavior across backends with shared validation and consistent destination recalculation.
+- Unified `mfb_get_monitor_scale` so `window == NULL` is accepted across backends, returning the primary monitor scale where available and `1.0` fallback otherwise.
 - Unified mouse wheel reset (`mouse_wheel_x/y = 0`) on every update across all backends.
 - Web backend: auto-creates missing canvas element; pumps events in `mfb_wait_sync`.
 - Moved `accumulated_error_ticks` into the timer struct (was static).
@@ -43,9 +43,10 @@ All notable changes to this project are documented in this file.
 - Fixed `MFB_ARGB` macro on Android little-endian (had 3 parameters instead of 4).
 - Fixed Web `mfb_update_ex` not updating `buffer_width`/`buffer_height`/`buffer_stride`.
 - Fixed integer overflow potential in buffer size calculations across all backends.
-- Fixed iOS: Metal safety, content scale, touch coordinates, window lookup, and active/close event management.
+- Fixed iOS: Metal safety, content scale, touch coordinates, window lookup, active/close event management, and safer cutout/safe-inset handling when no launch screen is configured.
 - Fixed Android: API 32-34 display cutout handling; surface transition and rotation edge cases.
 - Fixed macOS: improved robustness and replaced `NSLog` with `mfb_log`.
+- Fixed Windows: double-click messages now map to regular mouse button press events.
 - Fixed Web: initialization/teardown robustness when `document.body` is not yet available.
 - Fixed Wayland: dynamic resize and resource reallocation paths.
 - Fixed MS-DOS: multiple rendering and input handling issues.
