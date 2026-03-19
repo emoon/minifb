@@ -28,12 +28,7 @@ void
 mfb_timer_init() {
     struct timespec res;
 
-    if (clock_getres(kClock, &res) != 0) {
-        g_timer_frequency = 1e+9;
-    }
-    else {
-        g_timer_frequency = res.tv_sec + res.tv_nsec * 1e+9;
-    }
+    g_timer_frequency = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
 }
 
