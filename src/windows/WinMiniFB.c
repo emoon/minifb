@@ -345,32 +345,32 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_MBUTTONUP:
         case WM_XBUTTONUP:
         case WM_LBUTTONDOWN:
-        case WM_LBUTTONDBLCLK:
+        //case WM_LBUTTONDBLCLK:
         case WM_RBUTTONDOWN:
-        case WM_RBUTTONDBLCLK:
+        //case WM_RBUTTONDBLCLK:
         case WM_MBUTTONDOWN:
-        case WM_MBUTTONDBLCLK:
+        //case WM_MBUTTONDBLCLK:
         case WM_XBUTTONDOWN:
-        case WM_XBUTTONDBLCLK:
+        //case WM_XBUTTONDBLCLK:
             if (window_data) {
                 mfb_mouse_button button = MFB_MOUSE_BTN_0;
                 window_data->mod_keys   = translate_mod();
                 int          is_pressed = 0;
 
                 switch(message) {
-                    case WM_LBUTTONDBLCLK:
+                    //case WM_LBUTTONDBLCLK:
                     case WM_LBUTTONDOWN:
                         is_pressed = 1;
                     case WM_LBUTTONUP:
                         button = MFB_MOUSE_BTN_1;
                         break;
-                    case WM_RBUTTONDBLCLK:
+                    //case WM_RBUTTONDBLCLK:
                     case WM_RBUTTONDOWN:
                         is_pressed = 1;
                     case WM_RBUTTONUP:
                         button = MFB_MOUSE_BTN_2;
                         break;
-                    case WM_MBUTTONDBLCLK:
+                    //case WM_MBUTTONDBLCLK:
                     case WM_MBUTTONDOWN:
                         is_pressed = 1;
                     case WM_MBUTTONUP:
@@ -379,7 +379,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
                     default:
                         button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MFB_MOUSE_BTN_5 : MFB_MOUSE_BTN_6);
-                        if (message == WM_XBUTTONDOWN || message == WM_XBUTTONDBLCLK) {
+                        if (message == WM_XBUTTONDOWN) { //|| message == WM_XBUTTONDBLCLK) {
                             is_pressed = 1;
                         }
                 }
@@ -635,10 +635,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         y = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom + rect.top) / 2;
     }
 
+    // Disable Double Clicks Not adding CS_DBLCLKS
     window_data_specific->wc.style         = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
     window_data_specific->wc.lpfnWndProc   = WndProc;
     window_data_specific->wc.hCursor       = LoadCursor(0, IDC_ARROW);
-    window_data_specific->wc.lpszClassName = window_title;
+    window_data_specific->wc.lpszClassName = "minifb";
     if (RegisterClass(&window_data_specific->wc) == 0) {
         uint32_t error = GetLastError();
         if (error != ERROR_CLASS_ALREADY_EXISTS) {
@@ -654,7 +655,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->window = CreateWindowEx(
         0,
-        window_title, window_title,
+        "minifb", window_title,
         window_style,
         x, y,
         rect.right, rect.bottom,
@@ -950,6 +951,7 @@ destroy_window_data(SWindowData *window_data) {
         ReleaseDC(window_data_specific->window, window_data_specific->hdc);
     }
     if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
+        SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, 0);
         DestroyWindow(window_data_specific->window);
     }
 
