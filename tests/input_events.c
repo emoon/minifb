@@ -146,20 +146,24 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     }
     MFB_LOGI(TEST_TAG, "%s > keyboard: key: %s (pressed: %d) [key_mod: %x]", window_title, mfb_get_key_name(key), is_pressed, mod);
 
-    if (key == MFB_KB_KEY_SPACE) {
-        print_getters(window);
-    }
+    if (is_pressed == false) {
+        if (key == MFB_KB_KEY_SPACE) {
+            print_getters(window);
+        }
 
-    if (key == MFB_KB_KEY_LEFT_CONTROL) {
-        mfb_show_cursor(window, true);
-    }
+        if (key == MFB_KB_KEY_S) {
+            MFB_LOGI(TEST_TAG, "Show cursor");
+            mfb_show_cursor(window, true);
+        }
 
-    if (key == MFB_KB_KEY_RIGHT_CONTROL) {
-        mfb_show_cursor(window, false);
-    }
+        if (key == MFB_KB_KEY_H) {
+            MFB_LOGI(TEST_TAG, "Hide cursor");
+            mfb_show_cursor(window, false);
+        }
 
-    if (key == MFB_KB_KEY_ESCAPE) {
-        mfb_close(window);
+        if (key == MFB_KB_KEY_ESCAPE) {
+            mfb_close(window);
+        }
     }
 }
 

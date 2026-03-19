@@ -142,8 +142,7 @@ mfb_close(struct mfb_window *window) {
 void
 keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
-    kUnused(is_pressed);
-    if (key == MFB_KB_KEY_ESCAPE) {
+    if (key == MFB_KB_KEY_ESCAPE && is_pressed == false) {
         SWindowData *window_data = (SWindowData *) window;
         if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
             window_data->close = true;

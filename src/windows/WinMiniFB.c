@@ -195,8 +195,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         {
             const uint32_t dpi = (uint32_t) wParam;
 
-            // Scale factor from 96dpi
-            const float scale = dpi / (float) USER_DEFAULT_SCREEN_DPI;
+            // Scale factor relative to current DPI
+            const uint32_t current_dpi = mfb_GetDpiForWindow != NULL ? mfb_GetDpiForWindow(hWnd) : USER_DEFAULT_SCREEN_DPI;
+            const float scale = dpi / (float) current_dpi;
 
             RECT client_rect;
 
@@ -378,7 +379,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
                     default:
                         button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MFB_MOUSE_BTN_5 : MFB_MOUSE_BTN_6);
-                        if (message == WM_XBUTTONDOWN) {
+                        if (message == WM_XBUTTONDOWN || message == WM_XBUTTONDBLCLK) {
                             is_pressed = 1;
                         }
                 }

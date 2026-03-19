@@ -42,6 +42,7 @@ typedef struct {
     struct wl_cursor        *default_cursor;
     struct wl_surface       *cursor_surface;
     uint32_t                pointer_serial;
+    uint32_t                pointer_enter_serial;
     uint8_t                 pointer_serial_valid;
     uint8_t                 startup_state_applied;
     uint8_t                 request_fullscreen;

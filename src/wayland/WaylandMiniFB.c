@@ -603,6 +603,7 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     if (window_data_specific == NULL)
         return;
     window_data_specific->pointer_serial = serial;
+    window_data_specific->pointer_enter_serial = serial;
     window_data_specific->pointer_serial_valid = 1;
 
     if (window_data->is_cursor_visible) {
@@ -623,7 +624,7 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
         wl_surface_commit(window_data_specific->cursor_surface);
     }
     else {
-        wl_pointer_set_cursor(pointer, 0, NULL, 0, 0);
+        wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
     }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer entered surface %p at %d %d (serial: %d)", surface, sx, sy, serial);
@@ -2171,7 +2172,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
     }
 
-    uint32_t serial = window_data_specific->pointer_serial;
+    uint32_t serial = window_data_specific->pointer_enter_serial;
     if (show) {
         struct wl_cursor *cursor = window_data_specific->default_cursor;
         if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
