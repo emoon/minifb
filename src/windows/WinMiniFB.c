@@ -167,10 +167,74 @@ get_monitor_scale(HWND hWnd, float *scale_x, float *scale_y) {
 }
 
 //-------------------------------------
+static unsigned g_window_counter = 0;   // (not thread safe)
+
+//-------------------------------------
+static void
+release_window_counter(void) {
+    if (g_window_counter > 0) {
+        --g_window_counter;
+        if (g_window_counter == 0) {
+            timeEndPeriod(1);
+        }
+    }
+}
+
+//-------------------------------------
+static void
+destroy_window_data(SWindowData *window_data) {
+    if (window_data == NULL) {
+        return;
+    }
+
+    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
+    if (window_data_specific == NULL) {
+        release_window_counter();
+        free(window_data);
+        return;
+    }
+
+#if !defined(USE_OPENGL_API)
+    if (window_data_specific->bitmap_info != NULL) {
+        free(window_data_specific->bitmap_info);
+        window_data_specific->bitmap_info = NULL;
+    }
+#else
+    destroy_GL_context(window_data);
+#endif
+
+    if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
+        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+    }
+    if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
+        SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, 0);
+        DestroyWindow(window_data_specific->window);
+    }
+
+    window_data_specific->window = 0;
+    window_data_specific->hdc    = 0;
+
+    mfb_timer_destroy(window_data_specific->timer);
+    window_data_specific->timer = NULL;
+
+    window_data->draw_buffer = NULL;
+    window_data->close       = true;
+
+    // To be able to sleep 1 ms on Windows (not thread safe)
+    release_window_counter();
+
+    memset(window_data_specific, 0, sizeof(SWindowData_Win));
+    free(window_data_specific);
+    window_data->specific = NULL;
+
+    memset(window_data, 0, sizeof(SWindowData));
+    free(window_data);
+}
+
+//-------------------------------------
 void     init_keycodes();
 uint32_t translate_mod();
 mfb_key  translate_key(unsigned int wParam, unsigned long lParam);
-void     destroy_window_data(SWindowData *window_data);
 
 //-------------------------------------
 LRESULT CALLBACK
@@ -493,20 +557,6 @@ update_events(SWindowData *window_data, HWND window) {
     while (PeekMessage(&msg, window, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-    }
-}
-
-//-------------------------------------
-static unsigned g_window_counter = 0;   // (not thread safe)
-
-//-------------------------------------
-static void
-release_window_counter(void) {
-    if (g_window_counter > 0) {
-        --g_window_counter;
-        if (g_window_counter == 0) {
-            timeEndPeriod(1);
-        }
     }
 }
 
@@ -922,54 +972,6 @@ mfb_wait_sync(struct mfb_window *window) {
 
     mfb_timer_compensated_reset(window_data_specific->timer);
     return true;
-}
-
-//-------------------------------------
-void
-destroy_window_data(SWindowData *window_data) {
-    if (window_data == NULL) {
-        return;
-    }
-
-    SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
-    if (window_data_specific == NULL) {
-        release_window_counter();
-        free(window_data);
-        return;
-    }
-
-#if !defined(USE_OPENGL_API)
-    if (window_data_specific->bitmap_info != NULL) {
-        free(window_data_specific->bitmap_info);
-        window_data_specific->bitmap_info = NULL;
-    }
-#else
-    destroy_GL_context(window_data);
-#endif
-
-    if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
-        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
-    }
-    if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
-        SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, 0);
-        DestroyWindow(window_data_specific->window);
-    }
-
-    window_data_specific->window = 0;
-    window_data_specific->hdc    = 0;
-
-    mfb_timer_destroy(window_data_specific->timer);
-    window_data_specific->timer = NULL;
-
-    window_data->draw_buffer = NULL;
-    window_data->close       = true;
-
-    // To be able to sleep 1 ms on Windows (not thread safe)
-    release_window_counter();
-
-    free(window_data_specific);
-    window_data->specific = NULL;
-    free(window_data);
 }
 
 //-------------------------------------

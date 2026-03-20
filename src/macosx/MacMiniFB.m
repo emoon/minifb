@@ -518,7 +518,7 @@ mfb_wait_sync(struct mfb_window *window) {
 }
 
 //-------------------------------------
-void
+static void
 destroy_window_data(SWindowData *window_data) {
     if (window_data == NULL)
         return;

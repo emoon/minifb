@@ -26,8 +26,6 @@ mfb_timer_tick() {
 
 void
 mfb_timer_init() {
-    struct timespec res;
-
     g_timer_frequency = 1e+9;
     g_timer_resolution = 1.0 / g_timer_frequency;
 }

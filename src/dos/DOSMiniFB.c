@@ -267,27 +267,25 @@ init_keyboard(void) {
 }
 
 //-------------------------------------
-static mfb_update_state
-check_window_closed(SWindowData *window_data) {
-  if (window_data->close) {
-    if (window_data->specific) {
-      MFB_LOG(MFB_LOG_DEBUG, "mfb window requested close");
-      g_window = NULL;
-      vesa_dispose();
-      SWindowData_DOS *window_data_specific = window_data->specific;
-      free(window_data_specific->scale_buffer);
-      free(window_data_specific->scanline_buffer);
-      free(window_data->specific);
-      window_data->specific = NULL;
-      return MFB_STATE_EXIT;
-    }
-    else {
-      MFB_LOG(MFB_LOG_DEBUG, "mfb window close requested but specific data is NULL");
-      return MFB_STATE_INVALID_WINDOW;
-    }
+static void
+destroy_window_data(SWindowData *window_data) {
+  if (window_data == NULL)
+    return;
+
+  g_window = NULL;
+  vesa_dispose();
+
+  SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
+  if (window_data_specific != NULL) {
+    free(window_data_specific->scale_buffer);
+    free(window_data_specific->scanline_buffer);
+    memset(window_data_specific, 0, sizeof(SWindowData_DOS));
+    free(window_data_specific);
   }
 
-  return MFB_STATE_OK;
+  window_data->specific = NULL;
+  memset(window_data, 0, sizeof(SWindowData));
+  free(window_data);
 }
 
 //-------------------------------------
@@ -566,15 +564,21 @@ mfb_update_events(struct mfb_window *window) {
   }
 
   SWindowData *window_data = (SWindowData *) window;
-  mfb_update_state state = check_window_closed(window_data);
-  if (state)
-    return state;
+  if (window_data->close) {
+    destroy_window_data(window_data);
+    return MFB_STATE_EXIT;
+  }
 
   window_data->mouse_wheel_x = 0.0f;
   window_data->mouse_wheel_y = 0.0f;
 
   update_mouse(window_data);
   update_keyboard(window_data);
+
+  if (window_data->close) {
+    destroy_window_data(window_data);
+    return MFB_STATE_EXIT;
+  }
 
   return MFB_STATE_OK;
 }

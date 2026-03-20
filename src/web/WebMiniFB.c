@@ -731,7 +731,7 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
 
 //-------------------------------------
 static void
-mfb_destroy_window_data(SWindowData *window_data) {
+destroy_window_data(SWindowData *window_data) {
     if (window_data == NULL) {
         return;
     }
@@ -746,10 +746,12 @@ mfb_destroy_window_data(SWindowData *window_data) {
         window_data_specific->swizzle_buffer = NULL;
         window_data_specific->swizzle_buffer_size = 0;
 
+        memset(window_data_specific, 0, sizeof(SWindowData_Web));
         free(window_data_specific);
         window_data->specific = NULL;
     }
 
+    memset(window_data, 0, sizeof(SWindowData));
     free(window_data);
 }
 
@@ -897,7 +899,7 @@ mfb_update_events(struct mfb_window *window) {
     }
     if (window_data->close) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events aborted because the window is marked for close.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
@@ -907,7 +909,7 @@ mfb_update_events(struct mfb_window *window) {
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_events detected close request after event processing.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {
@@ -991,7 +993,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
     if (window_data->close) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex aborted because the window is marked for close.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
 
@@ -1014,7 +1016,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     mfb_update_state state = mfb_update_js(window, buffer, width, height);
     if (state == MFB_STATE_EXIT) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after frame update.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state != MFB_STATE_OK) {
@@ -1036,7 +1038,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_update_ex detected close request after event processing.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return MFB_STATE_EXIT;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {
@@ -1059,7 +1061,7 @@ mfb_wait_sync(struct mfb_window *window) {
     }
     if (window_data->close) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync aborted because the window is marked for close.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return false;
     }
 
@@ -1071,7 +1073,7 @@ mfb_wait_sync(struct mfb_window *window) {
     mfb_update_state state = mfb_update_events_js(window_data);
     if (state == MFB_STATE_EXIT || window_data->close) {
         MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
-        mfb_destroy_window_data(window_data);
+        destroy_window_data(window_data);
         return false;
     }
     if (state == MFB_STATE_INVALID_WINDOW) {

@@ -102,6 +102,7 @@ destroy_window_data(SWindowData *window_data) {
             mfb_timer_destroy(window_data_specific->timer);
             window_data_specific->timer = NULL;
         }
+        memset(window_data_specific, 0, sizeof(SWindowData_Android));
         free(window_data_specific);
         window_data->specific = NULL;
     }
@@ -110,6 +111,7 @@ destroy_window_data(SWindowData *window_data) {
         gApplication->userData = NULL;
     }
 
+    memset(window_data, 0, sizeof(SWindowData));
     free(window_data);
 }
 
