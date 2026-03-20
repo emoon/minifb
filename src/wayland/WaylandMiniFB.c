@@ -43,7 +43,6 @@
 #define MFB_STR_IMPL(x) #x
 #define MFB_STR(x) MFB_STR_IMPL(x)
 
-#define WAYLAND_MAX_OUTPUTS 16
 #define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
 
 //-------------------------------------
@@ -1109,6 +1108,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
             if (window_data_specific->output_count < WAYLAND_MAX_OUTPUTS) {
                 uint32_t idx = window_data_specific->output_count++;
                 window_data_specific->outputs[idx] = output;
+                window_data_specific->output_ids[idx] = id;
                 window_data_specific->output_scales[idx] = 1;
             }
             else {
@@ -1135,9 +1135,35 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
 //-------------------------------------
 static void
 registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
-    kUnused(data);
     kUnused(registry);
-    kUnused(name);
+
+    SWindowData     *window_data          = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+
+    for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
+        if (window_data_specific->output_ids[i] == name) {
+            wl_output_destroy(window_data_specific->outputs[i]);
+
+            // If this was the current output, clear it
+            if (window_data_specific->current_output == window_data_specific->outputs[i]) {
+                window_data_specific->current_output       = NULL;
+                window_data_specific->current_output_scale  = 1;
+            }
+
+            // Compact arrays by moving the last element into the gap
+            uint32_t last = window_data_specific->output_count - 1;
+            if (i < last) {
+                window_data_specific->outputs[i]       = window_data_specific->outputs[last];
+                window_data_specific->output_ids[i]    = window_data_specific->output_ids[last];
+                window_data_specific->output_scales[i] = window_data_specific->output_scales[last];
+            }
+            window_data_specific->outputs[last]       = NULL;
+            window_data_specific->output_ids[last]    = 0;
+            window_data_specific->output_scales[last] = 0;
+            window_data_specific->output_count--;
+            break;
+        }
+    }
 }
 
 //-------------------------------------

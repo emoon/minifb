@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define WAYLAND_MAX_OUTPUTS 16
+
 struct wl_display;
 struct wl_registry;
 struct wl_compositor;
@@ -53,8 +55,9 @@ typedef struct {
     struct wp_fractional_scale_manager_v1 *fractional_scale_manager;
     struct wp_fractional_scale_v1 *fractional_scale;
     uint32_t                preferred_scale_120;
-    struct wl_output        *outputs[16];
-    uint32_t                output_scales[16];
+    struct wl_output        *outputs[WAYLAND_MAX_OUTPUTS];
+    uint32_t                output_ids[WAYLAND_MAX_OUTPUTS];
+    uint32_t                output_scales[WAYLAND_MAX_OUTPUTS];
     uint32_t                output_count;
     struct wl_output        *current_output;
     uint32_t                current_output_scale;
