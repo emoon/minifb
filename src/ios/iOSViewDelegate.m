@@ -228,6 +228,9 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
     if (!vertex_shader_func) {
         MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: unable to find vertex function 'vertFunc'.");
+#if !__has_feature(objc_arc)
+        [fragment_shader_func release];
+#endif
         return false;
     }
 

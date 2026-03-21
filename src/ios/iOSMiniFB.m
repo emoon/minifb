@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "iOSViewController.h"
+#include "iOSView.h"
 #include "iOSViewDelegate.h"
 #include "WindowData_IOS.h"
 #include <MiniFB.h>
@@ -205,6 +206,24 @@ destroy_window_data(SWindowData *window_data) {
         return;
 
     @autoreleasepool {
+        // Invalidate window_data pointers in UIKit objects before freeing
+        UIWindow *app_window = get_application_window();
+        if (app_window != nil) {
+            UIViewController *vc = app_window.rootViewController;
+            if ([vc isKindOfClass:[iOSViewController class]]) {
+                iOSViewController *controller = (iOSViewController *) vc;
+                if (controller->window_data == window_data) {
+                    controller->window_data = NULL;
+                }
+                if ([controller isViewLoaded] && [controller.view isKindOfClass:[iOSView class]]) {
+                    iOSView *view = (iOSView *) controller.view;
+                    if (view->window_data == window_data) {
+                        view->window_data = NULL;
+                    }
+                }
+            }
+        }
+
         SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
         if(window_data_specific != NULL) {
 
