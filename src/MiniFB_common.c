@@ -243,14 +243,14 @@ mfb_get_mouse_y(struct mfb_window *window) {
 
 //-------------------------------------
 void
-mfb_split_pos_id(int combined, int *pos, int *id) {
+mfb_decode_touch(int combined, int *pos, int *id) {
 #if defined(__ANDROID__) || (defined(TARGET_OS_IOS) && TARGET_OS_IOS)
     uint32_t packed = (uint32_t) combined;
     if (pos != NULL) {
-        *pos = (int) mfb_unpack_pos_id_pos(packed);
+        *pos = (int) mfb_unpack_pos(packed);
     }
     if (id != NULL) {
-        *id = (int) mfb_unpack_pos_id_id(packed);
+        *id = (int) mfb_unpack_id(packed);
     }
 #else
     if (pos != NULL) {
@@ -259,6 +259,26 @@ mfb_split_pos_id(int combined, int *pos, int *id) {
     if (id != NULL) {
         *id = 0;
     }
+#endif
+}
+
+//-------------------------------------
+int
+mfb_decode_touch_pos(int combined) {
+#if defined(__ANDROID__) || (defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+    return (int) mfb_unpack_pos((uint32_t) combined);
+#else
+    return combined;
+#endif
+}
+
+//-------------------------------------
+int
+mfb_decode_touch_id(int combined) {
+#if defined(__ANDROID__) || (defined(TARGET_OS_IOS) && TARGET_OS_IOS)
+    return (int) mfb_unpack_id((uint32_t) combined);
+#else
+    return 0;
 #endif
 }
 

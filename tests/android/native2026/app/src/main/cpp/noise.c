@@ -10,10 +10,6 @@
 //-------------------------------------
 #define kUnused(var)        (void) var;
 
-#define kTouchIdMask    0xf0000000
-#define kTouchPosMask   0x0fffffff
-#define kTouchIdShift   28
-
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -68,8 +64,9 @@ print_getters(struct mfb_window *window) {
     draw_h = mfb_get_drawable_height(window);
     mfb_get_drawable_bounds(window, &bounds_offset_x, &bounds_offset_y, &bounds_w, &bounds_h);
 
-    mouse_x = mfb_get_mouse_x(window);
-    mouse_y = mfb_get_mouse_y(window);
+    int mouse_id = 0;
+    mfb_decode_touch(mfb_get_mouse_x(window), &mouse_x, &mouse_id);
+    mfb_decode_touch(mfb_get_mouse_y(window), &mouse_y, NULL);
     scroll_x = mfb_get_mouse_scroll_x(window);
     scroll_y = mfb_get_mouse_scroll_y(window);
     const uint8_t *mouse_buttons = mfb_get_mouse_button_buffer(window);
@@ -94,7 +91,7 @@ print_getters(struct mfb_window *window) {
     MFB_LOGI(LOG_TAG, "  drawable_bounds: offset (%u, %u) size (%u, %u)\n", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
     MFB_LOGI(LOG_TAG, "  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
     MFB_LOGI(LOG_TAG, "  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
-    MFB_LOGI(LOG_TAG, "  mouse_pos: %d, %d\n", mouse_x, mouse_y);
+    MFB_LOGI(LOG_TAG, "  mouse_pos: %d, %d (touch %d)\n", mouse_x, mouse_y, mouse_id);
     MFB_LOGI(LOG_TAG, "  mouse_scroll: %f, %f\n", scroll_x, scroll_y);
 
     if (mouse_buttons) {
@@ -160,20 +157,25 @@ char_input(struct mfb_window *window, unsigned int char_code) {
 //-------------------------------------
 void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
-    int x = (mfb_get_mouse_x(window) & kTouchPosMask) >> 1;
-    int y = (mfb_get_mouse_y(window) & kTouchPosMask) >> 1;
+    int x, y, id;
+    mfb_decode_touch(mfb_get_mouse_x(window), &x, &id);
+    mfb_decode_touch(mfb_get_mouse_y(window), &y, NULL);
+    x >>= 1;
+    y >>= 1;
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
+    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d (touch %d)", (int) button, (int) is_pressed, x, y, id);
 }
 
 //-------------------------------------
 void
 mouse_move(struct mfb_window *window, int x, int y) {
-    int id = (x & kTouchIdMask) >> kTouchIdShift;
-    x = (x & kTouchPosMask) >> 1;
-    y = (y & kTouchPosMask) >> 1;
+    int id;
+    mfb_decode_touch(x, &x, &id);
+    mfb_decode_touch(y, &y, NULL);
+    x >>= 1;
+    y >>= 1;
     g_positions[id].enabled = true;
     g_positions[id].x = x;
     g_positions[id].y = y;

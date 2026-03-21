@@ -64,8 +64,9 @@ print_getters(struct mfb_window *window) {
     draw_h = mfb_get_drawable_height(window);
     mfb_get_drawable_bounds(window, &bounds_offset_x, &bounds_offset_y, &bounds_w, &bounds_h);
 
-    mouse_x = mfb_get_mouse_x(window);
-    mouse_y = mfb_get_mouse_y(window);
+    int mouse_id = 0;
+    mfb_decode_touch(mfb_get_mouse_x(window), &mouse_x, &mouse_id);
+    mfb_decode_touch(mfb_get_mouse_y(window), &mouse_y, NULL);
     scroll_x = mfb_get_mouse_scroll_x(window);
     scroll_y = mfb_get_mouse_scroll_y(window);
     const uint8_t *mouse_buttons = mfb_get_mouse_button_buffer(window);
@@ -90,7 +91,7 @@ print_getters(struct mfb_window *window) {
     MFB_LOGD(APP_TAG, "  drawable_bounds: offset (%u, %u) size (%u, %u)", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
     MFB_LOGD(APP_TAG, "  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
     MFB_LOGD(APP_TAG, "  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
-    MFB_LOGD(APP_TAG, "  mouse_pos: %d, %d", mouse_x, mouse_y);
+    MFB_LOGD(APP_TAG, "  mouse_pos: %d, %d (touch %d)", mouse_x, mouse_y, mouse_id);
     MFB_LOGD(APP_TAG, "  mouse_scroll: %f, %f", scroll_x, scroll_y);
 
     if (mouse_buttons) {
@@ -120,16 +121,21 @@ print_getters(struct mfb_window *window) {
 static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
-    MFB_LOGD(APP_TAG, "Touch: %d at %d, %d is %d", (int)button - MFB_MOUSE_BTN_0, mfb_get_mouse_x(window),
-        mfb_get_mouse_y(window),
-        (int) is_pressed);
+    int x, y, id;
+    mfb_decode_touch(mfb_get_mouse_x(window), &x, &id);
+    mfb_decode_touch(mfb_get_mouse_y(window), &y, NULL);
+    MFB_LOGD(APP_TAG, "Touch: %d at %d, %d is %d (touch %d)", (int)button - MFB_MOUSE_BTN_0, x, y,
+        (int) is_pressed, id);
 }
 
 //-------------------------------------
 static void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
-    MFB_LOGD(APP_TAG, "Touch moved %d, %d", x, y);
+    int id;
+    mfb_decode_touch(x, &x, &id);
+    mfb_decode_touch(y, &y, NULL);
+    MFB_LOGD(APP_TAG, "Touch moved %d, %d (touch %d)", x, y, id);
 }
 
 //-------------------------------------

@@ -230,7 +230,9 @@ void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned 
 // Input state
 int                 mfb_get_mouse_x(struct mfb_window *window);
 int                 mfb_get_mouse_y(struct mfb_window *window);
-void                mfb_split_pos_id(int combined, int *pos, int *id);     // Split packed mobile pos/id safely
+void                mfb_decode_touch(int combined, int *pos, int *id);     // Decode packed mobile touch pos/id
+int                 mfb_decode_touch_pos(int combined);                     // Extract position from a packed touch value
+int                 mfb_decode_touch_id(int combined);                      // Extract pointer id from a packed touch value
 float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel delta X from the most recent event pump (0.0f if none)
 float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel delta Y from the most recent event pump (0.0f if none)
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1=pressed, 0=released (8 buttons)
@@ -238,7 +240,7 @@ const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // 1
 ```
 
 On Android/iOS touch paths, `mfb_get_mouse_x()` and `mfb_get_mouse_y()` include an encoded touch pointer id in the upper bits.
-Use `mfb_split_pos_id()` to decode safely (including signed positions). On desktop/Web/DOS, `id` is always `0`.
+Use `mfb_decode_touch()` to decode both at once, or `mfb_decode_touch_pos()` / `mfb_decode_touch_id()` individually. On desktop/Web/DOS, `id` is always `0`.
 For touch callbacks, the pointer id is also exposed as `button` in `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
 On Android/iOS touch move callbacks, `mfb_mouse_move_func` receives packed `x/y` values (same encoding as getters).
 On Android, external `HOVER_MOVE` also uses packed `x/y`; if Android does not provide a valid pointer id, MiniFB uses fallback id `15`.
@@ -631,7 +633,7 @@ Apple references:
 - `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
 - No dedicated multitouch API; touches are mapped to mouse callbacks (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`)
 - Mouse events represent touch events (coordinates track the last processed touch event)
-- Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_split_pos_id()`
+- Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_decode_touch()` / `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`
 - No mouse wheel/scroll callback support on iOS
 
 `mfb_set_active_callback()` is triggered from iOS app lifecycle notifications
@@ -710,7 +712,7 @@ Take a look at the example in tests/android. You need **Android Studio** to buil
 - `mfb_show_cursor()` is a no-op (no cursor concept on touch devices)
 - No dedicated multitouch API; touches are mapped to mouse callbacks (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`)
 - Mouse events represent touch events (last processed touch position)
-- Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_split_pos_id()`
+- Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_decode_touch()` / `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`
 - `mfb_get_monitor_scale()` reports Android density scale (same value for X/Y, from `AConfiguration_getDensity()` with `160dpi = 1.0`)
 
 **Note**: On Android, pressing `BACK` should close the app by default. In some emulators, right-click may be mapped to `BACK`. For debugging this case, the Android example CMake option `MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC` can be enabled to map `BACK` to `ESC` instead (default: `OFF`).

@@ -8,7 +8,7 @@ All notable changes to this project are documented in this file.
 
 - **Logging API**: `mfb_set_logger`, `mfb_set_log_level`, `mfb_log`, `mfb_log_level`, `mfb_log_info`, and `MFB_LOG*` helper macros for runtime log control and source-location-aware diagnostics. Backend messages now route through the shared logger instead of ad-hoc `fprintf`/`NSLog`.
 - **Display inset APIs**: `mfb_get_display_cutout_insets` and `mfb_get_display_safe_insets` for mobile-safe layouts (Android API 28+, iOS, desktop stubs return zeros).
-- **Touch pointer decoding**: `mfb_split_pos_id` to decode packed pointer id/position values from mobile mouse getters.
+- **Touch pointer decoding**: `mfb_decode_touch`, `mfb_decode_touch_pos`, and `mfb_decode_touch_id` to decode packed pointer id/position values from mobile mouse getters.
 - **Monitor scale**: implemented `mfb_get_monitor_scale` for Web (`devicePixelRatio`) and Android.
 - **Cursor control**: implemented `mfb_show_cursor` for Web.
 - **X11 scale detection**: layered fallbacks (XSettings, Xresources, XRandR, physical DPI).

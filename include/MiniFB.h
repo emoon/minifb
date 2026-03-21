@@ -92,12 +92,14 @@ unsigned            mfb_get_drawable_height(struct mfb_window *window);
 void                mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned *offset_y, unsigned *width, unsigned *height);
 int                 mfb_get_mouse_x(struct mfb_window *window);             // Last mouse pos X (Android/iOS touch path may encode pointer id in upper bits)
 int                 mfb_get_mouse_y(struct mfb_window *window);             // Last mouse pos Y (Android/iOS touch path may encode pointer id in upper bits)
-// Split a position value that may contain an encoded pointer id.
-// Android/iOS may encode touch pointer id in upper bits of mouse X/Y getters.
-// Desktop/Web/DOS return id=0 and pos=combined.
+// Decode a value that may contain an encoded touch pointer id.
+// Android/iOS encode touch pointer id in upper bits of mouse X/Y getters.
+// Desktop/Web/DOS: pos=combined, id=0.
 // Mobile decoding preserves signed position values.
 // Output pointers may be NULL.
-void                mfb_split_pos_id(int combined, int *pos, int *id);
+void                mfb_decode_touch(int combined, int *pos, int *id);
+int                 mfb_decode_touch_pos(int combined);               // Extract position from a packed touch value.
+int                 mfb_decode_touch_id(int combined);                // Extract pointer id from a packed touch value.
 float               mfb_get_mouse_scroll_x(struct mfb_window *window);      // Mouse wheel delta X from the most recent event pump (0.0f if none).
 float               mfb_get_mouse_scroll_y(struct mfb_window *window);      // Mouse wheel delta Y from the most recent event pump (0.0f if none).
 const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // One byte for every button. Press (1), Release 0. (up to 8 buttons)

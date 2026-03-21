@@ -29,7 +29,7 @@ mfb_pack_pos_id(int32_t pos, uint32_t id) {
 
 //-------------------------------------
 static inline int32_t
-mfb_unpack_pos_id_pos(uint32_t combined) {
+mfb_unpack_pos(uint32_t combined) {
     uint32_t pos_bits = combined & MFB_COMBINED_POS_MASK;
     if ((pos_bits & MFB_COMBINED_POS_SIGN_BIT) != 0u) {
         pos_bits |= ~MFB_COMBINED_POS_MASK;
@@ -39,7 +39,7 @@ mfb_unpack_pos_id_pos(uint32_t combined) {
 
 //-------------------------------------
 static inline uint32_t
-mfb_unpack_pos_id_id(uint32_t combined) {
+mfb_unpack_id(uint32_t combined) {
     return (combined >> MFB_COMBINED_POS_ID_SHIFT) & MFB_COMBINED_ID_MASK;
 }
 

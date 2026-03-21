@@ -10,10 +10,6 @@
 //-------------------------------------
 #define kUnused(var)        (void) var;
 
-#define kTouchIdMask    0xf0000000
-#define kTouchPosMask   0x0fffffff
-#define kTouchIdShift   28
-
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -71,20 +67,25 @@ char_input(struct mfb_window *window, unsigned int char_code) {
 //-------------------------------------
 void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
-    int x = (mfb_get_mouse_x(window) & kTouchPosMask) >> 1;
-    int y = (mfb_get_mouse_y(window) & kTouchPosMask) >> 1;
+    int x, y, id;
+    mfb_decode_touch(mfb_get_mouse_x(window), &x, &id);
+    mfb_decode_touch(mfb_get_mouse_y(window), &y, NULL);
+    x >>= 1;
+    y >>= 1;
     g_positions[button].enabled = is_pressed;
     g_positions[button].x = x;
     g_positions[button].y = y;
-    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d", (int) button, (int) is_pressed, x, y);
+    MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d (touch %d)", (int) button, (int) is_pressed, x, y, id);
 }
 
 //-------------------------------------
 void
 mouse_move(struct mfb_window *window, int x, int y) {
-    int id = (x & kTouchIdMask) >> kTouchIdShift;
-    x = (x & kTouchPosMask) >> 1;
-    y = (y & kTouchPosMask) >> 1;
+    int id;
+    mfb_decode_touch(x, &x, &id);
+    mfb_decode_touch(y, &y, NULL);
+    x >>= 1;
+    y >>= 1;
     g_positions[id].enabled = true;
     g_positions[id].x = x;
     g_positions[id].y = y;
