@@ -8,6 +8,10 @@
 #include "MiniFB_internal.h"
 #include "MiniFB_keylist.h"
 
+#if defined(__APPLE__)
+    #include <TargetConditionals.h>
+#endif
+
 //-------------------------------------
 short int g_keycodes[MFB_MAX_KEYS] = { 0 };
 //-------------------------------------

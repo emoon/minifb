@@ -11,6 +11,7 @@
 
 //-------------------------------------
 #define kUnused(var)        (void) var;
+#define APP_TAG             "noise"
 
 //-------------------------------------
 struct mfb_window   *g_window = 0x0;
@@ -51,10 +52,10 @@ print_getters(struct mfb_window *window) {
     win_h = mfb_get_window_height(window);
     mfb_get_window_size(window, &win_sw, &win_sh);
     if (win_w != win_sw) {
-        NSLog(@"Width does not match: %u != %u", win_w, win_sw);
+        MFB_LOGE(APP_TAG, "Width does not match: %u != %u", win_w, win_sw);
     }
     if (win_h != win_sh) {
-        NSLog(@"Height does not match: %u != %u", win_h, win_sh);
+        MFB_LOGE(APP_TAG, "Height does not match: %u != %u", win_h, win_sh);
     }
 
     draw_offset_x = mfb_get_drawable_offset_x(window);
@@ -78,31 +79,31 @@ print_getters(struct mfb_window *window) {
     mfb_get_display_cutout_insets(window, &cutout_left, &cutout_top, &cutout_right, &cutout_bottom);
     mfb_get_display_safe_insets(window, &safe_left, &safe_top, &safe_right, &safe_bottom);
 
-    NSLog(@"[getters frame=%d]", g_frame_count);
-    NSLog(@"  key_name(MFB_KB_KEY_ESCAPE): %s", key_name ? key_name : "(null)");
-    NSLog(@"  is_window_active: %d", is_active);
-    NSLog(@"  target_fps: %u", fps);
-    NSLog(@"  monitor_scale: %f, %f", scale_x, scale_y);
-    NSLog(@"  window_size: %u x %u", win_w, win_h);
-    NSLog(@"  drawable_offsets: %u, %u", draw_offset_x, draw_offset_y);
-    NSLog(@"  drawable_size: %u x %u", draw_w, draw_h);
-    NSLog(@"  drawable_bounds: offset (%u, %u) size (%u, %u)", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
-    NSLog(@"  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
-    NSLog(@"  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
-    NSLog(@"  mouse_pos: %d, %d", mouse_x, mouse_y);
-    NSLog(@"  mouse_scroll: %f, %f", scroll_x, scroll_y);
+    MFB_LOGD(APP_TAG, "[getters frame=%d]", g_frame_count);
+    MFB_LOGD(APP_TAG, "  key_name(MFB_KB_KEY_ESCAPE): %s", key_name ? key_name : "(null)");
+    MFB_LOGD(APP_TAG, "  is_window_active: %d", is_active);
+    MFB_LOGD(APP_TAG, "  target_fps: %u", fps);
+    MFB_LOGD(APP_TAG, "  monitor_scale: %f, %f", scale_x, scale_y);
+    MFB_LOGD(APP_TAG, "  window_size: %u x %u", win_w, win_h);
+    MFB_LOGD(APP_TAG, "  drawable_offsets: %u, %u", draw_offset_x, draw_offset_y);
+    MFB_LOGD(APP_TAG, "  drawable_size: %u x %u", draw_w, draw_h);
+    MFB_LOGD(APP_TAG, "  drawable_bounds: offset (%u, %u) size (%u, %u)", bounds_offset_x, bounds_offset_y, bounds_w, bounds_h);
+    MFB_LOGD(APP_TAG, "  cutout_insets: left %u, right %u, top %u, bottom %u", cutout_left, cutout_right, cutout_top, cutout_bottom);
+    MFB_LOGD(APP_TAG, "  safe_insets: left %u, right %u, top %u, bottom %u", safe_left, safe_right, safe_top, safe_bottom);
+    MFB_LOGD(APP_TAG, "  mouse_pos: %d, %d", mouse_x, mouse_y);
+    MFB_LOGD(APP_TAG, "  mouse_scroll: %f, %f", scroll_x, scroll_y);
 
     if (mouse_buttons) {
-        NSLog(@"  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u",
+        MFB_LOGD(APP_TAG, "  mouse_buttons[0..7]: %u %u %u %u %u %u %u %u",
                 mouse_buttons[0], mouse_buttons[1], mouse_buttons[2], mouse_buttons[3],
                 mouse_buttons[4], mouse_buttons[5], mouse_buttons[6], mouse_buttons[7]);
     }
     else {
-        NSLog(@"  mouse_buttons: (null)");
+        MFB_LOGD(APP_TAG, "  mouse_buttons: (null)");
     }
 
     if (key_buffer) {
-        NSLog(@"  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]",
+        MFB_LOGD(APP_TAG, "  key_buffer sample [ESC=%u, SPACE=%u, LEFT=%u, RIGHT=%u, UP=%u, DOWN=%u]",
                 key_buffer[MFB_KB_KEY_ESCAPE],
                 key_buffer[MFB_KB_KEY_SPACE],
                 key_buffer[MFB_KB_KEY_LEFT],
@@ -111,7 +112,7 @@ print_getters(struct mfb_window *window) {
                 key_buffer[MFB_KB_KEY_DOWN]);
     }
     else {
-        NSLog(@"  key_buffer: (null)");
+        MFB_LOGD(APP_TAG, "  key_buffer: (null)");
     }
 }
 
@@ -119,7 +120,7 @@ print_getters(struct mfb_window *window) {
 static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     kUnused(mod);
-    NSLog(@"Touch: %d at %d, %d is %d", (int)button - MFB_MOUSE_BTN_0, mfb_get_mouse_x(window),
+    MFB_LOGD(APP_TAG, "Touch: %d at %d, %d is %d", (int)button - MFB_MOUSE_BTN_0, mfb_get_mouse_x(window),
         mfb_get_mouse_y(window),
         (int) is_pressed);
 }
@@ -128,14 +129,14 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
 static void
 mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
-    NSLog(@"Touch moved %d, %d", x, y);
+    MFB_LOGD(APP_TAG, "Touch moved %d, %d", x, y);
 }
 
 //-------------------------------------
 static void
 active_changed(struct mfb_window *window, bool is_active) {
     kUnused(window);
-    NSLog(@"Active: %s", is_active ? "true" : "false");
+    MFB_LOGD(APP_TAG, "Active: %s", is_active ? "true" : "false");
     g_is_active = is_active;
 }
 
@@ -143,7 +144,7 @@ active_changed(struct mfb_window *window, bool is_active) {
 static bool
 window_closing(struct mfb_window *window) {
     kUnused(window);
-    NSLog(@"Window closing");
+    MFB_LOGD(APP_TAG, "Window closing");
     return true;
 }
 
@@ -157,21 +158,21 @@ resize(struct mfb_window *window, int width, int height) {
         g_buffer = 0x0;
         g_width  = 0;
         g_height = 0;
-        NSLog(@"Resize %d, %d", width, height);
+        MFB_LOGD(APP_TAG, "Resize %d, %d", width, height);
         return;
     }
 
     size_t new_size = (size_t) width * (size_t) height * sizeof(uint32_t);
     uint32_t *new_buffer = realloc(g_buffer, new_size);
     if (new_buffer == 0x0) {
-        NSLog(@"Resize %d, %d failed: out of memory", width, height);
+        MFB_LOGE(APP_TAG, "Resize %d, %d failed: out of memory", width, height);
         return;
     }
 
     g_width  = (uint32_t) width;
     g_height = (uint32_t) height;
     g_buffer = new_buffer;
-    NSLog(@"Resize %d, %d", width, height);
+    MFB_LOGD(APP_TAG, "Resize %d, %d", width, height);
 }
 
 //-------------------------------------
@@ -242,7 +243,7 @@ resize(struct mfb_window *window, int width, int height) {
         g_height  = 0;
     }
     else if (state != MFB_STATE_OK) {
-        NSLog(@"mfb_update_ex returned state=%d", state);
+        MFB_LOGE(APP_TAG, "mfb_update_ex returned state=%d", state);
     }
 }
 

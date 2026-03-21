@@ -19,7 +19,63 @@
 //-------------------------------------
 void     init_keycodes();
 
-void     destroy_window_data(SWindowData *window_data);
+//-------------------------------------
+static void
+destroy_window_data(SWindowData *window_data) {
+    if (window_data == NULL)
+        return;
+
+    @autoreleasepool {
+        SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
+        if (window_data_specific != NULL) {
+            OSXWindow   *window = window_data_specific->window;
+
+#if defined(USE_METAL_API)
+            // Nil the MTKView delegate before closing the window to prevent
+            // use-after-free if the display link fires during teardown.
+            if (window != nil && window_data_specific->viewController != nil) {
+                for (NSView *subview in window.contentView.subviews) {
+                    if ([subview isKindOfClass:[MTKView class]]) {
+                        MTKView *mtkView = (MTKView *) subview;
+                        mtkView.paused = YES;
+                        mtkView.delegate = nil;
+                        break;
+                    }
+                }
+            }
+#endif
+
+            if (window != nil) {
+                [window removeWindowData];
+                [window setDelegate:nil];
+                [window close];
+                [window release];
+                window_data_specific->window = nil;
+            }
+
+#if defined(USE_METAL_API)
+            if (window_data_specific->viewController != nil) {
+                [window_data_specific->viewController release];
+                window_data_specific->viewController = nil;
+            }
+#endif
+
+            mfb_timer_destroy(window_data_specific->timer);
+            window_data_specific->timer = NULL;
+
+            memset(window_data_specific, 0, sizeof(SWindowData_OSX));
+            free(window_data_specific);
+        }
+
+        if (window_data->draw_buffer != NULL) {
+            free(window_data->draw_buffer);
+            window_data->draw_buffer = NULL;
+        }
+
+        memset(window_data, 0, sizeof(SWindowData));
+        free(window_data);
+    }
+}
 
 //-------------------------------------
 SWindowData *
@@ -514,64 +570,6 @@ mfb_wait_sync(struct mfb_window *window) {
 
         mfb_timer_compensated_reset(window_data_specific->timer);
         return true;
-    }
-}
-
-//-------------------------------------
-static void
-destroy_window_data(SWindowData *window_data) {
-    if (window_data == NULL)
-        return;
-
-    @autoreleasepool {
-        SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
-        if (window_data_specific != NULL) {
-            OSXWindow   *window = window_data_specific->window;
-
-#if defined(USE_METAL_API)
-            // Nil the MTKView delegate before closing the window to prevent
-            // use-after-free if the display link fires during teardown.
-            if (window != nil && window_data_specific->viewController != nil) {
-                for (NSView *subview in window.contentView.subviews) {
-                    if ([subview isKindOfClass:[MTKView class]]) {
-                        MTKView *mtkView = (MTKView *) subview;
-                        mtkView.paused = YES;
-                        mtkView.delegate = nil;
-                        break;
-                    }
-                }
-            }
-#endif
-
-            if (window != nil) {
-                [window removeWindowData];
-                [window setDelegate:nil];
-                [window close];
-                [window release];
-                window_data_specific->window = nil;
-            }
-
-#if defined(USE_METAL_API)
-            if (window_data_specific->viewController != nil) {
-                [window_data_specific->viewController release];
-                window_data_specific->viewController = nil;
-            }
-#endif
-
-            mfb_timer_destroy(window_data_specific->timer);
-            window_data_specific->timer = NULL;
-
-            memset(window_data_specific, 0, sizeof(SWindowData_OSX));
-            free(window_data_specific);
-        }
-
-        if (window_data->draw_buffer != NULL) {
-            free(window_data->draw_buffer);
-            window_data->draw_buffer = NULL;
-        }
-
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
     }
 }
 
