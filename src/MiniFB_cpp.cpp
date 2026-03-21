@@ -20,10 +20,21 @@ mfb_stub::get_instance(struct mfb_window *window) {
         }
 
         mfb_stub *get(struct mfb_window *window) {
+            mfb_stub *free_slot = nullptr;
             for (mfb_stub *instance : instances) {
-                if (instance != NULL && instance->m_window == window) {
+                if (instance == nullptr)
+                    continue;
+                if (instance->m_window == window) {
                     return instance;
                 }
+                if (instance->m_window == nullptr && free_slot == nullptr) {
+                    free_slot = instance;
+                }
+            }
+
+            if (free_slot != nullptr) {
+                free_slot->m_window = window;
+                return free_slot;
             }
 
             instances.push_back(new mfb_stub);
@@ -31,6 +42,7 @@ mfb_stub::get_instance(struct mfb_window *window) {
 
             return instances.back();
         }
+
     };
 
     static stub_vector s_instances;
@@ -56,7 +68,11 @@ mfb_stub::resize_stub(struct mfb_window *window, int width, int height) {
 bool
 mfb_stub::close_stub(struct mfb_window *window) {
     mfb_stub    *stub = mfb_stub::get_instance(window);
-    return stub->m_close(window);
+    bool should_close = stub->m_close(window);
+    if (should_close) {
+        stub->m_window = nullptr;
+    }
+    return should_close;
 }
 
 //-------------------------------------
