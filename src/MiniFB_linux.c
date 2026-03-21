@@ -21,7 +21,7 @@ mfb_timer_tick() {
         return 0.0;
     }
 
-    return time.tv_sec * 1e+9 + time.tv_nsec;
+    return (uint64_t) time.tv_sec * 1000000000ULL + (uint64_t) time.tv_nsec;
 }
 
 void

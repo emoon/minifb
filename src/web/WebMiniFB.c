@@ -174,6 +174,7 @@ EM_ASYNC_JS(void, setup_web_mfb, (), {
             "Numpad7": 327,
             "Numpad8": 328,
             "Numpad9": 329,
+            "NumpadDecimal": 330,
             "NumpadComma": 330,
             "NumpadDivide": 331,
             "NumpadMultiply": 332,
@@ -520,6 +521,13 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         return pos;
     };
 
+    // JS: 0=left, 1=middle, 2=right
+    // MFB: 1=left(BTN_1), 2=right(BTN_2), 3=middle(BTN_3)
+    function mapMouseButton(jsButton) {
+        const map = [1, 3, 2];
+        return jsButton < map.length ? map[jsButton] : jsButton + 1;
+    }
+
     function getMfbKeyModFromEvent(event) {
         // FIXME can we make these global somehow? --pre-js maybe?
         // FIXME need to lookup caps and num lock keystates in window_data->key_status
@@ -594,16 +602,21 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     };
     document.addEventListener("visibilitychange", w.handlers.visibilityChange);
 
+    w.handlers.contextmenu = (event) => { event.preventDefault(); };
+    canvas.addEventListener("contextmenu", w.handlers.contextmenu);
+
     w.handlers.mousedown = (event) => {
             if (event.button > 6) return;
+            event.preventDefault();
             canvas.focus();
             requestFullscreenIfNeeded();
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
+            let btn = mapMouseButton(event.button);
             Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, event.button + 1, 1);
+            Module._window_data_set_mouse_button(window_data, btn, 1);
             Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: true});
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: true});
     };
     canvas.addEventListener("mousedown", w.handlers.mousedown, false);
 
@@ -618,21 +631,24 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
             if (event.button > 6) return;
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
+            let btn = mapMouseButton(event.button);
             Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, event.button + 1, 0);
+            Module._window_data_set_mouse_button(window_data, btn, 0);
             Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: false});
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false});
     };
     canvas.addEventListener("mouseup", w.handlers.mouseup, false);
 
     w.handlers.bodyMouseup = (event) => {
             if (event.button > 6) return;
+            if (event.target === canvas) return;  // already handled by canvas mouseup
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
+            let btn = mapMouseButton(event.button);
             Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, event.button + 1, 0);
+            Module._window_data_set_mouse_button(window_data, btn, 0);
             Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: event.button + 1, mod: mod, is_pressed: false});
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false});
     };
     w.globalMouseupTarget = document.body || document.documentElement || document;
     if (w.globalMouseupTarget) {

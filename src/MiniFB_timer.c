@@ -34,7 +34,7 @@ mfb_get_target_fps() {
         return 0;
     }
 
-    return (unsigned) (1.0 / g_time_for_frame);
+    return (unsigned) ((1.0 / g_time_for_frame) + 0.5);
 }
 
 // Creates and initializes a new timer. First call also initializes the global timing system
