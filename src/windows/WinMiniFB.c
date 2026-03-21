@@ -669,14 +669,31 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         }
     }
     else if (!(flags & MFB_WF_FULLSCREEN)) {
-        float scale_x, scale_y;
+        rect.right  = (LONG) width;
+        rect.bottom = (LONG) height;
 
-        get_monitor_scale(0, &scale_x, &scale_y);
+        // width/height already describe the requested client drawable size.
+        // Only expand the outer frame for the monitor DPI; do not scale the
+        // client area itself a second time here.
+        if (mfb_AdjustWindowRectExForDpi != NULL) {
+            float scale_x = 1.0f;
+            UINT dpi = USER_DEFAULT_SCREEN_DPI;
 
-        rect.right  = (LONG) (width  * scale_x);
-        rect.bottom = (LONG) (height * scale_y);
+            get_monitor_scale(0, &scale_x, NULL);
+            if (scale_x > 0.0f) {
+                dpi = (UINT) (scale_x * USER_DEFAULT_SCREEN_DPI + 0.5f);
+                if (dpi == 0) {
+                    dpi = USER_DEFAULT_SCREEN_DPI;
+                }
+            }
 
-        AdjustWindowRect(&rect, window_style, 0);
+            if (!mfb_AdjustWindowRectExForDpi(&rect, window_style, FALSE, 0, dpi)) {
+                AdjustWindowRect(&rect, window_style, 0);
+            }
+        }
+        else {
+            AdjustWindowRect(&rect, window_style, 0);
+        }
 
         rect.right  -= rect.left;
         rect.bottom -= rect.top;

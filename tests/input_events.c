@@ -120,9 +120,15 @@ resize(struct mfb_window *window, int width, int height) {
 
     MFB_LOGI(TEST_TAG, "%s > resize: %d, %d", window_title, width, height);
 
-    // Convert phisical pixels to logical pixels
-    g_to_logic_width  = 1.0f / width;
-    g_to_logic_height = 1.0f / height;
+    float scale = 1.0f;
+    mfb_get_monitor_scale(window, &scale, NULL);
+    int32_t viewport_x = (int32_t) (20 * scale);
+    int32_t viewport_y = (int32_t) (20 * scale);
+    int32_t viewport_width  = width - 2 * viewport_x;
+    int32_t viewport_height = height - 2 * viewport_y;
+
+    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
+    print_getters(window);
 }
 
 //-------------------------------------
@@ -251,7 +257,14 @@ main() {
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 
-    mfb_set_viewport(window, 10, 10, g_width-20, g_height-20);
+    float scale = 1.0f;
+    mfb_get_monitor_scale(window, &scale, NULL);
+    int32_t viewport_x = (int32_t) (20 * scale);
+    int32_t viewport_y = (int32_t) (20 * scale);
+    int32_t viewport_width  = g_width - 2 * viewport_x;
+    int32_t viewport_height = g_height - 2 * viewport_y;
+
+    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
     print_getters(window);
 
     uint32_t         i;
