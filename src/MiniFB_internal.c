@@ -110,11 +110,13 @@ interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, 
 void
 stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
               uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch) {
-
     uint32_t    x, y;
     uint32_t    src_offset_x, src_offset_y;
 
     if (src_image == NULL || dst_image == NULL)
+        return;
+
+    if (dst_width == 0 || dst_height == 0)
         return;
 
     src_image += src_x + src_y * src_pitch;
@@ -147,17 +149,25 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
 //-------------------------------------
 void
 calc_dst_factor(SWindowData *window_data, uint32_t width, uint32_t height) {
+    if (width == 0 || height == 0) {
+        return;
+    }
+
     if (window_data->dst_width == 0) {
         window_data->dst_width = width;
     }
-    window_data->factor_x     = (float) window_data->dst_offset_x / (float) width;
-    window_data->factor_width = (float) window_data->dst_width    / (float) width;
-
     if (window_data->dst_height == 0) {
         window_data->dst_height = height;
     }
-    window_data->factor_y      = (float) window_data->dst_offset_y / (float) height;
-    window_data->factor_height = (float) window_data->dst_height   / (float) height;
+
+    float inv_width  = 1.0f / (float) width;
+    float inv_height = 1.0f / (float) height;
+
+    window_data->factor_x     = (float) window_data->dst_offset_x * inv_width;
+    window_data->factor_width = (float) window_data->dst_width    * inv_width;
+
+    window_data->factor_y      = (float) window_data->dst_offset_y * inv_height;
+    window_data->factor_height = (float) window_data->dst_height   * inv_height;
 }
 
 //-------------------------------------
