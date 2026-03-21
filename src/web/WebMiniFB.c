@@ -529,18 +529,20 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     }
 
     function getMfbKeyModFromEvent(event) {
-        // FIXME can we make these global somehow? --pre-js maybe?
-        // FIXME need to lookup caps and num lock keystates in window_data->key_status
-        const MFB_KB_MOD_SHIFT   = 0x0001;
-        const MFB_KB_MOD_CONTROL = 0x0002;
-        const MFB_KB_MOD_ALT     = 0x0004;
-        const MFB_KB_MOD_SUPER   = 0x0008;
+        const MFB_KB_MOD_SHIFT     = 0x0001;
+        const MFB_KB_MOD_CONTROL   = 0x0002;
+        const MFB_KB_MOD_ALT       = 0x0004;
+        const MFB_KB_MOD_SUPER     = 0x0008;
+        const MFB_KB_MOD_CAPS_LOCK = 0x0010;
+        const MFB_KB_MOD_NUM_LOCK  = 0x0020;
 
         let mod = 0;
         if (event.shiftKey) mod = mod | MFB_KB_MOD_SHIFT;
         if (event.ctrlKey) mod = mod | MFB_KB_MOD_CONTROL;
         if (event.altKey) mod = mod | MFB_KB_MOD_ALT;
         if (event.metaKey) mod = mod | MFB_KB_MOD_SUPER;
+        if (event.getModifierState && event.getModifierState("CapsLock")) mod = mod | MFB_KB_MOD_CAPS_LOCK;
+        if (event.getModifierState && event.getModifierState("NumLock"))  mod = mod | MFB_KB_MOD_NUM_LOCK;
         return mod;
     };
 
@@ -658,9 +660,21 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     w.handlers.wheel = (event) => {
             event.preventDefault();
             let mod = getMfbKeyModFromEvent(event);
-            Module._window_data_set_mouse_wheel(window_data, event.deltaX, event.deltaY);
+            let dx = event.deltaX;
+            let dy = event.deltaY;
+            if (event.deltaMode === 0) {
+                // DOM_DELTA_PIXEL (Chrome default): normalize to ~1.0 per notch
+                dx /= 100.0;
+                dy /= 100.0;
+            } else if (event.deltaMode === 2) {
+                // DOM_DELTA_PAGE: convert pages to notches
+                dx *= 3.0;
+                dy *= 3.0;
+            }
+            // DOM_DELTA_LINE (mode 1, Firefox default): already ~1-3 per notch, pass through
+            Module._window_data_set_mouse_wheel(window_data, dx, dy);
             Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousescroll", mod: mod, x: event.deltaX, y: event.deltaY});
+            enqueueEvent({ type: "mousescroll", mod: mod, x: dx, y: dy});
     };
     canvas.addEventListener('wheel', w.handlers.wheel, NON_PASSIVE);
 
