@@ -58,15 +58,18 @@ set(SrcWindows
 )
 
 #--
-set(SrcMacOSX
-    src/macosx/MacMiniFB.m
-    src/macosx/OSXWindow.h
-    src/macosx/OSXWindow.m
-    src/macosx/OSXView.h
-    src/macosx/OSXView.m
-    src/macosx/OSXViewDelegate.h
-    src/macosx/OSXViewDelegate.m
-    src/macosx/WindowData_OSX.h
+set(SrcMacOS
+    src/macos/MacMiniFB.m
+    src/macos/OSXWindow.h
+    src/macos/OSXWindow.m
+    src/macos/OSXView.h
+    src/macos/OSXView.m
+    src/macos/WindowData_OSX.h
+)
+
+set(SrcMacOSMetal
+    src/macos/OSXViewDelegate.h
+    src/macos/OSXViewDelegate.m
 )
 
 #--
@@ -272,13 +275,14 @@ elseif (APPLE)
 
     if (USE_METAL_API)
         list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
+        list(APPEND SrcLib ${SrcMacOSMetal})
     endif()
 
     if (USE_INVERTED_Y_ON_MACOS)
         list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
     endif()
 
-    list(APPEND SrcLib ${SrcMacOSX})
+    list(APPEND SrcLib ${SrcMacOS})
 
 elseif (UNIX)
 
