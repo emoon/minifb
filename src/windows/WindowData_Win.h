@@ -16,4 +16,5 @@ typedef struct {
 #endif
     struct mfb_timer    *timer;
     bool                mouse_inside;
+    WCHAR               high_surrogate;
 } SWindowData_Win;

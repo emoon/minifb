@@ -369,16 +369,15 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_CHAR:
         case WM_SYSCHAR:
-            static WCHAR high_surrogate = 0;
-            if (window_data) {
+            if (window_data && window_data_specific) {
                 if (wParam >= 0xd800 && wParam <= 0xdbff) {
-                    high_surrogate = (WCHAR) wParam;
+                    window_data_specific->high_surrogate = (WCHAR) wParam;
                 }
                 else {
                     unsigned int codepoint = 0;
                     if (wParam >= 0xdc00 && wParam <= 0xdfff) {
-                        if (high_surrogate != 0) {
-                            codepoint += (high_surrogate - 0xd800) << 10;
+                        if (window_data_specific->high_surrogate != 0) {
+                            codepoint += (window_data_specific->high_surrogate - 0xd800) << 10;
                             codepoint += (WCHAR) wParam - 0xdc00;
                             codepoint += 0x10000;
                         }
@@ -386,7 +385,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     else {
                         codepoint = (WCHAR) wParam;
                     }
-                    high_surrogate = 0;
+                    window_data_specific->high_surrogate = 0;
                     kCall(char_input_func, codepoint);
                 }
             }
