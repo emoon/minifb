@@ -8,6 +8,6 @@
 *.hpp text eol=lf
 *.m text eol=lf
 *.mm text eol=lf
-*.txt
-*.cmake
-*.md
+*.txt text eol=lf
+*.cmake text eol=lf
+*.md text eol=lf

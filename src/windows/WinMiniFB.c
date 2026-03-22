@@ -187,6 +187,8 @@ destroy_window_data(SWindowData *window_data) {
         return;
     }
 
+    release_cpp_stub((struct mfb_window *) window_data);
+
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
         release_window_counter();

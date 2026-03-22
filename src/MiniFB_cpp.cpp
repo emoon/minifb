@@ -2,52 +2,84 @@
 #include <MiniFB_enums.h>
 #include <vector>
 
+struct mfb_stub_vector {
+    std::vector<mfb_stub *> instances;
+
+    mfb_stub_vector() = default;
+
+    ~mfb_stub_vector() {
+        for (mfb_stub *instance : instances) {
+            if (instance != nullptr) {
+                delete instance;
+            }
+        }
+        instances.clear();
+    }
+
+    mfb_stub *get(struct mfb_window *window) {
+        mfb_stub *free_slot = nullptr;
+        for (mfb_stub *instance : instances) {
+            if (instance == nullptr)
+                continue;
+            if (instance->m_window == window) {
+                return instance;
+            }
+            if (instance->m_window == nullptr && free_slot == nullptr) {
+                free_slot = instance;
+            }
+        }
+
+        if (free_slot != nullptr) {
+            free_slot->m_window = window;
+            return free_slot;
+        }
+
+        instances.push_back(new mfb_stub);
+        instances.back()->m_window = window;
+
+        return instances.back();
+    }
+
+    void release(struct mfb_window *window) {
+        for (mfb_stub *instance : instances) {
+            if (instance == nullptr || instance->m_window != window) {
+                continue;
+            }
+
+            instance->m_window = nullptr;
+            instance->m_active = {};
+            instance->m_resize = {};
+            instance->m_close = {};
+            instance->m_keyboard = {};
+            instance->m_char_input = {};
+            instance->m_mouse_btn = {};
+            instance->m_mouse_move = {};
+            instance->m_scroll = {};
+            return;
+        }
+    }
+};
+
+static mfb_stub_vector &
+get_stub_instances() {
+    static mfb_stub_vector s_instances;
+    return s_instances;
+}
+
 //-------------------------------------
 mfb_stub *
 mfb_stub::get_instance(struct mfb_window *window) {
-    struct stub_vector {
-        std::vector<mfb_stub *> instances;
+    return get_stub_instances().get(window);
+}
 
-        stub_vector() = default;
+//-------------------------------------
+extern "C" void
+release_cpp_stub(struct mfb_window *window) {
+    if (window == nullptr) {
+        return;
+    }
 
-        ~stub_vector() {
-            for (mfb_stub *instance : instances) {
-                if (instance != nullptr) {
-                    delete instance;
-                }
-            }
-            instances.clear();
-        }
-
-        mfb_stub *get(struct mfb_window *window) {
-            mfb_stub *free_slot = nullptr;
-            for (mfb_stub *instance : instances) {
-                if (instance == nullptr)
-                    continue;
-                if (instance->m_window == window) {
-                    return instance;
-                }
-                if (instance->m_window == nullptr && free_slot == nullptr) {
-                    free_slot = instance;
-                }
-            }
-
-            if (free_slot != nullptr) {
-                free_slot->m_window = window;
-                return free_slot;
-            }
-
-            instances.push_back(new mfb_stub);
-            instances.back()->m_window = window;
-
-            return instances.back();
-        }
-
-    };
-
-    static stub_vector s_instances;
-
-    return s_instances.get(window);
+    get_stub_instances().release(window);
 }
 
 //-------------------------------------
@@ -68,11 +100,7 @@ mfb_stub::resize_stub(struct mfb_window *window, int width, int height) {
 bool
 mfb_stub::close_stub(struct mfb_window *window) {
     mfb_stub    *stub = mfb_stub::get_instance(window);
-    bool should_close = stub->m_close(window);
-    if (should_close) {
-        stub->m_window = nullptr;
-    }
-    return should_close;
+    return stub->m_close(window);
 }
 
 //-------------------------------------

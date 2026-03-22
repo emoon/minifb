@@ -206,6 +206,8 @@ destroy_window_data(SWindowData *window_data) {
     if(window_data == NULL)
         return;
 
+    release_cpp_stub((struct mfb_window *) window_data);
+
     @autoreleasepool {
         // Invalidate window_data pointers in UIKit objects before freeing
         UIWindow *app_window = get_application_window();

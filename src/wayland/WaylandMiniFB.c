@@ -81,6 +81,8 @@ destroy_window_data(SWindowData *window_data) {
         return;
     }
 
+    release_cpp_stub((struct mfb_window *) window_data);
+
     if (window_data->draw_buffer) {
         wl_buffer_destroy(window_data->draw_buffer);
         window_data->draw_buffer = NULL;

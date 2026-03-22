@@ -1082,6 +1082,7 @@ mfb_wait_sync(struct mfb_window *window) {
 void
 destroy_window_data(SWindowData *window_data)  {
     if (window_data != NULL) {
+        release_cpp_stub((struct mfb_window *) window_data);
         if (window_data->specific != NULL) {
             SWindowData_X11   *window_data_specific = (SWindowData_X11 *) window_data->specific;
             Display *display = window_data_specific->display;

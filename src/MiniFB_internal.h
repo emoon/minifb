@@ -68,6 +68,7 @@ extern "C" {
 
     extern short int g_keycodes[MFB_MAX_KEYS];
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);
+    void release_cpp_stub(struct mfb_window *window);
 
     bool calculate_buffer_layout(uint32_t width, uint32_t height, uint32_t *stride_out, size_t *total_bytes_out);
     bool mfb_validate_viewport(const SWindowData *window_data,

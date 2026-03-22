@@ -57,6 +57,7 @@ void mfb_set_mouse_scroll_callback(struct mfb_window *window, T *obj, void (T::*
 class mfb_stub {
     mfb_stub() : m_window(NULL) {}
 
+    friend struct mfb_stub_vector;
     friend void mfb_set_active_callback      (std::function<void(struct mfb_window *window, bool)>                          func, struct mfb_window *window);
     friend void mfb_set_resize_callback      (std::function<void(struct mfb_window *, int, int)>                            func, struct mfb_window *window);
     friend void mfb_set_close_callback       (std::function<bool(struct mfb_window *)>                                      func, struct mfb_window *window);
