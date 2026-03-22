@@ -42,7 +42,7 @@ int main() {
 
 **Note:** By default, if ESC key is pressed, **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
 
-See <https://github.com/emoon/minifb/blob/master/tests/noise.c> for a complete example.
+See <https://github.com/emoon/minifb/blob/master/examples/noise.c> for a complete example.
 
 ## Supported Platforms
 
@@ -613,8 +613,8 @@ For App Store distribution, Apple requires a launch storyboard (legacy static la
 
 That is why there are now two iOS example targets:
 
-- `noise`: uses `tests/ios/Info.plist` + `tests/ios/LaunchScreen.storyboard` (recommended, App Store-ready).
-- `noise_no_storyboard`: uses `tests/ios/Info.no_storyboard.plist` without launch storyboard (useful for legacy/manual setups and behavior comparison).
+- `noise`: uses `examples/ios/Info.plist` + `examples/ios/LaunchScreen.storyboard` (recommended, App Store-ready).
+- `noise_no_storyboard`: uses `examples/ios/Info.no_storyboard.plist` without launch storyboard (useful for legacy/manual setups and behavior comparison).
 
 Apple references:
 - https://developer.apple.com/news/?id=03042020b
@@ -703,7 +703,7 @@ Then choose the Xcode scheme you want to run:
 
 ### Android (beta)
 
-Take a look at the example in tests/android. You need **Android Studio** to build and run it.
+Take a look at the example in examples/android. You need **Android Studio** to build and run it.
 
 **Limitations**:
 
@@ -772,7 +772,7 @@ and can cause a framebuffer-size mismatch if not handled explicitly:
 | 32-34     | System reserves space for the cutout by default | **Content shifted / clipped** |
 | ≥ 35      | Edge-to-edge is forced by the OS                | Works out of the box          |
 
-Two approaches are provided in the example (`tests/android/native2026`); pick whichever fits
+Two approaches are provided in the example (`examples/android/native2026`); pick whichever fits
 your project.
 
 ##### Option A - Manifest + theme (no Java code)
@@ -1001,11 +1001,11 @@ This will generate DOS 32-bit `.exe` files in the `build-dos/` folder which you 
 
 Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
 
-The `dos` example target (`tests/dos/debug_dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
+The `dos` example target (`examples/dos/debug_dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
 
 #### Compiling your own MiniFB app for DOS
 
-Copy the folder `tests/dos/` from the MiniFB repository to your project and run the `tools/dos/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
+Copy the folder `examples/dos/` from the MiniFB repository to your project and run the `tools/dos/download-dos-tools.sh` file as described above. Pull in MiniFB via CMake as described above.
 
 Then, when configuring your CMake build, specify the DJGPP toolchain file:
 
@@ -1019,7 +1019,7 @@ Running the executables in vanilla MS-DOS requires a DPMI server. Download [CWSD
 
 #### Debugging your MiniFB app in DOSBox-x
 
-The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`tests/dos/gdbstub.h`](tests/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `tools/dos/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
+The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`examples/dos/gdbstub.h`](examples/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `tools/dos/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
 
 ```c
 #define GDB_IMPLEMENTATION
@@ -1061,7 +1061,7 @@ If your app is executing and you press `CTRL+C` to interrupt it, you will end up
 
 Alternatively, you can use VS Code to debug via a graphical user interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag. This will install C/C++/CMake VS Code extensions and copy the `tools/dos/.vscode` folder to the project root. Open the project root folder in VS Code, select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html), select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant), and the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target), then run the `DOS debug target` launch configuration.
 
-You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [tests/dos/debug_dos.c](tests/dos/debug_dos.c) for usage of the GDB stub.
+You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [examples/dos/debug_dos.c](examples/dos/debug_dos.c) for usage of the GDB stub.
 
 ## Platform-Specific Limitations
 
