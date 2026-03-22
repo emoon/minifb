@@ -328,18 +328,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #endif
         case WM_CLOSE:
             if (window_data) {
-                bool destroy = false;
-
                 // Obtain a confirmation of close
                 if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
-                    destroy = true;
-                }
-
-                if (destroy) {
                     window_data->close = true;
-                    if (window_data_specific) {
-                        DestroyWindow(window_data_specific->window);
-                    }
                 }
             }
             break;
