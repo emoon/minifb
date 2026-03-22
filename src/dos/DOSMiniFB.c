@@ -223,14 +223,20 @@ init_mouse(SWindowData *window_data) {
   }
   g_mouse_present = true;
 
+  // Use the actual VESA resolution for the mouse range, not the user-requested
+  // window size, so the cursor covers the full screen area.
+  SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
+  uint32_t width  = window_data_specific ? window_data_specific->actual_width  : window_data->window_width;
+  uint32_t height = window_data_specific ? window_data_specific->actual_height : window_data->window_height;
+
   regs.x.ax = 7;
   regs.x.cx = 0;
-  regs.x.dx = window_data->window_width - 1;
+  regs.x.dx = width - 1;
   __dpmi_int(0x33, &regs);
 
   regs.x.ax = 8;
   regs.x.cx = 0;
-  regs.x.dx = window_data->window_height - 1;
+  regs.x.dx = height - 1;
   __dpmi_int(0x33, &regs);
 
   regs.x.ax = 2;
@@ -252,6 +258,7 @@ init_keyboard(void) {
 
   _go32_dpmi_lock_data(&g_keyboard, sizeof(g_keyboard));
   _go32_dpmi_lock_code(keyboard_handler, 4096);
+  _go32_dpmi_lock_code(ring_buffer_push, 4096);
 
   _go32_dpmi_get_protected_mode_interrupt_vector(
       0x9, &g_keyboard.old_keyboard_handler);
@@ -334,41 +341,41 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   window_data->dst_height = height;
   calc_dst_factor(window_data, width, height);
 
-  SWindowData_DOS *specific = malloc(sizeof(SWindowData_DOS));
-  if (!specific) {
+  SWindowData_DOS *window_data_specific = malloc(sizeof(SWindowData_DOS));
+  if (!window_data_specific) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS window data");
     free(window_data);
     vesa_dispose();
     return NULL;
   }
-  specific->actual_width = actual_width;
-  specific->actual_height = actual_height;
-  specific->actual_bpp = actual_bpp;
-  specific->bytes_per_scanline = bytes_per_scanline;
-  specific->scale_buffer = (uint32_t *) malloc((size_t) actual_width * actual_height * sizeof(uint32_t));
-  specific->scanline_buffer =
+  window_data_specific->actual_width = actual_width;
+  window_data_specific->actual_height = actual_height;
+  window_data_specific->actual_bpp = actual_bpp;
+  window_data_specific->bytes_per_scanline = bytes_per_scanline;
+  window_data_specific->scale_buffer = (uint32_t *) malloc((size_t) actual_width * actual_height * sizeof(uint32_t));
+  window_data_specific->scanline_buffer =
       actual_bpp != 32 || bytes_per_scanline != width << 2
           ? (uint8_t *) malloc(actual_height * bytes_per_scanline)
           : NULL;
 
-  if (!specific->scale_buffer) {
+  if (!window_data_specific->scale_buffer) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
-    free(specific);
+    free(window_data_specific);
     free(window_data);
     vesa_dispose();
     return NULL;
   }
 
-  if ((actual_bpp != 32 || bytes_per_scanline != width << 2) && !specific->scanline_buffer) {
+  if ((actual_bpp != 32 || bytes_per_scanline != width << 2) && !window_data_specific->scanline_buffer) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scanline buffer");
-    free(specific->scale_buffer);
-    free(specific);
+    free(window_data_specific->scale_buffer);
+    free(window_data_specific);
     free(window_data);
     vesa_dispose();
     return NULL;
   }
 
-  window_data->specific = specific;
+  window_data->specific = window_data_specific;
 
   mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
