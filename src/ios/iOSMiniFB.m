@@ -220,6 +220,9 @@ destroy_window_data(SWindowData *window_data) {
                     if (view->window_data == window_data) {
                         view->window_data = NULL;
                     }
+                    // Disconnect the MTKView delegate before freeing to prevent
+                    // drawInMTKView: from being called on a stale delegate.
+                    view.delegate = nil;
                 }
             }
         }
