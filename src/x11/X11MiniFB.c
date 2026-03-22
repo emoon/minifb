@@ -484,6 +484,72 @@ update_events(SWindowData *window_data, Display *display) {
 }
 
 //-------------------------------------
+// Query the primary monitor's geometry via XRandR.
+// Falls back to the first connected output if no primary is set.
+// If XRandR is unavailable, the output values are left unchanged.
+static void
+get_primary_monitor_geometry(Display *display, Window root,
+                             int *out_x, int *out_y, int *out_w, int *out_h) {
+#if defined(MINIFB_HAS_XRANDR)
+    XRRScreenResources *sr = XRRGetScreenResources(display, root);
+    if (sr == NULL)
+        return;
+
+    RROutput primary = XRRGetOutputPrimary(display, root);
+    bool found = false;
+
+    if (primary != None) {
+        XRROutputInfo *oi = XRRGetOutputInfo(display, sr, primary);
+        if (oi != NULL) {
+            if (oi->crtc != None && oi->connection == RR_Connected) {
+                XRRCrtcInfo *ci = XRRGetCrtcInfo(display, sr, oi->crtc);
+                if (ci != NULL) {
+                    *out_x = ci->x;
+                    *out_y = ci->y;
+                    *out_w = (int) ci->width;
+                    *out_h = (int) ci->height;
+                    found = true;
+                    XRRFreeCrtcInfo(ci);
+                }
+            }
+            XRRFreeOutputInfo(oi);
+        }
+    }
+
+    if (!found) {
+        for (int o = 0; o < sr->noutput; o++) {
+            XRROutputInfo *oi = XRRGetOutputInfo(display, sr, sr->outputs[o]);
+            if (oi != NULL) {
+                if (oi->crtc != None && oi->connection == RR_Connected) {
+                    XRRCrtcInfo *ci = XRRGetCrtcInfo(display, sr, oi->crtc);
+                    if (ci != NULL) {
+                        *out_x = ci->x;
+                        *out_y = ci->y;
+                        *out_w = (int) ci->width;
+                        *out_h = (int) ci->height;
+                        found = true;
+                        XRRFreeCrtcInfo(ci);
+                    }
+                }
+                XRRFreeOutputInfo(oi);
+                if (found)
+                    break;
+            }
+        }
+    }
+
+    XRRFreeScreenResources(sr);
+#else
+    (void) display;
+    (void) root;
+    (void) out_x;
+    (void) out_y;
+    (void) out_w;
+    (void) out_h;
+#endif
+}
+
+//-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     const unsigned known_flags = MFB_WF_RESIZABLE | MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_BORDERLESS | MFB_WF_ALWAYS_ON_TOP;
@@ -602,6 +668,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     int screen_width  = DisplayWidth(window_data_specific->display, window_data_specific->screen);
     int screen_height = DisplayHeight(window_data_specific->display, window_data_specific->screen);
 
+    int primary_x = 0, primary_y = 0;
+    int primary_w = screen_width, primary_h = screen_height;
+    get_primary_monitor_geometry(window_data_specific->display, default_root_window,
+                                &primary_x, &primary_y, &primary_w, &primary_h);
+
     window_attributes.border_pixel     = BlackPixel(window_data_specific->display, window_data_specific->screen);
     window_attributes.background_pixel = BlackPixel(window_data_specific->display, window_data_specific->screen);
     window_attributes.backing_store    = NotUseful;
@@ -624,8 +695,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         window_height = screen_height;
     }
     else {
-        pos_x         = (screen_width  - width)  / 2;
-        pos_y         = (screen_height - height) / 2;
+        pos_x         = primary_x + (primary_w - (int) width)  / 2;
+        pos_y         = primary_y + (primary_h - (int) height) / 2;
         window_width  = width;
         window_height = height;
     }
