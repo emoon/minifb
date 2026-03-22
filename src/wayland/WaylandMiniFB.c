@@ -707,8 +707,13 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
         window_data_specific->pointer_serial = serial;
         window_data_specific->pointer_serial_valid = 1;
     }
-    window_data->mouse_button_status[(button - BTN_MOUSE + 1) & MFB_MAX_MOUSE_BUTTONS_MASK] = (state == 1);
-    kCall(mouse_btn_func, (mfb_mouse_button) (button - BTN_MOUSE + 1), (mfb_key_mod) window_data->mod_keys, state == 1);
+    uint32_t mapped = button - BTN_MOUSE + 1;
+    if (mapped > MFB_MOUSE_BTN_7) {
+        MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.", mapped);
+    } else {
+        window_data->mouse_button_status[mapped] = (state == 1);
+        kCall(mouse_btn_func, (mfb_mouse_button) mapped, (mfb_key_mod) window_data->mod_keys, state == 1);
+    }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer button %x, state %x (serial: %d)", button, state, serial);
 }

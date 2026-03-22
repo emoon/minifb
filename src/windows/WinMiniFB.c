@@ -447,8 +447,12 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                             is_pressed = 1;
                         }
                 }
-                window_data->mouse_button_status[button & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
-                kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
+                if (button > MFB_MOUSE_BTN_7) {
+                    MFB_LOG(MFB_LOG_WARNING, "Mouse button %d exceeds MFB_MOUSE_BTN_7; ignoring.", button);
+                } else {
+                    window_data->mouse_button_status[button] = is_pressed;
+                    kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
+                }
             }
             break;
 

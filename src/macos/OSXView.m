@@ -165,9 +165,9 @@
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
         if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
-            MFB_LOG(MFB_LOG_WARNING, "OSXView: otherMouseDown received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
-                    (unsigned) [event buttonNumber]);
-            mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
+            MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.",
+                    (unsigned) mapped_button);
+            return;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
@@ -181,9 +181,9 @@
     if(window_data != 0x0) {
         uint32_t mapped_button = (uint32_t) [event buttonNumber] + 1u;
         if (mapped_button > (uint32_t) MFB_MOUSE_BTN_7) {
-            MFB_LOG(MFB_LOG_WARNING, "OSXView: otherMouseUp received buttonNumber=%u; clamping to MFB_MOUSE_BTN_7.",
-                    (unsigned) [event buttonNumber]);
-            mapped_button = (uint32_t) MFB_MOUSE_BTN_7;
+            MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.",
+                    (unsigned) mapped_button);
+            return;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
         window_data->mod_keys = translate_modifiers([event modifierFlags]);

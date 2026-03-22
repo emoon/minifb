@@ -363,10 +363,16 @@ process_event(SWindowData *window_data, XEvent *event) {
                     kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
                     break;
 
-                default:
-                    window_data->mouse_button_status[(button - 4) & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
-                    kCall(mouse_btn_func, (mfb_mouse_button) (button - 4), (mfb_key_mod) window_data->mod_keys, is_pressed);
+                default: {
+                    uint32_t mapped = button - 4;
+                    if (mapped > MFB_MOUSE_BTN_7) {
+                        MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.", mapped);
+                        break;
+                    }
+                    window_data->mouse_button_status[mapped] = is_pressed;
+                    kCall(mouse_btn_func, (mfb_mouse_button) mapped, (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
+                }
             }
         }
         break;
