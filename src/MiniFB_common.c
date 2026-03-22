@@ -157,6 +157,10 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
 //-------------------------------------
 bool
 mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height) {
+    if (old_width == 0 || old_height == 0) {
+        return false;
+    }
+
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
 
