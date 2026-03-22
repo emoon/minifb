@@ -599,10 +599,17 @@ android_main(struct android_app *app) {
         }
     }
 
-    char cwd[1024];
-    getcwd(cwd, sizeof(cwd));
+    char cwd[PATH_MAX];
+    char fallback_program_name[] = "minifb-android";
+    char *program_name = fallback_program_name;
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        program_name = cwd;
+    }
+    else {
+        MFB_LOG(MFB_LOG_WARNING, "AndroidMiniFB: getcwd failed, using fallback argv[0].");
+    }
     char *argv[] = {
-            cwd,
+            program_name,
             (char *) app
     };
     main(2, argv);
