@@ -14,7 +14,7 @@ All notable changes to this project are documented in this file.
 - **X11 scale detection**: layered fallbacks (XSettings, Xresources, XRandR, physical DPI).
 - **DOS viewport**: basic viewport support for the MS-DOS backend.
 - **Android `mfb_update_events`**: event-only pump without rendering, matching other backends.
-- **Android example**: new test project using Android Studio Narwhal (native2026).
+- **Android example**: new example project using Android Studio Narwhal (native2026).
 - **New headers**: `MiniFB_macros.h` (deprecation/pixel/logging macros), `MiniFB_types.h` (callback and logging typedefs), `WindowData_Web.h`.
 - **Internal helpers**: `calculate_buffer_layout` (overflow-safe buffer validation) and `mfb_validate_viewport` (unified viewport checks), used by all backends.
 
@@ -29,7 +29,8 @@ All notable changes to this project are documented in this file.
 - Moved `accumulated_error_ticks` into the timer struct (was static).
 - Replaced deprecated Android API `ALooper_pollAll` with `ALooper_pollOnce`.
 - Callback parameter names unified (`is_active`, `is_pressed`, `delta_x`, `delta_y`).
-- Reorganized Android tests into `native2021`/`native2026` folders.
+- Renamed `tests/` to `examples/` and updated CMake/example project paths accordingly.
+- Reorganized Android examples into `native2021`/`native2026` folders.
 - Moved DOS tools to `tools/dos/`, Wayland protocol generator to `tools/wayland/`.
 - Updated DJGPP GCC toolchain to 12.2.0.
 - Normalized line endings with `.gitattributes`.
@@ -47,6 +48,9 @@ All notable changes to this project are documented in this file.
 - Fixed Android: API 32-34 display cutout handling; surface transition and rotation edge cases.
 - Fixed macOS: improved robustness and replaced `NSLog` with `mfb_log`.
 - Fixed Windows: double-click messages now map to regular mouse button press events.
+- Fixed Windows: initial window sizing on high-DPI displays so the client area and viewport stay aligned.
+- Fixed X11: initial normal-window placement now centers on a real monitor instead of the combined virtual desktop.
+- Fixed C++ wrapper: callback stubs are released when windows are destroyed, preventing stale callback reuse after recreating windows.
 - Fixed Web: initialization/teardown robustness when `document.body` is not yet available.
 - Fixed Wayland: dynamic resize and resource reallocation paths.
 - Fixed MS-DOS: multiple rendering and input handling issues.
