@@ -302,7 +302,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
 //-------------------------------------
 - (bool) resizeTextures {
-    if (window_data == NULL || metal_device == nil) {
+    if (window_data == NULL || window_data_specific == NULL || metal_device == nil) {
         MFB_LOG(MFB_LOG_ERROR, "iOSViewDelegate: resizeTextures called with invalid window state.");
         return false;
     }
@@ -313,12 +313,11 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
                                                            height:window_data->buffer_height
                                                         mipmapped:false];
 
-    // Create new textures first, then release old ones to avoid dangling pointers if creation fails
+    // Create new textures first (outside the lock — Metal allocation can take time)
     id<MTLTexture> new_textures[MaxBuffersInFlight];
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
         new_textures[i] = [metal_device newTextureWithDescriptor:td];
         if (!new_textures[i]) {
-            // Release any textures already created in this attempt
 #if !__has_feature(objc_arc)
             for (int j = 0; j < i; ++j) {
                 [new_textures[j] release];
@@ -328,12 +327,17 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
         }
     }
 
+    // Swap texture_buffers under lock to prevent drawInMTKView from using
+    // a released texture between the release and the assignment.
+    os_unfair_lock_lock(&window_data_specific->buffer_lock);
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
-#if !__has_feature(objc_arc)
-        [texture_buffers[i] release];
-#endif
+        id<MTLTexture> old = texture_buffers[i];
         texture_buffers[i] = new_textures[i];
+#if !__has_feature(objc_arc)
+        [old release];
+#endif
     }
+    os_unfair_lock_unlock(&window_data_specific->buffer_lock);
 
     return true;
 }
@@ -374,9 +378,14 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
         dispatch_semaphore_signal(block_sema);
     }];
 
-    // Copy the bytes from our data object into the current texture slot
-    MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
-    [texture_buffers[current_buffer] replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
+    // Copy the bytes from our data object into the current texture slot.
+    // Lock to prevent mfb_update_ex from freeing/replacing draw_buffer mid-copy.
+    os_unfair_lock_lock(&window_data_specific->buffer_lock);
+    if (window_data->draw_buffer != NULL) {
+        MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
+        [texture_buffers[current_buffer] replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
+    }
+    os_unfair_lock_unlock(&window_data_specific->buffer_lock);
 
     // Delay getting the currentRenderPassDescriptor until absolutely needed. This avoids
     // holding onto the drawable and blocking the display pipeline any longer than necessary

@@ -97,6 +97,7 @@ create_window_data(unsigned width, unsigned height) {
         return NULL;
     }
     memset((void *) window_data_specific, 0, sizeof(SWindowData_IOS));
+    window_data_specific->buffer_lock = OS_UNFAIR_LOCK_INIT;
 
     window_data->specific = window_data_specific;
 
@@ -321,16 +322,22 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             return MFB_STATE_INTERNAL_ERROR;
         }
 
+        // Swap draw_buffer under lock so drawInMTKView never reads a freed pointer.
+        os_unfair_lock_lock(&window_data_specific->buffer_lock);
         free(window_data->draw_buffer);
         window_data->draw_buffer = new_draw_buffer;
+    } else {
+        os_unfair_lock_lock(&window_data_specific->buffer_lock);
     }
 
     if (window_data->draw_buffer == NULL) {
+        os_unfair_lock_unlock(&window_data_specific->buffer_lock);
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: internal draw buffer is null in mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
     memcpy(window_data->draw_buffer, buffer, total_bytes);
+    os_unfair_lock_unlock(&window_data_specific->buffer_lock);
 
     if (window_data->close) {
         MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: mfb_update_ex detected close request.");
