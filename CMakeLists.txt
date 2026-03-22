@@ -439,11 +439,11 @@ target_include_directories(minifb PRIVATE src)
 
 # Other targets
 #--------------------------------------
-set(MINIFB_TEST_TARGETS)
+set(MINIFB_EXAMPLE_TARGETS)
 
 if (MINIFB_BUILD_VERSION_INFO)
-    add_executable(minifb_version_info tests/version_info.c)
-    list(APPEND MINIFB_TEST_TARGETS minifb_version_info)
+    add_executable(minifb_version_info examples/version_info.c)
+    list(APPEND MINIFB_EXAMPLE_TARGETS minifb_version_info)
 endif()
 
 # Examples
@@ -451,16 +451,16 @@ endif()
 if (MINIFB_BUILD_EXAMPLES)
     if (NOT IOS)
 
-        add_executable(noise tests/noise.c)
-        add_executable(input_events tests/input_events.c)
-        add_executable(input_events_cpp tests/input_events_cpp.cpp)
-        add_executable(multiple_windows tests/multiple_windows.c)
-        add_executable(hidpi tests/hidpi.c)
-        add_executable(fullscreen tests/fullscreen.c)
-        add_executable(timer tests/timer.c)
-        add_executable(hide_cursor tests/hide_cursor.c)
+        add_executable(noise examples/noise.c)
+        add_executable(input_events examples/input_events.c)
+        add_executable(input_events_cpp examples/input_events_cpp.cpp)
+        add_executable(multiple_windows examples/multiple_windows.c)
+        add_executable(hidpi examples/hidpi.c)
+        add_executable(fullscreen examples/fullscreen.c)
+        add_executable(timer examples/timer.c)
+        add_executable(hide_cursor examples/hide_cursor.c)
 
-        list(APPEND MINIFB_TEST_TARGETS
+        list(APPEND MINIFB_EXAMPLE_TARGETS
             noise
             input_events
             input_events_cpp
@@ -475,7 +475,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
-                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/web
+                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/web
                     ${CMAKE_CURRENT_BINARY_DIR}
             )
 
@@ -496,18 +496,18 @@ if (MINIFB_BUILD_EXAMPLES)
         if (DJGPP)
 
             add_executable(debug_dos
-                tests/dos/debug_dos.c
+                examples/dos/debug_dos.c
             )
-            list(APPEND MINIFB_TEST_TARGETS debug_dos)
+            list(APPEND MINIFB_EXAMPLE_TARGETS debug_dos)
 
         endif()
 
     else() # iOS
 
         set(IOS_NOISE_COMMON_SOURCES
-            tests/ios/main.m
-            tests/ios/AppDelegate.h
-            tests/ios/AppDelegate.m
+            examples/ios/main.m
+            examples/ios/AppDelegate.h
+            examples/ios/AppDelegate.m
         )
 
         add_executable(noise
@@ -516,7 +516,7 @@ if (MINIFB_BUILD_EXAMPLES)
         add_executable(noise_no_storyboard
             ${IOS_NOISE_COMMON_SOURCES}
         )
-        list(APPEND MINIFB_TEST_TARGETS noise noise_no_storyboard)
+        list(APPEND MINIFB_EXAMPLE_TARGETS noise noise_no_storyboard)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
@@ -526,11 +526,11 @@ if (MINIFB_BUILD_EXAMPLES)
         endforeach()
 
         set_target_properties(noise PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/tests/ios/Info.plist"
-            RESOURCE "tests/ios/LaunchScreen.storyboard"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
+            RESOURCE "examples/ios/LaunchScreen.storyboard"
         )
         set_target_properties(noise_no_storyboard PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/tests/ios/Info.no_storyboard.plist"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
         )
 
     endif()
@@ -539,7 +539,7 @@ endif()
 
 # Add options to targets
 #--------------------------------------
-foreach(minifb_test_target IN LISTS MINIFB_TEST_TARGETS)
+foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
     target_link_libraries(${minifb_test_target} PRIVATE minifb)
 
     set_target_properties(${minifb_test_target} PROPERTIES
@@ -570,18 +570,18 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 
 if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
-    set_property(TARGET noise PROPERTY FOLDER "Tests")
-    set_property(TARGET timer PROPERTY FOLDER "Tests")
-    set_property(TARGET fullscreen PROPERTY FOLDER "Tests")
-    set_property(TARGET input_events PROPERTY FOLDER "Tests")
-    set_property(TARGET input_events_cpp PROPERTY FOLDER "Tests")
-    set_property(TARGET multiple_windows PROPERTY FOLDER "Tests")
-    set_property(TARGET hidpi PROPERTY FOLDER "Tests")
-    set_property(TARGET hide_cursor PROPERTY FOLDER "Tests")
+    set_property(TARGET noise PROPERTY FOLDER "Examples")
+    set_property(TARGET timer PROPERTY FOLDER "Examples")
+    set_property(TARGET fullscreen PROPERTY FOLDER "Examples")
+    set_property(TARGET input_events PROPERTY FOLDER "Examples")
+    set_property(TARGET input_events_cpp PROPERTY FOLDER "Examples")
+    set_property(TARGET multiple_windows PROPERTY FOLDER "Examples")
+    set_property(TARGET hidpi PROPERTY FOLDER "Examples")
+    set_property(TARGET hide_cursor PROPERTY FOLDER "Examples")
 endif()
 
 if (MINIFB_BUILD_VERSION_INFO)
-    set_property(TARGET minifb_version_info PROPERTY FOLDER "Tests")
+    set_property(TARGET minifb_version_info PROPERTY FOLDER "Examples")
 endif()
 
 #--------------------------------------
