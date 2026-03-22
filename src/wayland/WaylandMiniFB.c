@@ -809,7 +809,9 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_specific->keyboard) {
         window_data_specific->keyboard = wl_seat_get_keyboard(seat);
-        wl_keyboard_add_listener(window_data_specific->keyboard, &keyboard_listener, window_data);
+        if (window_data_specific->keyboard) {
+            wl_keyboard_add_listener(window_data_specific->keyboard, &keyboard_listener, window_data);
+        }
     }
 
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
@@ -819,7 +821,9 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_specific->pointer) {
         window_data_specific->pointer = wl_seat_get_pointer(seat);
-        wl_pointer_add_listener(window_data_specific->pointer, &pointer_listener, window_data);
+        if (window_data_specific->pointer) {
+            wl_pointer_add_listener(window_data_specific->pointer, &pointer_listener, window_data);
+        }
     }
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_specific->pointer) {
         wl_pointer_destroy(window_data_specific->pointer);
@@ -1142,13 +1146,15 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
 
     for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
         if (window_data_specific->output_ids[i] == name) {
-            wl_output_destroy(window_data_specific->outputs[i]);
+            struct wl_output *removed = window_data_specific->outputs[i];
 
-            // If this was the current output, clear it
-            if (window_data_specific->current_output == window_data_specific->outputs[i]) {
+            // If this was the current output, clear it (compare before destroy)
+            if (window_data_specific->current_output == removed) {
                 window_data_specific->current_output       = NULL;
                 window_data_specific->current_output_scale  = 1;
             }
+
+            wl_output_destroy(removed);
 
             // Compact arrays by moving the last element into the gap
             uint32_t last = window_data_specific->output_count - 1;
@@ -1195,8 +1201,7 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
 
     // On first configure, attach buffer and commit
     if (!window_data->is_initialized) {
-        wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer,
-                         window_data->dst_offset_x, window_data->dst_offset_y);
+        wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer, 0, 0);
 
         wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y,
                          window_data->dst_width, window_data->dst_height);
@@ -1691,7 +1696,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
     memcpy(window_data_specific->shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
-    wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer, window_data->dst_offset_x, window_data->dst_offset_y);
+    wl_surface_attach(window_data_specific->surface, (struct wl_buffer *) window_data->draw_buffer, 0, 0);
     wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
@@ -1967,7 +1972,7 @@ mfb_wait_sync2(struct mfb_window *window) {
         usleep(millis * 1000);
         //sched_yield();
 
-        if (millis == 1) {
+        if (millis <= 1) {
             if (wl_display_dispatch_pending(window_data_specific->display) == -1) {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed in mfb_wait_sync2.");
                 return false;
