@@ -1,7 +1,10 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.22)
 project(MiniFB VERSION 0.10.0 LANGUAGES C CXX)
 
-if (APPLE)
+# remove before this is merged
+message(STATUS "CMAKE_SYSTEM_NAME: " ${CMAKE_SYSTEM_NAME})
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     include(CheckLanguage)
     check_language(OBJC)
     if (CMAKE_OBJC_COMPILER)
@@ -132,7 +135,7 @@ set(MINIFB_COMPILE_DEFINITIONS)
 set(MINIFB_LINK_OPTIONS_LIB)
 set(MINIFB_LINK_OPTIONS_EXE)
 
-if (DJGPP)
+if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
     # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
     set(MINIFB_C_EXTENSIONS   ON)
     set(MINIFB_CXX_EXTENSIONS ON)
@@ -146,24 +149,41 @@ endif()
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
-if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
-    option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
+include(CMakeDependentOption) # Requires 3.22 to use full condition syntax
+
+# cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
+# the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
+# setting the default value lets us de-nest `if(<platform>) if(<option>)` - type stuff, into just `if(<option>)`.
+
+cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
+    "NOT (CMAKE_SYSTEM_NAME STREQUAL \"iOS\" OR CMAKE_SYSTEM_NAME STREQUAL \"Android\" OR CMAKE_SYSTEM_NAME STREQUAL \"Emscripten\")" OFF)
+
+cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
+    "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\"" OFF)
+cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
+    "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\"" OFF)
+
+cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
+    "CMAKE_SYSTEM_NAME STREQUAL \"Linux\"" OFF)
+
+# purely for internal use, never exposed to the user. easier than `if(NOT MINIFB_USE_WAYLAND_API AND CMAKE_SYSTEM_NAME STREQUAL "Linux")` every time.
+if (NOT MINIFB_USE_WAYLAND_API AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MINIFB_USE_X11_API ON)
 else()
-    set(MINIFB_BUILD_VERSION_INFO OFF)
+    set(MINIFB_USE_X11_API OFF)
 endif()
 
-if (APPLE AND NOT IOS)
-    option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
-    option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" OFF
+    "MINIFB_USE_X11_API OR CMAKE_SYSTEM_NAME STREQUAL \"Windows\"" OFF)
+
+# unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using metal API code")
     minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
-elseif (UNIX AND NOT EMSCRIPTEN)
-    option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using wayland API code")
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
-elseif (WIN32)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
@@ -173,7 +193,7 @@ if (NOT MSVC)
 
     # GCC/Clang
 
-    if (DJGPP)
+    if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
         list(APPEND MINIFB_COMPILE_OPTIONS
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
@@ -194,6 +214,7 @@ if (NOT MSVC)
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
     )
 
+    # TODO: why specifically not apple, and is this suppression neccecary anyway?
     if (NOT APPLE)
         list(APPEND MINIFB_COMPILE_OPTIONS
             -Wno-cast-function-type
@@ -237,6 +258,9 @@ else()
         list(APPEND MINIFB_COMPILE_OPTIONS /Gm)
     endif()
 
+    # prevent annoying c standard lib unsafety msvc warnings
+    list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
+
 endif()
 
 list(APPEND MINIFB_COMPILE_DEFINITIONS
@@ -244,65 +268,51 @@ list(APPEND MINIFB_COMPILE_DEFINITIONS
     "$<$<CONFIG:Debug>:DEBUG>"
 )
 
-if (EMSCRIPTEN)
+# TODO: does the toolchain include this automatically?
+if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     list(APPEND MINIFB_LINK_OPTIONS_EXE
         "$<$<CONFIG:Debug>:-g>"
     )
 endif()
 
-# Set compiler/platform specific flags and dependencies
+# Set platform specific flags and source files
 #--------------------------------------
-if (WIN32)
 
-    if (MSVC)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
-    endif()
+if (MINIFB_USE_INVERTED_Y_ON_MACOS)
+    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
+endif()
+
+# Add GL/Metal code if we're using GL/Metal, no matter the backend
+if (MINIFB_USE_OPENGL_API)
+    list(APPEND SrcLib ${SrcGL})
+    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
+endif()
+if (MINIFB_USE_METAL_API)
+    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
+    list(APPEND SrcLib ${SrcMacOSMetal})
+endif()
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
-
-    if (USE_OPENGL_API)
-        list(APPEND SrcLib ${SrcGL})
-
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-    endif()
-
     list(APPEND SrcLib ${SrcWindows})
 
-elseif (IOS)
-
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
     list(APPEND SrcLib ${SrcIOS})
 
-elseif (APPLE)
-
-    if (USE_METAL_API)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
-        list(APPEND SrcLib ${SrcMacOSMetal})
-    endif()
-
-    if (USE_INVERTED_Y_ON_MACOS)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
-    endif()
-
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     list(APPEND SrcLib ${SrcMacOS})
 
-elseif (UNIX)
+elseif (MINIFB_USE_WAYLAND_API)
+    list(APPEND SrcLib ${SrcWayland})
 
-    if (USE_WAYLAND_API)
-        list(APPEND SrcLib ${SrcWayland})
-    elseif (EMSCRIPTEN)
-        list(APPEND SrcLib ${SrcWeb})
-    else()
-        if (USE_OPENGL_API)
-            list(APPEND SrcLib ${SrcGL})
+elseif (MINIFB_USE_X11_API)
+    list(APPEND SrcLib ${SrcX11})
 
-            list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-        endif()
-        list(APPEND SrcLib ${SrcX11})
-    endif()
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    list(APPEND SrcLib ${SrcWeb})
 
-elseif (DJGPP)
-
+elseif (CMAKE_SYSTEM_NAME STREQUAL "DOS")
     list(APPEND SrcLib ${SrcDOS})
-
 endif()
 
 # Library
@@ -314,85 +324,86 @@ add_library(minifb::minifb ALIAS minifb)
 
 # Link
 #--------------------------------------
-if (APPLE)
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
-    if (IOS)
+    target_link_libraries(minifb PRIVATE
+        "-framework UIKit"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+    )
+
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+
+    target_link_libraries(minifb PRIVATE
+        "-framework Cocoa"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+    )
+
+elseif (MINIFB_USE_WAYLAND_API)
+
+    find_package(PkgConfig)
+    if (NOT PKG_CONFIG_FOUND)
+        message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
+    endif()
+    pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
+
+    target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
+    target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
+    target_link_libraries(minifb PRIVATE
+        ${WAYLAND_LIBRARIES}
+    )
+
+elseif(MINIFB_USE_X11_API)
+    find_package(X11)
+    if (NOT X11_FOUND)
+        message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
+    endif()
+
+    target_link_libraries(minifb PRIVATE
+        X11::X11
+        #"-lxkbcommon"
+    )
+    if (X11_Xrandr_FOUND)
+        if (TARGET X11::Xrandr)
+            target_link_libraries(minifb PRIVATE X11::Xrandr)
+        else()
+            target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
+        endif()
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
+    endif()
+    if (MINIFB_USE_OPENGL_API)
+        find_package(OpenGL)
+        if (NOT OpenGL_FOUND)
+            message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
+        endif()
         target_link_libraries(minifb PRIVATE
-            "-framework UIKit"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
-        )
-    else()
-        target_link_libraries(minifb PRIVATE
-            "-framework Cocoa"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
+            OpenGL::GL
         )
     endif()
 
-elseif (UNIX)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
-    if (USE_WAYLAND_API)
-        find_package(PkgConfig)
-        if (NOT PKG_CONFIG_FOUND)
-            message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
-        endif()
-        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
+    list(APPEND MINIFB_LINK_OPTIONS_EXE
+        "-sSTRICT=1"
+        "-sENVIRONMENT=web"
+        "-sMODULARIZE=1"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sALLOW_TABLE_GROWTH"
+        "-sMALLOC=emmalloc"
+        "-sEXPORT_ALL=1"
+        "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
+        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+        "-sASYNCIFY"
+        "--no-entry"
+        "-sSINGLE_FILE"
+    )
 
-        target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
-        target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
-        target_link_libraries(minifb PRIVATE
-            ${WAYLAND_LIBRARIES}
-        )
-    elseif (EMSCRIPTEN)
-        list(APPEND MINIFB_LINK_OPTIONS_EXE
-            "-sSTRICT=1"
-            "-sENVIRONMENT=web"
-            "-sMODULARIZE=1"
-            "-sALLOW_MEMORY_GROWTH=1"
-            "-sALLOW_TABLE_GROWTH"
-            "-sMALLOC=emmalloc"
-            "-sEXPORT_ALL=1"
-            "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
-            "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
-            "-sASYNCIFY"
-            "--no-entry"
-            "-sSINGLE_FILE"
-        )
-    else()
-        find_package(X11)
-        if (NOT X11_FOUND)
-            message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
-        endif()
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 
-        target_link_libraries(minifb PRIVATE
-            X11::X11
-            #"-lxkbcommon"
-        )
-        if (X11_Xrandr_FOUND)
-            if (TARGET X11::Xrandr)
-                target_link_libraries(minifb PRIVATE X11::Xrandr)
-            else()
-                target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
-            endif()
-            target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
-        endif()
-        if (USE_OPENGL_API)
-            find_package(OpenGL)
-            if (NOT OpenGL_FOUND)
-                message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
-            endif()
-            target_link_libraries(minifb PRIVATE
-                OpenGL::GL
-            )
-        endif()
-    endif()
-
-elseif (WIN32)
-
-    if (USE_OPENGL_API)
+    if (MINIFB_USE_OPENGL_API)
         find_package(OpenGL)
         if (NOT OpenGL_FOUND)
             message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
@@ -448,8 +459,9 @@ endif()
 
 # Examples
 #--------------------------------------
+# TODO: clean up further
 if (MINIFB_BUILD_EXAMPLES)
-    if (NOT IOS)
+    if (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
         add_executable(noise examples/noise.c)
         add_executable(input_events examples/input_events.c)
@@ -471,7 +483,7 @@ if (MINIFB_BUILD_EXAMPLES)
             hide_cursor
         )
 
-        if (EMSCRIPTEN)
+        if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
 
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -493,7 +505,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
         endif()
 
-        if (DJGPP)
+        if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
 
             add_executable(debug_dos
                 examples/dos/debug_dos.c
@@ -598,15 +610,11 @@ set(MINIFB_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
 set(MINIFB_PACKAGE_FIND_OPENGL FALSE)
 set(MINIFB_PACKAGE_FIND_X11 FALSE)
 
-if (WIN32 AND USE_OPENGL_API)
+if (MINIFB_USE_OPENNGL_API)
     set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-elseif (UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-    if (NOT USE_WAYLAND_API)
-        set(MINIFB_PACKAGE_FIND_X11 TRUE)
-        if (USE_OPENGL_API)
-            set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-        endif()
-    endif()
+endif()
+if (MINIFB_USE_X11_API)
+	set(MINIFB_PACKAGE_FIND_X11 TRUE)
 endif()
 
 minifb_configure_package_config_file(
@@ -626,8 +634,8 @@ install(FILES
     DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
 
-message(STATUS "Done " ${PROJECT_NAME})
-
 if (MSVC AND MINIFB_BUILD_EXAMPLES)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
+
+message(STATUS "Done " ${PROJECT_NAME})
