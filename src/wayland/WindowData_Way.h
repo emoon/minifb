@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define WAYLAND_MAX_OUTPUTS 16
+#define WAYLAND_BUFFER_SLOTS 2
 
 struct wl_display;
 struct wl_registry;
@@ -30,6 +31,14 @@ struct zxdg_toplevel_decoration_v1;
 struct xkb_context;
 struct xkb_keymap;
 struct xkb_state;
+
+typedef struct {
+    struct wl_buffer    *wl_buf;
+    size_t               offset;          // byte offset within the pool
+    unsigned             width;           // dimensions this wl_buf was created with
+    unsigned             height;
+    uint8_t              busy;            // 1 = compositor owns it
+} SWaylandBufferSlot;
 
 typedef struct {
     struct wl_display       *display;
@@ -71,7 +80,10 @@ typedef struct {
     uint32_t                shm_format;
     size_t                  shm_length;
     size_t                  shm_pool_size;
-    uint32_t                *shm_ptr;
+    size_t                  single_buffer_size;
+    uint32_t                *shm_base;
+    SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
+    int                     front_slot;
 
     int                     fd;
 
