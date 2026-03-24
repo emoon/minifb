@@ -519,8 +519,10 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
             }
         }
 
-        window_data->key_status[key_code] = is_pressed;
-        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
+            window_data->key_status[key_code] = is_pressed;
+            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+        }
     }
 }
 
@@ -2001,10 +2003,16 @@ extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
 void
-init_keycodes(void) {
-    // Clear keys
-    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
-        g_keycodes[i] = 0;
+init_keycodes() {
+    static bool s_initialized = false;
+    if (s_initialized) {
+        return;
+    }
+    s_initialized = true;
+
+    for (size_t i = 0; i < MFB_MAX_KEYS; ++i) {
+        g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
+    }
 
     g_keycodes[KEY_GRAVE]      = MFB_KB_KEY_GRAVE_ACCENT;
     g_keycodes[KEY_1]          = MFB_KB_KEY_1;

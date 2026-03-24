@@ -576,17 +576,18 @@ mfb_wait_sync(struct mfb_window *window) {
 }
 
 //-------------------------------------
-extern short int g_keycodes[512];
+extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
 void
 init_keycodes() {
-    static bool initialized = false;
-    if (initialized) {
+    static bool s_initialized = false;
+    if (s_initialized) {
         return;
     }
+    s_initialized = true;
 
-    for (size_t i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i) {
+    for (size_t i = 0; i < MFB_MAX_KEYS; ++i) {
         g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
     }
 
@@ -704,8 +705,6 @@ init_keycodes() {
     g_keycodes[0x51] = MFB_KB_KEY_KP_EQUAL;
     g_keycodes[0x43] = MFB_KB_KEY_KP_MULTIPLY;
     g_keycodes[0x4E] = MFB_KB_KEY_KP_SUBTRACT;
-
-    initialized = true;
 }
 
 //-------------------------------------

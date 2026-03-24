@@ -993,8 +993,14 @@ extern short int g_keycodes[MFB_MAX_KEYS];
 //-------------------------------------
 void
 init_keycodes() {
-    if ((g_keycodes[0x00B] == MFB_KB_KEY_0) && (g_keycodes[0x002] == MFB_KB_KEY_1)) {
+    static bool s_initialized = false;
+    if (s_initialized) {
         return;
+    }
+    s_initialized = true;
+
+    for (size_t i = 0; i < MFB_MAX_KEYS; ++i) {
+        g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
     }
 
     g_keycodes[0x00B] = MFB_KB_KEY_0;

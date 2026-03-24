@@ -313,7 +313,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
                                                            height:window_data->buffer_height
                                                         mipmapped:false];
 
-    // Create new textures first (outside the lock — Metal allocation can take time)
+    // Create new textures first (outside the lock - Metal allocation can take time)
     id<MTLTexture> new_textures[MaxBuffersInFlight];
     for (int i = 0; i < MaxBuffersInFlight; ++i) {
         new_textures[i] = [metal_device newTextureWithDescriptor:td];

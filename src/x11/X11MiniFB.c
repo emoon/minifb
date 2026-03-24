@@ -310,8 +310,8 @@ process_event(SWindowData *window_data, XEvent *event) {
 
             if (key_code != MFB_KB_KEY_UNKNOWN) {
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
+                kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
             }
-            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
 
             if (event->type == KeyPress) {
                 dispatch_text_input(window_data, window_data_specific, event);
@@ -1384,8 +1384,9 @@ init_keycodes(SWindowData_X11 *window_data_specific) {
     int     key_sym;
 
     // Clear keys
-    for (i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
+    for (i = 0; i < MFB_MAX_KEYS; ++i) {
         g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
+    }
 
     // Valid key code range is  [8, 255], according to the Xlib manual
     for (i=8; i<=255; ++i) {
