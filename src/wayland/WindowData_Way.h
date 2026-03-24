@@ -67,9 +67,9 @@ typedef struct {
     struct wl_output        *outputs[WAYLAND_MAX_OUTPUTS];
     uint32_t                output_ids[WAYLAND_MAX_OUTPUTS];
     uint32_t                output_scales[WAYLAND_MAX_OUTPUTS];
+    uint8_t                 output_entered[WAYLAND_MAX_OUTPUTS]; // 1 = surface is on this output
     uint32_t                output_count;
-    struct wl_output        *current_output;
-    uint32_t                current_output_scale;
+    uint32_t                integer_output_scale;                // max scale of entered outputs (fallback)
     struct wl_surface       *surface;
     struct xdg_surface      *shell_surface;
     struct xdg_toplevel     *toplevel;

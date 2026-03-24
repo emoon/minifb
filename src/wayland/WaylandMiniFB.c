@@ -217,8 +217,7 @@ destroy(SWindowData *window_data) {
     }
 
     window_data_specific->output_count = 0;
-    window_data_specific->current_output = NULL;
-    window_data_specific->current_output_scale = 1;
+    window_data_specific->integer_output_scale = 1;
 
     if (window_data_specific->compositor) {
         wl_compositor_destroy(window_data_specific->compositor);
@@ -848,6 +847,22 @@ find_output_index(SWindowData_Way *window_data_specific, struct wl_output *outpu
 }
 
 //-------------------------------------
+// Recompute the integer output scale from all outputs the surface currently
+// overlaps.  Uses the maximum scale so content is never blurry on any of them.
+// Only meaningful when fractional scale is unavailable.
+//-------------------------------------
+static void
+recompute_output_scale(SWindowData_Way *window_data_specific) {
+    uint32_t max_scale = 1;
+    for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
+        if (window_data_specific->output_entered[i] && window_data_specific->output_scales[i] > max_scale) {
+            max_scale = window_data_specific->output_scales[i];
+        }
+    }
+    window_data_specific->integer_output_scale = max_scale;
+}
+
+//-------------------------------------
 static void
 output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
                 int32_t subpixel, const char *make, const char *model, int32_t transform) {
@@ -897,8 +912,8 @@ output_scale(void *data, struct wl_output *output, int32_t factor) {
 
     uint32_t scale = (factor > 0) ? (uint32_t) factor : 1;
     window_data_specific->output_scales[idx] = scale;
-    if (window_data_specific->current_output == output) {
-        window_data_specific->current_output_scale = scale;
+    if (window_data_specific->output_entered[idx]) {
+        recompute_output_scale(window_data_specific);
     }
 }
 
@@ -950,13 +965,10 @@ surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) 
         return;
     }
 
-    window_data_specific->current_output = output;
     int idx = find_output_index(window_data_specific, output);
-    if (idx >= 0 && window_data_specific->output_scales[idx] > 0) {
-        window_data_specific->current_output_scale = window_data_specific->output_scales[idx];
-    }
-    else {
-        window_data_specific->current_output_scale = 1;
+    if (idx >= 0) {
+        window_data_specific->output_entered[idx] = 1;
+        recompute_output_scale(window_data_specific);
     }
 }
 
@@ -970,9 +982,10 @@ surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) 
         return;
     }
 
-    if (window_data_specific->current_output == output) {
-        window_data_specific->current_output = NULL;
-        window_data_specific->current_output_scale = 1;
+    int idx = find_output_index(window_data_specific, output);
+    if (idx >= 0) {
+        window_data_specific->output_entered[idx] = 0;
+        recompute_output_scale(window_data_specific);
     }
 }
 
@@ -1082,25 +1095,27 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
         if (window_data_specific->output_ids[i] == name) {
             struct wl_output *removed = window_data_specific->outputs[i];
 
-            // If this was the current output, clear it (compare before destroy)
-            if (window_data_specific->current_output == removed) {
-                window_data_specific->current_output       = NULL;
-                window_data_specific->current_output_scale  = 1;
-            }
+            bool was_entered = window_data_specific->output_entered[i];
 
             wl_output_destroy(removed);
 
             // Compact arrays by moving the last element into the gap
             uint32_t last = window_data_specific->output_count - 1;
             if (i < last) {
-                window_data_specific->outputs[i]       = window_data_specific->outputs[last];
-                window_data_specific->output_ids[i]    = window_data_specific->output_ids[last];
-                window_data_specific->output_scales[i] = window_data_specific->output_scales[last];
+                window_data_specific->outputs[i]        = window_data_specific->outputs[last];
+                window_data_specific->output_ids[i]     = window_data_specific->output_ids[last];
+                window_data_specific->output_scales[i]  = window_data_specific->output_scales[last];
+                window_data_specific->output_entered[i] = window_data_specific->output_entered[last];
             }
-            window_data_specific->outputs[last]       = NULL;
-            window_data_specific->output_ids[last]    = 0;
-            window_data_specific->output_scales[last] = 0;
+            window_data_specific->outputs[last]        = NULL;
+            window_data_specific->output_ids[last]     = 0;
+            window_data_specific->output_scales[last]  = 0;
+            window_data_specific->output_entered[last] = 0;
             window_data_specific->output_count--;
+
+            if (was_entered) {
+                recompute_output_scale(window_data_specific);
+            }
             break;
         }
     }
@@ -1474,7 +1489,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Way));
     window_data_specific->fd = -1;
-    window_data_specific->current_output_scale = 1;
+    window_data_specific->integer_output_scale = 1;
     window_data->specific = window_data_specific;
 
     window_data_specific->shm_format = -1u;
@@ -2173,9 +2188,9 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
                     y = scale;
                 }
             }
-            else if (window_data_specific->current_output_scale > 0) {
-                x = (float) window_data_specific->current_output_scale;
-                y = (float) window_data_specific->current_output_scale;
+            else if (window_data_specific->integer_output_scale > 0) {
+                x = (float) window_data_specific->integer_output_scale;
+                y = (float) window_data_specific->integer_output_scale;
             }
         }
     }
