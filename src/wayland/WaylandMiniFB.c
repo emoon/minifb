@@ -1137,8 +1137,8 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
     if (!window_data->is_initialized) {
         wl_surface_attach(window_data_specific->surface, window_data_specific->slots[0].wl_buf, 0, 0);
 
-        wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y,
-                         window_data->dst_width, window_data->dst_height);
+        wl_surface_damage(window_data_specific->surface, 0, 0,
+                         window_data->buffer_width, window_data->buffer_height);
 
         wl_surface_commit(window_data_specific->surface);
         window_data_specific->slots[0].busy = 1;
@@ -1828,7 +1828,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     memcpy(shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
-    wl_surface_damage(window_data_specific->surface, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
+    wl_surface_damage(window_data_specific->surface, 0, 0, window_data->buffer_width, window_data->buffer_height);
     struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
