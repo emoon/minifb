@@ -138,6 +138,19 @@ compose_dead_codepoint(KeySym dead_keysym, uint32_t codepoint) {
 }
 
 //-------------------------------------
+static uint32_t
+dead_keysym_to_codepoint(KeySym dead_keysym) {
+    switch (dead_keysym) {
+        case XK_dead_grave:       return 0x0060; // `
+        case XK_dead_acute:       return 0x00b4; // ´
+        case XK_dead_circumflex:  return 0x005e; // ^
+        case XK_dead_tilde:       return 0x007e; // ~
+        case XK_dead_diaeresis:   return 0x00a8; // ¨
+        default:                  return 0;
+    }
+}
+
+//-------------------------------------
 static void
 emit_codepoint_with_dead_state(SWindowData *window_data, SWindowData_X11 *window_data_specific, uint32_t codepoint) {
     if (window_data == NULL || window_data_specific == NULL || codepoint == 0) {
@@ -146,10 +159,16 @@ emit_codepoint_with_dead_state(SWindowData *window_data, SWindowData_X11 *window
 
     if (window_data_specific->pending_dead_keysym != NoSymbol) {
         uint32_t composed = compose_dead_codepoint(window_data_specific->pending_dead_keysym, codepoint);
-        window_data_specific->pending_dead_keysym = NoSymbol;
         if (composed != 0) {
             codepoint = composed;
         }
+        else {
+            uint32_t accent = dead_keysym_to_codepoint(window_data_specific->pending_dead_keysym);
+            if (accent != 0) {
+                kCall(char_input_func, accent);
+            }
+        }
+        window_data_specific->pending_dead_keysym = NoSymbol;
     }
 
     kCall(char_input_func, codepoint);
@@ -611,7 +630,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         int error_base = 0;
         if (XRRQueryExtension(window_data_specific->display, &s_xrr_event_base, &error_base)) {
             MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR event base = %d", s_xrr_event_base);
-        } else {
+        }
+        else {
             MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XRRQueryExtension failed; XRandR events unavailable.");
             s_xrr_event_base = -1;
         }

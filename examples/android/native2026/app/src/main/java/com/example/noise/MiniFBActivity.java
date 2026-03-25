@@ -55,7 +55,8 @@ public class MiniFBActivity extends NativeActivity {
             params.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
             getWindow().setAttributes(params);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {   // API 28-30
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {   // API 28-30
             WindowManager.LayoutParams params = getWindow().getAttributes();
             params.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -77,7 +78,8 @@ public class MiniFBActivity extends NativeActivity {
                 controller.setSystemBarsBehavior(
                     WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
             }
-        } else {
+        }
+        else {
             // noinspection deprecation
             getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN            |

@@ -419,9 +419,11 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         canvas.id = canvasId;
         if (document.body) {
             document.body.appendChild(canvas);
-        } else if (document.documentElement) {
+        }
+        else if (document.documentElement) {
             document.documentElement.appendChild(canvas);
-        } else {
+        }
+        else {
             return 0;
         }
     }
@@ -666,7 +668,8 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                 // DOM_DELTA_PIXEL (Chrome default): normalize to ~1.0 per notch
                 dx /= 100.0;
                 dy /= 100.0;
-            } else if (event.deltaMode === 2) {
+            }
+            else if (event.deltaMode === 2) {
                 // DOM_DELTA_PAGE: convert pages to notches
                 dx *= 3.0;
                 dy *= 3.0;
@@ -904,17 +907,23 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
         let event = events[i];
         if (event.type == "active") {
             Module._window_data_call_active_func(window_data, event.is_active ? 1 : 0);
-        } else if (event.type == "mousebutton") {
+        }
+        else if (event.type == "mousebutton") {
             Module._window_data_call_mouse_btn_func(window_data, event.button, event.mod, event.is_pressed ? 1 : 0);
-        } else if (event.type == "mousemove") {
+        }
+        else if (event.type == "mousemove") {
             Module._window_data_call_mouse_move_func(window_data, event.x, event.y);
-        } else if (event.type == "mousescroll") {
+        }
+        else if (event.type == "mousescroll") {
             Module._window_data_call_mouse_wheel_func(window_data, event.mod, event.x, event.y);
-        } else if (event.type == "keydown") {
+        }
+        else if (event.type == "keydown") {
             Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 1);
-        } else if (event.type == "keyup") {
+        }
+        else if (event.type == "keyup") {
             Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 0);
-        } else if (event.type == "char") {
+        }
+        else if (event.type == "char") {
             Module._window_data_call_char_input_func(window_data, event.code);
         }
     }
@@ -1001,7 +1010,8 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
 
     if (dstWidth === width && dstHeight === height) {
         ctx.putImageData(imageData, dstOffsetX, dstOffsetY);
-    } else {
+    }
+    else {
         if (!w.backCanvas || w.backCanvas.width !== width || w.backCanvas.height !== height) {
             w.backCanvas = document.createElement("canvas");
             w.backCanvas.width = width;
