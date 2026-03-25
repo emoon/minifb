@@ -101,8 +101,10 @@ static int hex_to_int(char **ptr, int *intValue) {
     if (hexValue >= 0) {
       *intValue = (*intValue << 4) | hexValue;
       numChars++;
-    } else
+    }
+    else {
       break;
+    }
 
     (*ptr)++;
   }
@@ -450,28 +452,34 @@ void gdb_loop(int exception_number) {
         ctx.output_buffer[1] = 'C';
         ctx.output_buffer[2] = '0';
         ctx.output_buffer[3] = 0;
-      } else if (!strcmp(ptr, "Attached")) {
+      }
+      else if (!strcmp(ptr, "Attached")) {
         gdb_debug("qAttached (Check if attached to existing or new process)\n");
         ctx.output_buffer[0] = '1';
         ctx.output_buffer[1] = 0;
-      } else if (!strcmp(ptr, "fThreadInfo")) {
+      }
+      else if (!strcmp(ptr, "fThreadInfo")) {
         gdb_debug("qfThreadInfo (Obtain a list of all active thread IDs)\n");
         ctx.output_buffer[0] = 'm';
         ctx.output_buffer[1] = '0';
         ctx.output_buffer[2] = 0;
-      } else if (!strcmp(ptr, "sThreadInfo")) {
+      }
+      else if (!strcmp(ptr, "sThreadInfo")) {
         gdb_debug("qsThreadInfo (Obtain a list of all active thread IDs, "
                   "subsequent)\n");
         ctx.output_buffer[0] = 'l';
         ctx.output_buffer[1] = 0;
-      } else if (!strcmp(ptr, "Symbol::")) {
+      }
+      else if (!strcmp(ptr, "Symbol::")) {
         gdb_debug("Symbol:: (Notify the target that GDB is prepared to serve "
                   "symbol lookup requests)\n");
         strcpy(ctx.output_buffer, "OK");
-      } else if (!strcmp(ptr, "Supported")) {
+      }
+      else if (!strcmp(ptr, "Supported")) {
         gdb_debug("qSupported");
         strcpy(ctx.output_buffer, "QStartNoAckMode+;PacketSize=1048576;");
-      } else if (!strcmp(ptr, "Offsets")) {
+      }
+      else if (!strcmp(ptr, "Offsets")) {
         gdb_debug("qOffsets");
         strcpy(ctx.output_buffer, "Text=0;Data=0;Bss=0;");
       }

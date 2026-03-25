@@ -328,7 +328,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         os_unfair_lock_lock(&window_data_specific->buffer_lock);
         free(window_data->draw_buffer);
         window_data->draw_buffer = new_draw_buffer;
-    } else {
+    }
+    else {
         os_unfair_lock_lock(&window_data_specific->buffer_lock);
     }
 
