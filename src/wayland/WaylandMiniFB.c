@@ -534,6 +534,8 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
     }
 }
 
+#if defined(WL_KEYBOARD_REPEAT_INFO_SINCE_VERSION)
+
 //-------------------------------------
 // Informs the client about the keyboard's repeat rate and delay.
 // rate:  the rate of repeating keys in characters per second
@@ -547,6 +549,8 @@ keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int
     kUnused(delay);
 }
 
+#endif
+
 //-------------------------------------
 static const struct
 wl_keyboard_listener keyboard_listener = {
@@ -555,7 +559,9 @@ wl_keyboard_listener keyboard_listener = {
     .leave       = keyboard_leave,
     .key         = keyboard_key,
     .modifiers   = keyboard_modifiers,
+#if defined(WL_KEYBOARD_REPEAT_INFO_SINCE_VERSION)
     .repeat_info = keyboard_repeat_info,
+#endif
 };
 
 //-------------------------------------
@@ -745,12 +751,18 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
     }
 }
 
+#if defined(WL_POINTER_FRAME_SINCE_VERSION)
+
 //-------------------------------------
 static void
 frame(void *data, struct wl_pointer *pointer) {
     kUnused(data);
     kUnused(pointer);
 }
+
+#endif
+
+#if defined(WL_POINTER_AXIS_SOURCE_SINCE_VERSION)
 
 //-------------------------------------
 static void
@@ -759,6 +771,10 @@ axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
     kUnused(pointer);
     kUnused(axis_source);
 }
+
+#endif
+
+#if defined(WL_POINTER_AXIS_STOP_SINCE_VERSION)
 
 //-------------------------------------
 static void
@@ -769,6 +785,10 @@ axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) 
     kUnused(axis);
 }
 
+#endif
+
+#if defined(WL_POINTER_AXIS_DISCRETE_SINCE_VERSION)
+
 //-------------------------------------
 static void
 axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
@@ -778,6 +798,8 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
     kUnused(discrete);
 }
 
+#endif
+
 //-------------------------------------
 static const struct
 wl_pointer_listener pointer_listener = {
@@ -786,10 +808,18 @@ wl_pointer_listener pointer_listener = {
     .motion        = pointer_motion,
     .button        = pointer_button,
     .axis          = pointer_axis,
+#if defined(WL_POINTER_FRAME_SINCE_VERSION)
     .frame         = frame,
+#endif
+#if defined(WL_POINTER_AXIS_SOURCE_SINCE_VERSION)
     .axis_source   = axis_source,
+#endif
+#if defined(WL_POINTER_AXIS_STOP_SINCE_VERSION)
     .axis_stop     = axis_stop,
+#endif
+#if defined(WL_POINTER_AXIS_DISCRETE_SINCE_VERSION)
     .axis_discrete = axis_discrete,
+#endif
 };
 
 //-------------------------------------
@@ -824,6 +854,8 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     }
 }
 
+#if defined(WL_SEAT_NAME_SINCE_VERSION)
+
 //-------------------------------------
 static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
@@ -833,11 +865,15 @@ seat_name(void *data, struct wl_seat *seat, const char *name) {
     MFB_LOG(MFB_LOG_DEBUG, "Seat '%s'", name);
 }
 
+#endif
+
 //-------------------------------------
 static const struct
 wl_seat_listener seat_listener = {
     .capabilities = seat_capabilities,
+#if defined(WL_SEAT_NAME_SINCE_VERSION)
     .name         = seat_name,
+#endif
 };
 
 //-------------------------------------
@@ -949,12 +985,18 @@ output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width,
     kUnused(refresh);
 }
 
+#if defined(WL_OUTPUT_DONE_SINCE_VERSION)
+
 //-------------------------------------
 static void
 output_done(void *data, struct wl_output *output) {
     kUnused(data);
     kUnused(output);
 }
+
+#endif
+
+#if defined(WL_OUTPUT_SCALE_SINCE_VERSION)
 
 //-------------------------------------
 static void
@@ -976,6 +1018,8 @@ output_scale(void *data, struct wl_output *output, int32_t factor) {
         recompute_output_scale(window_data_specific);
     }
 }
+
+#endif
 
 #if defined(WL_OUTPUT_NAME_SINCE_VERSION)
 
@@ -1005,8 +1049,12 @@ output_description(void *data, struct wl_output *output, const char *description
 static const struct wl_output_listener output_listener = {
     .geometry = output_geometry,
     .mode = output_mode,
+#if defined(WL_OUTPUT_DONE_SINCE_VERSION)
     .done = output_done,
+#endif
+#if defined(WL_OUTPUT_SCALE_SINCE_VERSION)
     .scale = output_scale,
+#endif
 #if defined(WL_OUTPUT_NAME_SINCE_VERSION)
     .name = output_name,
 #endif
@@ -1074,13 +1122,18 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (strcmp(iface, "wl_compositor") == 0) {
-        // Use version 1 for compositor (stable)
-        window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, 1);
+        uint32_t client_version = (uint32_t) wl_compositor_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, use_version);
+        window_data_specific->compositor_version = use_version;
+        MFB_LOG(MFB_LOG_TRACE, "wl_compositor: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
     else if (strcmp(iface, "wl_shm") == 0) {
-        // Use version 1 for shm (stable)
-        window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
+        uint32_t client_version = (uint32_t) wl_shm_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "wl_shm: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->shm) {
             wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
             window_data_specific->cursor_theme = wl_cursor_theme_load(NULL, 32, window_data_specific->shm);
@@ -1091,20 +1144,21 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 
     else if (strcmp(iface, "xdg_wm_base") == 0) {
-        // Bind to the maximum version supported by BOTH server and client stubs.
-        // This keeps compatibility with old compositors and avoids receiving
-        // events newer than the generated protocol code can decode.
         uint32_t client_version = (uint32_t) xdg_wm_base_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_specific->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "xdg_wm_base: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->shell) {
             xdg_wm_base_add_listener(window_data_specific->shell, &shell_listener, NULL);
         }
     }
 
     else if (strcmp(iface, "wl_seat") == 0) {
-        // Use version 1 for seat (stable)
-        window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, 1);
+        uint32_t client_version = (uint32_t) wl_seat_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, use_version);
+        window_data_specific->seat_version = use_version;
+        MFB_LOG(MFB_LOG_TRACE, "wl_seat: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->seat) {
             wl_seat_add_listener(window_data_specific->seat, &seat_listener, window_data);
         }
@@ -1114,6 +1168,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         uint32_t client_version = (uint32_t) wl_output_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
         struct wl_output *output = (struct wl_output *) wl_registry_bind(registry, id, &wl_output_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "wl_output: server=%u client=%u using=%u", version, client_version, use_version);
         if (output) {
             wl_output_add_listener(output, &output_listener, window_data);
             if (window_data_specific->output_count < WAYLAND_MAX_OUTPUTS) {
@@ -1133,6 +1188,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_specific->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
             wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "wp_fractional_scale_manager_v1: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
@@ -1140,6 +1196,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         uint32_t use_version = version < client_version ? version : client_version;
         window_data_specific->decoration_manager = (struct zxdg_decoration_manager_v1 *)
             wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "zxdg_decoration_manager_v1: server=%u client=%u using=%u", version, client_version, use_version);
     }
 }
 

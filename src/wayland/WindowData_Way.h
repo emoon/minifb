@@ -76,6 +76,7 @@ typedef struct {
     struct zxdg_decoration_manager_v1 *decoration_manager;
     struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
 
+    uint32_t                compositor_version;
     uint32_t                seat_version;
     uint32_t                shm_format;
     size_t                  shm_length;
