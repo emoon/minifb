@@ -343,6 +343,57 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
 }
 
 //-------------------------------------
+// Clear all keyboard state: key_status, mod_keys, and xkb_state.
+// Used on keyboard_leave and when the seat loses keyboard capability.
+//-------------------------------------
+static void
+reset_keyboard_state(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    memset(window_data->key_status, 0, sizeof(window_data->key_status));
+    window_data->mod_keys = 0;
+
+    if (window_data_specific != NULL
+        && window_data_specific->xkb_keymap != NULL
+        && window_data_specific->xkb_state != NULL) {
+        struct xkb_state *fresh = xkb_state_new(window_data_specific->xkb_keymap);
+        if (fresh != NULL) {
+            xkb_state_unref(window_data_specific->xkb_state);
+            window_data_specific->xkb_state = fresh;
+        }
+    }
+}
+
+//-------------------------------------
+// Rebuild keyboard state from the compositor's pressed-key list.
+// Assumes reset_keyboard_state was called first.
+// Does not emit synthetic keyboard callbacks — only synchronizes state.
+//-------------------------------------
+static void
+rebuild_keyboard_state_from_keys(SWindowData *window_data, SWindowData_Way *window_data_specific, struct wl_array *keys) {
+    if (keys == NULL) {
+        return;
+    }
+
+    uint32_t *key;
+    wl_array_for_each(key, keys) {
+        if (*key < 512) {
+            mfb_key key_code = (mfb_key) g_keycodes[*key];
+            if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
+                window_data->key_status[key_code] = true;
+            }
+            // Update xkb_state so mod_keys reflects held modifiers.
+            if (window_data_specific != NULL && window_data_specific->xkb_state != NULL) {
+                xkb_keycode_t xkb_keycode = (xkb_keycode_t) *key + 8;
+                xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, XKB_KEY_DOWN);
+            }
+        }
+    }
+
+    if (window_data_specific != NULL) {
+        update_mod_keys_from_xkb(window_data, window_data_specific);
+    }
+}
+
+//-------------------------------------
 // Notification that this seat's keyboard focus is on a certain surface.
 // serial:  serial number of the enter event
 // surface: surface gaining keyboard focus
@@ -353,10 +404,13 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(keyboard);
     kUnused(serial);
     kUnused(surface);
-    kUnused(keys);
 
     SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+
     window_data->is_active = true;
+    reset_keyboard_state(window_data, window_data_specific);
+    rebuild_keyboard_state_from_keys(window_data, window_data_specific, keys);
     kCall(active_func, true);
 }
 
@@ -372,7 +426,10 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+
     window_data->is_active = false;
+    reset_keyboard_state(window_data, window_data_specific);
     kCall(active_func, false);
 }
 
@@ -750,6 +807,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
         wl_keyboard_destroy(window_data_specific->keyboard);
         window_data_specific->keyboard = NULL;
+        reset_keyboard_state(window_data, window_data_specific);
     }
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_specific->pointer) {
