@@ -442,11 +442,13 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
         if (compose_state != NULL) {
             window_data_specific->xkb_compose_table = compose_table;
             window_data_specific->xkb_compose_state = compose_state;
-        } else {
+        }
+        else {
             xkb_compose_table_unref(compose_table);
             MFB_LOG(MFB_LOG_WARNING, "xkb_compose_state_new failed; dead keys will not work");
         }
-    } else {
+    }
+    else {
         MFB_LOG(MFB_LOG_DEBUG, "xkb_compose_table_new_from_locale('%s') failed; dead keys will not work", locale);
     }
 }
@@ -604,7 +606,8 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                         }
                         window_data_specific->compose_sequence_count = 0;
                         xkb_compose_state_reset(window_data_specific->xkb_compose_state);
-                    } else if (status == XKB_COMPOSE_CANCELLED) {
+                    }
+                    else if (status == XKB_COMPOSE_CANCELLED) {
                         // Replay buffered keycodes + cancelling key as individual characters
                         for (uint8_t i = 0; i < window_data_specific->compose_sequence_count; ++i) {
                             uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, window_data_specific->compose_sequence[i]);
@@ -617,18 +620,21 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                             kCall(char_input_func, codepoint);
                         }
                         window_data_specific->compose_sequence_count = 0;
-                    } else if (status == XKB_COMPOSE_COMPOSING) {
+                    }
+                    else if (status == XKB_COMPOSE_COMPOSING) {
                         // Dead key pending — buffer keycode, don't emit
                         if (window_data_specific->compose_sequence_count < 8) {
                             window_data_specific->compose_sequence[window_data_specific->compose_sequence_count++] = xkb_keycode;
                         }
-                    } else if (status == XKB_COMPOSE_NOTHING) {
+                    }
+                    else if (status == XKB_COMPOSE_NOTHING) {
                         uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
                         if (codepoint != 0) {
                             kCall(char_input_func, codepoint);
                         }
                     }
-                } else {
+                }
+                else {
                     uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
                     if (codepoint != 0) {
                         kCall(char_input_func, codepoint);
@@ -785,7 +791,15 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 
         wl_pointer_set_cursor(pointer, serial, window_data_specific->cursor_surface, image->hotspot_x, image->hotspot_y);
         wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
-        wl_surface_damage(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
+#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+            wl_surface_damage_buffer(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
+        }
+        else
+#endif
+        {
+            wl_surface_damage(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
+        }
         wl_surface_commit(window_data_specific->cursor_surface);
     }
     else {
@@ -876,7 +890,8 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
     uint32_t mapped = button - BTN_MOUSE + 1;
     if (mapped > MFB_MOUSE_BTN_7) {
         MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.", mapped);
-    } else {
+    }
+    else {
         window_data->mouse_button_status[mapped] = (state == 1);
         kCall(mouse_btn_func, (mfb_mouse_button) mapped, (mfb_key_mod) window_data->mod_keys, state == 1);
     }
@@ -1442,8 +1457,17 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
     if (!window_data->is_initialized) {
         wl_surface_attach(window_data_specific->surface, window_data_specific->slots[0].wl_buf, 0, 0);
 
-        wl_surface_damage(window_data_specific->surface, 0, 0,
-                         window_data->buffer_width, window_data->buffer_height);
+#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+            wl_surface_damage_buffer(window_data_specific->surface, 0, 0,
+                                     window_data->buffer_width, window_data->buffer_height);
+        }
+        else
+#endif
+        {
+            wl_surface_damage(window_data_specific->surface, 0, 0,
+                              window_data->buffer_width, window_data->buffer_height);
+        }
 
         wl_surface_commit(window_data_specific->surface);
         window_data_specific->slots[0].busy = 1;
@@ -2133,7 +2157,17 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     memcpy(shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
 
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
-    wl_surface_damage(window_data_specific->surface, 0, 0, window_data->buffer_width, window_data->buffer_height);
+#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+        wl_surface_damage_buffer(window_data_specific->surface, 0, 0,
+                                 window_data->buffer_width, window_data->buffer_height);
+    }
+    else
+#endif
+    {
+        wl_surface_damage(window_data_specific->surface, 0, 0,
+                          window_data->buffer_width, window_data->buffer_height);
+    }
     struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
@@ -2547,7 +2581,15 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
 
         wl_pointer_set_cursor(pointer, serial, cursor_surface, cursor_image->hotspot_x, cursor_image->hotspot_y);
         wl_surface_attach(cursor_surface, cursor_image_buffer, 0, 0);
-        wl_surface_damage(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
+#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+            wl_surface_damage_buffer(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
+        }
+        else
+#endif
+        {
+            wl_surface_damage(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
+        }
         wl_surface_commit(cursor_surface);
     }
     else {
