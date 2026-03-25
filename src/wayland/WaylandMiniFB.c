@@ -1469,8 +1469,8 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
                               window_data->buffer_width, window_data->buffer_height);
         }
 
-        wl_surface_commit(window_data_specific->surface);
         window_data_specific->slots[0].busy = 1;
+        wl_surface_commit(window_data_specific->surface);
         window_data->is_initialized = true;
     }
 }
@@ -2174,8 +2174,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INTERNAL_ERROR;
     }
     wl_callback_add_listener(frame_callback, &frame_listener, &done);
-    wl_surface_commit(window_data_specific->surface);
     active_slot->busy = 1;
+    wl_surface_commit(window_data_specific->surface);
 
     {
         struct wl_display *display = window_data_specific->display;
