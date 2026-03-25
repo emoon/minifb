@@ -18,6 +18,7 @@
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <xkbcommon/xkbcommon.h>
+#include <xkbcommon/xkbcommon-compose.h>
 
 #include <inttypes.h>
 #include <limits.h>
@@ -99,6 +100,14 @@ destroy_window_data(SWindowData *window_data) {
             munmap(window_data_specific->shm_base, window_data_specific->shm_length);
             window_data_specific->shm_base   = NULL;
             window_data_specific->shm_length = 0;
+        }
+
+        if (window_data_specific->xkb_compose_state) {
+            xkb_compose_state_unref(window_data_specific->xkb_compose_state);
+        }
+
+        if (window_data_specific->xkb_compose_table) {
+            xkb_compose_table_unref(window_data_specific->xkb_compose_table);
         }
 
         if (window_data_specific->xkb_state) {
@@ -270,6 +279,79 @@ static struct xdg_wm_base_listener shell_listener = {
 };
 
 //-------------------------------------
+static bool
+utf8_decode_next(const unsigned char *bytes, size_t length, size_t *index, uint32_t *codepoint) {
+    if (bytes == NULL || index == NULL || codepoint == NULL || *index >= length) {
+        return false;
+    }
+
+    unsigned char c0 = bytes[*index];
+    if (c0 < 0x80) {
+        *codepoint = c0;
+        *index += 1;
+        return true;
+    }
+
+    if ((c0 & 0xe0) == 0xc0 && *index + 1 < length) {
+        unsigned char c1 = bytes[*index + 1];
+        if ((c1 & 0xc0) == 0x80) {
+            uint32_t cp = ((uint32_t) (c0 & 0x1f) << 6) | (uint32_t) (c1 & 0x3f);
+            if (cp >= 0x80) {
+                *codepoint = cp;
+                *index += 2;
+                return true;
+            }
+        }
+    }
+    else if ((c0 & 0xf0) == 0xe0 && *index + 2 < length) {
+        unsigned char c1 = bytes[*index + 1];
+        unsigned char c2 = bytes[*index + 2];
+        if ((c1 & 0xc0) == 0x80 && (c2 & 0xc0) == 0x80) {
+            uint32_t cp = ((uint32_t) (c0 & 0x0f) << 12) |
+                          ((uint32_t) (c1 & 0x3f) << 6) |
+                          (uint32_t) (c2 & 0x3f);
+            if (cp >= 0x800 && !(cp >= 0xd800 && cp <= 0xdfff)) {
+                *codepoint = cp;
+                *index += 3;
+                return true;
+            }
+        }
+    }
+    else if ((c0 & 0xf8) == 0xf0 && *index + 3 < length) {
+        unsigned char c1 = bytes[*index + 1];
+        unsigned char c2 = bytes[*index + 2];
+        unsigned char c3 = bytes[*index + 3];
+        if ((c1 & 0xc0) == 0x80 && (c2 & 0xc0) == 0x80 && (c3 & 0xc0) == 0x80) {
+            uint32_t cp = ((uint32_t) (c0 & 0x07) << 18) |
+                          ((uint32_t) (c1 & 0x3f) << 12) |
+                          ((uint32_t) (c2 & 0x3f) << 6) |
+                          (uint32_t) (c3 & 0x3f);
+            if (cp >= 0x10000 && cp <= 0x10ffff) {
+                *codepoint = cp;
+                *index += 4;
+                return true;
+            }
+        }
+    }
+
+    *index += 1;
+    return false;
+}
+
+//-------------------------------------
+static const char *
+get_compose_locale(void) {
+    const char *locale;
+    locale = getenv("LC_ALL");
+    if (locale && *locale) return locale;
+    locale = getenv("LC_CTYPE");
+    if (locale && *locale) return locale;
+    locale = getenv("LANG");
+    if (locale && *locale) return locale;
+    return "C";
+}
+
+//-------------------------------------
 // This event provides a file descriptor to the client which can be memory-mapped
 // to provide a keyboard mapping description.
 // format: keymap format
@@ -340,6 +422,33 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
 
     window_data_specific->xkb_keymap = keymap;
     window_data_specific->xkb_state = state;
+
+    // (Re)create compose table and state for dead-key support
+    if (window_data_specific->xkb_compose_state) {
+        xkb_compose_state_unref(window_data_specific->xkb_compose_state);
+        window_data_specific->xkb_compose_state = NULL;
+    }
+    if (window_data_specific->xkb_compose_table) {
+        xkb_compose_table_unref(window_data_specific->xkb_compose_table);
+        window_data_specific->xkb_compose_table = NULL;
+    }
+
+    const char *locale = get_compose_locale();
+    struct xkb_compose_table *compose_table = xkb_compose_table_new_from_locale(
+        window_data_specific->xkb_context, locale, XKB_COMPOSE_COMPILE_NO_FLAGS);
+    if (compose_table != NULL) {
+        struct xkb_compose_state *compose_state = xkb_compose_state_new(
+            compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
+        if (compose_state != NULL) {
+            window_data_specific->xkb_compose_table = compose_table;
+            window_data_specific->xkb_compose_state = compose_state;
+        } else {
+            xkb_compose_table_unref(compose_table);
+            MFB_LOG(MFB_LOG_WARNING, "xkb_compose_state_new failed; dead keys will not work");
+        }
+    } else {
+        MFB_LOG(MFB_LOG_DEBUG, "xkb_compose_table_new_from_locale('%s') failed; dead keys will not work", locale);
+    }
 }
 
 //-------------------------------------
@@ -359,6 +468,13 @@ reset_keyboard_state(SWindowData *window_data, SWindowData_Way *window_data_spec
             xkb_state_unref(window_data_specific->xkb_state);
             window_data_specific->xkb_state = fresh;
         }
+    }
+
+    if (window_data_specific != NULL) {
+        if (window_data_specific->xkb_compose_state != NULL) {
+            xkb_compose_state_reset(window_data_specific->xkb_compose_state);
+        }
+        window_data_specific->compose_sequence_count = 0;
     }
 }
 
@@ -457,9 +573,66 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
             xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
             update_mod_keys_from_xkb(window_data, window_data_specific);
             if (is_pressed) {
-                uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
-                if (codepoint != 0) {
-                    kCall(char_input_func, codepoint);
+                if (window_data_specific->xkb_compose_state) {
+                    xkb_keysym_t keysym = xkb_state_key_get_one_sym(window_data_specific->xkb_state, xkb_keycode);
+                    xkb_compose_state_feed(window_data_specific->xkb_compose_state, keysym);
+                    enum xkb_compose_status status = xkb_compose_state_get_status(window_data_specific->xkb_compose_state);
+                    if (status == XKB_COMPOSE_COMPOSED) {
+                        bool emitted = false;
+                        xkb_keysym_t composed_sym = xkb_compose_state_get_one_sym(window_data_specific->xkb_compose_state);
+                        if (composed_sym != XKB_KEY_NoSymbol) {
+                            uint32_t codepoint = xkb_keysym_to_utf32(composed_sym);
+                            if (codepoint != 0) {
+                                kCall(char_input_func, codepoint);
+                                emitted = true;
+                            }
+                        }
+                        if (emitted == false) {
+                            // Fallback: compose result has no keysym, decode UTF-8
+                            char buf[64];
+                            int len = xkb_compose_state_get_utf8(window_data_specific->xkb_compose_state, buf, sizeof(buf));
+                            if (len > 0) {
+                                size_t actual = ((size_t) len < sizeof(buf) - 1) ? (size_t) len : sizeof(buf) - 1;
+                                size_t idx = 0;
+                                uint32_t cp;
+                                while (utf8_decode_next((const unsigned char *) buf, actual, &idx, &cp)) {
+                                    if (cp != 0) {
+                                        kCall(char_input_func, cp);
+                                    }
+                                }
+                            }
+                        }
+                        window_data_specific->compose_sequence_count = 0;
+                        xkb_compose_state_reset(window_data_specific->xkb_compose_state);
+                    } else if (status == XKB_COMPOSE_CANCELLED) {
+                        // Replay buffered keycodes + cancelling key as individual characters
+                        for (uint8_t i = 0; i < window_data_specific->compose_sequence_count; ++i) {
+                            uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, window_data_specific->compose_sequence[i]);
+                            if (codepoint != 0) {
+                                kCall(char_input_func, codepoint);
+                            }
+                        }
+                        uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
+                        if (codepoint != 0) {
+                            kCall(char_input_func, codepoint);
+                        }
+                        window_data_specific->compose_sequence_count = 0;
+                    } else if (status == XKB_COMPOSE_COMPOSING) {
+                        // Dead key pending — buffer keycode, don't emit
+                        if (window_data_specific->compose_sequence_count < 8) {
+                            window_data_specific->compose_sequence[window_data_specific->compose_sequence_count++] = xkb_keycode;
+                        }
+                    } else if (status == XKB_COMPOSE_NOTHING) {
+                        uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
+                        if (codepoint != 0) {
+                            kCall(char_input_func, codepoint);
+                        }
+                    }
+                } else {
+                    uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
+                    if (codepoint != 0) {
+                        kCall(char_input_func, codepoint);
+                    }
                 }
             }
         }

@@ -31,6 +31,8 @@ struct zxdg_toplevel_decoration_v1;
 struct xkb_context;
 struct xkb_keymap;
 struct xkb_state;
+struct xkb_compose_table;
+struct xkb_compose_state;
 
 typedef struct {
     struct wl_buffer    *wl_buf;
@@ -92,4 +94,8 @@ typedef struct {
     struct xkb_context      *xkb_context;
     struct xkb_keymap       *xkb_keymap;
     struct xkb_state        *xkb_state;
+    struct xkb_compose_table *xkb_compose_table;
+    struct xkb_compose_state *xkb_compose_state;
+    uint32_t                compose_sequence[8]; // keycodes buffered during compose
+    uint8_t                 compose_sequence_count;
 } SWindowData_Way;
