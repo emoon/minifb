@@ -575,8 +575,6 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     //kUnused(pointer);
     //kUnused(serial);
     kUnused(surface);
-    kUnused(sx);
-    kUnused(sy);
     struct wl_buffer *buffer;
     struct wl_cursor_image *image;
 
@@ -589,6 +587,10 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     window_data_specific->pointer_serial = serial;
     window_data_specific->pointer_enter_serial = serial;
     window_data_specific->pointer_serial_valid = 1;
+
+    // Synchronize stored mouse position from the enter event coordinates.
+    window_data->mouse_pos_x = wl_fixed_to_int(sx);
+    window_data->mouse_pos_y = wl_fixed_to_int(sy);
 
     if (window_data->is_cursor_visible) {
         if (window_data_specific->default_cursor == NULL ||
