@@ -544,12 +544,23 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
 }
 
 //-------------------------------------
-// A key was pressed or released. The time argument is a timestamp with
+// Emit a Unicode codepoint for the given xkb key if one exists.
+//-------------------------------------
+static void
+emit_char_input_from_xkb_state(SWindowData *window_data, SWindowData_Way *window_data_specific, xkb_keycode_t xkb_keycode) {
+    uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
+    if (codepoint != 0) {
+        kCall(char_input_func, codepoint);
+    }
+}
+
+//-------------------------------------
+// A key changed logical state. The time argument is a timestamp with
 // millisecond granularity, with an undefined base.
 // serial: serial number of the key event
 // time:   timestamp with millisecond granularity
 // key:    key that produced the event
-// state:  physical state of the key
+// state:  logical key state reported by the compositor
 //-------------------------------------
 static void
 keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
@@ -561,12 +572,50 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (key < 512) {
         mfb_key key_code = (mfb_key) g_keycodes[key];
-        bool   is_pressed = (bool) (state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        bool   is_pressed = false;
+        bool   should_emit_key_press = false;
+        bool   should_update_xkb_state = false;
+#if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
+        bool   is_repeated = false;
+#endif
+
+        switch (state) {
+            case WL_KEYBOARD_KEY_STATE_RELEASED:
+                should_update_xkb_state = true;
+                break;
+
+            case WL_KEYBOARD_KEY_STATE_PRESSED:
+                is_pressed = true;
+                should_emit_key_press = true;
+                should_update_xkb_state = true;
+                break;
+
+#if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
+            case WL_KEYBOARD_KEY_STATE_REPEATED:
+                is_pressed = true;
+                should_emit_key_press = true;
+                is_repeated = true;
+                break;
+#endif
+
+            default:
+                MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: ignoring unknown wl_keyboard key state %u.", state);
+                return;
+        }
+
         if (window_data_specific && window_data_specific->xkb_state) {
             xkb_keycode_t xkb_keycode = (xkb_keycode_t) key + 8;
-            xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
-            update_mod_keys_from_xkb(window_data, window_data_specific);
-            if (is_pressed) {
+            if (should_update_xkb_state) {
+                xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+                update_mod_keys_from_xkb(window_data, window_data_specific);
+            }
+            if (should_emit_key_press) {
+#if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
+                if (is_repeated) {
+                    emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
+                }
+                else
+#endif
                 if (window_data_specific->xkb_compose_state) {
                     xkb_keysym_t keysym = xkb_state_key_get_one_sym(window_data_specific->xkb_state, xkb_keycode);
                     xkb_compose_state_feed(window_data_specific->xkb_compose_state, keysym);
@@ -620,17 +669,11 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                         }
                     }
                     else if (status == XKB_COMPOSE_NOTHING) {
-                        uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
-                        if (codepoint != 0) {
-                            kCall(char_input_func, codepoint);
-                        }
+                        emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
                     }
                 }
                 else {
-                    uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
-                    if (codepoint != 0) {
-                        kCall(char_input_func, codepoint);
-                    }
+                    emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
                 }
             }
         }
@@ -973,6 +1016,38 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
 
 #endif
 
+#if defined(WL_POINTER_AXIS_VALUE120_SINCE_VERSION)
+
+//-------------------------------------
+// High-resolution wheel scroll information.
+// Currently unused; MiniFB keeps handling scroll through axis/axis_discrete.
+//-------------------------------------
+static void
+axis_value120(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t value120) {
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(axis);
+    kUnused(value120);
+}
+
+#endif
+
+#if defined(WL_POINTER_AXIS_RELATIVE_DIRECTION_SINCE_VERSION)
+
+//-------------------------------------
+// Physical direction of the entity causing the axis motion.
+// Currently unused; MiniFB consumes logical scroll direction only.
+//-------------------------------------
+static void
+axis_relative_direction(void *data, struct wl_pointer *pointer, uint32_t axis, uint32_t direction) {
+    kUnused(data);
+    kUnused(pointer);
+    kUnused(axis);
+    kUnused(direction);
+}
+
+#endif
+
 //-------------------------------------
 static const struct
 wl_pointer_listener pointer_listener = {
@@ -992,6 +1067,12 @@ wl_pointer_listener pointer_listener = {
 #endif
 #if defined(WL_POINTER_AXIS_DISCRETE_SINCE_VERSION)
     .axis_discrete = axis_discrete,
+#endif
+#if defined(WL_POINTER_AXIS_VALUE120_SINCE_VERSION)
+    .axis_value120 = axis_value120,
+#endif
+#if defined(WL_POINTER_AXIS_RELATIVE_DIRECTION_SINCE_VERSION)
+    .axis_relative_direction = axis_relative_direction,
 #endif
 };
 
@@ -1270,10 +1351,46 @@ surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) 
     }
 }
 
+#if defined(WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION)
+
+//-------------------------------------
+// Compositor-preferred integer buffer scale for this surface.
+// Currently unused; the backend derives scale from fractional-scale/output data.
+//-------------------------------------
+static void
+surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t factor) {
+    kUnused(data);
+    kUnused(surface);
+    kUnused(factor);
+}
+
+#endif
+
+#if defined(WL_SURFACE_PREFERRED_BUFFER_TRANSFORM_SINCE_VERSION)
+
+//-------------------------------------
+// Compositor-preferred buffer transform for this surface.
+// Currently unused; the backend does not render with transformed buffers.
+//-------------------------------------
+static void
+surface_preferred_buffer_transform(void *data, struct wl_surface *surface, uint32_t transform) {
+    kUnused(data);
+    kUnused(surface);
+    kUnused(transform);
+}
+
+#endif
+
 //-------------------------------------
 static const struct wl_surface_listener surface_listener = {
     .enter = surface_enter,
     .leave = surface_leave,
+#if defined(WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION)
+    .preferred_buffer_scale = surface_preferred_buffer_scale,
+#endif
+#if defined(WL_SURFACE_PREFERRED_BUFFER_TRANSFORM_SINCE_VERSION)
+    .preferred_buffer_transform = surface_preferred_buffer_transform,
+#endif
 };
 
 //-------------------------------------
