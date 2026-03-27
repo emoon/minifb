@@ -55,6 +55,20 @@ static void slot_destroy(SWaylandBufferSlot *slot);
 static bool slot_ensure_buffer(SWaylandBufferSlot *slot, struct wl_shm *shm, uint32_t shm_format, uint32_t surface_w, uint32_t surface_h);
 
 //-------------------------------------
+static inline void
+surface_damage(struct wl_surface *surface, uint32_t compositor_version,
+               int32_t x, int32_t y, int32_t w, int32_t h) {
+    kUnused(compositor_version);
+#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+    if (compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+        wl_surface_damage_buffer(surface, x, y, w, h);
+        return;
+    }
+#endif
+    wl_surface_damage(surface, x, y, w, h);
+}
+
+//-------------------------------------
 static void
 update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_specific) {
     if (window_data == NULL || window_data_specific == NULL || window_data_specific->xkb_state == NULL) {
@@ -769,15 +783,8 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 
         wl_pointer_set_cursor(pointer, serial, window_data_specific->cursor_surface, image->hotspot_x, image->hotspot_y);
         wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
-#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-            wl_surface_damage_buffer(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
-        }
-        else
-#endif
-        {
-            wl_surface_damage(window_data_specific->cursor_surface, 0, 0, image->width, image->height);
-        }
+        surface_damage(window_data_specific->cursor_surface, window_data_specific->compositor_version,
+                       0, 0, image->width, image->height);
         wl_surface_commit(window_data_specific->cursor_surface);
     }
     else {
@@ -1446,15 +1453,8 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
         else {
             wl_surface_attach(window_data_specific->surface, slot->wl_buf, 0, 0);
 
-#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-            if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-                wl_surface_damage_buffer(window_data_specific->surface, 0, 0, init_w, init_h);
-            }
-            else
-#endif
-            {
-                wl_surface_damage(window_data_specific->surface, 0, 0, init_w, init_h);
-            }
+            surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
+                           0, 0, init_w, init_h);
 
             slot->busy = 1;
             wl_surface_commit(window_data_specific->surface);
@@ -2178,17 +2178,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
-#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-    if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-        wl_surface_damage_buffer(window_data_specific->surface, 0, 0,
-                                 surface_w, surface_h);
-    }
-    else
-#endif
-    {
-        wl_surface_damage(window_data_specific->surface, 0, 0,
-                          surface_w, surface_h);
-    }
+    surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
+                   0, 0, surface_w, surface_h);
     struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
@@ -2602,15 +2593,8 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
 
         wl_pointer_set_cursor(pointer, serial, cursor_surface, cursor_image->hotspot_x, cursor_image->hotspot_y);
         wl_surface_attach(cursor_surface, cursor_image_buffer, 0, 0);
-#if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-            wl_surface_damage_buffer(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
-        }
-        else
-#endif
-        {
-            wl_surface_damage(cursor_surface, 0, 0, cursor_image->width, cursor_image->height);
-        }
+        surface_damage(cursor_surface, window_data_specific->compositor_version,
+                       0, 0, cursor_image->width, cursor_image->height);
         wl_surface_commit(cursor_surface);
     }
     else {
