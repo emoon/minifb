@@ -2079,12 +2079,16 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = buffer_stride;
     }
 
-    // --- Capture surface dimensions for the entire frame ---
+    // --- Capture surface and viewport dimensions for the entire frame ---
     // Configure events can arrive during dispatch loops later in this function,
-    // changing window_width/height.  Capture once here so pool, slots, and
-    // pixel composition all use consistent dimensions.
-    const uint32_t surface_w = window_data->window_width;
-    const uint32_t surface_h = window_data->window_height;
+    // changing window_width/height and dst_* via resize_dst.  Capture once here
+    // so pool, slots, and pixel composition all use consistent dimensions.
+    const uint32_t surface_w    = window_data->window_width;
+    const uint32_t surface_h    = window_data->window_height;
+    const uint32_t dst_offset_x = window_data->dst_offset_x;
+    const uint32_t dst_offset_y = window_data->dst_offset_y;
+    const uint32_t dst_width    = window_data->dst_width;
+    const uint32_t dst_height   = window_data->dst_height;
 
     // --- Acquire a free slot, rebuilding its pool+buffer if dimensions changed ---
     // Each slot owns its own wl_shm_pool, so resizing one slot never affects
@@ -2154,12 +2158,12 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     // --- Compose pixels into the presentation buffer ---
     uint32_t *shm_ptr = active_slot->shm_ptr;
 
-    if (window_data->buffer_width == window_data->dst_width
-        && window_data->buffer_height == window_data->dst_height
-        && window_data->dst_offset_x == 0
-        && window_data->dst_offset_y == 0
-        && surface_w == window_data->dst_width
-        && surface_h == window_data->dst_height) {
+    if (window_data->buffer_width == dst_width
+        && window_data->buffer_height == dst_height
+        && dst_offset_x == 0
+        && dst_offset_y == 0
+        && surface_w == dst_width
+        && surface_h == dst_height) {
         // Fast path: source fills the entire surface, no scaling needed.
         memcpy(shm_ptr, buffer, (size_t) surface_w * surface_h * sizeof(uint32_t));
     }
@@ -2169,8 +2173,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         stretch_image(
             (uint32_t *) buffer, 0, 0,
             window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
-            shm_ptr, window_data->dst_offset_x, window_data->dst_offset_y,
-            window_data->dst_width, window_data->dst_height, surface_w);
+            shm_ptr, dst_offset_x, dst_offset_y,
+            dst_width, dst_height, surface_w);
     }
 
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
