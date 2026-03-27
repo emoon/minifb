@@ -35,11 +35,14 @@ struct xkb_compose_table;
 struct xkb_compose_state;
 
 typedef struct {
+    struct wl_shm_pool  *pool;
     struct wl_buffer    *wl_buf;
-    size_t               offset;          // byte offset within the pool
-    unsigned             width;           // dimensions this wl_buf was created with
+    uint32_t            *shm_ptr;       // mmap'd pointer for this slot
+    int                  fd;
+    size_t               pool_size;
+    unsigned             width;         // dimensions this wl_buf was created with
     unsigned             height;
-    uint8_t              busy;            // 1 = compositor owns it
+    uint8_t              busy;          // 1 = compositor owns it
 } SWaylandBufferSlot;
 
 typedef struct {
@@ -62,7 +65,6 @@ typedef struct {
     uint8_t                 request_maximized;
 
     struct wl_shm           *shm;
-    struct wl_shm_pool      *shm_pool;
     struct wp_fractional_scale_manager_v1 *fractional_scale_manager;
     struct wp_fractional_scale_v1 *fractional_scale;
     uint32_t                preferred_scale_120;
@@ -81,14 +83,8 @@ typedef struct {
     uint32_t                compositor_version;
     uint32_t                seat_version;
     uint32_t                shm_format;
-    size_t                  shm_length;
-    size_t                  shm_pool_size;
-    size_t                  single_buffer_size;
-    uint32_t                *shm_base;
     SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
     int                     front_slot;
-
-    int                     fd;
 
     struct mfb_timer        *timer;
     struct xkb_context      *xkb_context;
