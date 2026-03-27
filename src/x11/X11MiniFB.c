@@ -38,10 +38,6 @@ static int s_xrr_event_base = -1;
 void init_keycodes(SWindowData_X11 *window_data_specific);
 Cursor create_blank_cursor(Display *display, Window window);
 
-extern void
-stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
-              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
-
 //-------------------------------------
 int translate_key(int scancode);
 int translate_mod(int state);

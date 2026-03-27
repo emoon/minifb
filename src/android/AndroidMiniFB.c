@@ -57,11 +57,6 @@ android_mfb_log_sink(const mfb_log_info *info, const char *tag, const char *mess
 }
 
 //-------------------------------------
-extern void
-stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
-              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
-
-//-------------------------------------
 extern int
 main(int argc, char *argv[]);
 

@@ -79,6 +79,11 @@ extern "C" {
     void resize_dst(SWindowData *window_data, uint32_t width, uint32_t height);
     void set_target_fps_aux();
 
+    void stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y,
+                       uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
+                       uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y,
+                       uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
+
 #if defined(__cplusplus)
 }
 #endif
