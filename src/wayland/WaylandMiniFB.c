@@ -49,6 +49,11 @@
 //-------------------------------------
 void init_keycodes();
 
+// Forward declarations for functions used in destroy/configure
+// but defined later in the file.
+static void slot_destroy(SWaylandBufferSlot *slot);
+static bool slot_ensure_buffer(SWaylandBufferSlot *slot, struct wl_shm *shm, uint32_t shm_format, uint32_t surface_w, uint32_t surface_h);
+
 //-------------------------------------
 static void
 update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_specific) {
@@ -86,20 +91,9 @@ destroy_window_data(SWindowData *window_data) {
 
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (window_data_specific != NULL) {
-        // Destroy all buffer slots.
+        // Destroy all buffer slots (pool, buffer, mmap, fd per slot).
         for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-            SWaylandBufferSlot *slot = &window_data_specific->slots[i];
-            if (slot->wl_buf) {
-                wl_buffer_destroy(slot->wl_buf);
-                slot->wl_buf = NULL;
-            }
-            slot->busy = 0;
-        }
-
-        if (window_data_specific->shm_base && window_data_specific->shm_base != MAP_FAILED && window_data_specific->shm_length > 0) {
-            munmap(window_data_specific->shm_base, window_data_specific->shm_length);
-            window_data_specific->shm_base   = NULL;
-            window_data_specific->shm_length = 0;
+            slot_destroy(&window_data_specific->slots[i]);
         }
 
         if (window_data_specific->xkb_compose_state) {
@@ -187,15 +181,9 @@ destroy(SWindowData *window_data) {
         window_data_specific->surface = NULL;
     }
 
-    // Destroy wl_buffer proxies before pool/display disconnect.
-    // destroy_window_data handles the munmap; here we only release the protocol objects.
+    // Destroy all buffer slots (protocol objects + resources) before display disconnect.
     for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-        SWaylandBufferSlot *slot = &window_data_specific->slots[i];
-        if (slot->wl_buf) {
-            wl_buffer_destroy(slot->wl_buf);
-            slot->wl_buf = NULL;
-        }
-        slot->busy = 0;
+        slot_destroy(&window_data_specific->slots[i]);
     }
 
     if (window_data_specific->cursor_surface) {
@@ -206,11 +194,6 @@ destroy(SWindowData *window_data) {
     if (window_data_specific->cursor_theme) {
         wl_cursor_theme_destroy(window_data_specific->cursor_theme);
         window_data_specific->cursor_theme = NULL;
-    }
-
-    if (window_data_specific->shm_pool) {
-        wl_shm_pool_destroy(window_data_specific->shm_pool);
-        window_data_specific->shm_pool = NULL;
     }
 
     if (window_data_specific->shm) {
@@ -256,11 +239,6 @@ destroy(SWindowData *window_data) {
     if (window_data_specific->display) {
         wl_display_disconnect(window_data_specific->display);
         window_data_specific->display = NULL;
-    }
-
-    if (window_data_specific->fd >= 0) {
-        close(window_data_specific->fd);
-        window_data_specific->fd = -1;
     }
 
     destroy_window_data(window_data);
@@ -1453,25 +1431,35 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
         window_data_specific->startup_state_applied = 1;
     }
 
-    // On first configure, attach slot 0 and commit so the compositor shows the surface.
+    // On first configure, adapt slot 0 to the compositor's chosen size and
+    // attach it so the surface becomes visible.
     if (!window_data->is_initialized) {
-        wl_surface_attach(window_data_specific->surface, window_data_specific->slots[0].wl_buf, 0, 0);
+        uint32_t init_w = window_data->window_width;
+        uint32_t init_h = window_data->window_height;
+
+        SWaylandBufferSlot *slot = &window_data_specific->slots[0];
+        if (slot_ensure_buffer(slot, window_data_specific->shm,
+                               window_data_specific->shm_format, init_w, init_h) == false) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create initial buffer in first configure.");
+            window_data->close = true;
+        }
+        else {
+            wl_surface_attach(window_data_specific->surface, slot->wl_buf, 0, 0);
 
 #if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-        if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-            wl_surface_damage_buffer(window_data_specific->surface, 0, 0,
-                                     window_data->buffer_width, window_data->buffer_height);
-        }
-        else
+            if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+                wl_surface_damage_buffer(window_data_specific->surface, 0, 0, init_w, init_h);
+            }
+            else
 #endif
-        {
-            wl_surface_damage(window_data_specific->surface, 0, 0,
-                              window_data->buffer_width, window_data->buffer_height);
-        }
+            {
+                wl_surface_damage(window_data_specific->surface, 0, 0, init_w, init_h);
+            }
 
-        window_data_specific->slots[0].busy = 1;
-        wl_surface_commit(window_data_specific->surface);
-        window_data->is_initialized = true;
+            slot->busy = 1;
+            wl_surface_commit(window_data_specific->surface);
+            window_data->is_initialized = true;
+        }
     }
 }
 
@@ -1568,34 +1556,116 @@ static const struct wl_buffer_listener buffer_listener = {
 };
 
 //-------------------------------------
-// Rebuild a slot's wl_buffer if its dimensions are stale or the buffer was
-// destroyed by a release callback.  Returns true on success (or if no rebuild
-// was needed), false if buffer creation failed.
+// Destroy a slot's resources (pool, buffer, mmap, fd).
 //-------------------------------------
-static bool
-slot_ensure_buffer(SWaylandBufferSlot *slot, int idx,
-                   SWindowData *window_data, SWindowData_Way *window_data_specific) {
-    if (slot->wl_buf != NULL
-        && slot->width == window_data->buffer_width
-        && slot->height == window_data->buffer_height) {
-        return true;
-    }
-
+static void
+slot_destroy(SWaylandBufferSlot *slot) {
     if (slot->wl_buf) {
         wl_buffer_destroy(slot->wl_buf);
         slot->wl_buf = NULL;
     }
-    slot->offset = (size_t) idx * window_data_specific->single_buffer_size;
-    slot->wl_buf = wl_shm_pool_create_buffer(window_data_specific->shm_pool,
-                        (int32_t) slot->offset,
-                        window_data->buffer_width, window_data->buffer_height,
-                        window_data->buffer_stride, window_data_specific->shm_format);
-    if (slot->wl_buf == NULL) {
+    if (slot->pool) {
+        wl_shm_pool_destroy(slot->pool);
+        slot->pool = NULL;
+    }
+    if (slot->shm_ptr && slot->shm_ptr != MAP_FAILED && slot->pool_size > 0) {
+        munmap(slot->shm_ptr, slot->pool_size);
+        slot->shm_ptr = NULL;
+    }
+    if (slot->fd >= 0) {
+        close(slot->fd);
+        slot->fd = -1;
+    }
+    slot->pool_size = 0;
+    slot->width     = 0;
+    slot->height    = 0;
+    slot->busy      = 0;
+}
+
+//-------------------------------------
+// Rebuild a slot's pool+buffer if its dimensions are stale.
+// Each slot owns its own fd, mmap, and wl_shm_pool — no shared offsets.
+// Returns true on success (or if no rebuild was needed).
+//-------------------------------------
+static bool
+slot_ensure_buffer(SWaylandBufferSlot *slot, struct wl_shm *shm,
+                   uint32_t shm_format, uint32_t surface_w, uint32_t surface_h) {
+    if (slot->wl_buf != NULL
+        && slot->width == surface_w
+        && slot->height == surface_h) {
+        return true;
+    }
+
+    // Tear down previous resources for this slot.
+    slot_destroy(slot);
+
+    uint32_t stride    = 0;
+    size_t   pool_size = 0;
+    if (calculate_buffer_layout(surface_w, surface_h, &stride, &pool_size) == false) {
         return false;
     }
+
+    if (pool_size > (size_t) INT_MAX) {
+        return false;
+    }
+
+    // Create anonymous shared memory.
+    char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
+    if (xdg_rt_dir == NULL) {
+        return false;
+    }
+    char shmfile[PATH_MAX];
+    if (snprintf(shmfile, sizeof(shmfile), "%s/mfb-slot-XXXXXX", xdg_rt_dir) >= (int) sizeof(shmfile)) {
+        return false;
+    }
+    slot->fd = mkstemp(shmfile);
+    if (slot->fd == -1) {
+        return false;
+    }
+    unlink(shmfile);
+
+    if (ftruncate(slot->fd, (off_t) pool_size) == -1) {
+        close(slot->fd);
+        slot->fd = -1;
+        return false;
+    }
+
+    slot->shm_ptr = (uint32_t *) mmap(NULL, pool_size, PROT_WRITE, MAP_SHARED, slot->fd, 0);
+    if (slot->shm_ptr == MAP_FAILED) {
+        slot->shm_ptr = NULL;
+        close(slot->fd);
+        slot->fd = -1;
+        return false;
+    }
+    slot->pool_size = pool_size;
+
+    slot->pool = wl_shm_create_pool(shm, slot->fd, (int) pool_size);
+    if (slot->pool == NULL) {
+        munmap(slot->shm_ptr, pool_size);
+        slot->shm_ptr = NULL;
+        close(slot->fd);
+        slot->fd = -1;
+        slot->pool_size = 0;
+        return false;
+    }
+
+    slot->wl_buf = wl_shm_pool_create_buffer(slot->pool, 0,
+                        surface_w, surface_h,
+                        stride, shm_format);
+    if (slot->wl_buf == NULL) {
+        wl_shm_pool_destroy(slot->pool);
+        slot->pool = NULL;
+        munmap(slot->shm_ptr, pool_size);
+        slot->shm_ptr = NULL;
+        close(slot->fd);
+        slot->fd = -1;
+        slot->pool_size = 0;
+        return false;
+    }
+
     wl_buffer_add_listener(slot->wl_buf, &buffer_listener, slot);
-    slot->width  = window_data->buffer_width;
-    slot->height = window_data->buffer_height;
+    slot->width  = surface_w;
+    slot->height = surface_h;
     return true;
 }
 
@@ -1603,82 +1673,28 @@ slot_ensure_buffer(SWaylandBufferSlot *slot, int idx,
 static bool
 create_shm_buffer(SWindowData *window_data, SWindowData_Way *window_data_specific,
                   unsigned width, unsigned height, uint32_t buffer_stride, size_t buffer_total_bytes) {
-    char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
-    if (xdg_rt_dir == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: XDG_RUNTIME_DIR is not set.");
-        return false;
-    }
-
-    char shmfile[PATH_MAX];
-    uint32_t ret = snprintf(shmfile, sizeof(shmfile), "%s/WaylandMiniFB-SHM-XXXXXX", xdg_rt_dir);
-    if (ret >= sizeof(shmfile)) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: shared memory path exceeds PATH_MAX.");
-        return false;
-    }
-
-    window_data_specific->fd = mkstemp(shmfile);
-    if (window_data_specific->fd == -1) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mkstemp failed for shared memory file (%s).", strerror(errno));
-        return false;
-    }
-    unlink(shmfile);
-
-    // Pool holds WAYLAND_BUFFER_SLOTS buffers so that the compositor can hold
-    // one while the client writes the next.
-    size_t pool_size = (size_t) WAYLAND_BUFFER_SLOTS * buffer_total_bytes;
-    if (pool_size / WAYLAND_BUFFER_SLOTS != buffer_total_bytes || pool_size > (size_t) INT_MAX) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: requested window buffer size exceeds Wayland pool limits.");
-        return false;
-    }
-
-    int pool_size_i = (int) pool_size;
-
-    if (ftruncate(window_data_specific->fd, (off_t) pool_size) == -1) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed for shared memory buffer (%s).", strerror(errno));
-        return false;
-    }
-
-    uint32_t *shm_base = (uint32_t *) mmap(NULL, pool_size, PROT_WRITE, MAP_SHARED, window_data_specific->fd, 0);
-    if (shm_base == MAP_FAILED) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed for shared memory buffer (%s).", strerror(errno));
-        return false;
-    }
-
-    window_data_specific->shm_base        = shm_base;
-    window_data_specific->shm_length       = pool_size;
-    window_data_specific->shm_pool_size    = pool_size;
-    window_data_specific->single_buffer_size = buffer_total_bytes;
+    kUnused(buffer_stride);
+    kUnused(buffer_total_bytes);
 
     window_data->window_width  = width;
     window_data->window_height = height;
     window_data->buffer_width  = width;
     window_data->buffer_height = height;
-    window_data->buffer_stride = buffer_stride;
+    window_data->buffer_stride = width * sizeof(uint32_t);
     calc_dst_factor(window_data, width, height);
 
     window_data->is_cursor_visible = true;
 
-    window_data_specific->shm_pool = wl_shm_create_pool(window_data_specific->shm, window_data_specific->fd, pool_size_i);
-    if (window_data_specific->shm_pool == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_create_pool failed.");
-        return false;
-    }
-
-    // Create one wl_buffer per slot at different offsets within the pool.
+    // Each slot creates its own pool on demand via slot_ensure_buffer.
     for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
         SWaylandBufferSlot *slot = &window_data_specific->slots[i];
-        slot->offset = (size_t) i * buffer_total_bytes;
-        slot->wl_buf = wl_shm_pool_create_buffer(window_data_specific->shm_pool,
-                            (int32_t) slot->offset, width, height,
-                            buffer_stride, window_data_specific->shm_format);
-        if (slot->wl_buf == NULL) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer failed for slot %d.", i);
+        memset(slot, 0, sizeof(*slot));
+        slot->fd = -1;
+        if (!slot_ensure_buffer(slot, window_data_specific->shm,
+                                window_data_specific->shm_format, width, height)) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: initial buffer creation failed for slot %d.", i);
             return false;
         }
-        wl_buffer_add_listener(slot->wl_buf, &buffer_listener, slot);
-        slot->width  = width;
-        slot->height = height;
-        slot->busy   = 0;
     }
     window_data_specific->front_slot = 0;
 
@@ -1752,11 +1768,16 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
     wl_surface_commit(window_data_specific->surface);
 
     // Process events until we get the configure event and the surface is mapped
-    while (!window_data->is_initialized) {
+    while (window_data->is_initialized == false && window_data->close == false) {
         if (wl_display_dispatch(window_data_specific->display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch failed while waiting for initial configure event.");
             return false;
         }
+    }
+
+    if (window_data->close) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: initialization failed during configure handshake.");
+        return false;
     }
 
     return true;
@@ -1802,8 +1823,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Way));
-    window_data_specific->fd = -1;
     window_data_specific->integer_output_scale = 1;
+    for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
+        window_data_specific->slots[i].fd = -1;
+    }
     window_data->specific = window_data_specific;
 
     window_data_specific->shm_format = -1u;
@@ -2049,49 +2072,23 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INTERNAL_ERROR;
     }
 
-    // --- Resize: grow pool if needed, update target dimensions ---
-    // Slot wl_buffers are rebuilt lazily in the acquire phase, so multiple
-    // resizes between frames collapse into a single rebuild per slot.
+    // --- Update source buffer dimensions (user-provided) ---
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
-        size_t new_pool_size = (size_t) WAYLAND_BUFFER_SLOTS * buffer_total_bytes;
-        if (new_pool_size / WAYLAND_BUFFER_SLOTS != buffer_total_bytes || new_pool_size > (size_t) INT_MAX) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: resize buffer size exceeds Wayland pool limits.");
-            return MFB_STATE_INTERNAL_ERROR;
-        }
-
-        // Wayland pools are grow-only: only resize if the new size is larger.
-        if (new_pool_size > window_data_specific->shm_pool_size) {
-            if (ftruncate(window_data_specific->fd, (off_t) new_pool_size) == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: ftruncate failed while resizing shared memory buffer (%s).", strerror(errno));
-                return MFB_STATE_INTERNAL_ERROR;
-            }
-
-            uint32_t *old_base   = window_data_specific->shm_base;
-            size_t    old_length = window_data_specific->shm_length;
-            uint32_t *new_base   = (uint32_t *) mmap(NULL, new_pool_size, PROT_WRITE, MAP_SHARED, window_data_specific->fd, 0);
-            if (new_base == MAP_FAILED) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mmap failed while resizing shared memory buffer (%s).", strerror(errno));
-                return MFB_STATE_INTERNAL_ERROR;
-            }
-            if (old_base && old_base != MAP_FAILED && old_length > 0) {
-                munmap(old_base, old_length);
-            }
-            window_data_specific->shm_base     = new_base;
-            window_data_specific->shm_length   = new_pool_size;
-
-            wl_shm_pool_resize(window_data_specific->shm_pool, (int) new_pool_size);
-            window_data_specific->shm_pool_size = new_pool_size;
-        }
-
-        window_data_specific->single_buffer_size = buffer_total_bytes;
         window_data->buffer_width  = width;
         window_data->buffer_height = height;
         window_data->buffer_stride = buffer_stride;
-        // Keep destination rectangle in window space. Changing input buffer size
-        // should not recompute dst from buffer dimensions.
     }
 
-    // --- Acquire a free slot, rebuilding stale wl_buffers on demand ---
+    // --- Capture surface dimensions for the entire frame ---
+    // Configure events can arrive during dispatch loops later in this function,
+    // changing window_width/height.  Capture once here so pool, slots, and
+    // pixel composition all use consistent dimensions.
+    const uint32_t surface_w = window_data->window_width;
+    const uint32_t surface_h = window_data->window_height;
+
+    // --- Acquire a free slot, rebuilding its pool+buffer if dimensions changed ---
+    // Each slot owns its own wl_shm_pool, so resizing one slot never affects
+    // another — no overlap on shrink, no shared offsets.
     SWaylandBufferSlot *active_slot = NULL;
     bool ensure_failed = false;
     {
@@ -2103,7 +2100,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
             if (slot->busy) {
                 continue;
             }
-            if (!slot_ensure_buffer(slot, idx, window_data, window_data_specific)) {
+            if (!slot_ensure_buffer(slot, window_data_specific->shm,
+                                    window_data_specific->shm_format, surface_w, surface_h)) {
                 MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed for slot %d.", idx);
                 ensure_failed = true;
                 continue;
@@ -2128,7 +2126,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
                 if (slot->busy) {
                     continue;
                 }
-                if (!slot_ensure_buffer(slot, i, window_data, window_data_specific)) {
+                if (!slot_ensure_buffer(slot, window_data_specific->shm,
+                                        window_data_specific->shm_format, surface_w, surface_h)) {
                     ensure_failed = true;
                     continue;
                 }
@@ -2152,21 +2151,39 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_OK;
     }
 
-    // --- Copy pixels and submit frame ---
-    uint32_t *shm_ptr = (uint32_t *) ((uint8_t *) window_data_specific->shm_base + active_slot->offset);
-    memcpy(shm_ptr, buffer, window_data->buffer_stride * window_data->buffer_height);
+    // --- Compose pixels into the presentation buffer ---
+    uint32_t *shm_ptr = active_slot->shm_ptr;
+
+    if (window_data->buffer_width == window_data->dst_width
+        && window_data->buffer_height == window_data->dst_height
+        && window_data->dst_offset_x == 0
+        && window_data->dst_offset_y == 0
+        && surface_w == window_data->dst_width
+        && surface_h == window_data->dst_height) {
+        // Fast path: source fills the entire surface, no scaling needed.
+        memcpy(shm_ptr, buffer, (size_t) surface_w * surface_h * sizeof(uint32_t));
+    }
+    else {
+        // Clear the surface buffer, then stretch the source into the viewport.
+        memset(shm_ptr, 0, (size_t) surface_w * surface_h * sizeof(uint32_t));
+        stretch_image(
+            (uint32_t *) buffer, 0, 0,
+            window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
+            shm_ptr, window_data->dst_offset_x, window_data->dst_offset_y,
+            window_data->dst_width, window_data->dst_height, surface_w);
+    }
 
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
 #if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
     if (window_data_specific->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
         wl_surface_damage_buffer(window_data_specific->surface, 0, 0,
-                                 window_data->buffer_width, window_data->buffer_height);
+                                 surface_w, surface_h);
     }
     else
 #endif
     {
         wl_surface_damage(window_data_specific->surface, 0, 0,
-                          window_data->buffer_width, window_data->buffer_height);
+                          surface_w, surface_h);
     }
     struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
     if (!frame_callback) {
