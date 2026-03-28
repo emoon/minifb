@@ -661,6 +661,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                             kCall(char_input_func, codepoint);
                         }
                         window_data_specific->compose_sequence_count = 0;
+                        xkb_compose_state_reset(window_data_specific->xkb_compose_state);
                     }
                     else if (status == XKB_COMPOSE_COMPOSING) {
                         // Dead key pending — buffer keycode, don't emit
@@ -1079,8 +1080,6 @@ wl_pointer_listener pointer_listener = {
 //-------------------------------------
 static void
 seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps) {
-    kUnused(data);
-
     SWindowData       *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_specific->keyboard) {
@@ -2440,25 +2439,23 @@ mfb_wait_sync(struct mfb_window *window) {
             break;
 
         double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
+        int timeout_ms = 0;
 
         // Leave ~1 ms margin to avoid oversleep
         if (remaining_ms > 1.5) {
-            int timeout_ms = (int) (remaining_ms - 1.0);
+            timeout_ms = (int) (remaining_ms - 1.0);
             if (timeout_ms < 0)
                 timeout_ms = 0;
-
-            if (wayland_poll_dispatch(display, timeout_ms) == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during sync loop.");
-                return false;
-            }
-        }
-        else {
-            sched_yield(); // or nanosleep((const struct timespec){0, 0}, NULL);
         }
 
-        if (wl_display_dispatch_pending(display) == -1) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed during sync loop.");
+        int poll_res = wayland_poll_dispatch(display, timeout_ms);
+        if (poll_res == -1) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during sync loop.");
             return false;
+        }
+
+        if (timeout_ms == 0 && poll_res == 0) {
+            sched_yield(); // or nanosleep((const struct timespec){0, 0}, NULL);
         }
 
         if (window_data->close) {
