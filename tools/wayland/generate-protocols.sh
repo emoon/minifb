@@ -107,4 +107,16 @@ if [ -f "$PROTOCOL_DIR/staging/fractional-scale/fractional-scale-v1.xml" ]; then
       "$OUTPUT_DIR/fractional-scale-v1-protocol.c"
 fi
 
+# Viewporter (stable)
+if [ -f "$PROTOCOL_DIR/stable/viewporter/viewporter.xml" ]; then
+    echo "Generating viewporter..."
+    wayland-scanner client-header \
+      "$PROTOCOL_DIR/stable/viewporter/viewporter.xml" \
+      "$OUTPUT_DIR/viewporter-client-protocol.h"
+
+    wayland-scanner private-code \
+      "$PROTOCOL_DIR/stable/viewporter/viewporter.xml" \
+      "$OUTPUT_DIR/viewporter-protocol.c"
+fi
+
 echo "Protocols successfully generated in $OUTPUT_DIR"

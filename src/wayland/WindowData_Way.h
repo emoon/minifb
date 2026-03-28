@@ -26,6 +26,8 @@ struct xdg_surface;
 struct xdg_toplevel;
 struct wp_fractional_scale_manager_v1;
 struct wp_fractional_scale_v1;
+struct wp_viewporter;
+struct wp_viewport;
 struct zxdg_decoration_manager_v1;
 struct zxdg_toplevel_decoration_v1;
 struct xkb_context;
@@ -68,6 +70,8 @@ typedef struct {
     struct wp_fractional_scale_manager_v1 *fractional_scale_manager;
     struct wp_fractional_scale_v1 *fractional_scale;
     uint32_t                preferred_scale_120;
+    struct wp_viewporter    *viewporter;
+    struct wp_viewport      *viewport;
     struct wl_output        *outputs[WAYLAND_MAX_OUTPUTS];
     uint32_t                output_ids[WAYLAND_MAX_OUTPUTS];
     uint32_t                output_scales[WAYLAND_MAX_OUTPUTS];

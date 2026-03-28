@@ -96,6 +96,8 @@ set(SrcWayland
     src/wayland/generated/xdg-output-unstable-v1-client-protocol.h
     src/wayland/generated/fractional-scale-v1-protocol.c
     src/wayland/generated/fractional-scale-v1-client-protocol.h
+    src/wayland/generated/viewporter-protocol.c
+    src/wayland/generated/viewporter-client-protocol.h
 
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h

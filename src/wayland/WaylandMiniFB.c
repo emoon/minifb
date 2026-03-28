@@ -10,6 +10,7 @@
 #include "generated/xdg-shell-client-protocol.h"
 #include "generated/xdg-decoration-client-protocol.h"
 #include "generated/fractional-scale-v1-client-protocol.h"
+#include "generated/viewporter-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "WindowData.h"
@@ -188,6 +189,16 @@ destroy(SWindowData *window_data) {
     if (window_data_specific->fractional_scale_manager) {
         wp_fractional_scale_manager_v1_destroy(window_data_specific->fractional_scale_manager);
         window_data_specific->fractional_scale_manager = NULL;
+    }
+
+    if (window_data_specific->viewport) {
+        wp_viewport_destroy(window_data_specific->viewport);
+        window_data_specific->viewport = NULL;
+    }
+
+    if (window_data_specific->viewporter) {
+        wp_viewporter_destroy(window_data_specific->viewporter);
+        window_data_specific->viewporter = NULL;
     }
 
     if (window_data_specific->surface) {
@@ -1480,6 +1491,14 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         MFB_LOG(MFB_LOG_TRACE, "wp_fractional_scale_manager_v1: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
+    else if (strcmp(iface, "wp_viewporter") == 0) {
+        uint32_t client_version = (uint32_t) wp_viewporter_interface.version;
+        uint32_t use_version = version < client_version ? version : client_version;
+        window_data_specific->viewporter = (struct wp_viewporter *)
+            wl_registry_bind(registry, id, &wp_viewporter_interface, use_version);
+        MFB_LOG(MFB_LOG_TRACE, "wp_viewporter: server=%u client=%u using=%u", version, client_version, use_version);
+    }
+
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
         uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
         uint32_t use_version = version < client_version ? version : client_version;
@@ -2006,6 +2025,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     wl_surface_add_listener(window_data_specific->surface, &surface_listener, window_data);
+    if (window_data_specific->viewporter) {
+        window_data_specific->viewport =
+            wp_viewporter_get_viewport(window_data_specific->viewporter, window_data_specific->surface);
+    }
     if (window_data_specific->fractional_scale_manager) {
         window_data_specific->fractional_scale =
             wp_fractional_scale_manager_v1_get_fractional_scale(window_data_specific->fractional_scale_manager,
@@ -2162,6 +2185,7 @@ typedef struct {
     uint32_t physical_dst_height;
     uint32_t integer_scale;
     bool     use_buffer_scale;
+    bool     use_fractional;
 } SWaylandPresentationMetrics;
 
 typedef enum {
@@ -2183,11 +2207,44 @@ compute_presentation_metrics(const SWindowData *window_data,
     metrics->logical_dst_height     = window_data->dst_height;
     metrics->integer_scale          = window_data_specific->integer_output_scale;
     metrics->use_buffer_scale       = false;
+    metrics->use_fractional         = false;
 
     if (metrics->integer_scale == 0) {
         metrics->integer_scale = 1;
     }
 
+    // 4B: fractional HiDPI via wp_viewporter — takes priority over 4A.
+    if (window_data_specific->viewport != NULL
+        && window_data_specific->preferred_scale_120 > 0) {
+        float fscale = (float) window_data_specific->preferred_scale_120 / 120.0f;
+        metrics->use_fractional          = true;
+        metrics->physical_surface_width  = (uint32_t) ((float) metrics->logical_surface_width  * fscale + 0.5f);
+        metrics->physical_surface_height = (uint32_t) ((float) metrics->logical_surface_height * fscale + 0.5f);
+        metrics->physical_dst_offset_x   = (uint32_t) ((float) metrics->logical_dst_offset_x   * fscale + 0.5f);
+        metrics->physical_dst_offset_y   = (uint32_t) ((float) metrics->logical_dst_offset_y   * fscale + 0.5f);
+        metrics->physical_dst_width      = (uint32_t) ((float) metrics->logical_dst_width       * fscale + 0.5f);
+        metrics->physical_dst_height     = (uint32_t) ((float) metrics->logical_dst_height      * fscale + 0.5f);
+        if (metrics->physical_surface_width  == 0) { metrics->physical_surface_width  = 1; }
+        if (metrics->physical_surface_height == 0) { metrics->physical_surface_height = 1; }
+        // Clamp dst rect to physical surface bounds to prevent stretch_image
+        // writing outside the slot buffer when independent rounding of offset
+        // and size pushes offset + size beyond the physical surface edge.
+        if (metrics->physical_dst_offset_x > metrics->physical_surface_width) {
+            metrics->physical_dst_offset_x = metrics->physical_surface_width;
+        }
+        if (metrics->physical_dst_offset_y > metrics->physical_surface_height) {
+            metrics->physical_dst_offset_y = metrics->physical_surface_height;
+        }
+        if (metrics->physical_dst_offset_x + metrics->physical_dst_width > metrics->physical_surface_width) {
+            metrics->physical_dst_width = metrics->physical_surface_width - metrics->physical_dst_offset_x;
+        }
+        if (metrics->physical_dst_offset_y + metrics->physical_dst_height > metrics->physical_surface_height) {
+            metrics->physical_dst_height = metrics->physical_surface_height - metrics->physical_dst_offset_y;
+        }
+        return;
+    }
+
+    // 4A: integer HiDPI via wl_surface_set_buffer_scale.
 #if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
     if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION
         && metrics->integer_scale > 1) {
@@ -2289,13 +2346,14 @@ compose_presentation_buffer(const SWindowData *window_data,
                             const void *buffer,
                             uint32_t *shm_ptr) {
     if (metrics->use_buffer_scale == false
+        && metrics->use_fractional == false
         && window_data->buffer_width == metrics->logical_dst_width
         && window_data->buffer_height == metrics->logical_dst_height
         && metrics->logical_dst_offset_x == 0
         && metrics->logical_dst_offset_y == 0
         && metrics->logical_surface_width == metrics->logical_dst_width
         && metrics->logical_surface_height == metrics->logical_dst_height) {
-        // Fast path: scale == 1 and source fills the entire surface exactly.
+        // Fast path: no scaling and source fills the entire surface exactly.
         memcpy(shm_ptr, buffer,
                (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t));
     }
@@ -2327,6 +2385,17 @@ present_presentation_buffer(SWindowData *window_data,
                                     (int32_t) (metrics->use_buffer_scale ? metrics->integer_scale : 1u));
     }
 #endif
+    if (window_data_specific->viewport != NULL) {
+        // 4B: declare logical surface size; clear when not in fractional mode.
+        if (metrics->use_fractional) {
+            wp_viewport_set_destination(window_data_specific->viewport,
+                                        (int32_t) metrics->logical_surface_width,
+                                        (int32_t) metrics->logical_surface_height);
+        }
+        else {
+            wp_viewport_set_destination(window_data_specific->viewport, -1, -1);
+        }
+    }
     surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
                    0, 0,
                    (int32_t) metrics->physical_surface_width,
