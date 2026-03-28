@@ -2147,10 +2147,239 @@ wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
+typedef struct {
+    uint32_t logical_surface_width;
+    uint32_t logical_surface_height;
+    uint32_t logical_dst_offset_x;
+    uint32_t logical_dst_offset_y;
+    uint32_t logical_dst_width;
+    uint32_t logical_dst_height;
+    uint32_t physical_surface_width;
+    uint32_t physical_surface_height;
+    uint32_t physical_dst_offset_x;
+    uint32_t physical_dst_offset_y;
+    uint32_t physical_dst_width;
+    uint32_t physical_dst_height;
+    uint32_t integer_scale;
+    bool     use_buffer_scale;
+} SWaylandPresentationMetrics;
+
+typedef enum {
+    WAYLAND_SLOT_ACQUIRE_OK = 0,
+    WAYLAND_SLOT_ACQUIRE_BUSY,
+    WAYLAND_SLOT_ACQUIRE_ERROR,
+} EWaylandSlotAcquireStatus;
+
+//-------------------------------------
+static void
+compute_presentation_metrics(const SWindowData *window_data,
+                             const SWindowData_Way *window_data_specific,
+                             SWaylandPresentationMetrics *metrics) {
+    metrics->logical_surface_width  = window_data->window_width;
+    metrics->logical_surface_height = window_data->window_height;
+    metrics->logical_dst_offset_x   = window_data->dst_offset_x;
+    metrics->logical_dst_offset_y   = window_data->dst_offset_y;
+    metrics->logical_dst_width      = window_data->dst_width;
+    metrics->logical_dst_height     = window_data->dst_height;
+    metrics->integer_scale          = window_data_specific->integer_output_scale;
+    metrics->use_buffer_scale       = false;
+
+    if (metrics->integer_scale == 0) {
+        metrics->integer_scale = 1;
+    }
+
+#if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION
+        && metrics->integer_scale > 1) {
+        metrics->use_buffer_scale = true;
+    }
+#endif
+
+    if (metrics->use_buffer_scale == true
+        && (metrics->logical_surface_width > UINT32_MAX / metrics->integer_scale
+            || metrics->logical_surface_height > UINT32_MAX / metrics->integer_scale
+            || metrics->logical_dst_offset_x > UINT32_MAX / metrics->integer_scale
+            || metrics->logical_dst_offset_y > UINT32_MAX / metrics->integer_scale
+            || metrics->logical_dst_width > UINT32_MAX / metrics->integer_scale
+            || metrics->logical_dst_height > UINT32_MAX / metrics->integer_scale)) {
+        metrics->use_buffer_scale = false;
+    }
+
+    uint32_t applied_scale = metrics->use_buffer_scale ? metrics->integer_scale : 1u;
+
+    metrics->physical_surface_width  = metrics->logical_surface_width * applied_scale;
+    metrics->physical_surface_height = metrics->logical_surface_height * applied_scale;
+    metrics->physical_dst_offset_x   = metrics->logical_dst_offset_x * applied_scale;
+    metrics->physical_dst_offset_y   = metrics->logical_dst_offset_y * applied_scale;
+    metrics->physical_dst_width      = metrics->logical_dst_width * applied_scale;
+    metrics->physical_dst_height     = metrics->logical_dst_height * applied_scale;
+}
+
+//-------------------------------------
+static EWaylandSlotAcquireStatus
+acquire_presentation_slot(SWindowData_Way *window_data_specific,
+                          const SWaylandPresentationMetrics *metrics,
+                          SWaylandBufferSlot **out_slot) {
+    bool ensure_failed = false;
+
+    *out_slot = NULL;
+
+    int start = window_data_specific->front_slot;
+    for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
+        int idx = (start + i) % WAYLAND_BUFFER_SLOTS;
+        SWaylandBufferSlot *slot = &window_data_specific->slots[idx];
+
+        if (slot->busy) {
+            continue;
+        }
+        if (slot_ensure_buffer(slot, window_data_specific->shm,
+                               window_data_specific->shm_format,
+                               metrics->physical_surface_width,
+                               metrics->physical_surface_height) == false) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed for slot %d.", idx);
+            ensure_failed = true;
+            continue;
+        }
+
+        *out_slot = slot;
+        window_data_specific->front_slot = (idx + 1) % WAYLAND_BUFFER_SLOTS;
+        return WAYLAND_SLOT_ACQUIRE_OK;
+    }
+
+    if (ensure_failed == false) {
+        struct wl_display *display = window_data_specific->display;
+        for (int attempt = 0; attempt < 50 && *out_slot == NULL; ++attempt) {
+            if (wayland_poll_dispatch(display, 2) == -1) {
+                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed while waiting for buffer release.");
+                return WAYLAND_SLOT_ACQUIRE_ERROR;
+            }
+
+            for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
+                SWaylandBufferSlot *slot = &window_data_specific->slots[i];
+                if (slot->busy) {
+                    continue;
+                }
+                if (slot_ensure_buffer(slot, window_data_specific->shm,
+                                       window_data_specific->shm_format,
+                                       metrics->physical_surface_width,
+                                       metrics->physical_surface_height) == false) {
+                    ensure_failed = true;
+                    continue;
+                }
+
+                *out_slot = slot;
+                window_data_specific->front_slot = (i + 1) % WAYLAND_BUFFER_SLOTS;
+                return WAYLAND_SLOT_ACQUIRE_OK;
+            }
+        }
+    }
+
+    if (ensure_failed == true) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed; cannot present frame.");
+        return WAYLAND_SLOT_ACQUIRE_ERROR;
+    }
+
+    return WAYLAND_SLOT_ACQUIRE_BUSY;
+}
+
+//-------------------------------------
+static void
+compose_presentation_buffer(const SWindowData *window_data,
+                            const SWaylandPresentationMetrics *metrics,
+                            const void *buffer,
+                            uint32_t *shm_ptr) {
+    if (metrics->use_buffer_scale == false
+        && window_data->buffer_width == metrics->logical_dst_width
+        && window_data->buffer_height == metrics->logical_dst_height
+        && metrics->logical_dst_offset_x == 0
+        && metrics->logical_dst_offset_y == 0
+        && metrics->logical_surface_width == metrics->logical_dst_width
+        && metrics->logical_surface_height == metrics->logical_dst_height) {
+        // Fast path: scale == 1 and source fills the entire surface exactly.
+        memcpy(shm_ptr, buffer,
+               (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t));
+    }
+    else {
+        // Clear the physical buffer, then stretch the source into the viewport.
+        // When use_buffer_scale is true, physical_* coords are in physical pixels.
+        memset(shm_ptr, 0,
+               (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t));
+        stretch_image(
+            (uint32_t *) buffer, 0, 0,
+            window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
+            shm_ptr, metrics->physical_dst_offset_x, metrics->physical_dst_offset_y,
+            metrics->physical_dst_width, metrics->physical_dst_height, metrics->physical_surface_width);
+    }
+}
+
+//-------------------------------------
+static mfb_update_state
+present_presentation_buffer(SWindowData *window_data,
+                            SWindowData_Way *window_data_specific,
+                            SWaylandBufferSlot *active_slot,
+                            const SWaylandPresentationMetrics *metrics) {
+    uint32_t done = 0;
+
+    wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
+#if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
+        wl_surface_set_buffer_scale(window_data_specific->surface,
+                                    (int32_t) (metrics->use_buffer_scale ? metrics->integer_scale : 1u));
+    }
+#endif
+    surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
+                   0, 0,
+                   (int32_t) metrics->physical_surface_width,
+                   (int32_t) metrics->physical_surface_height);
+
+    struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
+    if (frame_callback == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
+    wl_callback_add_listener(frame_callback, &frame_listener, &done);
+    active_slot->busy = 1;
+    wl_surface_commit(window_data_specific->surface);
+
+    {
+        struct wl_display *display = window_data_specific->display;
+
+        while (done == 0 && window_data->close == false) {
+            int poll_res = wayland_poll_dispatch(display, 100);
+            if (poll_res == -1) {
+                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during frame wait.");
+                if (done == 0) {
+                    wl_callback_destroy(frame_callback);
+                }
+                return MFB_STATE_INTERNAL_ERROR;
+            }
+
+            // The helper may have dispatched the frame callback during its
+            // pending-event drain and then timed out waiting for further
+            // events. Check done before treating the timeout as a problem.
+            if (poll_res == 0 && done == 0) {
+                MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: frame callback not received within 100 ms.");
+                break;
+            }
+        }
+    }
+
+    if (done == 0) {
+        wl_callback_destroy(frame_callback);
+    }
+
+    if (window_data->close) {
+        destroy(window_data);
+        return MFB_STATE_EXIT;
+    }
+
+    return MFB_STATE_OK;
+}
+
 //-------------------------------------
 mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
-    uint32_t done = 0;
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
 
@@ -2171,7 +2400,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_BUFFER;
     }
 
-    if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
+    if (calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes) == false) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
     }
@@ -2182,161 +2411,39 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    if (!window_data_specific->display || wl_display_get_error(window_data_specific->display) != 0)
-    {
+    if (window_data_specific->display == NULL
+        || wl_display_get_error(window_data_specific->display) != 0) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_ex.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
-    // --- Update source buffer dimensions (user-provided) ---
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
         window_data->buffer_width  = width;
         window_data->buffer_height = height;
         window_data->buffer_stride = buffer_stride;
     }
 
-    // --- Capture surface and viewport dimensions for the entire frame ---
-    // Configure events can arrive during dispatch loops later in this function,
-    // changing window_width/height and dst_* via resize_dst.  Capture once here
-    // so pool, slots, and pixel composition all use consistent dimensions.
-    const uint32_t surface_w    = window_data->window_width;
-    const uint32_t surface_h    = window_data->window_height;
-    const uint32_t dst_offset_x = window_data->dst_offset_x;
-    const uint32_t dst_offset_y = window_data->dst_offset_y;
-    const uint32_t dst_width    = window_data->dst_width;
-    const uint32_t dst_height   = window_data->dst_height;
+    SWaylandPresentationMetrics metrics;
+    compute_presentation_metrics(window_data, window_data_specific, &metrics);
 
-    // --- Acquire a free slot, rebuilding its pool+buffer if dimensions changed ---
-    // Each slot owns its own wl_shm_pool, so resizing one slot never affects
-    // another — no overlap on shrink, no shared offsets.
     SWaylandBufferSlot *active_slot = NULL;
-    bool ensure_failed = false;
-    {
-        int start = window_data_specific->front_slot;
-        for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-            int idx = (start + i) % WAYLAND_BUFFER_SLOTS;
-            SWaylandBufferSlot *slot = &window_data_specific->slots[idx];
-
-            if (slot->busy) {
-                continue;
-            }
-            if (!slot_ensure_buffer(slot, window_data_specific->shm,
-                                    window_data_specific->shm_format, surface_w, surface_h)) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed for slot %d.", idx);
-                ensure_failed = true;
-                continue;
-            }
-
-            active_slot = slot;
-            window_data_specific->front_slot = (idx + 1) % WAYLAND_BUFFER_SLOTS;
-            break;
-        }
-    }
-
-    // If no slot is free, dispatch events briefly to process pending releases.
-    if (active_slot == NULL && !ensure_failed) {
-        struct wl_display *display = window_data_specific->display;
-        for (int attempt = 0; attempt < 50 && active_slot == NULL; ++attempt) {
-            if (wayland_poll_dispatch(display, 2) == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed while waiting for buffer release.");
-                return MFB_STATE_INTERNAL_ERROR;
-            }
-            for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-                SWaylandBufferSlot *slot = &window_data_specific->slots[i];
-                if (slot->busy) {
-                    continue;
-                }
-                if (!slot_ensure_buffer(slot, window_data_specific->shm,
-                                        window_data_specific->shm_format, surface_w, surface_h)) {
-                    ensure_failed = true;
-                    continue;
-                }
-                active_slot = slot;
-                window_data_specific->front_slot = (i + 1) % WAYLAND_BUFFER_SLOTS;
-                break;
-            }
-        }
-    }
+    EWaylandSlotAcquireStatus slot_status = acquire_presentation_slot(window_data_specific, &metrics, &active_slot);
 
     // Always reset per-frame input state, even when dropping a frame.
     window_data->mouse_wheel_x = 0.0f;
     window_data->mouse_wheel_y = 0.0f;
 
-    if (active_slot == NULL) {
-        if (ensure_failed) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed; cannot present frame.");
-            return MFB_STATE_INTERNAL_ERROR;
-        }
+    if (slot_status == WAYLAND_SLOT_ACQUIRE_ERROR) {
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
+    if (slot_status == WAYLAND_SLOT_ACQUIRE_BUSY || active_slot == NULL) {
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: all buffer slots busy; dropping frame.");
         return MFB_STATE_OK;
     }
 
-    // --- Compose pixels into the presentation buffer ---
-    uint32_t *shm_ptr = active_slot->shm_ptr;
-
-    if (window_data->buffer_width == dst_width
-        && window_data->buffer_height == dst_height
-        && dst_offset_x == 0
-        && dst_offset_y == 0
-        && surface_w == dst_width
-        && surface_h == dst_height) {
-        // Fast path: source fills the entire surface, no scaling needed.
-        memcpy(shm_ptr, buffer, (size_t) surface_w * surface_h * sizeof(uint32_t));
-    }
-    else {
-        // Clear the surface buffer, then stretch the source into the viewport.
-        memset(shm_ptr, 0, (size_t) surface_w * surface_h * sizeof(uint32_t));
-        stretch_image(
-            (uint32_t *) buffer, 0, 0,
-            window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
-            shm_ptr, dst_offset_x, dst_offset_y,
-            dst_width, dst_height, surface_w);
-    }
-
-    wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
-    surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
-                   0, 0, surface_w, surface_h);
-    struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
-    if (!frame_callback) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
-        return MFB_STATE_INTERNAL_ERROR;
-    }
-    wl_callback_add_listener(frame_callback, &frame_listener, &done);
-    active_slot->busy = 1;
-    wl_surface_commit(window_data_specific->surface);
-
-    {
-        struct wl_display *display = window_data_specific->display;
-
-        while (!done && window_data->close == false) {
-            int poll_res = wayland_poll_dispatch(display, 100);
-            if (poll_res == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during frame wait.");
-                if (!done) {
-                    wl_callback_destroy(frame_callback);
-                }
-                return MFB_STATE_INTERNAL_ERROR;
-            }
-            // The helper may have dispatched the frame callback during its
-            // pending-event drain and then timed out waiting for further
-            // events.  Check done before treating the timeout as a problem.
-            if (poll_res == 0 && !done) {
-                MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: frame callback not received within 100 ms.");
-                break;
-            }
-        }
-    }
-
-    if (!done) {
-        wl_callback_destroy(frame_callback);
-    }
-
-    if (window_data->close) {
-        destroy(window_data);
-        return MFB_STATE_EXIT;
-    }
-
-    return MFB_STATE_OK;
+    compose_presentation_buffer(window_data, &metrics, buffer, active_slot->shm_ptr);
+    return present_presentation_buffer(window_data, window_data_specific, active_slot, &metrics);
 }
 
 //-------------------------------------
