@@ -2150,23 +2150,18 @@ wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
 }
 
 //-------------------------------------
-// done event
-//
-// Notify the client when the related request is done.
-//
-// callback_data: request-specific data for the callback
+// Frame callback: fired by the compositor at the next vblank after a commit
+// that included a wl_surface_frame request. Tells KWin to process the surface
+// at vsync rate (and release old SHM buffers promptly). We do not block on it.
 //-------------------------------------
 static void
-frame_done(void *data, struct wl_callback *callback, uint32_t cookie) {
-    kUnused(cookie);
+frame_done(void *data, struct wl_callback *callback, uint32_t serial) {
+    kUnused(data);
+    kUnused(serial);
     wl_callback_destroy(callback);
-
-    *(uint32_t *) data = 1;
 }
 
-//-------------------------------------
-static const struct
-wl_callback_listener frame_listener = {
+static const struct wl_callback_listener frame_listener = {
     .done = frame_done,
 };
 
@@ -2280,12 +2275,10 @@ acquire_presentation_slot(SWindowData_Way *window_data_specific,
     bool ensure_failed = false;
 
     *out_slot = NULL;
-
     int start = window_data_specific->front_slot;
     for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
         int idx = (start + i) % WAYLAND_BUFFER_SLOTS;
         SWaylandBufferSlot *slot = &window_data_specific->slots[idx];
-
         if (slot->busy) {
             continue;
         }
@@ -2305,29 +2298,28 @@ acquire_presentation_slot(SWindowData_Way *window_data_specific,
 
     if (ensure_failed == false) {
         struct wl_display *display = window_data_specific->display;
-        for (int attempt = 0; attempt < 50 && *out_slot == NULL; ++attempt) {
-            if (wayland_poll_dispatch(display, 2) == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed while waiting for buffer release.");
-                return WAYLAND_SLOT_ACQUIRE_ERROR;
+        // One non-blocking dispatch to handle any buffered release events.
+        if (wayland_poll_dispatch(display, 0) == -1) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed while waiting for buffer release.");
+            return WAYLAND_SLOT_ACQUIRE_ERROR;
+        }
+
+        for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
+            SWaylandBufferSlot *slot = &window_data_specific->slots[i];
+            if (slot->busy) {
+                continue;
+            }
+            if (slot_ensure_buffer(slot, window_data_specific->shm,
+                                   window_data_specific->shm_format,
+                                   metrics->physical_surface_width,
+                                   metrics->physical_surface_height) == false) {
+                ensure_failed = true;
+                continue;
             }
 
-            for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-                SWaylandBufferSlot *slot = &window_data_specific->slots[i];
-                if (slot->busy) {
-                    continue;
-                }
-                if (slot_ensure_buffer(slot, window_data_specific->shm,
-                                       window_data_specific->shm_format,
-                                       metrics->physical_surface_width,
-                                       metrics->physical_surface_height) == false) {
-                    ensure_failed = true;
-                    continue;
-                }
-
-                *out_slot = slot;
-                window_data_specific->front_slot = (i + 1) % WAYLAND_BUFFER_SLOTS;
-                return WAYLAND_SLOT_ACQUIRE_OK;
-            }
+            *out_slot = slot;
+            window_data_specific->front_slot = (i + 1) % WAYLAND_BUFFER_SLOTS;
+            return WAYLAND_SLOT_ACQUIRE_OK;
         }
     }
 
@@ -2376,8 +2368,6 @@ present_presentation_buffer(SWindowData *window_data,
                             SWindowData_Way *window_data_specific,
                             SWaylandBufferSlot *active_slot,
                             const SWaylandPresentationMetrics *metrics) {
-    uint32_t done = 0;
-
     wl_surface_attach(window_data_specific->surface, active_slot->wl_buf, 0, 0);
 #if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
     if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
@@ -2401,41 +2391,21 @@ present_presentation_buffer(SWindowData *window_data,
                    (int32_t) metrics->physical_surface_width,
                    (int32_t) metrics->physical_surface_height);
 
-    struct wl_callback *frame_callback = wl_surface_frame(window_data_specific->surface);
-    if (frame_callback == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
-        return MFB_STATE_INTERNAL_ERROR;
+    // Request a frame callback so the compositor processes this surface at the
+    // next vblank and releases SHM buffers promptly. We do not wait for it.
+    struct wl_callback *frame_cb = wl_surface_frame(window_data_specific->surface);
+    if (frame_cb != NULL) {
+        wl_callback_add_listener(frame_cb, &frame_listener, NULL);
     }
 
-    wl_callback_add_listener(frame_callback, &frame_listener, &done);
     active_slot->busy = 1;
     wl_surface_commit(window_data_specific->surface);
 
-    {
-        struct wl_display *display = window_data_specific->display;
-
-        while (done == 0 && window_data->close == false) {
-            int poll_res = wayland_poll_dispatch(display, 100);
-            if (poll_res == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during frame wait.");
-                if (done == 0) {
-                    wl_callback_destroy(frame_callback);
-                }
-                return MFB_STATE_INTERNAL_ERROR;
-            }
-
-            // The helper may have dispatched the frame callback during its
-            // pending-event drain and then timed out waiting for further
-            // events. Check done before treating the timeout as a problem.
-            if (poll_res == 0 && done == 0) {
-                MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: frame callback not received within 100 ms.");
-                break;
-            }
-        }
-    }
-
-    if (done == 0) {
-        wl_callback_destroy(frame_callback);
+    // Pump pending events (input, close, configure) without blocking.
+    // Pacing is handled by mfb_wait_sync; mfb_update_ex must not stall here.
+    if (wayland_poll_dispatch(window_data_specific->display, 0) == -1) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed after surface commit.");
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     if (window_data->close) {
@@ -2451,7 +2421,6 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
-
     if (window == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
         return MFB_STATE_INVALID_WINDOW;

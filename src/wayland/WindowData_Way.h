@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define WAYLAND_MAX_OUTPUTS 16
-#define WAYLAND_BUFFER_SLOTS 2
+#define WAYLAND_BUFFER_SLOTS 3
 
 struct wl_display;
 struct wl_registry;
