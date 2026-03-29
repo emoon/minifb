@@ -90,6 +90,9 @@ typedef struct {
     SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
     int                     front_slot;
 
+    struct wl_callback      *frame_cb;      // pending vblank callback (NULL = none)
+    uint8_t                 frame_ready;    // set to 1 by frame_done, cleared by mfb_wait_sync
+
     struct mfb_timer        *timer;
     struct xkb_context      *xkb_context;
     struct xkb_keymap       *xkb_keymap;
