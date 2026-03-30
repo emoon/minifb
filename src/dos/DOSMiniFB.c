@@ -18,11 +18,6 @@
 #include "vesa.h"
 
 //-------------------------------------
-extern void
-stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
-              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
-
-//-------------------------------------
 static const uint32_t scancode_to_mfb_key[] = {
     MFB_KB_KEY_UNKNOWN,
     MFB_KB_KEY_ESCAPE,

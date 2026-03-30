@@ -38,10 +38,6 @@ static int s_xrr_event_base = -1;
 void init_keycodes(SWindowData_X11 *window_data_specific);
 Cursor create_blank_cursor(Display *display, Window window);
 
-extern void
-stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
-              uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
-
 //-------------------------------------
 int translate_key(int scancode);
 int translate_mod(int state);
@@ -138,6 +134,19 @@ compose_dead_codepoint(KeySym dead_keysym, uint32_t codepoint) {
 }
 
 //-------------------------------------
+static uint32_t
+dead_keysym_to_codepoint(KeySym dead_keysym) {
+    switch (dead_keysym) {
+        case XK_dead_grave:       return 0x0060; // `
+        case XK_dead_acute:       return 0x00b4; // ´
+        case XK_dead_circumflex:  return 0x005e; // ^
+        case XK_dead_tilde:       return 0x007e; // ~
+        case XK_dead_diaeresis:   return 0x00a8; // ¨
+        default:                  return 0;
+    }
+}
+
+//-------------------------------------
 static void
 emit_codepoint_with_dead_state(SWindowData *window_data, SWindowData_X11 *window_data_specific, uint32_t codepoint) {
     if (window_data == NULL || window_data_specific == NULL || codepoint == 0) {
@@ -146,10 +155,16 @@ emit_codepoint_with_dead_state(SWindowData *window_data, SWindowData_X11 *window
 
     if (window_data_specific->pending_dead_keysym != NoSymbol) {
         uint32_t composed = compose_dead_codepoint(window_data_specific->pending_dead_keysym, codepoint);
-        window_data_specific->pending_dead_keysym = NoSymbol;
         if (composed != 0) {
             codepoint = composed;
         }
+        else {
+            uint32_t accent = dead_keysym_to_codepoint(window_data_specific->pending_dead_keysym);
+            if (accent != 0) {
+                kCall(char_input_func, accent);
+            }
+        }
+        window_data_specific->pending_dead_keysym = NoSymbol;
     }
 
     kCall(char_input_func, codepoint);
@@ -310,8 +325,8 @@ process_event(SWindowData *window_data, XEvent *event) {
 
             if (key_code != MFB_KB_KEY_UNKNOWN) {
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
+                kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
             }
-            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
 
             if (event->type == KeyPress) {
                 dispatch_text_input(window_data, window_data_specific, event);
@@ -611,7 +626,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         int error_base = 0;
         if (XRRQueryExtension(window_data_specific->display, &s_xrr_event_base, &error_base)) {
             MFB_LOG(MFB_LOG_TRACE, "X11MiniFB: XRandR event base = %d", s_xrr_event_base);
-        } else {
+        }
+        else {
             MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XRRQueryExtension failed; XRandR events unavailable.");
             s_xrr_event_base = -1;
         }
@@ -1384,8 +1400,9 @@ init_keycodes(SWindowData_X11 *window_data_specific) {
     int     key_sym;
 
     // Clear keys
-    for (i = 0; i < sizeof(g_keycodes) / sizeof(g_keycodes[0]); ++i)
+    for (i = 0; i < MFB_MAX_KEYS; ++i) {
         g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
+    }
 
     // Valid key code range is  [8, 255], according to the Xlib manual
     for (i=8; i<=255; ++i) {
