@@ -237,8 +237,10 @@ else()
         /fp:fast
         # Force Visual Studio to actualize __cplusplus version macro
         /Zc:__cplusplus
+        # Additional security checks
+        /sdl
 
-        # Program database for edit and continue
+        # Program database (edit and continue in debug mode)
         "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
         # Optimizations
         "$<IF:$<CONFIG:Debug>,/Od,/O2>"
@@ -247,16 +249,6 @@ else()
         # Basic runtime checks
         "$<$<CONFIG:Debug>:/RTC1>"
     )
-
-    if (MSVC_VERSION GREATER_EQUAL 1900)
-        # SDL checks 2015+
-        list(APPEND MINIFB_COMPILE_OPTIONS /sdl)
-    endif()
-
-    if (MSVC_VERSION LESS_EQUAL 1920)
-        # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
-        list(APPEND MINIFB_COMPILE_OPTIONS /Gm)
-    endif()
 
     # prevent annoying c standard lib unsafety msvc warnings
     list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
@@ -614,7 +606,7 @@ if (MINIFB_USE_OPENNGL_API)
     set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
 endif()
 if (MINIFB_USE_X11_API)
-	set(MINIFB_PACKAGE_FIND_X11 TRUE)
+    set(MINIFB_PACKAGE_FIND_X11 TRUE)
 endif()
 
 minifb_configure_package_config_file(
