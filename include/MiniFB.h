@@ -43,6 +43,9 @@ mfb_update_state    mfb_update_events(struct mfb_window *window);
 // Close the window
 void                mfb_close(struct mfb_window *window);
 
+// Set title
+void                mfb_set_title(struct mfb_window *window, const char *title);
+
 // Set user data
 void                mfb_set_user_data(struct mfb_window *window, void *user_data);
 void *              mfb_get_user_data(struct mfb_window *window);

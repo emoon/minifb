@@ -2798,6 +2798,23 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
 //-------------------------------------
 void
+mfb_set_title(struct mfb_window *window, const char *title) {
+    if (window == 0x0 || title == 0x0) {
+        return;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific == 0x0) {
+        return;
+    }
+
+    xdg_toplevel_set_title(window_data_specific->toplevel, title);
+    wl_surface_commit(window_data_specific->surface);
+}
+
+//-------------------------------------
+void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 1.0f, y = 1.0f;
 
