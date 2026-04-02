@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.16)
 project(MiniFB VERSION 0.10.0 LANGUAGES C CXX)
 
 # prefer these over general `UNIX` or `APPLE`
@@ -154,32 +154,58 @@ endif()
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
-include(CMakeDependentOption) # Requires 3.22 to use full condition syntax
+# purely for internal use, never exposed to the user
+set(MINIFB_USE_X11_API OFF)
 
-# cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
-# the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
-# setting the default value lets us de-nest `if(<platform>) if(<option>)` type stuff, into just `if(<option>)`.
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22) 
 
-cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
-    "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
+    # requires 3.22+ to use full condition syntax, technically could use in 3.16, but it would be a lot worse
+    include(CMakeDependentOption)
 
-cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
-    "MACOS" OFF)
-cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
-	"MACOS" OFF)
+    # cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
+    # the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
+    # setting the default value lets us de-nest `if(<platform>) if(<option>)` type stuff, into just `if(<option>)`.
 
-cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
-	"LINUX" OFF)
+    cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
+        "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
 
-# purely for internal use, never exposed to the user. easier than `if(NOT MINIFB_USE_WAYLAND_API AND LINUX)` every time.
-if (NOT MINIFB_USE_WAYLAND_API AND LINUX)
-    set(MINIFB_USE_X11_API ON)
-else()
-    set(MINIFB_USE_X11_API OFF)
+    cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
+        "MACOS" OFF)
+    cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
+        "MACOS" OFF)
+
+    cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
+        "LINUX" OFF)
+
+    if (NOT MINIFB_USE_WAYLAND_API AND LINUX)
+        set(MINIFB_USE_X11_API ON)
+    endif()
+
+    cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" OFF
+        "MINIFB_USE_X11_API OR WIN32" OFF)
+
+else() # when we upgrade past cmake 3.22, remove this path, the above does the same thing but cleaner
+
+    if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
+        option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
+    else()
+        set(MINIFB_BUILD_VERSION_INFO OFF)
+    endif()
+
+    if (MACOS)
+        option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
+        option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    elseif (LINUX)
+        option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
+		if (NOT MINIFB_USE_WAYLAND_API)
+            option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+            set(MINIFB_USE_X11_API ON)
+        endif()
+    elseif (WIN32)
+        option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    endif()
+
 endif()
-
-cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" OFF
-    "MINIFB_USE_X11_API OR WIN32" OFF)
 
 # unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
 if (MACOS)
