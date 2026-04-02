@@ -262,9 +262,8 @@ destroy(SWindowData *window_data) {
     }
 
     if (window_data_specific->frame_cb != NULL) {
-        // Drain the pending frame callback before disconnecting so frame_done
-        // does not fire on freed memory. wl_callback is a destructor object —
-        // the compositor always sends done; we must not destroy it ourselves.
+        // Give any already-queued frame callback a chance to run before freeing
+        // the listener data. Disconnecting the display remains the final stop.
         wl_display_roundtrip(window_data_specific->display);
         window_data_specific->frame_cb = NULL;
     }
@@ -2089,21 +2088,21 @@ out:
 // already-queued events before attempting a read.
 //
 // timeout_ms:  -1 = block forever, 0 = non-blocking, >0 = milliseconds.
-// Returns:      1 = events dispatched successfully (from fd or pending queue)
-//               0 = poll timed out without dispatching any events
+// Returns:      1 = at least one event was dispatched
+//               0 = no events were dispatched before timeout
 //              -1 = fatal error
 //-------------------------------------
 static int
-wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
+wayland_dispatch_once(struct wl_display *display, int timeout_ms) {
     int display_fd = wl_display_get_fd(display);
+    bool dispatched_any = false;
 
     // Drain any already-queued events until prepare_read succeeds.
-    bool had_pending = false;
     while (wl_display_prepare_read(display) != 0) {
         if (wl_display_dispatch_pending(display) == -1) {
             return -1;
         }
-        had_pending = true;
+        dispatched_any = true;
     }
 
     // Flush outgoing requests; track EAGAIN so we can poll for writability.
@@ -2113,10 +2112,6 @@ wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
         return -1;
     }
 
-    // If pending events were already dispatched, do not block - just check
-    // the fd non-blocking so the caller can re-evaluate its loop condition.
-    int effective_timeout = had_pending ? 0 : timeout_ms;
-
     struct pollfd pfd;
     pfd.fd = display_fd;
     pfd.events = POLLIN | ((flush_res == -1) ? POLLOUT : 0);
@@ -2124,7 +2119,7 @@ wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
 
     int rc;
     do {
-        rc = poll(&pfd, 1, effective_timeout);
+        rc = poll(&pfd, 1, timeout_ms);
     } while (rc < 0 && errno == EINTR);
 
     if (rc > 0) {
@@ -2146,7 +2141,11 @@ wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
             return -1;
         }
 
-        return 1;
+        if (pfd.revents & POLLIN) {
+            dispatched_any = true;
+        }
+
+        return dispatched_any ? 1 : 0;
     }
 
     wl_display_cancel_read(display);
@@ -2154,21 +2153,37 @@ wayland_poll_dispatch(struct wl_display *display, int timeout_ms) {
         return -1;
     }
 
-    return had_pending ? 1 : 0;
+    return dispatched_any ? 1 : 0;
 }
 
 //-------------------------------------
-// Frame callback: fired by the compositor at the next vblank after a commit.
-// mfb_wait_sync blocks on this instead of a software timer, keeping the client
-// phase-locked with the compositor's vsync cycle.
+// Non-blocking Wayland event pump used by mfb_update_ex / mfb_update_events.
+//-------------------------------------
+static int
+wayland_dispatch_nonblocking(struct wl_display *display) {
+    return wayland_dispatch_once(display, 0);
+}
+
+//-------------------------------------
+// Blocking Wayland event pump used by mfb_wait_sync.
+//-------------------------------------
+static int
+wayland_dispatch_blocking(struct wl_display *display, int timeout_ms) {
+    return wayland_dispatch_once(display, timeout_ms);
+}
+
+//-------------------------------------
+// Auxiliary frame callback used only as compositor feedback. Software pacing
+// remains timer-driven in mfb_wait_sync.
 //-------------------------------------
 static void
 frame_done(void *data, struct wl_callback *callback, uint32_t serial) {
     kUnused(serial);
     wl_callback_destroy(callback);
     SWindowData_Way *window_data_specific = (SWindowData_Way *) data;
-    window_data_specific->frame_cb    = NULL;
-    window_data_specific->frame_ready = 1;
+    if (window_data_specific->frame_cb == callback) {
+        window_data_specific->frame_cb = NULL;
+    }
 }
 
 static const struct wl_callback_listener frame_listener = {
@@ -2309,7 +2324,7 @@ acquire_presentation_slot(SWindowData_Way *window_data_specific,
     if (ensure_failed == false) {
         struct wl_display *display = window_data_specific->display;
         // One non-blocking dispatch to handle any buffered release events.
-        if (wayland_poll_dispatch(display, 0) == -1) {
+        if (wayland_dispatch_nonblocking(display) == -1) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed while waiting for buffer release.");
             return WAYLAND_SLOT_ACQUIRE_ERROR;
         }
@@ -2401,13 +2416,13 @@ present_presentation_buffer(SWindowData *window_data,
                    (int32_t) metrics->physical_surface_width,
                    (int32_t) metrics->physical_surface_height);
 
-    // Request a frame callback. mfb_wait_sync will block on it, phase-locking
-    // the client with the compositor's vsync instead of a software timer.
-    window_data_specific->frame_ready = 0;
-    struct wl_callback *frame_cb = wl_surface_frame(window_data_specific->surface);
-    if (frame_cb != NULL) {
-        wl_callback_add_listener(frame_cb, &frame_listener, window_data_specific);
-        window_data_specific->frame_cb = frame_cb;
+    // Keep at most one auxiliary compositor frame callback pending.
+    if (window_data_specific->frame_cb == NULL) {
+        struct wl_callback *frame_cb = wl_surface_frame(window_data_specific->surface);
+        if (frame_cb != NULL) {
+            wl_callback_add_listener(frame_cb, &frame_listener, window_data_specific);
+            window_data_specific->frame_cb = frame_cb;
+        }
     }
 
     active_slot->busy = 1;
@@ -2415,7 +2430,7 @@ present_presentation_buffer(SWindowData *window_data,
 
     // Pump pending events (input, close, configure) without blocking.
     // Pacing is handled by mfb_wait_sync; mfb_update_ex must not stall here.
-    if (wayland_poll_dispatch(window_data_specific->display, 0) == -1) {
+    if (wayland_dispatch_nonblocking(window_data_specific->display) == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed after surface commit.");
         return MFB_STATE_INTERNAL_ERROR;
     }
@@ -2488,7 +2503,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if (slot_status == WAYLAND_SLOT_ACQUIRE_BUSY || active_slot == NULL) {
-        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: all buffer slots busy; dropping frame.");
+        MFB_LOG(MFB_LOG_INFO, "WaylandMiniFB: all buffer slots busy; dropping frame.");
         return MFB_STATE_OK;
     }
 
@@ -2526,7 +2541,7 @@ mfb_update_events(struct mfb_window *window) {
     window_data->mouse_wheel_y = 0.0f;
 
     // Non-blocking read/dispatch so mfb_update_events keeps X11-like behavior.
-    if (wayland_poll_dispatch(window_data_specific->display, 0) == -1) {
+    if (wayland_dispatch_nonblocking(window_data_specific->display) == -1) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed in mfb_update_events.");
         return MFB_STATE_INTERNAL_ERROR;
     }
@@ -2576,10 +2591,10 @@ mfb_wait_sync(struct mfb_window *window) {
     window_data->mouse_wheel_x = 0.0f;
     window_data->mouse_wheel_y = 0.0f;
 
-    // Flush outgoing requests and dispatch any already-queued events.
-    wl_display_flush(display);
-    if (wl_display_dispatch_pending(display) == -1) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_dispatch_pending failed before sync pacing.");
+    // Pump events once before pacing so input, configure, and release events
+    // are handled promptly without stalling mfb_update_ex.
+    if (wayland_dispatch_nonblocking(display) == -1) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed before sync pacing.");
         return false;
     }
 
@@ -2589,68 +2604,38 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    if (window_data_specific->frame_cb != NULL) {
-        // Hardware sync: wait for compositor vblank callback.
-        // Poll with a short timeout so we receive the callback promptly
-        // (~16.7ms at 60Hz) and do not accidentally overshoot the fallback.
-        // Fallback fires after ~4 frame periods (e.g. window occluded).
-        // IMPORTANT: never call wl_callback_destroy here — wl_callback is a
-        // destructor object; the compositor always fires done. frame_done handles
-        // the destroy. Destroying it ourselves causes a use-after-free.
-        int max_polls = (int)(g_time_for_frame * 4.0 * 1000.0 / 5.0) + 2;
-        int polls = 0;
-
-        while (window_data_specific->frame_ready == 0 && window_data->close == false) {
-            if (++polls > max_polls) {
-                MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: frame callback not received; falling back to software timer.");
-                window_data_specific->frame_cb = NULL; // forget ref; frame_done will destroy when it fires
-                break;
-            }
-
-            int poll_res = wayland_poll_dispatch(display, 5);
-            if (poll_res == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during frame callback wait.");
-                return false;
-            }
-
-            if (window_data->close) {
-                destroy(window_data);
-                return false;
-            }
-        }
-        window_data_specific->frame_ready = 0;
+    if (g_time_for_frame == 0) {
+        mfb_timer_compensated_reset(window_data_specific->timer);
+        return true;
     }
-    else {
-        // No frame callback pending (first frame, or callback was not available):
-        // fall back to software pacing.
-        for (;;) {
-            double elapsed_time = mfb_timer_now(window_data_specific->timer);
-            if (elapsed_time >= g_time_for_frame)
-                break;
 
-            double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
-            int timeout_ms = 0;
-            if (remaining_ms > 1.5) {
-                timeout_ms = (int) (remaining_ms - 1.0);
-                if (timeout_ms < 0)
-                    timeout_ms = 0;
-            }
+    for (;;) {
+        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        if (elapsed_time >= g_time_for_frame)
+            break;
 
-            int poll_res = wayland_poll_dispatch(display, timeout_ms);
-            if (poll_res == -1) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during sync loop.");
-                return false;
-            }
+        double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
+        int timeout_ms = 0;
+        if (remaining_ms > 1.5) {
+            timeout_ms = (int) (remaining_ms - 1.0);
+            if (timeout_ms < 0)
+                timeout_ms = 0;
+        }
 
-            if (timeout_ms == 0 && poll_res == 0) {
-                sched_yield();
-            }
+        int poll_res = wayland_dispatch_blocking(display, timeout_ms);
+        if (poll_res == -1) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed during sync loop.");
+            return false;
+        }
 
-            if (window_data->close) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
-                destroy(window_data);
-                return false;
-            }
+        if (timeout_ms == 0 && poll_res == 0) {
+            sched_yield();
+        }
+
+        if (window_data->close) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
+            destroy(window_data);
+            return false;
         }
     }
 
