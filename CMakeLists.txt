@@ -1,10 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 project(MiniFB VERSION 0.10.0 LANGUAGES C CXX)
 
-# remove before this is merged
-message(STATUS "CMAKE_SYSTEM_NAME: " ${CMAKE_SYSTEM_NAME})
+# prefer these over general `UNIX` or `APPLE`
+# `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX TRUE)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(MACOS TRUE)
+endif()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if (MACOS OR IOS)
     include(CheckLanguage)
     check_language(OBJC)
     if (CMAKE_OBJC_COMPILER)
@@ -135,7 +140,7 @@ set(MINIFB_COMPILE_DEFINITIONS)
 set(MINIFB_LINK_OPTIONS_LIB)
 set(MINIFB_LINK_OPTIONS_EXE)
 
-if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
+if (DJGPP)
     # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
     set(MINIFB_C_EXTENSIONS   ON)
     set(MINIFB_CXX_EXTENSIONS ON)
@@ -153,37 +158,37 @@ include(CMakeDependentOption) # Requires 3.22 to use full condition syntax
 
 # cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
 # the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
-# setting the default value lets us de-nest `if(<platform>) if(<option>)` - type stuff, into just `if(<option>)`.
+# setting the default value lets us de-nest `if(<platform>) if(<option>)` type stuff, into just `if(<option>)`.
 
 cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
-    "NOT (CMAKE_SYSTEM_NAME STREQUAL \"iOS\" OR CMAKE_SYSTEM_NAME STREQUAL \"Android\" OR CMAKE_SYSTEM_NAME STREQUAL \"Emscripten\")" OFF)
+    "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
 
 cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
-    "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\"" OFF)
+    "MACOS" OFF)
 cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
-    "CMAKE_SYSTEM_NAME STREQUAL \"Darwin\"" OFF)
+	"MACOS" OFF)
 
 cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
-    "CMAKE_SYSTEM_NAME STREQUAL \"Linux\"" OFF)
+	"LINUX" OFF)
 
-# purely for internal use, never exposed to the user. easier than `if(NOT MINIFB_USE_WAYLAND_API AND CMAKE_SYSTEM_NAME STREQUAL "Linux")` every time.
-if (NOT MINIFB_USE_WAYLAND_API AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+# purely for internal use, never exposed to the user. easier than `if(NOT MINIFB_USE_WAYLAND_API AND LINUX)` every time.
+if (NOT MINIFB_USE_WAYLAND_API AND LINUX)
     set(MINIFB_USE_X11_API ON)
 else()
     set(MINIFB_USE_X11_API OFF)
 endif()
 
 cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" OFF
-    "MINIFB_USE_X11_API OR CMAKE_SYSTEM_NAME STREQUAL \"Windows\"" OFF)
+    "MINIFB_USE_X11_API OR WIN32" OFF)
 
 # unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
-if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using metal API code")
+if (MACOS)
+    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using Metal API code")
     minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using wayland API code")
+elseif (LINUX)
+    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using Wayland API code")
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+elseif (WIN32)
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
@@ -193,7 +198,7 @@ if (NOT MSVC)
 
     # GCC/Clang
 
-    if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
+    if (DJGPP)
         list(APPEND MINIFB_COMPILE_OPTIONS
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
@@ -261,7 +266,7 @@ list(APPEND MINIFB_COMPILE_DEFINITIONS
 )
 
 # TODO: does the toolchain include this automatically?
-if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+if (EMSCRIPTEN)
     list(APPEND MINIFB_LINK_OPTIONS_EXE
         "$<$<CONFIG:Debug>:-g>"
     )
@@ -284,14 +289,14 @@ if (MINIFB_USE_METAL_API)
     list(APPEND SrcLib ${SrcMacOSMetal})
 endif()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if (WIN32)
     list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
     list(APPEND SrcLib ${SrcWindows})
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+elseif (IOS)
     list(APPEND SrcLib ${SrcIOS})
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+elseif (DARWIN)
     list(APPEND SrcLib ${SrcMacOS})
 
 elseif (MINIFB_USE_WAYLAND_API)
@@ -300,10 +305,10 @@ elseif (MINIFB_USE_WAYLAND_API)
 elseif (MINIFB_USE_X11_API)
     list(APPEND SrcLib ${SrcX11})
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+elseif (EMSCRIPTEN)
     list(APPEND SrcLib ${SrcWeb})
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "DOS")
+elseif (DJGPP)
     list(APPEND SrcLib ${SrcDOS})
 endif()
 
@@ -316,7 +321,7 @@ add_library(minifb::minifb ALIAS minifb)
 
 # Link
 #--------------------------------------
-if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if (IOS)
 
     target_link_libraries(minifb PRIVATE
         "-framework UIKit"
@@ -325,7 +330,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         "-framework MetalKit"
     )
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+elseif (MACOS)
 
     target_link_libraries(minifb PRIVATE
         "-framework Cocoa"
@@ -376,7 +381,7 @@ elseif(MINIFB_USE_X11_API)
         )
     endif()
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+elseif (EMSCRIPTEN)
 
     list(APPEND MINIFB_LINK_OPTIONS_EXE
         "-sSTRICT=1"
@@ -393,7 +398,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         "-sSINGLE_FILE"
     )
 
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+elseif (WIN32)
 
     if (MINIFB_USE_OPENGL_API)
         find_package(OpenGL)
@@ -453,7 +458,7 @@ endif()
 #--------------------------------------
 # TODO: clean up further
 if (MINIFB_BUILD_EXAMPLES)
-    if (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if (NOT IOS)
 
         add_executable(noise examples/noise.c)
         add_executable(input_events examples/input_events.c)
@@ -475,7 +480,7 @@ if (MINIFB_BUILD_EXAMPLES)
             hide_cursor
         )
 
-        if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+        if (EMSCRIPTEN)
 
             add_custom_target(web_assets
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -497,7 +502,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
         endif()
 
-        if (CMAKE_SYSTEM_NAME STREQUAL "DOS")
+        if (DJGPP)
 
             add_executable(debug_dos
                 examples/dos/debug_dos.c
