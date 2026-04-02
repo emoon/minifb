@@ -1511,6 +1511,23 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
 //-------------------------------------
 void
+mfb_set_title(struct mfb_window *window, const char *title) {
+    if (window == 0x0 || title == 0x0) {
+        return;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    SWindowData_X11 *window_data_specific = window_data->specific;
+    if (window_data_specific == 0x0) {
+        return;
+    }
+
+    XStoreName(window_data_specific->display, window_data_specific->window, title);
+    XFlush(window_data_specific->display);
+}
+
+//-------------------------------------
+void
 mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y) {
     float x = 1.0f, y = 1.0f;
 
