@@ -86,7 +86,9 @@ surface_damage(struct wl_surface *surface, uint32_t compositor_version,
 // stalls when the compositor holds buffers.
 //-------------------------------------
 
-static SWindowData_Way *get_window_data_specific(SWindowData *window_data) {
+//-------------------------------------
+static SWindowData_Way *
+get_window_data_specific(SWindowData *window_data) {
     if (window_data == NULL) {
         return NULL;
     }
@@ -94,7 +96,9 @@ static SWindowData_Way *get_window_data_specific(SWindowData *window_data) {
     return (SWindowData_Way *) window_data->specific;
 }
 
-static void ts_add(struct timespec *out, const struct timespec *a, const struct timespec *b) {
+//-------------------------------------
+static void
+ts_add(struct timespec *out, const struct timespec *a, const struct timespec *b) {
     out->tv_sec = a->tv_sec + b->tv_sec;
     out->tv_nsec = a->tv_nsec + b->tv_nsec;
 
@@ -104,7 +108,9 @@ static void ts_add(struct timespec *out, const struct timespec *a, const struct 
     }
 }
 
-static void ts_sub_sat(struct timespec *out, const struct timespec *a, const struct timespec *b) {
+//-------------------------------------
+static void
+ts_sub_sat(struct timespec *out, const struct timespec *a, const struct timespec *b) {
     out->tv_sec = a->tv_sec - b->tv_sec;
     out->tv_nsec = a->tv_nsec - b->tv_nsec;
 
@@ -119,7 +125,9 @@ static void ts_sub_sat(struct timespec *out, const struct timespec *a, const str
     }
 }
 
-static struct timespec ms_to_ts(double ms) {
+//-------------------------------------
+static struct timespec
+ms_to_ts(double ms) {
     struct timespec out = { 0, 0 };
 
     if (ms <= 0.0) {
@@ -137,7 +145,9 @@ static struct timespec ms_to_ts(double ms) {
     return out;
 }
 
-static int poll_display_fd(struct wl_display *display, short events, const struct timespec *timeout) {
+//-------------------------------------
+static int
+poll_display_fd(struct wl_display *display, short events, const struct timespec *timeout) {
     struct pollfd pfd;
     struct timespec now;
     struct timespec deadline = { 0, 0 };
@@ -167,7 +177,9 @@ static int poll_display_fd(struct wl_display *display, short events, const struc
     return result;
 }
 
-static bool flush_display(struct wl_display *display) {
+//-------------------------------------
+static bool
+flush_display(struct wl_display *display) {
     int result = wl_display_flush(display);
 
     if (result == -1 && errno != EAGAIN) {
@@ -177,7 +189,9 @@ static bool flush_display(struct wl_display *display) {
     return true;
 }
 
-static int dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
+//-------------------------------------
+static int
+dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
 
     if (window_data_specific == NULL ||
@@ -189,7 +203,9 @@ static int dispatch_queue_pending_count(SWindowData *window_data, struct wl_even
     return wl_display_dispatch_queue_pending(window_data_specific->display, queue);
 }
 
-static bool dispatch_owned_pending(SWindowData *window_data) {
+//-------------------------------------
+static bool
+dispatch_owned_pending(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
 
     if (window_data_specific == NULL ||
@@ -210,7 +226,9 @@ static bool dispatch_owned_pending(SWindowData *window_data) {
     return true;
 }
 
-static bool dispatch_render_pending(SWindowData *window_data) {
+//-------------------------------------
+static bool
+dispatch_render_pending(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
 
     if (window_data_specific == NULL ||
@@ -226,9 +244,11 @@ static bool dispatch_render_pending(SWindowData *window_data) {
     return true;
 }
 
-static bool dispatch_queue_timeout(SWindowData *window_data,
-                                   struct wl_event_queue *read_queue,
-                                   const struct timespec *timeout) {
+//-------------------------------------
+static bool
+dispatch_queue_timeout(SWindowData *window_data,
+                       struct wl_event_queue *read_queue,
+                       const struct timespec *timeout) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
     struct timespec now;
     struct timespec deadline = { 0, 0 };
@@ -325,7 +345,9 @@ static bool dispatch_queue_timeout(SWindowData *window_data,
     }
 }
 
-static bool dispatch_owned_timeout(SWindowData *window_data, const struct timespec *timeout) {
+//-------------------------------------
+static bool
+dispatch_owned_timeout(SWindowData *window_data, const struct timespec *timeout) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
 
     if (window_data_specific == NULL) {
@@ -335,7 +357,9 @@ static bool dispatch_owned_timeout(SWindowData *window_data, const struct timesp
     return dispatch_queue_timeout(window_data, window_data_specific->window_queue, timeout);
 }
 
-static bool dispatch_owned_non_blocking(SWindowData *window_data) {
+//-------------------------------------
+static bool
+dispatch_owned_non_blocking(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
     struct wl_event_queue *read_queue;
     struct pollfd pfd;
@@ -425,7 +449,9 @@ static bool dispatch_owned_non_blocking(SWindowData *window_data) {
     return flush_display(window_data_specific->display);
 }
 
-static bool dispatch_render_blocking(SWindowData *window_data) {
+//-------------------------------------
+static bool
+dispatch_render_blocking(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
 
     if (window_data_specific == NULL ||
@@ -435,6 +461,76 @@ static bool dispatch_render_blocking(SWindowData *window_data) {
     }
 
     return dispatch_queue_timeout(window_data, window_data_specific->render_queue, NULL);
+}
+
+//-------------------------------------
+// Throttle infrastructure.
+//
+// surface_throttle() waits for the PREVIOUS frame's callback before starting
+// the next frame. This is the key difference from the old inline-wait pattern:
+// the CPU can prepare the next frame while the compositor presents the current
+// one (pipelined rendering).
+//
+// g_use_wayland_frame_callback_throttle controls whether wl_surface_frame is
+// used (vsync-like) or skipped (mailbox-style, throttled only by wl_display_sync).
+//-------------------------------------
+
+//-------------------------------------
+extern double g_time_for_frame;
+extern bool   g_use_hardware_sync;
+bool          g_use_wayland_frame_callback_throttle = true;
+//-------------------------------------
+
+//-------------------------------------
+static void
+throttle_done(void *data, struct wl_callback *callback, uint32_t time) {
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) data;
+
+    kUnused(time);
+
+    if (window_data_specific != NULL) {
+        window_data_specific->throttle_callback = NULL;
+    }
+
+    wl_callback_destroy(callback);
+}
+
+//-------------------------------------
+static const struct
+wl_callback_listener g_throttle_listener = {
+    throttle_done,
+};
+
+//-------------------------------------
+static bool
+surface_throttle(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL || window_data_specific->surface_wrapper == NULL) {
+        return false;
+    }
+
+    while (window_data_specific->throttle_callback != NULL) {
+        if (window_data->close == true) {
+            return false;
+        }
+
+        if (dispatch_render_blocking(window_data) == false) {
+            return false;
+        }
+    }
+
+    if (g_use_wayland_frame_callback_throttle == false) {
+        return true;
+    }
+
+    window_data_specific->throttle_callback = wl_surface_frame(window_data_specific->surface_wrapper);
+    if (window_data_specific->throttle_callback == NULL) {
+        return false;
+    }
+
+    wl_callback_add_listener(window_data_specific->throttle_callback, &g_throttle_listener, window_data_specific);
+    return true;
 }
 
 //-------------------------------------
@@ -2926,9 +3022,6 @@ mfb_update_events(struct mfb_window *window) {
 
     return MFB_STATE_OK;
 }
-
-//-------------------------------------
-extern double   g_time_for_frame;
 
 //-------------------------------------
 bool
