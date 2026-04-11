@@ -6,6 +6,10 @@
     #define _DEFAULT_SOURCE     // ensure usleep prototype on glibc
 #endif
 
+#ifndef _GNU_SOURCE
+    #define _GNU_SOURCE         // for ppoll
+#endif
+
 #include <MiniFB.h>
 #include "generated/xdg-shell-client-protocol.h"
 #include "generated/xdg-decoration-client-protocol.h"
@@ -29,6 +33,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <sched.h>
+#include <time.h>
 #include <errno.h>
 
 #include <linux/limits.h>
@@ -67,6 +72,369 @@ surface_damage(struct wl_surface *surface, uint32_t compositor_version,
     }
 #endif
     wl_surface_damage(surface, x, y, w, h);
+}
+
+//-------------------------------------
+// Dual-queue dispatch infrastructure.
+//
+// MiniFB uses two Wayland event queues (following Mesa's eglSwapBuffers pattern):
+//   window_queue  - shell, input, output, decoration events
+//   render_queue  - buffer release, frame callback, sync callback events
+//
+// This separation prevents input callbacks from firing during blocking waits
+// for frame presentation, which would otherwise cause re-entrant updates or
+// stalls when the compositor holds buffers.
+//-------------------------------------
+
+static SWindowData_Way *get_window_data_specific(SWindowData *window_data) {
+    if (window_data == NULL) {
+        return NULL;
+    }
+
+    return (SWindowData_Way *) window_data->specific;
+}
+
+static void ts_add(struct timespec *out, const struct timespec *a, const struct timespec *b) {
+    out->tv_sec = a->tv_sec + b->tv_sec;
+    out->tv_nsec = a->tv_nsec + b->tv_nsec;
+
+    if (out->tv_nsec >= 1000000000L) {
+        out->tv_sec += 1;
+        out->tv_nsec -= 1000000000L;
+    }
+}
+
+static void ts_sub_sat(struct timespec *out, const struct timespec *a, const struct timespec *b) {
+    out->tv_sec = a->tv_sec - b->tv_sec;
+    out->tv_nsec = a->tv_nsec - b->tv_nsec;
+
+    if (out->tv_nsec < 0) {
+        out->tv_sec -= 1;
+        out->tv_nsec += 1000000000L;
+    }
+
+    if (out->tv_sec < 0) {
+        out->tv_sec = 0;
+        out->tv_nsec = 0;
+    }
+}
+
+static struct timespec ms_to_ts(double ms) {
+    struct timespec out = { 0, 0 };
+
+    if (ms <= 0.0) {
+        return out;
+    }
+
+    out.tv_sec = (time_t) (ms / 1000.0);
+    out.tv_nsec = (long) ((ms - ((double) out.tv_sec * 1000.0)) * 1000000.0);
+
+    if (out.tv_nsec >= 1000000000L) {
+        out.tv_sec += out.tv_nsec / 1000000000L;
+        out.tv_nsec %= 1000000000L;
+    }
+
+    return out;
+}
+
+static int poll_display_fd(struct wl_display *display, short events, const struct timespec *timeout) {
+    struct pollfd pfd;
+    struct timespec now;
+    struct timespec deadline = { 0, 0 };
+    struct timespec remaining;
+    const struct timespec *effective_timeout = timeout;
+    int result;
+
+    if (timeout != NULL) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        ts_add(&deadline, &now, timeout);
+    }
+
+    pfd.fd = wl_display_get_fd(display);
+    pfd.events = events;
+    pfd.revents = 0;
+
+    do {
+        if (timeout != NULL) {
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            ts_sub_sat(&remaining, &deadline, &now);
+            effective_timeout = &remaining;
+        }
+
+        result = ppoll(&pfd, 1, effective_timeout, NULL);
+    } while (result == -1 && errno == EINTR);
+
+    return result;
+}
+
+static bool flush_display(struct wl_display *display) {
+    int result = wl_display_flush(display);
+
+    if (result == -1 && errno != EAGAIN) {
+        return false;
+    }
+
+    return true;
+}
+
+static int dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        queue == NULL) {
+        return -1;
+    }
+
+    return wl_display_dispatch_queue_pending(window_data_specific->display, queue);
+}
+
+static bool dispatch_owned_pending(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        window_data_specific->window_queue == NULL ||
+        window_data_specific->render_queue == NULL) {
+        return false;
+    }
+
+    if (dispatch_queue_pending_count(window_data, window_data_specific->render_queue) == -1) {
+        return false;
+    }
+
+    if (dispatch_queue_pending_count(window_data, window_data_specific->window_queue) == -1) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool dispatch_render_pending(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        window_data_specific->render_queue == NULL) {
+        return false;
+    }
+
+    if (dispatch_queue_pending_count(window_data, window_data_specific->render_queue) == -1) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool dispatch_queue_timeout(SWindowData *window_data,
+                                   struct wl_event_queue *read_queue,
+                                   const struct timespec *timeout) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    struct timespec now;
+    struct timespec deadline = { 0, 0 };
+    struct timespec remaining = { 0, 0 };
+    const struct timespec *timeout_ptr = NULL;
+    int result;
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        window_data_specific->window_queue == NULL ||
+        window_data_specific->render_queue == NULL ||
+        read_queue == NULL) {
+        return false;
+    }
+
+    if (timeout != NULL) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        ts_add(&deadline, &now, timeout);
+    }
+
+    if (wl_display_prepare_read_queue(window_data_specific->display, read_queue) == -1) {
+        result = dispatch_queue_pending_count(window_data, read_queue);
+        return result >= 0;
+    }
+
+    while (true) {
+        result = wl_display_flush(window_data_specific->display);
+        if (result != -1 || errno != EAGAIN) {
+            break;
+        }
+
+        if (timeout != NULL) {
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            ts_sub_sat(&remaining, &deadline, &now);
+            timeout_ptr = &remaining;
+        }
+        else {
+            timeout_ptr = NULL;
+        }
+
+        result = poll_display_fd(window_data_specific->display, POLLOUT, timeout_ptr);
+        if (result < 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            return false;
+        }
+
+        if (result == 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            return true;
+        }
+    }
+
+    if (result < 0) {
+        wl_display_cancel_read(window_data_specific->display);
+        return false;
+    }
+
+    while (true) {
+        if (timeout != NULL) {
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            ts_sub_sat(&remaining, &deadline, &now);
+            timeout_ptr = &remaining;
+        }
+        else {
+            timeout_ptr = NULL;
+        }
+
+        result = poll_display_fd(window_data_specific->display, POLLIN, timeout_ptr);
+        if (result <= 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            if (result < 0) {
+                return false;
+            }
+            return true;
+        }
+
+        if (wl_display_read_events(window_data_specific->display) == -1) {
+            return false;
+        }
+
+        result = dispatch_queue_pending_count(window_data, read_queue);
+        if (result < 0) {
+            return false;
+        }
+
+        if (result != 0) {
+            return true;
+        }
+
+        if (wl_display_prepare_read_queue(window_data_specific->display, read_queue) == -1) {
+            result = dispatch_queue_pending_count(window_data, read_queue);
+            return result >= 0;
+        }
+    }
+}
+
+static bool dispatch_owned_timeout(SWindowData *window_data, const struct timespec *timeout) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL) {
+        return false;
+    }
+
+    return dispatch_queue_timeout(window_data, window_data_specific->window_queue, timeout);
+}
+
+static bool dispatch_owned_non_blocking(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    struct wl_event_queue *read_queue;
+    struct pollfd pfd;
+    int result;
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        window_data_specific->window_queue == NULL) {
+        return false;
+    }
+
+    read_queue = window_data_specific->window_queue;
+
+    if (dispatch_owned_pending(window_data) == false) {
+        return false;
+    }
+
+    if (wl_display_prepare_read_queue(window_data_specific->display, read_queue) == -1) {
+        return dispatch_owned_pending(window_data);
+    }
+
+    while (true) {
+        result = wl_display_flush(window_data_specific->display);
+        if (result != -1 || errno != EAGAIN) {
+            break;
+        }
+
+        pfd.fd = wl_display_get_fd(window_data_specific->display);
+        pfd.events = POLLIN | POLLOUT;
+        pfd.revents = 0;
+
+        do {
+            result = poll(&pfd, 1, 0);
+        } while (result == -1 && errno == EINTR);
+
+        if (result < 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            return false;
+        }
+
+        if (result == 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            return dispatch_owned_pending(window_data);
+        }
+
+        if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+            wl_display_cancel_read(window_data_specific->display);
+            return false;
+        }
+
+        if ((pfd.revents & POLLIN) != 0) {
+            break;
+        }
+    }
+
+    if (result == -1) {
+        wl_display_cancel_read(window_data_specific->display);
+        return false;
+    }
+
+    pfd.fd = wl_display_get_fd(window_data_specific->display);
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    do {
+        result = poll(&pfd, 1, 0);
+    } while (result == -1 && errno == EINTR);
+
+    if (result < 0) {
+        wl_display_cancel_read(window_data_specific->display);
+        return false;
+    }
+
+    if (result == 0) {
+        wl_display_cancel_read(window_data_specific->display);
+        return dispatch_owned_pending(window_data);
+    }
+
+    if (wl_display_read_events(window_data_specific->display) == -1) {
+        return false;
+    }
+
+    if (dispatch_owned_pending(window_data) == false) {
+        return false;
+    }
+
+    return flush_display(window_data_specific->display);
+}
+
+static bool dispatch_render_blocking(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+
+    if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
+        window_data_specific->render_queue == NULL) {
+        return false;
+    }
+
+    return dispatch_queue_timeout(window_data, window_data_specific->render_queue, NULL);
 }
 
 //-------------------------------------
