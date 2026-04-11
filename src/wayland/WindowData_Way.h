@@ -5,9 +5,10 @@
 #include <stdint.h>
 
 #define WAYLAND_MAX_OUTPUTS 16
-#define WAYLAND_BUFFER_SLOTS 2
+#define WAYLAND_BUFFER_SLOTS 3
 
 struct wl_display;
+struct wl_event_queue;
 struct wl_registry;
 struct wl_compositor;
 struct wl_shell;
@@ -78,7 +79,13 @@ typedef struct {
     uint8_t                 output_entered[WAYLAND_MAX_OUTPUTS]; // 1 = surface is on this output
     uint32_t                output_count;
     uint32_t                integer_output_scale;                // max scale of entered outputs (fallback)
+    struct wl_event_queue   *window_queue;
+    struct wl_event_queue   *render_queue;
+    struct wl_display       *window_display_wrapper;
+    struct wl_display       *render_display_wrapper;
+
     struct wl_surface       *surface;
+    struct wl_surface       *surface_wrapper;
     struct xdg_surface      *shell_surface;
     struct xdg_toplevel     *toplevel;
     struct zxdg_decoration_manager_v1 *decoration_manager;
@@ -87,6 +94,7 @@ typedef struct {
     uint32_t                compositor_version;
     uint32_t                seat_version;
     uint32_t                shm_format;
+    struct wl_callback      *throttle_callback;
     SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
     int                     front_slot;
 
