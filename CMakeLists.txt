@@ -100,6 +100,8 @@ set(SrcWayland
     src/wayland/generated/viewporter-client-protocol.h
 
     src/wayland/WaylandMiniFB.c
+    src/wayland/WaylandMiniFB_input_keyboard.c
+    src/wayland/WaylandMiniFB_input_keyboard.h
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
     src/MiniFB_utf8.c
