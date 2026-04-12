@@ -63,8 +63,10 @@ static bool slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window
 
 //-------------------------------------
 static inline void
-surface_damage(struct wl_surface *surface, uint32_t compositor_version,
-               int32_t x, int32_t y, int32_t w, int32_t h) {
+surface_damage(struct wl_surface *surface,
+               uint32_t compositor_version,
+               int32_t x, int32_t y,
+               int32_t w, int32_t h) {
     kUnused(compositor_version);
 #if defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
     if (compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
@@ -73,6 +75,26 @@ surface_damage(struct wl_surface *surface, uint32_t compositor_version,
     }
 #endif
     wl_surface_damage(surface, x, y, w, h);
+}
+
+//-------------------------------------
+static bool
+get_window_data(struct mfb_window *window, const char *func_name, SWindowData **window_data, SWindowData_Way **window_data_specific) {
+    const char *function_name = (func_name != NULL) ? func_name : "unknown";
+
+    if (window == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s called with a null window pointer.", function_name);
+        return false;
+    }
+
+    *window_data = (SWindowData *) window;
+    *window_data_specific = (SWindowData_Way *) (*window_data)->specific;
+    if (*window_data_specific == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s missing Wayland-specific window data.", function_name);
+        return false;
+    }
+
+    return true;
 }
 
 //-------------------------------------
@@ -86,16 +108,6 @@ surface_damage(struct wl_surface *surface, uint32_t compositor_version,
 // for frame presentation, which would otherwise cause re-entrant updates or
 // stalls when the compositor holds buffers.
 //-------------------------------------
-
-//-------------------------------------
-static SWindowData_Way *
-get_window_data_specific(SWindowData *window_data) {
-    if (window_data == NULL) {
-        return NULL;
-    }
-
-    return (SWindowData_Way *) window_data->specific;
-}
 
 //-------------------------------------
 static void
@@ -193,10 +205,9 @@ flush_display(struct wl_display *display) {
 //-------------------------------------
 static int
 dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         queue == NULL) {
         return -1;
     }
@@ -207,10 +218,9 @@ dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *qu
 //-------------------------------------
 static bool
 dispatch_owned_pending(SWindowData *window_data) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         window_data_specific->window_queue == NULL ||
         window_data_specific->render_queue == NULL) {
         return false;
@@ -230,10 +240,9 @@ dispatch_owned_pending(SWindowData *window_data) {
 //-------------------------------------
 static bool
 dispatch_render_pending(SWindowData *window_data) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         window_data_specific->render_queue == NULL) {
         return false;
     }
@@ -250,15 +259,14 @@ static bool
 dispatch_queue_timeout(SWindowData *window_data,
                        struct wl_event_queue *read_queue,
                        const struct timespec *timeout) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
     struct timespec now;
     struct timespec deadline = { 0, 0 };
     struct timespec remaining = { 0, 0 };
     const struct timespec *timeout_ptr = NULL;
     int result;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         window_data_specific->window_queue == NULL ||
         window_data_specific->render_queue == NULL ||
         read_queue == NULL) {
@@ -349,11 +357,7 @@ dispatch_queue_timeout(SWindowData *window_data,
 //-------------------------------------
 static bool
 dispatch_owned_timeout(SWindowData *window_data, const struct timespec *timeout) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
-
-    if (window_data_specific == NULL) {
-        return false;
-    }
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
     return dispatch_queue_timeout(window_data, window_data_specific->window_queue, timeout);
 }
@@ -361,13 +365,12 @@ dispatch_owned_timeout(SWindowData *window_data, const struct timespec *timeout)
 //-------------------------------------
 static bool
 dispatch_owned_non_blocking(SWindowData *window_data) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
     struct wl_event_queue *read_queue;
     struct pollfd pfd;
     int result;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         window_data_specific->window_queue == NULL) {
         return false;
     }
@@ -453,10 +456,9 @@ dispatch_owned_non_blocking(SWindowData *window_data) {
 //-------------------------------------
 static bool
 dispatch_render_blocking(SWindowData *window_data) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific == NULL ||
-        window_data_specific->display == NULL ||
+    if (window_data_specific->display == NULL ||
         window_data_specific->render_queue == NULL) {
         return false;
     }
@@ -505,9 +507,9 @@ wl_callback_listener g_throttle_listener = {
 //-------------------------------------
 static bool
 surface_throttle(SWindowData *window_data) {
-    SWindowData_Way *window_data_specific = get_window_data_specific(window_data);
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific == NULL || window_data_specific->surface_wrapper == NULL) {
+    if (window_data_specific->surface_wrapper == NULL) {
         return false;
     }
 
@@ -848,12 +850,14 @@ utf8_decode_next(const unsigned char *bytes, size_t length, size_t *index, uint3
 static const char *
 get_compose_locale(void) {
     const char *locale;
+
     locale = getenv("LC_ALL");
     if (locale && *locale) return locale;
     locale = getenv("LC_CTYPE");
     if (locale && *locale) return locale;
     locale = getenv("LANG");
     if (locale && *locale) return locale;
+
     return "C";
 }
 
@@ -1174,10 +1178,13 @@ refresh_cursor_surface(SWindowData *window_data) {
     }
 
     wl_pointer_set_cursor(window_data_specific->pointer, serial,
-                          window_data_specific->cursor_surface, hotspot_x, hotspot_y);
+                          window_data_specific->cursor_surface,
+                          hotspot_x, hotspot_y);
     wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
-    surface_damage(window_data_specific->cursor_surface, window_data_specific->compositor_version,
-                   0, 0, image->width, image->height);
+    surface_damage(window_data_specific->cursor_surface,
+                   window_data_specific->compositor_version,
+                   0, 0,
+                   image->width, image->height);
     wl_surface_commit(window_data_specific->cursor_surface);
 }
 
@@ -2397,7 +2404,8 @@ slot_destroy(SWaylandBufferSlot *slot) {
 // Returns true on success (or if no rebuild was needed).
 //-------------------------------------
 static bool
-slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window_data_specific,
+slot_ensure_buffer(SWaylandBufferSlot *slot,
+                   SWindowData_Way *window_data_specific,
                    uint32_t surface_w, uint32_t surface_h) {
     if (slot->wl_buf != NULL
         && slot->width == surface_w
@@ -3006,7 +3014,8 @@ present_presentation_buffer(SWindowData *window_data,
         }
     }
 
-    surface_damage(window_data_specific->surface_wrapper, window_data_specific->compositor_version,
+    surface_damage(window_data_specific->surface_wrapper,
+                   window_data_specific->compositor_version,
                    0, 0,
                    (int32_t) metrics->physical_surface_width,
                    (int32_t) metrics->physical_surface_height);
@@ -3040,12 +3049,13 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
-    if (window == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
+    SWindowData *window_data;
+    SWindowData_Way *window_data_specific;
+
+    if (get_window_data(window, __func__, &window_data, &window_data_specific) == false) {
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close == true) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex aborted because the window is marked for close.");
         destroy(window_data);
@@ -3060,12 +3070,6 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     if (calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes) == false) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with invalid buffer size %ux%u.", width, height);
         return MFB_STATE_INVALID_BUFFER;
-    }
-
-    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    if (window_data_specific == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_ex.");
-        return MFB_STATE_INVALID_WINDOW;
     }
 
     if (window_data_specific->display == NULL
@@ -3143,23 +3147,19 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 //-------------------------------------
 mfb_update_state
 mfb_update_events(struct mfb_window *window) {
-    if (window == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events called with a null window pointer.");
+    SWindowData *window_data;
+    SWindowData_Way *window_data_specific;
+
+    if (get_window_data(window, __func__, &window_data, &window_data_specific) == false) {
         return MFB_STATE_INVALID_WINDOW;
     }
 
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close == true) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events aborted because the window is marked for close.");
         destroy(window_data);
         return MFB_STATE_EXIT;
     }
 
-    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    if (window_data_specific == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: missing Wayland-specific window data during mfb_update_events.");
-        return MFB_STATE_INVALID_WINDOW;
-    }
     if (window_data_specific->display == NULL
         || wl_display_get_error(window_data_specific->display) != 0) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during mfb_update_events.");
@@ -3192,21 +3192,16 @@ mfb_update_events(struct mfb_window *window) {
 //-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
-    if (window == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync called with a null window pointer.");
+    SWindowData *window_data;
+    SWindowData_Way *window_data_specific;
+
+    if (get_window_data(window, __func__, &window_data, &window_data_specific) == false) {
         return false;
     }
 
-    SWindowData *window_data = (SWindowData *) window;
     if (window_data->close == true) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted because the window is marked for close.");
         destroy(window_data);
-        return false;
-    }
-
-    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    if (window_data_specific == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync missing Wayland-specific window data.");
         return false;
     }
 
@@ -3442,16 +3437,18 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
-    if (window == 0x0 || title == 0x0) {
+    SWindowData *window_data;
+    SWindowData_Way *window_data_specific;
+
+    if (title == NULL) {
         return;
     }
 
-    SWindowData *window_data = (SWindowData *) window;
-    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    if (window_data_specific == 0x0) {
+    if (get_window_data(window, __func__, &window_data, &window_data_specific) == false) {
         return;
     }
 
+    kUnused(window_data);
     xdg_toplevel_set_title(window_data_specific->toplevel, title);
     wl_surface_commit(window_data_specific->surface);
 }
@@ -3497,15 +3494,10 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
 //-------------------------------------
 void
 mfb_show_cursor(struct mfb_window *window, bool show) {
-    SWindowData *window_data = (SWindowData *) window;
-    if (window_data == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor called with a null window pointer.");
-        return;
-    }
+    SWindowData *window_data;
+    SWindowData_Way *window_data_specific;
 
-    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    if (window_data_specific == NULL) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_show_cursor missing Wayland-specific window data.");
+    if (get_window_data(window, __func__, &window_data, &window_data_specific) == false) {
         return;
     }
 
