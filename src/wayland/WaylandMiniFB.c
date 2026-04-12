@@ -478,7 +478,7 @@ dispatch_render_blocking(SWindowData *window_data) {
 //-------------------------------------
 extern double g_time_for_frame;
 extern bool   g_use_hardware_sync;
-bool          g_use_wayland_frame_callback_throttle = false;
+bool          g_use_wayland_frame_callback_throttle = true;
 //-------------------------------------
 
 //-------------------------------------
@@ -3053,6 +3053,11 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
+    if (window_data->must_resize_context) {
+        window_data->must_resize_context = false;
+        kCall(resize_func, window_data->window_width, window_data->window_height);
+    }
+
     // When hardware sync is active (frame callback provides timing) or
     // no target FPS is set, skip software pacing entirely.
     if (g_use_hardware_sync == true || g_time_for_frame == 0.0) {
@@ -3088,6 +3093,11 @@ mfb_wait_sync(struct mfb_window *window) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
             destroy(window_data);
             return false;
+        }
+
+        if (window_data->must_resize_context) {
+            window_data->must_resize_context = false;
+            kCall(resize_func, window_data->window_width, window_data->window_height);
         }
     }
 
