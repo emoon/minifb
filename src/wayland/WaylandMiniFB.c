@@ -978,9 +978,30 @@ reset_keyboard_state(SWindowData *window_data, SWindowData_Way *window_data_spec
 }
 
 //-------------------------------------
+static void
+clear_keyboard_focus_state(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    bool was_active = window_data->is_active;
+
+    window_data->is_active = false;
+    reset_keyboard_state(window_data, window_data_specific);
+
+    if (was_active == true) {
+        kCall(active_func, false);
+    }
+}
+
+//-------------------------------------
+static void
+invalidate_pointer_serial_state(SWindowData_Way *window_data_specific) {
+    window_data_specific->pointer_serial = 0;
+    window_data_specific->pointer_enter_serial = 0;
+    window_data_specific->pointer_serial_valid = 0;
+}
+
+//-------------------------------------
 // Rebuild keyboard state from the compositor's pressed-key list.
 // Assumes reset_keyboard_state was called first.
-// Does not emit synthetic keyboard callbacks — only synchronizes state.
+// Does not emit synthetic keyboard callbacks - only synchronizes state.
 //-------------------------------------
 static void
 rebuild_keyboard_state_from_keys(SWindowData *window_data, SWindowData_Way *window_data_specific, struct wl_array *keys) {
@@ -1043,9 +1064,7 @@ keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
 
-    window_data->is_active = false;
-    reset_keyboard_state(window_data, window_data_specific);
-    kCall(active_func, false);
+    clear_keyboard_focus_state(window_data, window_data_specific);
 }
 
 //-------------------------------------
@@ -1169,7 +1188,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                         xkb_compose_state_reset(window_data_specific->xkb_compose_state);
                     }
                     else if (status == XKB_COMPOSE_COMPOSING) {
-                        // Dead key pending — buffer keycode, don't emit
+                        // Dead key pending - buffer keycode, don't emit
                         if (window_data_specific->compose_sequence_count < 8) {
                             window_data_specific->compose_sequence[window_data_specific->compose_sequence_count++] = xkb_keycode;
                         }
@@ -1360,7 +1379,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_specific) {
-        window_data_specific->pointer_serial_valid = 0;
+        invalidate_pointer_serial_state(window_data_specific);
     }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer left surface %p (serial: %d)", surface, serial);
@@ -1597,7 +1616,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
         wl_keyboard_destroy(window_data_specific->keyboard);
         window_data_specific->keyboard = NULL;
-        reset_keyboard_state(window_data, window_data_specific);
+        clear_keyboard_focus_state(window_data, window_data_specific);
     }
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_specific->pointer) {
@@ -1609,6 +1628,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_specific->pointer) {
         wl_pointer_destroy(window_data_specific->pointer);
         window_data_specific->pointer = NULL;
+        invalidate_pointer_serial_state(window_data_specific);
     }
 }
 
@@ -2212,7 +2232,7 @@ slot_destroy(SWaylandBufferSlot *slot) {
 
 //-------------------------------------
 // Rebuild a slot's pool+buffer if its dimensions are stale.
-// Each slot owns its own fd, mmap, and wl_shm_pool — no shared offsets.
+// Each slot owns its own fd, mmap, and wl_shm_pool - no shared offsets.
 // Returns true on success (or if no rebuild was needed).
 //-------------------------------------
 static bool
@@ -2661,7 +2681,7 @@ compute_presentation_metrics(const SWindowData *window_data,
         metrics->integer_scale = 1;
     }
 
-    // 4B: fractional HiDPI via wp_viewporter — takes priority over 4A.
+    // 4B: fractional HiDPI via wp_viewporter - takes priority over 4A.
     if (window_data_specific->viewport != NULL
         && window_data_specific->preferred_scale_120 > 0) {
         float fscale = (float) window_data_specific->preferred_scale_120 / 120.0f;
@@ -2753,7 +2773,7 @@ acquire_presentation_slot(SWindowData *window_data,
             return WAYLAND_SLOT_ACQUIRE_OK;
         }
 
-        // All slots busy — block until a release event arrives.
+        // All slots busy - block until a release event arrives.
         if (window_data->close == true) {
             return WAYLAND_SLOT_ACQUIRE_ERROR;
         }
