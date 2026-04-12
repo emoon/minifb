@@ -23,6 +23,7 @@ resize(struct mfb_window *window, int width, int height) {
 int
 main() {
     uint32_t    i, noise, carry, seed = 0xbeef;
+    char        title[64];
 
     struct mfb_window *window = mfb_open_ex("Timer Test", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window) {
@@ -62,7 +63,10 @@ main() {
         time += mfb_timer_delta(timer);
         ++frames;
         if (frames >= 60) {
-            MFB_LOGI(TEST_TAG, "FPS: %.3f", (frames / time));
+            double fps = frames / time;
+            snprintf(title, sizeof(title), "Timer Test - FPS: %.3f", fps);
+            mfb_set_title(window, title);
+            MFB_LOGI(TEST_TAG, "FPS: %.3f", fps);
             frames = 0;
             time = 0;
 
