@@ -51,6 +51,7 @@
 #define MFB_STR(x) MFB_STR_IMPL(x)
 
 #define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
+#define WAYLAND_DEFAULT_CURSOR_SIZE 32
 
 //-------------------------------------
 void init_keycodes();
@@ -690,10 +691,18 @@ destroy(SWindowData *window_data) {
         window_data_specific->cursor_surface = NULL;
     }
 
-    if (window_data_specific->cursor_theme) {
-        wl_cursor_theme_destroy(window_data_specific->cursor_theme);
-        window_data_specific->cursor_theme = NULL;
+    for (uint32_t i = 0; i < window_data_specific->cursor_theme_cache_count; ++i) {
+        if (window_data_specific->cursor_theme_cache[i]) {
+            wl_cursor_theme_destroy(window_data_specific->cursor_theme_cache[i]);
+            window_data_specific->cursor_theme_cache[i] = NULL;
+        }
+        window_data_specific->default_cursor_cache[i] = NULL;
+        window_data_specific->cursor_theme_cache_scales[i] = 0;
     }
+    window_data_specific->cursor_theme_cache_count = 0;
+    window_data_specific->cursor_theme = NULL;
+    window_data_specific->default_cursor = NULL;
+    window_data_specific->cursor_theme_scale = 0;
 
     if (window_data_specific->shm) {
         wl_shm_destroy(window_data_specific->shm);
@@ -996,6 +1005,180 @@ invalidate_pointer_serial_state(SWindowData_Way *window_data_specific) {
     window_data_specific->pointer_serial = 0;
     window_data_specific->pointer_enter_serial = 0;
     window_data_specific->pointer_serial_valid = 0;
+}
+
+//-------------------------------------
+static uint32_t
+get_cursor_buffer_scale(const SWindowData_Way *window_data_specific) {
+    uint32_t scale = 1;
+
+#if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
+        if (window_data_specific->preferred_scale_120 > 0) {
+            scale = (window_data_specific->preferred_scale_120 + 119u) / 120u;
+        }
+        else if (window_data_specific->integer_output_scale > 0) {
+            scale = window_data_specific->integer_output_scale;
+        }
+    }
+#endif
+
+    if (scale == 0) {
+        scale = 1;
+    }
+
+    return scale;
+}
+
+//-------------------------------------
+static int
+find_cursor_theme_cache_index(const SWindowData_Way *window_data_specific, uint32_t scale) {
+    for (uint32_t i = 0; i < window_data_specific->cursor_theme_cache_count; ++i) {
+        if (window_data_specific->cursor_theme_cache_scales[i] == scale) {
+            return (int) i;
+        }
+    }
+
+    return -1;
+}
+
+//-------------------------------------
+static bool
+ensure_cursor_theme_for_scale(SWindowData_Way *window_data_specific, uint32_t scale) {
+    if (scale == 0) {
+        scale = 1;
+    }
+
+    if (window_data_specific->cursor_theme != NULL &&
+        window_data_specific->default_cursor != NULL &&
+        window_data_specific->cursor_theme_scale == scale) {
+        return true;
+    }
+
+    int cache_index = find_cursor_theme_cache_index(window_data_specific, scale);
+    if (cache_index >= 0) {
+        window_data_specific->cursor_theme = window_data_specific->cursor_theme_cache[cache_index];
+        window_data_specific->default_cursor = window_data_specific->default_cursor_cache[cache_index];
+        window_data_specific->cursor_theme_scale = scale;
+        return true;
+    }
+
+    if (window_data_specific->shm == NULL) {
+        return false;
+    }
+
+    if (window_data_specific->cursor_theme_cache_count >= WAYLAND_CURSOR_THEME_CACHE_SIZE) {
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: cursor theme cache is full; keeping the current cursor theme.");
+        return window_data_specific->cursor_theme != NULL && window_data_specific->default_cursor != NULL;
+    }
+
+    if (scale > (uint32_t) (INT_MAX / WAYLAND_DEFAULT_CURSOR_SIZE)) {
+        return false;
+    }
+
+    int theme_size = (int) (WAYLAND_DEFAULT_CURSOR_SIZE * scale);
+    struct wl_cursor_theme *theme = wl_cursor_theme_load(NULL, theme_size, window_data_specific->shm);
+    if (theme == NULL) {
+        return false;
+    }
+
+    struct wl_cursor *cursor = wl_cursor_theme_get_cursor(theme, "left_ptr");
+    if (cursor == NULL || cursor->image_count == 0) {
+        wl_cursor_theme_destroy(theme);
+        return false;
+    }
+
+    uint32_t cache_slot = window_data_specific->cursor_theme_cache_count++;
+    window_data_specific->cursor_theme_cache[cache_slot] = theme;
+    window_data_specific->default_cursor_cache[cache_slot] = cursor;
+    window_data_specific->cursor_theme_cache_scales[cache_slot] = scale;
+
+    window_data_specific->cursor_theme = theme;
+    window_data_specific->default_cursor = cursor;
+    window_data_specific->cursor_theme_scale = scale;
+
+    return true;
+}
+
+//-------------------------------------
+static void
+refresh_cursor_surface(SWindowData *window_data) {
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL ||
+        window_data_specific->pointer == NULL ||
+        window_data_specific->cursor_surface == NULL ||
+        window_data_specific->pointer_serial_valid == 0) {
+        return;
+    }
+
+    uint32_t serial = window_data_specific->pointer_enter_serial;
+    if (window_data->is_cursor_visible == false) {
+        wl_pointer_set_cursor(window_data_specific->pointer, serial, NULL, 0, 0);
+        return;
+    }
+
+    uint32_t cursor_scale = get_cursor_buffer_scale(window_data_specific);
+    if (ensure_cursor_theme_for_scale(window_data_specific, cursor_scale) == false) {
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: failed to load cursor theme for scale %u.", cursor_scale);
+        return;
+    }
+
+    uint32_t applied_scale = 1;
+#if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
+        applied_scale = window_data_specific->cursor_theme_scale > 0 ? window_data_specific->cursor_theme_scale : 1u;
+    }
+#endif
+
+    struct wl_cursor *cursor = window_data_specific->default_cursor;
+    if (cursor == NULL || cursor->image_count == 0) {
+        return;
+    }
+
+    struct wl_cursor_image *image = cursor->images[0];
+    if (applied_scale > 1 &&
+        (image->width % applied_scale != 0 || image->height % applied_scale != 0)) {
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: cursor image %ux%u is incompatible with buffer scale %u; retrying with scale 1.",
+                image->width, image->height, applied_scale);
+
+        if (ensure_cursor_theme_for_scale(window_data_specific, 1) == false) {
+            return;
+        }
+
+        cursor = window_data_specific->default_cursor;
+        if (cursor == NULL || cursor->image_count == 0) {
+            return;
+        }
+
+        image = cursor->images[0];
+        applied_scale = 1;
+    }
+
+    struct wl_buffer *buffer = wl_cursor_image_get_buffer(image);
+    if (buffer == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_cursor_image_get_buffer returned NULL.");
+        return;
+    }
+
+#if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
+        wl_surface_set_buffer_scale(window_data_specific->cursor_surface, (int32_t) applied_scale);
+    }
+#endif
+
+    int32_t hotspot_x = (int32_t) image->hotspot_x;
+    int32_t hotspot_y = (int32_t) image->hotspot_y;
+    if (applied_scale > 1) {
+        hotspot_x = (hotspot_x + (int32_t) (applied_scale / 2)) / (int32_t) applied_scale;
+        hotspot_y = (hotspot_y + (int32_t) (applied_scale / 2)) / (int32_t) applied_scale;
+    }
+
+    wl_pointer_set_cursor(window_data_specific->pointer, serial,
+                          window_data_specific->cursor_surface, hotspot_x, hotspot_y);
+    wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
+    surface_damage(window_data_specific->cursor_surface, window_data_specific->compositor_version,
+                   0, 0, image->width, image->height);
+    wl_surface_commit(window_data_specific->cursor_surface);
 }
 
 //-------------------------------------
@@ -1317,11 +1500,8 @@ wl_keyboard_listener keyboard_listener = {
 //-------------------------------------
 static void
 pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy) {
-    //kUnused(pointer);
-    //kUnused(serial);
+    kUnused(pointer);
     kUnused(surface);
-    struct wl_buffer *buffer;
-    struct wl_cursor_image *image;
 
     SWindowData *window_data = (SWindowData *) data;
     if (window_data == NULL)
@@ -1337,27 +1517,7 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     window_data->mouse_pos_x = wl_fixed_to_int(sx);
     window_data->mouse_pos_y = wl_fixed_to_int(sy);
 
-    if (window_data->is_cursor_visible) {
-        if (window_data_specific->default_cursor == NULL ||
-            window_data_specific->default_cursor->image_count == 0 ||
-            window_data_specific->cursor_surface == NULL) {
-            return;
-        }
-        image  = window_data_specific->default_cursor->images[0];
-        buffer = wl_cursor_image_get_buffer(image);
-        if (buffer == NULL) {
-            return;
-        }
-
-        wl_pointer_set_cursor(pointer, serial, window_data_specific->cursor_surface, image->hotspot_x, image->hotspot_y);
-        wl_surface_attach(window_data_specific->cursor_surface, buffer, 0, 0);
-        surface_damage(window_data_specific->cursor_surface, window_data_specific->compositor_version,
-                       0, 0, image->width, image->height);
-        wl_surface_commit(window_data_specific->cursor_surface);
-    }
-    else {
-        wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
-    }
+    refresh_cursor_surface(window_data);
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer entered surface %p at %d %d (serial: %d)", surface, sx, sy, serial);
 }
@@ -1698,6 +1858,7 @@ fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *frac
         return;
     }
     window_data_specific->preferred_scale_120 = scale;
+    refresh_cursor_surface(window_data);
 }
 
 //-------------------------------------
@@ -1794,6 +1955,7 @@ output_scale(void *data, struct wl_output *output, int32_t factor) {
     window_data_specific->output_scales[idx] = scale;
     if (window_data_specific->output_entered[idx]) {
         recompute_output_scale(window_data_specific);
+        refresh_cursor_surface(window_data);
     }
 }
 
@@ -1855,6 +2017,7 @@ surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) 
     if (idx >= 0) {
         window_data_specific->output_entered[idx] = 1;
         recompute_output_scale(window_data_specific);
+        refresh_cursor_surface(window_data);
     }
 }
 
@@ -1872,6 +2035,7 @@ surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) 
     if (idx >= 0) {
         window_data_specific->output_entered[idx] = 0;
         recompute_output_scale(window_data_specific);
+        refresh_cursor_surface(window_data);
     }
 }
 
@@ -1950,10 +2114,6 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
         MFB_LOG(MFB_LOG_TRACE, "wl_shm: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->shm) {
             wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
-            window_data_specific->cursor_theme = wl_cursor_theme_load(NULL, 32, window_data_specific->shm);
-            if (window_data_specific->cursor_theme) {
-                window_data_specific->default_cursor = wl_cursor_theme_get_cursor(window_data_specific->cursor_theme, "left_ptr");
-            }
         }
     }
 
@@ -2054,6 +2214,7 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
 
             if (was_entered) {
                 recompute_output_scale(window_data_specific);
+                refresh_cursor_surface(window_data);
             }
             break;
         }
@@ -3362,29 +3523,6 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
         return;
     }
 
-    uint32_t serial = window_data_specific->pointer_enter_serial;
-    if (show) {
-        struct wl_cursor *cursor = window_data_specific->default_cursor;
-        if (cursor == NULL || cursor->image_count == 0 || cursor_surface == NULL) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: default cursor data is incomplete (cursor=%p, image_count=%u, cursor_surface=%p).",
-                    (void *) cursor, cursor ? cursor->image_count : 0, (void *) cursor_surface);
-            return;
-        }
-
-        struct wl_cursor_image *cursor_image = cursor->images[0];
-        struct wl_buffer *cursor_image_buffer = wl_cursor_image_get_buffer(cursor_image);
-        if (cursor_image_buffer == NULL) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_cursor_image_get_buffer returned NULL.");
-            return;
-        }
-
-        wl_pointer_set_cursor(pointer, serial, cursor_surface, cursor_image->hotspot_x, cursor_image->hotspot_y);
-        wl_surface_attach(cursor_surface, cursor_image_buffer, 0, 0);
-        surface_damage(cursor_surface, window_data_specific->compositor_version,
-                       0, 0, cursor_image->width, cursor_image->height);
-        wl_surface_commit(cursor_surface);
-    }
-    else {
-        wl_pointer_set_cursor(pointer, serial, NULL, 0, 0);
-    }
+    kUnused(cursor_surface);
+    refresh_cursor_surface(window_data);
 }
