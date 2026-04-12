@@ -11,7 +11,7 @@ t2-output
 /way
 /x11
 /vs
-/vs
+/vc
 /mingw
 /build
 /build-*
@@ -23,9 +23,6 @@ t2-output
 .gradle
 .idea
 .cxx
-build
-/build_*
-/build-*
 kk
 vc
 cmake-build-debug

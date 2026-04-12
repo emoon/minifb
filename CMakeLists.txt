@@ -102,6 +102,8 @@ set(SrcWayland
     src/wayland/WaylandMiniFB.c
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
+    src/MiniFB_utf8.c
+    src/MiniFB_utf8.h
 )
 
 #--
@@ -111,6 +113,8 @@ set(SrcX11
     src/x11/X11MiniFB_scale_funcs.h
     src/x11/WindowData_X11.h
     src/MiniFB_linux.c
+    src/MiniFB_utf8.c
+    src/MiniFB_utf8.h
 )
 
 set(SrcGL
