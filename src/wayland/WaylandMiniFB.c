@@ -1250,6 +1250,15 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         wl_pointer_destroy(window_data_specific->pointer);
         window_data_specific->pointer = NULL;
         invalidate_pointer_serial_state(window_data_specific);
+
+        // Release any buttons still marked as pressed; otherwise getters would
+        // report them as held forever now that we won't receive release events.
+        for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
+            if (window_data->mouse_button_status[button] != 0) {
+                window_data->mouse_button_status[button] = 0;
+                kCall(mouse_btn_func, (mfb_mouse_button) button, (mfb_key_mod) window_data->mod_keys, false);
+            }
+        }
     }
 }
 
@@ -2372,7 +2381,9 @@ acquire_presentation_slot(SWindowData *window_data,
     *out_slot = NULL;
 
     // Dispatch render pending to process any buffer release events.
-    dispatch_render_pending(window_data);
+    if (dispatch_render_pending(window_data) == false) {
+        return WAYLAND_SLOT_ACQUIRE_ERROR;
+    }
 
     while (true) {
         int start = window_data_specific->front_slot;
