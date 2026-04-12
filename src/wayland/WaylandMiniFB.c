@@ -2108,7 +2108,7 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
             window_data->window_width  = (unsigned) width;
             window_data->window_height = (unsigned) height;
             resize_dst(window_data, (unsigned) width, (unsigned) height);
-            kCall(resize_func, window_data->window_width, window_data->window_height);
+            window_data->must_resize_context = true;
         }
     }
 
@@ -2299,6 +2299,7 @@ slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window_data_specif
     wl_buffer_add_listener(slot->wl_buf, &buffer_listener, slot);
     slot->width  = surface_w;
     slot->height = surface_h;
+
     return true;
 }
 
@@ -2601,6 +2602,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+    // Avoid retroactive callback to resize
+    window_data->must_resize_context = false;
+
     MFB_LOG(MFB_LOG_DEBUG, "Window created using Wayland API");
 
     return (struct mfb_window *) window_data;
@@ -2612,6 +2616,7 @@ out:
     return NULL;
 }
 
+//-------------------------------------
 typedef struct {
     uint32_t logical_surface_width;
     uint32_t logical_surface_height;
@@ -2630,6 +2635,7 @@ typedef struct {
     bool     use_fractional;
 } SWaylandPresentationMetrics;
 
+//-------------------------------------
 typedef enum {
     WAYLAND_SLOT_ACQUIRE_OK = 0,
     WAYLAND_SLOT_ACQUIRE_BUSY,
@@ -2664,8 +2670,8 @@ compute_presentation_metrics(const SWindowData *window_data,
         metrics->physical_surface_height = (uint32_t) ((float) metrics->logical_surface_height * fscale + 0.5f);
         metrics->physical_dst_offset_x   = (uint32_t) ((float) metrics->logical_dst_offset_x   * fscale + 0.5f);
         metrics->physical_dst_offset_y   = (uint32_t) ((float) metrics->logical_dst_offset_y   * fscale + 0.5f);
-        metrics->physical_dst_width      = (uint32_t) ((float) metrics->logical_dst_width       * fscale + 0.5f);
-        metrics->physical_dst_height     = (uint32_t) ((float) metrics->logical_dst_height      * fscale + 0.5f);
+        metrics->physical_dst_width      = (uint32_t) ((float) metrics->logical_dst_width      * fscale + 0.5f);
+        metrics->physical_dst_height     = (uint32_t) ((float) metrics->logical_dst_height     * fscale + 0.5f);
         if (metrics->physical_surface_width  == 0) { metrics->physical_surface_width  = 1; }
         if (metrics->physical_surface_height == 0) { metrics->physical_surface_height = 1; }
         // Clamp dst rect to physical surface bounds to prevent stretch_image
@@ -2695,23 +2701,23 @@ compute_presentation_metrics(const SWindowData *window_data,
 #endif
 
     if (metrics->use_buffer_scale == true
-        && (metrics->logical_surface_width > UINT32_MAX / metrics->integer_scale
-            || metrics->logical_surface_height > UINT32_MAX / metrics->integer_scale
-            || metrics->logical_dst_offset_x > UINT32_MAX / metrics->integer_scale
-            || metrics->logical_dst_offset_y > UINT32_MAX / metrics->integer_scale
-            || metrics->logical_dst_width > UINT32_MAX / metrics->integer_scale
-            || metrics->logical_dst_height > UINT32_MAX / metrics->integer_scale)) {
+        && (metrics->logical_surface_width  > UINT32_MAX / metrics->integer_scale
+        ||  metrics->logical_surface_height > UINT32_MAX / metrics->integer_scale
+        ||  metrics->logical_dst_offset_x   > UINT32_MAX / metrics->integer_scale
+        ||  metrics->logical_dst_offset_y   > UINT32_MAX / metrics->integer_scale
+        ||  metrics->logical_dst_width      > UINT32_MAX / metrics->integer_scale
+        ||  metrics->logical_dst_height     > UINT32_MAX / metrics->integer_scale)) {
         metrics->use_buffer_scale = false;
     }
 
     uint32_t applied_scale = metrics->use_buffer_scale ? metrics->integer_scale : 1u;
 
-    metrics->physical_surface_width  = metrics->logical_surface_width * applied_scale;
+    metrics->physical_surface_width  = metrics->logical_surface_width  * applied_scale;
     metrics->physical_surface_height = metrics->logical_surface_height * applied_scale;
-    metrics->physical_dst_offset_x   = metrics->logical_dst_offset_x * applied_scale;
-    metrics->physical_dst_offset_y   = metrics->logical_dst_offset_y * applied_scale;
-    metrics->physical_dst_width      = metrics->logical_dst_width * applied_scale;
-    metrics->physical_dst_height     = metrics->logical_dst_height * applied_scale;
+    metrics->physical_dst_offset_x   = metrics->logical_dst_offset_x   * applied_scale;
+    metrics->physical_dst_offset_y   = metrics->logical_dst_offset_y   * applied_scale;
+    metrics->physical_dst_width      = metrics->logical_dst_width      * applied_scale;
+    metrics->physical_dst_height     = metrics->logical_dst_height     * applied_scale;
 }
 
 //-------------------------------------
@@ -2853,7 +2859,6 @@ mfb_update_state
 mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned height) {
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
-
     if (window == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_ex called with a null window pointer.");
         return MFB_STATE_INVALID_WINDOW;
@@ -2906,11 +2911,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = buffer_stride;
     }
 
-    // 2. Compute metrics AFTER dispatch (captures latest size from resize events).
-    SWaylandPresentationMetrics metrics;
-    compute_presentation_metrics(window_data, window_data_specific, &metrics);
-
-    // 3. Wait for PREVIOUS frame's callback (pipelined throttle).
+    // 2. Wait for PREVIOUS frame's callback (pipelined throttle).
     if (surface_throttle(window_data) == false) {
         if (window_data->close == true) {
             destroy(window_data);
@@ -2924,6 +2925,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         destroy(window_data);
         return MFB_STATE_EXIT;
     }
+
+    // 3. Compute metrics AFTER dispatch (captures latest size from resize events).
+    SWaylandPresentationMetrics metrics;
+    compute_presentation_metrics(window_data, window_data_specific, &metrics);
 
     // 4. Acquire a free buffer slot (blocks on render_queue if all busy).
     SWaylandBufferSlot *active_slot = NULL;
@@ -2944,7 +2949,14 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     // 5. Compose and present.
     compose_presentation_buffer(window_data, &metrics, buffer, active_slot->shm_ptr);
-    return present_presentation_buffer(window_data, window_data_specific, active_slot, &metrics);
+    mfb_update_state state = present_presentation_buffer(window_data, window_data_specific, active_slot, &metrics);
+
+    if (window_data->must_resize_context && state == MFB_STATE_OK) {
+        window_data->must_resize_context = false;
+        kCall(resize_func, window_data->window_width, window_data->window_height);
+    }
+
+    return state;
 }
 
 //-------------------------------------
@@ -2986,6 +2998,11 @@ mfb_update_events(struct mfb_window *window) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_update_events detected close request after event dispatch.");
         destroy(window_data);
         return MFB_STATE_EXIT;
+    }
+
+    if (window_data->must_resize_context) {
+        window_data->must_resize_context = false;
+        kCall(resize_func, window_data->window_width, window_data->window_height);
     }
 
     return MFB_STATE_OK;

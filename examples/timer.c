@@ -17,6 +17,7 @@ resize(struct mfb_window *window, int width, int height) {
     g_width  = width;
     g_height = height;
     g_buffer = realloc(g_buffer, g_width * g_height * 4);
+    MFB_LOGI(TEST_TAG, "resize: %dx%d", width, height);
 }
 
 //-------------------------------------
