@@ -181,10 +181,15 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
         set(MINIFB_USE_X11_API ON)
     endif()
 
-    cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" OFF
+    cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON
         "MINIFB_USE_X11_API OR WIN32" OFF)
 
-else() # when we upgrade past cmake 3.22, remove this path, the above does the same thing but cleaner
+else()
+
+	# even if an `option()` isn't reached, if it's been reached in previous configurations then the old value still exists as a cache variable
+	# this means it can still be seen and edited by tools such as cmake-gui, without any indication that it's not meant to be enabled
+	# this can lead to cases where two conflicting options are active, so we need to manually `set()` values OFF if they're not reached
+	# dependent options fix this, which is why they should be prioritised if available
 
     if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
         option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
@@ -193,16 +198,29 @@ else() # when we upgrade past cmake 3.22, remove this path, the above does the s
     endif()
 
     if (MACOS)
-        option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
+        option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON)
         option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-    elseif (LINUX)
-        option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
-		if (NOT MINIFB_USE_WAYLAND_API)
-            option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
-            set(MINIFB_USE_X11_API ON)
-        endif()
-    elseif (WIN32)
-        option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+	else()
+		set(MINIFB_USE_METAL_API OFF)
+		set(MINIFB_USE_INVERTED_Y_ON_MACOS OFF)
+	endif()
+
+    if (LINUX)
+        option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF)
+	else()
+		set(MINIFB_USE_WAYLAND_API OFF)
+	endif()
+
+	if (LINUX AND NOT MINIFB_USE_WAYLAND_API)
+		set(MINIFB_USE_X11_API ON)
+	else()
+		set(MINIFB_USE_X11_API OFF)
+	endif()
+
+    if (WIN32 OR MINIFB_USE_X11_API)
+		option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+	else()
+		set(MINIFB_USE_OPENGL_API OFF)
     endif()
 
 endif()
@@ -244,13 +262,6 @@ if (NOT MSVC)
         -Wno-implicit-fallthrough
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
     )
-
-    # TODO: why specifically not apple, and is this suppression neccecary anyway?
-    if (NOT APPLE)
-        list(APPEND MINIFB_COMPILE_OPTIONS
-            -Wno-cast-function-type
-        )
-    endif()
 
 else()
 
