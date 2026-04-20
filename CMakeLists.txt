@@ -130,25 +130,6 @@ set(SrcDOS
     src/dos/vesa.c
 )
 
-# Set features
-#--------------------------------------
-set(MINIFB_C_STANDARD 11)
-set(MINIFB_CXX_STANDARD 11)
-
-set(MINIFB_COMPILE_OPTIONS)
-set(MINIFB_COMPILE_DEFINITIONS)
-set(MINIFB_LINK_OPTIONS_LIB)
-set(MINIFB_LINK_OPTIONS_EXE)
-
-if (DJGPP)
-    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
-    set(MINIFB_C_EXTENSIONS   ON)
-    set(MINIFB_CXX_EXTENSIONS ON)
-else()
-    set(MINIFB_C_EXTENSIONS   OFF)
-    set(MINIFB_CXX_EXTENSIONS OFF)
-endif()
-
 # Options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
@@ -236,6 +217,27 @@ elseif (WIN32)
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
+# Create library target
+#--------------------------------------
+add_library(minifb STATIC
+    ${SrcLib}
+)
+add_library(minifb::minifb ALIAS minifb)
+
+# Set features
+#--------------------------------------
+set(MINIFB_C_STANDARD 11)
+set(MINIFB_CXX_STANDARD 11)
+
+if (DJGPP)
+    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
+    set(MINIFB_C_EXTENSIONS   ON)
+    set(MINIFB_CXX_EXTENSIONS ON)
+else()
+    set(MINIFB_C_EXTENSIONS   OFF)
+    set(MINIFB_CXX_EXTENSIONS OFF)
+endif()
+
 # Set compile flags depending on the compiler
 #--------------------------------------
 if (NOT MSVC)
@@ -243,17 +245,17 @@ if (NOT MSVC)
     # GCC/Clang
 
     if (DJGPP)
-        list(APPEND MINIFB_COMPILE_OPTIONS
+        target_compile_options(minifb PUBLIC
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
         )
     else()
-        list(APPEND MINIFB_COMPILE_OPTIONS
+        target_compile_options(minifb PUBLIC
             "$<$<CONFIG:Debug>:-g>"
         )
     endif()
 
-    list(APPEND MINIFB_COMPILE_OPTIONS
+    target_compile_options(minifb PUBLIC
         -Wall
         -Wextra
         -Wno-switch
@@ -268,7 +270,7 @@ else()
     # MSVC
     #--------------------------------------
 
-    list(APPEND MINIFB_COMPILE_OPTIONS
+    target_compile_options(minifb PUBLIC
         # Security check
         /GS
         # Function level linking
@@ -293,18 +295,18 @@ else()
     )
 
     # prevent annoying c standard lib unsafety msvc warnings
-    list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
+    target_compile_definitions(minifb PUBLIC _CRT_SECURE_NO_WARNINGS)
 
 endif()
 
-list(APPEND MINIFB_COMPILE_DEFINITIONS
+target_compile_definitions(minifb PUBLIC
     "$<$<CONFIG:Debug>:_DEBUG>"
     "$<$<CONFIG:Debug>:DEBUG>"
 )
 
 # TODO: does the toolchain include this automatically?
 if (EMSCRIPTEN)
-    list(APPEND MINIFB_LINK_OPTIONS_EXE
+    target_link_options(minifb INTERFACE
         "$<$<CONFIG:Debug>:-g>"
     )
 endif()
@@ -313,48 +315,41 @@ endif()
 #--------------------------------------
 
 if (MINIFB_USE_INVERTED_Y_ON_MACOS)
-    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
+    target_compile_definitions(minifb PUBLIC USE_INVERTED_Y_ON_MACOS)
 endif()
 
 # Add GL/Metal code if we're using GL/Metal, no matter the backend
 if (MINIFB_USE_OPENGL_API)
-    list(APPEND SrcLib ${SrcGL})
-    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
+    target_sources(minifb PRIVATE ${SrcGL})
+    target_compile_definitions(minifb PUBLIC USE_OPENGL_API)
 endif()
 if (MINIFB_USE_METAL_API)
-    list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
-    list(APPEND SrcLib ${SrcMacOSMetal})
+    target_compile_definitions(minifb PUBLIC USE_METAL_API)
+    target_sources(minifb PRIVATE ${SrcMacOSMetal})
 endif()
 
 if (WIN32)
-    list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
-    list(APPEND SrcLib ${SrcWindows})
+    target_compile_definitions(minifb PUBLIC _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
+    target_sources(minifb PRIVATE ${SrcWindows})
 
 elseif (IOS)
-    list(APPEND SrcLib ${SrcIOS})
+    target_sources(minifb PRIVATE ${SrcIOS})
 
 elseif (DARWIN)
-    list(APPEND SrcLib ${SrcMacOS})
+    target_sources(minifb PRIVATE ${SrcMacOS})
 
 elseif (MINIFB_USE_WAYLAND_API)
-    list(APPEND SrcLib ${SrcWayland})
+    target_sources(minifb PRIVATE ${SrcWayland})
 
 elseif (MINIFB_USE_X11_API)
-    list(APPEND SrcLib ${SrcX11})
+    target_sources(minifb PRIVATE ${SrcX11})
 
 elseif (EMSCRIPTEN)
-    list(APPEND SrcLib ${SrcWeb})
+    target_sources(minifb PRIVATE ${SrcWeb})
 
 elseif (DJGPP)
-    list(APPEND SrcLib ${SrcDOS})
+    target_sources(minifb PRIVATE ${SrcDOS})
 endif()
-
-# Library
-#--------------------------------------
-add_library(minifb STATIC
-    ${SrcLib}
-)
-add_library(minifb::minifb ALIAS minifb)
 
 # Link
 #--------------------------------------
@@ -420,7 +415,7 @@ elseif(MINIFB_USE_X11_API)
 
 elseif (EMSCRIPTEN)
 
-    list(APPEND MINIFB_LINK_OPTIONS_EXE
+    target_link_options(minifb INTERFACE
         "-sSTRICT=1"
         "-sENVIRONMENT=web"
         "-sMODULARIZE=1"
@@ -463,18 +458,6 @@ set_target_properties(minifb PROPERTIES
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
 )
-
-if (MINIFB_COMPILE_OPTIONS)
-    target_compile_options(minifb PRIVATE ${MINIFB_COMPILE_OPTIONS})
-endif()
-
-if (MINIFB_COMPILE_DEFINITIONS)
-    target_compile_definitions(minifb PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-endif()
-
-if (MINIFB_LINK_OPTIONS_LIB)
-    target_link_options(minifb PRIVATE ${MINIFB_LINK_OPTIONS_LIB})
-endif()
 
 target_include_directories(minifb PUBLIC
     $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
@@ -596,18 +579,6 @@ foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
     )
-
-    if (MINIFB_COMPILE_OPTIONS)
-        target_compile_options(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_OPTIONS})
-    endif()
-
-    if (MINIFB_COMPILE_DEFINITIONS)
-        target_compile_definitions(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-    endif()
-
-    if (MINIFB_LINK_OPTIONS_EXE)
-        target_link_options(${minifb_test_target} PRIVATE ${MINIFB_LINK_OPTIONS_EXE})
-    endif()
 endforeach()
 
 # Organize IDE Folders
