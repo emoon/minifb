@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 project(MiniFB VERSION 0.10.1 LANGUAGES C CXX)
 
-if (APPLE)
+# prefer these over general `UNIX` or `APPLE`
+# `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX TRUE)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(MACOS TRUE)
+endif()
+
+if (MACOS OR IOS)
     include(CheckLanguage)
     check_language(OBJC)
     if (CMAKE_OBJC_COMPILER)
@@ -122,15 +130,102 @@ set(SrcDOS
     src/dos/vesa.c
 )
 
+# Options
+#--------------------------------------
+option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
+option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
+
+# purely for internal use, never exposed to the user
+set(MINIFB_USE_X11_API OFF)
+
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22) 
+
+    # requires 3.22+ to use full condition syntax, technically could use in 3.16, but it would be a lot worse
+    include(CMakeDependentOption)
+
+    # cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
+    # the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
+    # setting the default value lets us de-nest `if(<platform>) if(<option>)` type stuff, into just `if(<option>)`.
+
+    cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
+        "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
+
+    cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
+        "MACOS" OFF)
+    cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
+        "MACOS" OFF)
+
+    cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
+        "LINUX" OFF)
+
+    if (NOT MINIFB_USE_WAYLAND_API AND LINUX)
+        set(MINIFB_USE_X11_API ON)
+    endif()
+
+    cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON
+        "MINIFB_USE_X11_API OR WIN32" OFF)
+
+else()
+
+    # even if an `option()` isn't reached, if it's been reached in previous configurations then the old value still exists as a cache variable
+    # this means it can still be seen and edited by tools such as cmake-gui, without any indication that it's not meant to be enabled
+    # this can lead to cases where two conflicting options are active, so we need to manually `set()` values OFF if they're not reached
+    # dependent options fix this, which is why they should be prioritised if available
+
+    if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
+        option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
+    else()
+        set(MINIFB_BUILD_VERSION_INFO OFF)
+    endif()
+
+    if (MACOS)
+        option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON)
+        option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    else()
+        set(MINIFB_USE_METAL_API OFF)
+        set(MINIFB_USE_INVERTED_Y_ON_MACOS OFF)
+    endif()
+
+    if (LINUX)
+        option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF)
+    else()
+        set(MINIFB_USE_WAYLAND_API OFF)
+    endif()
+
+    if (LINUX AND NOT MINIFB_USE_WAYLAND_API)
+        set(MINIFB_USE_X11_API ON)
+    else()
+        set(MINIFB_USE_X11_API OFF)
+    endif()
+
+    if (WIN32 OR MINIFB_USE_X11_API)
+        option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    else()
+        set(MINIFB_USE_OPENGL_API OFF)
+    endif()
+
+endif()
+
+# unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
+if (MACOS)
+    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using Metal API code")
+    minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
+elseif (LINUX)
+    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using Wayland API code")
+    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+elseif (WIN32)
+    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+endif()
+
+# Create library target
+#--------------------------------------
+add_library(minifb STATIC ${SrcLib})
+add_library(minifb::minifb ALIAS minifb)
+
 # Set features
 #--------------------------------------
 set(MINIFB_C_STANDARD 11)
 set(MINIFB_CXX_STANDARD 11)
-
-set(MINIFB_COMPILE_OPTIONS)
-set(MINIFB_COMPILE_DEFINITIONS)
-set(MINIFB_LINK_OPTIONS_LIB)
-set(MINIFB_LINK_OPTIONS_EXE)
 
 if (DJGPP)
     # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
@@ -141,32 +236,6 @@ else()
     set(MINIFB_CXX_EXTENSIONS OFF)
 endif()
 
-# Options
-#--------------------------------------
-option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
-option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
-
-if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
-    option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
-else()
-    set(MINIFB_BUILD_VERSION_INFO OFF)
-endif()
-
-if (APPLE AND NOT IOS)
-    option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
-    option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using metal API code")
-    minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
-elseif (UNIX AND NOT EMSCRIPTEN)
-    option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
-    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using wayland API code")
-    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
-elseif (WIN32)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
-    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
-endif()
-
 # Set compile flags depending on the compiler
 #--------------------------------------
 if (NOT MSVC)
@@ -174,17 +243,17 @@ if (NOT MSVC)
     # GCC/Clang
 
     if (DJGPP)
-        list(APPEND MINIFB_COMPILE_OPTIONS
+        target_compile_options(minifb PUBLIC
             "$<$<CONFIG:Debug>:-gdwarf>"
             "$<$<CONFIG:Debug>:-save-temps>"
         )
     else()
-        list(APPEND MINIFB_COMPILE_OPTIONS
+        target_compile_options(minifb PUBLIC
             "$<$<CONFIG:Debug>:-g>"
         )
     endif()
 
-    list(APPEND MINIFB_COMPILE_OPTIONS
+    target_compile_options(minifb PUBLIC
         -Wall
         -Wextra
         -Wno-switch
@@ -194,18 +263,12 @@ if (NOT MSVC)
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
     )
 
-    if (NOT APPLE)
-        list(APPEND MINIFB_COMPILE_OPTIONS
-            -Wno-cast-function-type
-        )
-    endif()
-
 else()
 
     # MSVC
     #--------------------------------------
 
-    list(APPEND MINIFB_COMPILE_OPTIONS
+    target_compile_options(minifb PUBLIC
         # Security check
         /GS
         # Function level linking
@@ -216,8 +279,10 @@ else()
         /fp:fast
         # Force Visual Studio to actualize __cplusplus version macro
         /Zc:__cplusplus
+        # Additional security checks
+        /sdl
 
-        # Program database for edit and continue
+        # Program database (edit and continue in debug mode)
         "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
         # Optimizations
         "$<IF:$<CONFIG:Debug>,/Od,/O2>"
@@ -227,184 +292,137 @@ else()
         "$<$<CONFIG:Debug>:/RTC1>"
     )
 
-    if (MSVC_VERSION GREATER_EQUAL 1900)
-        # SDL checks 2015+
-        list(APPEND MINIFB_COMPILE_OPTIONS /sdl)
-    endif()
-
-    if (MSVC_VERSION LESS_EQUAL 1920)
-        # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
-        list(APPEND MINIFB_COMPILE_OPTIONS /Gm)
-    endif()
+    # prevent annoying c standard lib unsafety msvc warnings
+    target_compile_definitions(minifb PUBLIC _CRT_SECURE_NO_WARNINGS)
 
 endif()
 
-list(APPEND MINIFB_COMPILE_DEFINITIONS
+target_compile_definitions(minifb PUBLIC
     "$<$<CONFIG:Debug>:_DEBUG>"
     "$<$<CONFIG:Debug>:DEBUG>"
 )
 
+# TODO: does the toolchain include this automatically?
 if (EMSCRIPTEN)
-    list(APPEND MINIFB_LINK_OPTIONS_EXE
+    target_link_options(minifb INTERFACE
         "$<$<CONFIG:Debug>:-g>"
     )
 endif()
 
-# Set compiler/platform specific flags and dependencies
+# Set platform specific flags and source files
 #--------------------------------------
-if (WIN32)
 
-    if (MSVC)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
-    endif()
-    list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
-
-    if (USE_OPENGL_API)
-        list(APPEND SrcLib ${SrcGL})
-
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-    endif()
-
-    list(APPEND SrcLib ${SrcWindows})
-
-elseif (IOS)
-
-    list(APPEND SrcLib ${SrcIOS})
-
-elseif (APPLE)
-
-    if (USE_METAL_API)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
-        list(APPEND SrcLib ${SrcMacOSMetal})
-    endif()
-
-    if (USE_INVERTED_Y_ON_MACOS)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
-    endif()
-
-    list(APPEND SrcLib ${SrcMacOS})
-
-elseif (UNIX)
-
-    if (USE_WAYLAND_API)
-        list(APPEND SrcLib ${SrcWayland})
-    elseif (EMSCRIPTEN)
-        list(APPEND SrcLib ${SrcWeb})
-    else()
-        if (USE_OPENGL_API)
-            list(APPEND SrcLib ${SrcGL})
-
-            list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-        endif()
-        list(APPEND SrcLib ${SrcX11})
-    endif()
-
-elseif (DJGPP)
-
-    list(APPEND SrcLib ${SrcDOS})
-
+if (MINIFB_USE_INVERTED_Y_ON_MACOS)
+    target_compile_definitions(minifb PUBLIC USE_INVERTED_Y_ON_MACOS)
 endif()
 
-# Library
-#--------------------------------------
-add_library(minifb STATIC
-    ${SrcLib}
-)
-add_library(minifb::minifb ALIAS minifb)
+# Add GL/Metal code if we're using GL/Metal, no matter the backend
+if (MINIFB_USE_OPENGL_API)
+    target_sources(minifb PRIVATE ${SrcGL})
+    target_compile_definitions(minifb PUBLIC USE_OPENGL_API)
+endif()
+if (MINIFB_USE_METAL_API)
+    target_compile_definitions(minifb PUBLIC USE_METAL_API)
+    target_sources(minifb PRIVATE ${SrcMacOSMetal})
+endif()
+
+if (WIN32)
+    target_compile_definitions(minifb PUBLIC _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
+    target_sources(minifb PRIVATE ${SrcWindows})
+
+elseif (IOS)
+    target_sources(minifb PRIVATE ${SrcIOS})
+
+elseif (MACOS)
+    target_sources(minifb PRIVATE ${SrcMacOS})
+
+elseif (MINIFB_USE_WAYLAND_API)
+    target_sources(minifb PRIVATE ${SrcWayland})
+
+elseif (MINIFB_USE_X11_API)
+    target_sources(minifb PRIVATE ${SrcX11})
+
+elseif (EMSCRIPTEN)
+    target_sources(minifb PRIVATE ${SrcWeb})
+
+elseif (DJGPP)
+    target_sources(minifb PRIVATE ${SrcDOS})
+endif()
 
 # Link
 #--------------------------------------
-if (APPLE)
-
-    if (IOS)
-        target_link_libraries(minifb PRIVATE
-            "-framework UIKit"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
-        )
-    else()
-        target_link_libraries(minifb PRIVATE
-            "-framework Cocoa"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
-        )
-    endif()
-
-elseif (UNIX)
-
-    if (USE_WAYLAND_API)
-        find_package(PkgConfig)
-        if (NOT PKG_CONFIG_FOUND)
-            message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
-        endif()
-        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
-
-        target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
-        target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
-        target_link_libraries(minifb PRIVATE
-            ${WAYLAND_LIBRARIES}
-        )
-    elseif (EMSCRIPTEN)
-        list(APPEND MINIFB_LINK_OPTIONS_EXE
-            "-sSTRICT=1"
-            "-sENVIRONMENT=web"
-            "-sMODULARIZE=1"
-            "-sALLOW_MEMORY_GROWTH=1"
-            "-sALLOW_TABLE_GROWTH"
-            "-sMALLOC=emmalloc"
-            "-sEXPORT_ALL=1"
-            "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
-            "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
-            "-sASYNCIFY"
-            "--no-entry"
-            "-sSINGLE_FILE"
-        )
-    else()
-        find_package(X11)
-        if (NOT X11_FOUND)
-            message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
-        endif()
-
-        target_link_libraries(minifb PRIVATE
-            X11::X11
-            #"-lxkbcommon"
-        )
-        if (X11_Xrandr_FOUND)
-            if (TARGET X11::Xrandr)
-                target_link_libraries(minifb PRIVATE X11::Xrandr)
-            else()
-                target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
-            endif()
-            target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
-        endif()
-        if (USE_OPENGL_API)
-            find_package(OpenGL)
-            if (NOT OpenGL_FOUND)
-                message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
-            endif()
-            target_link_libraries(minifb PRIVATE
-                OpenGL::GL
-            )
+if (MINIFB_USE_OPENGL_API)
+    find_package(OpenGL)
+    if (NOT OpenGL_FOUND)
+        if (WIN32)
+            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
+        elseif (MINIFB_USE_X11_API)
+            message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
         endif()
     endif()
+
+    target_link_libraries(minifb PRIVATE OpenGL::GL)
+endif()
+
+if (IOS)
+    target_link_libraries(minifb PRIVATE
+        "-framework UIKit"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+    )
+
+elseif (MACOS)
+	# TODO: do we need to link cocoa if we're using metal, or metal if we're using cocoa?
+    target_link_libraries(minifb PRIVATE
+        "-framework Cocoa"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+    )
+
+elseif (MINIFB_USE_WAYLAND_API)
+	# wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
+    find_package(PkgConfig)
+    if (NOT PKG_CONFIG_FOUND)
+        message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
+    endif()
+    pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
+
+    target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
+    target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
+    target_link_libraries(minifb PRIVATE ${WAYLAND_LIBRARIES})
+
+elseif(MINIFB_USE_X11_API)
+    find_package(X11)
+    if (NOT X11_FOUND)
+        message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
+    endif()
+    target_link_libraries(minifb PRIVATE X11::X11)
+
+    if (X11_Xrandr_FOUND)
+        target_link_libraries(minifb PRIVATE X11::Xrandr)
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
+    endif()
+
+elseif (EMSCRIPTEN)
+    target_link_options(minifb INTERFACE
+        "-sSTRICT=1"
+        "-sENVIRONMENT=web"
+        "-sMODULARIZE=1"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sALLOW_TABLE_GROWTH"
+        "-sMALLOC=emmalloc"
+        "-sEXPORT_ALL=1"
+        "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
+        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+        "-sASYNCIFY"
+        "--no-entry"
+        "-sSINGLE_FILE"
+    )
 
 elseif (WIN32)
-
-    if (USE_OPENGL_API)
-        find_package(OpenGL)
-        if (NOT OpenGL_FOUND)
-            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
-        endif()
-        target_link_libraries(minifb PRIVATE
-            "opengl32.lib"
-        )
-    endif()
-
-    target_link_libraries(minifb PRIVATE
-        "winmm.lib"
-    )
+    target_link_libraries(minifb PRIVATE "winmm.lib")  # windows multimedia library, used in our case for precise timing
 
 endif()
 
@@ -418,18 +436,6 @@ set_target_properties(minifb PROPERTIES
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
 )
-
-if (MINIFB_COMPILE_OPTIONS)
-    target_compile_options(minifb PRIVATE ${MINIFB_COMPILE_OPTIONS})
-endif()
-
-if (MINIFB_COMPILE_DEFINITIONS)
-    target_compile_definitions(minifb PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-endif()
-
-if (MINIFB_LINK_OPTIONS_LIB)
-    target_link_options(minifb PRIVATE ${MINIFB_LINK_OPTIONS_LIB})
-endif()
 
 target_include_directories(minifb PUBLIC
     $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
@@ -448,6 +454,7 @@ endif()
 
 # Examples
 #--------------------------------------
+# TODO: clean up further
 if (MINIFB_BUILD_EXAMPLES)
     if (NOT IOS)
 
@@ -495,9 +502,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
         if (DJGPP)
 
-            add_executable(debug_dos
-                examples/dos/debug_dos.c
-            )
+            add_executable(debug_dos examples/dos/debug_dos.c)
             list(APPEND MINIFB_EXAMPLE_TARGETS debug_dos)
 
         endif()
@@ -510,12 +515,8 @@ if (MINIFB_BUILD_EXAMPLES)
             examples/ios/AppDelegate.m
         )
 
-        add_executable(noise
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
-        add_executable(noise_no_storyboard
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
+        add_executable(noise ${IOS_NOISE_COMMON_SOURCES})
+        add_executable(noise_no_storyboard ${IOS_NOISE_COMMON_SOURCES})
         list(APPEND MINIFB_EXAMPLE_TARGETS noise noise_no_storyboard)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
@@ -550,18 +551,6 @@ foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
     )
-
-    if (MINIFB_COMPILE_OPTIONS)
-        target_compile_options(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_OPTIONS})
-    endif()
-
-    if (MINIFB_COMPILE_DEFINITIONS)
-        target_compile_definitions(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-    endif()
-
-    if (MINIFB_LINK_OPTIONS_EXE)
-        target_link_options(${minifb_test_target} PRIVATE ${MINIFB_LINK_OPTIONS_EXE})
-    endif()
 endforeach()
 
 # Organize IDE Folders
@@ -595,19 +584,6 @@ install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/"
 install(FILES "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 set(MINIFB_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
-set(MINIFB_PACKAGE_FIND_OPENGL FALSE)
-set(MINIFB_PACKAGE_FIND_X11 FALSE)
-
-if (WIN32 AND USE_OPENGL_API)
-    set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-elseif (UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-    if (NOT USE_WAYLAND_API)
-        set(MINIFB_PACKAGE_FIND_X11 TRUE)
-        if (USE_OPENGL_API)
-            set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-        endif()
-    endif()
-endif()
 
 minifb_configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb-config.cmake.in"
@@ -626,8 +602,8 @@ install(FILES
     DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
 
-message(STATUS "Done " ${PROJECT_NAME})
-
 if (MSVC AND MINIFB_BUILD_EXAMPLES)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
+
+message(STATUS "Done " ${PROJECT_NAME})
