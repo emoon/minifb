@@ -335,7 +335,7 @@ if (WIN32)
 elseif (IOS)
     target_sources(minifb PRIVATE ${SrcIOS})
 
-elseif (DARWIN)
+elseif (MACOS)
     target_sources(minifb PRIVATE ${SrcMacOS})
 
 elseif (MINIFB_USE_WAYLAND_API)
@@ -353,8 +353,21 @@ endif()
 
 # Link
 #--------------------------------------
-if (IOS)
+if (MINIFB_USE_OPENGL_API)
+    find_package(OpenGL)
+    if (NOT OpenGL_FOUND)
+        if (WIN32)
+            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
+        elseif (MINIFB_USE_X11_API)
+            message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
+        endif()
+    endif()
+    target_link_libraries(minifb PRIVATE
+        OpenGL::GL
+    )
+endif()
 
+if (IOS)
     target_link_libraries(minifb PRIVATE
         "-framework UIKit"
         "-framework QuartzCore"
@@ -363,7 +376,7 @@ if (IOS)
     )
 
 elseif (MACOS)
-
+	# TODO: do we need to link cocoa if we're using metal, or metal if we're using cocoa?
     target_link_libraries(minifb PRIVATE
         "-framework Cocoa"
         "-framework QuartzCore"
@@ -372,7 +385,7 @@ elseif (MACOS)
     )
 
 elseif (MINIFB_USE_WAYLAND_API)
-
+	# wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
     find_package(PkgConfig)
     if (NOT PKG_CONFIG_FOUND)
         message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
@@ -390,31 +403,18 @@ elseif(MINIFB_USE_X11_API)
     if (NOT X11_FOUND)
         message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
     endif()
-
     target_link_libraries(minifb PRIVATE
         X11::X11
-        #"-lxkbcommon"
     )
+
     if (X11_Xrandr_FOUND)
-        if (TARGET X11::Xrandr)
-            target_link_libraries(minifb PRIVATE X11::Xrandr)
-        else()
-            target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
-        endif()
-        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
-    endif()
-    if (MINIFB_USE_OPENGL_API)
-        find_package(OpenGL)
-        if (NOT OpenGL_FOUND)
-            message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
-        endif()
         target_link_libraries(minifb PRIVATE
-            OpenGL::GL
+            X11::Xrandr
         )
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
     endif()
 
 elseif (EMSCRIPTEN)
-
     target_link_options(minifb INTERFACE
         "-sSTRICT=1"
         "-sENVIRONMENT=web"
@@ -431,19 +431,8 @@ elseif (EMSCRIPTEN)
     )
 
 elseif (WIN32)
-
-    if (MINIFB_USE_OPENGL_API)
-        find_package(OpenGL)
-        if (NOT OpenGL_FOUND)
-            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
-        endif()
-        target_link_libraries(minifb PRIVATE
-            "opengl32.lib"
-        )
-    endif()
-
     target_link_libraries(minifb PRIVATE
-        "winmm.lib"
+        "winmm.lib"   # windows multimedia library, used in our case for precise timing
     )
 
 endif()
