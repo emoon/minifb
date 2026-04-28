@@ -219,9 +219,7 @@ endif()
 
 # Create library target
 #--------------------------------------
-add_library(minifb STATIC
-    ${SrcLib}
-)
+add_library(minifb STATIC ${SrcLib})
 add_library(minifb::minifb ALIAS minifb)
 
 # Set features
@@ -362,9 +360,8 @@ if (MINIFB_USE_OPENGL_API)
             message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
         endif()
     endif()
-    target_link_libraries(minifb PRIVATE
-        OpenGL::GL
-    )
+
+    target_link_libraries(minifb PRIVATE OpenGL::GL)
 endif()
 
 if (IOS)
@@ -394,23 +391,17 @@ elseif (MINIFB_USE_WAYLAND_API)
 
     target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
     target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
-    target_link_libraries(minifb PRIVATE
-        ${WAYLAND_LIBRARIES}
-    )
+    target_link_libraries(minifb PRIVATE ${WAYLAND_LIBRARIES})
 
 elseif(MINIFB_USE_X11_API)
     find_package(X11)
     if (NOT X11_FOUND)
         message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
     endif()
-    target_link_libraries(minifb PRIVATE
-        X11::X11
-    )
+    target_link_libraries(minifb PRIVATE X11::X11)
 
     if (X11_Xrandr_FOUND)
-        target_link_libraries(minifb PRIVATE
-            X11::Xrandr
-        )
+        target_link_libraries(minifb PRIVATE X11::Xrandr)
         target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
     endif()
 
@@ -431,9 +422,7 @@ elseif (EMSCRIPTEN)
     )
 
 elseif (WIN32)
-    target_link_libraries(minifb PRIVATE
-        "winmm.lib"   # windows multimedia library, used in our case for precise timing
-    )
+    target_link_libraries(minifb PRIVATE "winmm.lib")  # windows multimedia library, used in our case for precise timing
 
 endif()
 
@@ -513,9 +502,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
         if (DJGPP)
 
-            add_executable(debug_dos
-                examples/dos/debug_dos.c
-            )
+            add_executable(debug_dos examples/dos/debug_dos.c)
             list(APPEND MINIFB_EXAMPLE_TARGETS debug_dos)
 
         endif()
@@ -528,12 +515,8 @@ if (MINIFB_BUILD_EXAMPLES)
             examples/ios/AppDelegate.m
         )
 
-        add_executable(noise
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
-        add_executable(noise_no_storyboard
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
+        add_executable(noise ${IOS_NOISE_COMMON_SOURCES})
+        add_executable(noise_no_storyboard ${IOS_NOISE_COMMON_SOURCES})
         list(APPEND MINIFB_EXAMPLE_TARGETS noise noise_no_storyboard)
 
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
