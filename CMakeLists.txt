@@ -242,17 +242,6 @@ if (NOT MSVC)
 
     # GCC/Clang
 
-    if (DJGPP)
-        target_compile_options(minifb PUBLIC
-            "$<$<CONFIG:Debug>:-gdwarf>"
-            "$<$<CONFIG:Debug>:-save-temps>"
-        )
-    else()
-        target_compile_options(minifb PUBLIC
-            "$<$<CONFIG:Debug>:-g>"
-        )
-    endif()
-
     target_compile_options(minifb PUBLIC
         -Wall
         -Wextra
@@ -261,6 +250,7 @@ if (NOT MSVC)
         -Wno-unused-parameter
         -Wno-implicit-fallthrough
         "$<IF:$<CONFIG:Debug>,-O0,-O2>"
+        "$<$<CONFIG:Debug>:-g>"
     )
 
 else()
@@ -373,7 +363,7 @@ if (IOS)
     )
 
 elseif (MACOS)
-	# TODO: do we need to link cocoa if we're using metal, or metal if we're using cocoa?
+    # TODO: do we need to link cocoa if we're using metal, or metal if we're using cocoa?
     target_link_libraries(minifb PRIVATE
         "-framework Cocoa"
         "-framework QuartzCore"
@@ -382,7 +372,7 @@ elseif (MACOS)
     )
 
 elseif (MINIFB_USE_WAYLAND_API)
-	# wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
+    # wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
     find_package(PkgConfig)
     if (NOT PKG_CONFIG_FOUND)
         message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
