@@ -306,7 +306,7 @@ if (MINIFB_USE_INVERTED_Y_ON_MACOS)
     target_compile_definitions(minifb PUBLIC USE_INVERTED_Y_ON_MACOS)
 endif()
 
-# Add GL/Metal code if we're using GL/Metal, no matter the backend
+# Add GL/Metal code if we're using GL/Metal, no matter the specific platform
 if (MINIFB_USE_OPENGL_API)
     target_sources(minifb PRIVATE ${SrcGL})
     target_compile_definitions(minifb PUBLIC USE_OPENGL_API)
@@ -317,7 +317,7 @@ if (MINIFB_USE_METAL_API)
 endif()
 
 if (WIN32)
-    target_compile_definitions(minifb PUBLIC _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
+    target_compile_definitions(minifb PUBLIC _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
     target_sources(minifb PRIVATE ${SrcWindows})
 
 elseif (IOS)
@@ -433,107 +433,15 @@ target_include_directories(minifb PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_include_directories(minifb PRIVATE src)
 
-# Other targets
-#--------------------------------------
-set(MINIFB_EXAMPLE_TARGETS)
+# example use: minifb_add_example(NAME noise SOURCE examples/noise.c)
+function(minifb_add_example)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD IOS_NO_STORYBOARD" "NAME" "SOURCE")
 
-if (MINIFB_BUILD_VERSION_INFO)
-    add_executable(minifb_version_info examples/version_info.c)
-    list(APPEND MINIFB_EXAMPLE_TARGETS minifb_version_info)
-endif()
+    add_executable(${arg_NAME} ${arg_SOURCE})
+    target_link_libraries(${arg_NAME} PRIVATE minifb) # also configures compilation by the minifb target's PUBLIC properties
 
-# Examples
-#--------------------------------------
-# TODO: clean up further
-if (MINIFB_BUILD_EXAMPLES)
-    if (NOT IOS)
-
-        add_executable(noise examples/noise.c)
-        add_executable(input_events examples/input_events.c)
-        add_executable(input_events_cpp examples/input_events_cpp.cpp)
-        add_executable(multiple_windows examples/multiple_windows.c)
-        add_executable(hidpi examples/hidpi.c)
-        add_executable(fullscreen examples/fullscreen.c)
-        add_executable(timer examples/timer.c)
-        add_executable(hide_cursor examples/hide_cursor.c)
-
-        list(APPEND MINIFB_EXAMPLE_TARGETS
-            noise
-            input_events
-            input_events_cpp
-            multiple_windows
-            hidpi
-            fullscreen
-            timer
-            hide_cursor
-        )
-
-        if (EMSCRIPTEN)
-
-            add_custom_target(web_assets
-                COMMAND ${CMAKE_COMMAND} -E copy_directory
-                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/web
-                    ${CMAKE_CURRENT_BINARY_DIR}
-            )
-
-            add_dependencies(noise web_assets)
-            add_dependencies(input_events web_assets)
-            add_dependencies(hidpi web_assets)
-            add_dependencies(multiple_windows web_assets)
-            add_dependencies(timer web_assets)
-
-            target_link_options(noise PRIVATE "-sEXPORT_NAME=noise")
-            target_link_options(input_events PRIVATE "-sEXPORT_NAME=input_events")
-            target_link_options(hidpi PRIVATE "-sEXPORT_NAME=hidpi")
-            target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
-            target_link_options(timer PRIVATE "-sEXPORT_NAME=timer")
-
-        endif()
-
-        if (DJGPP)
-
-            add_executable(debug_dos examples/dos/debug_dos.c)
-            list(APPEND MINIFB_EXAMPLE_TARGETS debug_dos)
-
-        endif()
-
-    else() # iOS
-
-        set(IOS_NOISE_COMMON_SOURCES
-            examples/ios/main.m
-            examples/ios/AppDelegate.h
-            examples/ios/AppDelegate.m
-        )
-
-        add_executable(noise ${IOS_NOISE_COMMON_SOURCES})
-        add_executable(noise_no_storyboard ${IOS_NOISE_COMMON_SOURCES})
-        list(APPEND MINIFB_EXAMPLE_TARGETS noise noise_no_storyboard)
-
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
-
-        foreach(ios_noise_target IN ITEMS noise noise_no_storyboard)
-            target_include_directories(${ios_noise_target} PRIVATE src)
-            target_include_directories(${ios_noise_target} PRIVATE src/ios)
-        endforeach()
-
-        set_target_properties(noise PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
-            RESOURCE "examples/ios/LaunchScreen.storyboard"
-        )
-        set_target_properties(noise_no_storyboard PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
-        )
-
-    endif()
-
-endif()
-
-# Add options to targets
-#--------------------------------------
-foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
-    target_link_libraries(${minifb_test_target} PRIVATE minifb)
-
-    set_target_properties(${minifb_test_target} PROPERTIES
+    set_property(TARGET ${arg_NAME} PROPERTY FOLDER "Examples")
+    set_target_properties(${arg_NAME} PROPERTIES
         C_STANDARD ${MINIFB_C_STANDARD}
         C_STANDARD_REQUIRED ON
         C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
@@ -541,27 +449,72 @@ foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
     )
-endforeach()
+
+    # specific rules for building on specific platforms
+    if (EMSCRIPTEN)
+        target_link_options(${arg_NAME} PRIVATE "-sEXPORT_NAME=${arg_NAME}")
+
+    elseif (IOS)
+		# TODO: why do examples need to include internal headers?
+        target_include_directories(${arg_NAME} PRIVATE src src/ios)
+
+        if (IOS_STORYBOARD)
+            set_target_properties(${arg_NAME} PROPERTIES
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
+                RESOURCE "examples/ios/LaunchScreen.storyboard"
+            )
+        elseif (IOS_NO_STORYBOARD)
+            set_target_properties(${arg_NAME} PROPERTIES
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
+            )
+        endif()
+    endif()
+endfunction()
+
+# Other targets
+#--------------------------------------
+if (MINIFB_BUILD_VERSION_INFO)
+	minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
+endif()
+
+# Examples
+#--------------------------------------
+if (MINIFB_BUILD_EXAMPLES)
+    if (NOT IOS)
+        minifb_add_example(NAME noise                SOURCE examples/noise.c)
+        minifb_add_example(NAME input_events         SOURCE examples/input_events.c)
+        minifb_add_example(NAME hidpi                SOURCE examples/hidpi.c)
+        minifb_add_example(NAME multiple_windows     SOURCE examples/multiple_windows.c)
+        minifb_add_example(NAME timer                SOURCE examples/timer.c)
+        if (NOT EMSCRIPTEN)
+            minifb_add_example(NAME fullscreen       SOURCE examples/fullscreen.c)
+            minifb_add_example(NAME hide_cursor      SOURCE examples/hide_cursor.c)
+            minifb_add_example(NAME input_events_cpp SOURCE examples/input_events_cpp.cpp)
+        endif()
+        if (DJGPP)
+            minifb_add_example(NAME debug_dos        SOURCE examples/dos/debug_dos.c)
+        endif()
+
+    else() # iOS
+        set(IOS_NOISE_COMMON_SOURCES
+            examples/ios/main.m
+            examples/ios/AppDelegate.h
+            examples/ios/AppDelegate.m
+        )
+
+        minifb_add_example(NAME noise               SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_STORYBOARD)
+        minifb_add_example(NAME noise_no_storyboard SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_NO_STORYBOARD)
+
+        # TODO: this is an IOS build, why do we need to set a minimum macos version?
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
+
+    endif()
+endif()
 
 # Organize IDE Folders
 #--------------------------------------
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
-
-if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
-    set_property(TARGET noise PROPERTY FOLDER "Examples")
-    set_property(TARGET timer PROPERTY FOLDER "Examples")
-    set_property(TARGET fullscreen PROPERTY FOLDER "Examples")
-    set_property(TARGET input_events PROPERTY FOLDER "Examples")
-    set_property(TARGET input_events_cpp PROPERTY FOLDER "Examples")
-    set_property(TARGET multiple_windows PROPERTY FOLDER "Examples")
-    set_property(TARGET hidpi PROPERTY FOLDER "Examples")
-    set_property(TARGET hide_cursor PROPERTY FOLDER "Examples")
-endif()
-
-if (MINIFB_BUILD_VERSION_INFO)
-    set_property(TARGET minifb_version_info PROPERTY FOLDER "Examples")
-endif()
 
 #--------------------------------------
 install(TARGETS minifb EXPORT minifb)
