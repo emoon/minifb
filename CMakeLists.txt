@@ -458,12 +458,12 @@ function(minifb_add_example)
 		# TODO: why do examples need to include internal headers?
         target_include_directories(${arg_NAME} PRIVATE src src/ios)
 
-        if (IOS_STORYBOARD)
+        if (${arg_IOS_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
                 RESOURCE "examples/ios/LaunchScreen.storyboard"
             )
-        elseif (IOS_NO_STORYBOARD)
+        elseif (${arg_IOS_NO_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
             )
