@@ -455,7 +455,7 @@ function(minifb_add_example)
         target_link_options(${arg_NAME} PRIVATE "-sEXPORT_NAME=${arg_NAME}")
 
     elseif (IOS)
-		# TODO: why do examples need to include internal headers?
+        # TODO: why do examples need to include internal headers?
         target_include_directories(${arg_NAME} PRIVATE src src/ios)
 
         if (${arg_IOS_STORYBOARD})
@@ -474,7 +474,7 @@ endfunction()
 # Other targets
 #--------------------------------------
 if (MINIFB_BUILD_VERSION_INFO)
-	minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
+    minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
 endif()
 
 # Examples
