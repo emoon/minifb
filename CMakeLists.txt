@@ -292,13 +292,6 @@ target_compile_definitions(minifb PUBLIC
     "$<$<CONFIG:Debug>:DEBUG>"
 )
 
-# TODO: does the toolchain include this automatically?
-if (EMSCRIPTEN)
-    target_link_options(minifb INTERFACE
-        "$<$<CONFIG:Debug>:-g>"
-    )
-endif()
-
 # Set platform specific flags and source files
 #--------------------------------------
 
@@ -396,7 +389,7 @@ elseif(MINIFB_USE_X11_API)
     endif()
 
 elseif (EMSCRIPTEN)
-    target_link_options(minifb INTERFACE
+    target_link_options(minifb PRIVATE
         "-sSTRICT=1"
         "-sENVIRONMENT=web"
         "-sMODULARIZE=1"
