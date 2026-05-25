@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.10.1]
+
+### Added
+
+- **Window title API**: added `mfb_set_title` to change the window title after creation. Implemented on Windows, macOS, X11, and Wayland, with no-op stubs on iOS, Android, Web, and DOS.
+
+### Changed
+
+- Unified keycode-table initialization across Windows, macOS, X11, and Wayland with one-time setup and explicit reset to `MFB_KB_KEY_UNKNOWN`.
+- Moved the shared `stretch_image` declaration into `src/MiniFB_internal.h`.
+
+### Fixed
+
+- Fixed X11 dead-key compose cancellation so the standalone accent is emitted before the following character, matching Windows and macOS behavior.
+- Fixed X11 and Wayland keyboard handling to avoid updating key state or firing keyboard callbacks for untranslated keys.
+- Fixed DOS release completeness by adding the missing `mfb_set_title` backend stub required by the public API.
+
 ## [0.10.0]
 
 ### Added

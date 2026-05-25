@@ -946,6 +946,13 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 
 //-------------------------------------
 void
+mfb_set_title(struct mfb_window *window, const char *title) {
+    (void) window;
+    (void) title;
+}
+
+//-------------------------------------
+void
 mfb_show_cursor(struct mfb_window *window, bool show) {
     kUnused(window);
     kUnused(show);

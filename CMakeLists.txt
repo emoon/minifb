@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MiniFB VERSION 0.10.0 LANGUAGES C CXX)
+project(MiniFB VERSION 0.10.1 LANGUAGES C CXX)
 
 # prefer these over general `UNIX` or `APPLE`
 # `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want

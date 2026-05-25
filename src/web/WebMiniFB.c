@@ -889,6 +889,13 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 }
 
 //-------------------------------------
+void
+mfb_set_title(struct mfb_window *window, const char *title) {
+    (void) window;
+    (void) title;
+}
+
+//-------------------------------------
 EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     // FIXME can we make these global somehow? --pre-js maybe?
     const MFB_STATE_OK = 0;

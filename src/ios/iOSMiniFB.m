@@ -459,6 +459,13 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 }
 
 //-------------------------------------
+void
+mfb_set_title(struct mfb_window *window, const char *title) {
+    (void) window;
+    (void) title;
+}
+
+//-------------------------------------
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 
