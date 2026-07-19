@@ -156,7 +156,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
                 is_pressed = (mod_keys & MFB_KB_MOD_SUPER) != 0;
                 break;
             default:
-                is_pressed = !window_data->key_status[key_code];
+                is_pressed = window_data->key_status[key_code];
                 break;
         }
 
