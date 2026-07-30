@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(MiniFB VERSION 0.10.1 LANGUAGES C CXX)
 
+message(STATUS "Processing " ${PROJECT_NAME})
+
+# CMake configuration
+#--------------------------------------
+
 # prefer these over general `UNIX` or `APPLE`
 # `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -17,8 +22,6 @@ if (MACOS OR IOS)
     endif()
 endif()
 
-message(STATUS "Processing " ${PROJECT_NAME})
-
 include(GNUInstallDirs)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioning.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
@@ -26,6 +29,9 @@ if (POLICY CMP0072)
     cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
 endif()
 set(OpenGL_GL_PREFERENCE "GLVND")
+
+# use IDE folders in build systems that support it. enabled by default in cmake 3.26+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 minifb_compute_git_metadata(
     MINIFB_COMMITS_SINCE_TAG
@@ -138,7 +144,7 @@ option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 # purely for internal use, never exposed to the user
 set(MINIFB_USE_X11_API OFF)
 
-if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22) 
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
 
     # requires 3.22+ to use full condition syntax, technically could use in 3.16, but it would be a lot worse
     include(CMakeDependentOption)
@@ -217,100 +223,113 @@ elseif (WIN32)
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
-# Create library target
+# Compilation configuration (library and examples)
+#--------------------------------------
+function(minifb_configure_target target)
+    if (NOT MSVC)
+        # GCC/Clang
+        target_compile_options(${target} PRIVATE
+            -Wall
+            -Wextra
+            -Wno-switch
+            -Wno-unused-function
+            -Wno-unused-parameter
+            -Wno-implicit-fallthrough
+            "$<IF:$<CONFIG:Debug>,-O0,-O2>"
+            "$<$<CONFIG:Debug>:-g>"
+        )
+
+    else()
+        # MSVC
+        target_compile_options(${target} PRIVATE
+            # Security check
+            /GS
+            # Function level linking
+            /Gy
+            # Exceptions
+            /EHsc
+            # Fast floating point maths
+            /fp:fast
+            # Force Visual Studio to actualize __cplusplus version macro
+            /Zc:__cplusplus
+            # Additional security checks
+            /sdl
+
+            # Program database (edit and continue in debug mode)
+            "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
+            # Optimizations
+            "$<IF:$<CONFIG:Debug>,/Od,/O2>"
+            # Inline function expansion
+            "$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>"
+            # Basic runtime checks
+            "$<$<CONFIG:Debug>:/RTC1>"
+        )
+
+        # prevent annoying c standard lib unsafety msvc warnings
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
+
+    target_compile_definitions(${target} PRIVATE
+        "$<$<CONFIG:Debug>:_DEBUG>"
+        "$<$<CONFIG:Debug>:DEBUG>"
+    )
+
+    if (WIN32)
+        target_compile_definitions(${target} PRIVATE _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
+    endif()
+
+    # TODO does this even matter
+    if (DJGPP)
+        # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
+        set(MINIFB_C_EXTENSIONS   ON)
+        set(MINIFB_CXX_EXTENSIONS ON)
+    else()
+        set(MINIFB_C_EXTENSIONS   OFF)
+        set(MINIFB_CXX_EXTENSIONS OFF)
+    endif()
+
+    set_target_properties(${target} PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
+    )
+
+endfunction()
+
+# Create library target and configure
 #--------------------------------------
 add_library(minifb STATIC ${SrcLib})
 add_library(minifb::minifb ALIAS minifb)
 
-# Set features
-#--------------------------------------
-set(MINIFB_C_STANDARD 11)
-set(MINIFB_CXX_STANDARD 11)
+set_property(TARGET minifb PROPERTY FOLDER "Libs")
+minifb_configure_target(minifb)
 
-if (DJGPP)
-    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
-    set(MINIFB_C_EXTENSIONS   ON)
-    set(MINIFB_CXX_EXTENSIONS ON)
-else()
-    set(MINIFB_C_EXTENSIONS   OFF)
-    set(MINIFB_CXX_EXTENSIONS OFF)
-endif()
+target_include_directories(minifb PUBLIC
+    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-# Set compile flags depending on the compiler
-#--------------------------------------
-if (NOT MSVC)
+target_include_directories(minifb PRIVATE src)  # include internal headers
 
-    # GCC/Clang
-
-    target_compile_options(minifb PUBLIC
-        -Wall
-        -Wextra
-        -Wno-switch
-        -Wno-unused-function
-        -Wno-unused-parameter
-        -Wno-implicit-fallthrough
-        "$<IF:$<CONFIG:Debug>,-O0,-O2>"
-        "$<$<CONFIG:Debug>:-g>"
-    )
-
-else()
-
-    # MSVC
-    #--------------------------------------
-
-    target_compile_options(minifb PUBLIC
-        # Security check
-        /GS
-        # Function level linking
-        /Gy
-        # Exceptions
-        /EHsc
-        # Fast floating point maths
-        /fp:fast
-        # Force Visual Studio to actualize __cplusplus version macro
-        /Zc:__cplusplus
-        # Additional security checks
-        /sdl
-
-        # Program database (edit and continue in debug mode)
-        "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
-        # Optimizations
-        "$<IF:$<CONFIG:Debug>,/Od,/O2>"
-        # Inline function expansion
-        "$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>"
-        # Basic runtime checks
-        "$<$<CONFIG:Debug>:/RTC1>"
-    )
-
-    # prevent annoying c standard lib unsafety msvc warnings
-    target_compile_definitions(minifb PUBLIC _CRT_SECURE_NO_WARNINGS)
-
-endif()
-
-target_compile_definitions(minifb PUBLIC
-    "$<$<CONFIG:Debug>:_DEBUG>"
-    "$<$<CONFIG:Debug>:DEBUG>"
-)
-
-# Set platform specific flags and source files
-#--------------------------------------
-
+# conditional configuration
 if (MINIFB_USE_INVERTED_Y_ON_MACOS)
-    target_compile_definitions(minifb PUBLIC USE_INVERTED_Y_ON_MACOS)
+    target_compile_definitions(minifb PRIVATE USE_INVERTED_Y_ON_MACOS)
 endif()
 
 # Add GL/Metal code if we're using GL/Metal, no matter the specific platform
 if (MINIFB_USE_OPENGL_API)
     target_sources(minifb PRIVATE ${SrcGL})
-    target_compile_definitions(minifb PUBLIC USE_OPENGL_API)
+    target_compile_definitions(minifb PRIVATE USE_OPENGL_API)
 endif()
 if (MINIFB_USE_METAL_API)
-    target_compile_definitions(minifb PUBLIC USE_METAL_API)
+    target_compile_definitions(minifb PRIVATE USE_METAL_API)
     target_sources(minifb PRIVATE ${SrcMacOSMetal})
 endif()
 
 if (WIN32)
-    target_compile_definitions(minifb PUBLIC _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
     target_sources(minifb PRIVATE ${SrcWindows})
 
 elseif (IOS)
@@ -332,7 +351,7 @@ elseif (DJGPP)
     target_sources(minifb PRIVATE ${SrcDOS})
 endif()
 
-# Link
+# Linking main library
 #--------------------------------------
 if (MINIFB_USE_OPENGL_API)
     find_package(OpenGL)
@@ -409,41 +428,20 @@ elseif (WIN32)
 
 endif()
 
-# For all projects
+# Examples and other targets
 #--------------------------------------
-set_target_properties(minifb PROPERTIES
-    C_STANDARD ${MINIFB_C_STANDARD}
-    C_STANDARD_REQUIRED ON
-    C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
-    CXX_STANDARD ${MINIFB_CXX_STANDARD}
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
-)
-
-target_include_directories(minifb PUBLIC
-    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(minifb PRIVATE src)
 
 # example use: minifb_add_example(NAME noise SOURCE examples/noise.c)
 function(minifb_add_example)
     cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD IOS_NO_STORYBOARD" "NAME" "SOURCE")
 
     add_executable(${arg_NAME} ${arg_SOURCE})
-    target_link_libraries(${arg_NAME} PRIVATE minifb) # also configures compilation by the minifb target's PUBLIC properties
+    target_link_libraries(${arg_NAME} PRIVATE minifb)
+    minifb_configure_target(${arg_NAME})
 
     set_property(TARGET ${arg_NAME} PROPERTY FOLDER "Examples")
-    set_target_properties(${arg_NAME} PROPERTIES
-        C_STANDARD ${MINIFB_C_STANDARD}
-        C_STANDARD_REQUIRED ON
-        C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
-        CXX_STANDARD ${MINIFB_CXX_STANDARD}
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
-    )
 
-    # specific rules for building on specific platforms
+    # conditional configuration
     if (EMSCRIPTEN)
         target_link_options(${arg_NAME} PRIVATE "-sEXPORT_NAME=${arg_NAME}")
 
@@ -464,14 +462,10 @@ function(minifb_add_example)
     endif()
 endfunction()
 
-# Other targets
-#--------------------------------------
 if (MINIFB_BUILD_VERSION_INFO)
     minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
 endif()
 
-# Examples
-#--------------------------------------
 if (MINIFB_BUILD_EXAMPLES)
     if (NOT IOS)
         minifb_add_example(NAME noise                SOURCE examples/noise.c)
@@ -504,11 +498,7 @@ if (MINIFB_BUILD_EXAMPLES)
     endif()
 endif()
 
-# Organize IDE Folders
-#--------------------------------------
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set_property(TARGET minifb PROPERTY FOLDER "Libs")
-
+# Configure installation
 #--------------------------------------
 install(TARGETS minifb EXPORT minifb)
 install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/"
