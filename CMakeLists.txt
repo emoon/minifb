@@ -446,6 +446,12 @@ function(minifb_add_example)
             "-sSINGLE_FILE"
         )
 
+        add_custom_command(TARGET ${arg_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_SOURCE_DIR}/examples/web/${arg_NAME}.html"
+                "${CMAKE_CURRENT_BINARY_DIR}"
+            )
+
     elseif (IOS)
         # TODO: why do examples need to include internal headers?
         target_include_directories(${arg_NAME} PRIVATE src src/ios)
