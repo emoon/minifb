@@ -408,20 +408,7 @@ elseif(MINIFB_USE_X11_API)
     endif()
 
 elseif (EMSCRIPTEN)
-    target_link_options(minifb PRIVATE
-        "-sSTRICT=1"
-        "-sENVIRONMENT=web"
-        "-sMODULARIZE=1"
-        "-sALLOW_MEMORY_GROWTH=1"
-        "-sALLOW_TABLE_GROWTH"
-        "-sMALLOC=emmalloc"
-        "-sEXPORT_ALL=1"
-        "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
-        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
-        "-sASYNCIFY"
-        "--no-entry"
-        "-sSINGLE_FILE"
-    )
+    # emscripten has no dedicated linking code
 
 elseif (WIN32)
     target_link_libraries(minifb PRIVATE "winmm.lib")  # windows multimedia library, used in our case for precise timing
@@ -443,7 +430,21 @@ function(minifb_add_example)
 
     # conditional configuration
     if (EMSCRIPTEN)
-        target_link_options(${arg_NAME} PRIVATE "-sEXPORT_NAME=${arg_NAME}")
+        target_link_options(${arg_NAME} PRIVATE
+            "-sEXPORT_NAME=${arg_NAME}"
+            "-sSTRICT=1"
+            "-sENVIRONMENT=web"
+            "-sMODULARIZE=1"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sALLOW_TABLE_GROWTH"
+            "-sMALLOC=emmalloc"
+            "-sEXPORT_ALL=1"
+            "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
+            "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+            "-sASYNCIFY"
+            "--no-entry"
+            "-sSINGLE_FILE"
+        )
 
     elseif (IOS)
         # TODO: why do examples need to include internal headers?
