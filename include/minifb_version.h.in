@@ -1,5 +1,7 @@
 #pragma once
 
+// filled by CMake
+
 #include <stdint.h>
 
 #define MINIFB_VERSION_MAJOR @PROJECT_VERSION_MAJOR@

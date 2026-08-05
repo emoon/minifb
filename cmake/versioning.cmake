@@ -45,11 +45,6 @@ function(minifb_compute_git_metadata out_commits_since_tag out_commit_count out_
     set(${out_git_dirty} "${_git_dirty}" PARENT_SCOPE)
 endfunction()
 
-function(minifb_configure_version_header template_path output_dir output_path)
-    file(MAKE_DIRECTORY "${output_dir}")
-    configure_file("${template_path}" "${output_path}" @ONLY)
-endfunction()
-
 function(minifb_write_package_version_file output_path)
     include(CMakePackageConfigHelpers)
     write_basic_package_version_file(

@@ -33,18 +33,21 @@ set(OpenGL_GL_PREFERENCE "GLVND")
 # use IDE folders in build systems that support it. enabled by default in cmake 3.26+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# directory to add generated headers (created during configuration)
+set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${output_dir}")
+
+# generate the version header from the templace (.in)
 minifb_compute_git_metadata(
     MINIFB_COMMITS_SINCE_TAG
     MINIFB_COMMIT_COUNT
     MINIFB_GIT_SHA
     MINIFB_GIT_DIRTY
 )
-
-set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
-minifb_configure_version_header(
+configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/minifb_version.h.in"
-    "${MINIFB_GENERATED_INCLUDE_DIR}"
     "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
+    @ONLY
 )
 
 # Sources
@@ -56,6 +59,9 @@ set(SrcLib
     include/MiniFB_keylist.h
     include/MiniFB_macros.h
     include/MiniFB_types.h
+
+	# remember to include generated headers as source files
+	${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
@@ -307,14 +313,16 @@ add_library(minifb::minifb ALIAS minifb)
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 minifb_configure_target(minifb)
 
+# headers required for users (differs depending on if it's been built or installed)
 target_include_directories(minifb PUBLIC
-    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>  # most headers
+    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>    # auto-generated headers
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)     # (both of those are in the same location if installed)
 
 target_include_directories(minifb PRIVATE src)  # include internal headers
 
-# conditional configuration
+# conditional main library target configuration
+
 if (MINIFB_USE_INVERTED_Y_ON_MACOS)
     target_compile_definitions(minifb PRIVATE USE_INVERTED_Y_ON_MACOS)
 endif()
