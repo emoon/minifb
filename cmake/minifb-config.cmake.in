@@ -5,10 +5,10 @@
 
 # depending on the configuration minifb was built with, make sure it has the required dependencies
 include(CMakeFindDependencyMacro)
-if(@MINIFB_PACKAGE_FIND_OPENGL@)
+if(@MINIFB_USE_OPENGL_API@)
     find_dependency(OpenGL)
 endif()
-if(@MINIFB_PACKAGE_FIND_X11@)
+if(@MINIFB_USE_X11_API@)
     find_dependency(X11)
 endif()
 
