@@ -511,6 +511,9 @@ if (MINIFB_BUILD_EXAMPLES)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
     endif()
+
+	# example that will be ran on actions such as f5 in visual studio
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
 
 # Configure installation
@@ -552,9 +555,5 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
     DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
-
-if (MSVC AND MINIFB_BUILD_EXAMPLES)
-    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
-endif()
 
 message(STATUS "Done " ${PROJECT_NAME})
