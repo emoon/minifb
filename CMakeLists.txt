@@ -60,8 +60,8 @@ set(SrcLib
     include/MiniFB_macros.h
     include/MiniFB_types.h
 
-	# remember to include generated headers as source files
-	${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h
+    # remember to include generated headers as source files
+    ${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
@@ -317,7 +317,7 @@ minifb_configure_target(minifb)
 target_include_directories(minifb PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>  # most headers
     $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>    # auto-generated headers
-	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)     # (both of those are in the same location if installed)
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)     # (both of those are in the same location if installed)
 
 target_include_directories(minifb PRIVATE src)  # include internal headers
 
@@ -512,7 +512,7 @@ if (MINIFB_BUILD_EXAMPLES)
 
     endif()
 
-	# example that will be ran on actions such as f5 in visual studio
+    # example that will be ran on actions such as f5 in visual studio
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
 
