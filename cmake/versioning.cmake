@@ -44,21 +44,3 @@ function(minifb_compute_git_metadata out_commits_since_tag out_commit_count out_
     set(${out_git_sha} "${_git_sha}" PARENT_SCOPE)
     set(${out_git_dirty} "${_git_dirty}" PARENT_SCOPE)
 endfunction()
-
-function(minifb_write_package_version_file output_path)
-    include(CMakePackageConfigHelpers)
-    write_basic_package_version_file(
-        "${output_path}"
-        VERSION "${PROJECT_VERSION}"
-        COMPATIBILITY SameMajorVersion
-    )
-endfunction()
-
-function(minifb_configure_package_config_file input_path output_path install_destination)
-    include(CMakePackageConfigHelpers)
-    configure_package_config_file(
-        "${input_path}"
-        "${output_path}"
-        INSTALL_DESTINATION "${install_destination}"
-    )
-endfunction()

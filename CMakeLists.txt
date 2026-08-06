@@ -515,28 +515,38 @@ endif()
 
 # Configure installation
 #--------------------------------------
-install(TARGETS minifb EXPORT minifb)
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    FILES_MATCHING
-    PATTERN "*.h"
-    PATTERN "*.hpp"
-)
-install(FILES "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
+# install the library, and all headers
+install(TARGETS minifb EXPORT minifb)
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/" "${MINIFB_GENERATED_INCLUDE_DIR}"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)
+
+# generate and install files required to find_package minifb
+include(CMakePackageConfigHelpers)
 set(MINIFB_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
 
-minifb_configure_package_config_file(
+# generate the cmake code that will create the minifb:: target when found, to minifb-targets.cmake
+install(EXPORT minifb
+    FILE minifb-targets.cmake
+    DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+    NAMESPACE minifb::
+)
+
+# generate file from our template that will be found directly by find_package (<name>-config.cmake is one of file filenames it searches for)
+# the file will find dependancies and `include`s the previously created minifb-targets.cmake
+configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
-    "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+    INSTALL_DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
-
-minifb_write_package_version_file(
+# in case find_package is called with the VERSION flag, generate the file that checks the version
+write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
+    COMPATIBILITY SameMajorVersion
 )
-
-install(EXPORT minifb FILE minifb-targets.cmake DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}" NAMESPACE minifb::)
+# install the previous two files
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
