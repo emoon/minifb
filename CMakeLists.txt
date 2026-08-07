@@ -229,7 +229,7 @@ endif()
 
 endif()
 
-# Compilation configuration (library and examples)
+# Compilation configuration (will be ran on library and examples)
 #--------------------------------------
 function(minifb_configure_target target)
     if (NOT MSVC)
@@ -307,7 +307,7 @@ endfunction()
 # Create library target and configure
 #--------------------------------------
 add_library(minifb STATIC ${SrcLib})
-add_library(minifb::minifb ALIAS minifb)
+add_library(minifb::minifb ALIAS minifb) # cmake installing will install the "minifb::" namespace
 
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 minifb_configure_target(minifb)
@@ -358,7 +358,7 @@ elseif (DJGPP)
     target_sources(minifb PRIVATE ${SrcDOS})
 endif()
 
-# Linking main library
+# Link main library
 #--------------------------------------
 if (MINIFB_USE_OPENGL_API)
     find_package(OpenGL)
@@ -453,6 +453,7 @@ function(minifb_add_example)
             "-sSINGLE_FILE"
         )
 
+        # copy the example's .html file into the build directory after the example is built
         add_custom_command(TARGET ${arg_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
                 "examples/web/${arg_NAME}.html"
