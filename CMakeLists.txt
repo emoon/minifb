@@ -24,10 +24,6 @@ endif()
 
 include(GNUInstallDirs)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
-if (POLICY CMP0072)
-    cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
-endif()
-set(OpenGL_GL_PREFERENCE "GLVND")
 
 # use IDE folders in build systems that support it. enabled by default in cmake 3.26+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
