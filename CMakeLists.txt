@@ -23,7 +23,6 @@ if (MACOS OR IOS)
 endif()
 
 include(GNUInstallDirs)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioning.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
 if (POLICY CMP0072)
     cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
@@ -150,6 +149,22 @@ option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 # purely for internal use, never exposed to the user
 set(MINIFB_USE_X11_API OFF)
 
+# unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
+if (MACOS)
+	minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using Metal API code")
+	minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
+elseif (LINUX)
+    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using Wayland API code")
+	if (NOT MINIFB_USE_WAYLAND_API)
+		set(MINIFB_USE_X11_API ON)
+		minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+	endif()
+elseif (WIN32)
+    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+endif()
+
+if (NOT MINIFB_HAVE_SET_LEGACY_OPTION) # only use new options if no legacy options are used to prevent conflicts
+
 if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
 
     # requires 3.22+ to use full condition syntax, technically could use in 3.16, but it would be a lot worse
@@ -202,12 +217,7 @@ else()
         option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF)
     else()
         set(MINIFB_USE_WAYLAND_API OFF)
-    endif()
-
-    if (LINUX AND NOT MINIFB_USE_WAYLAND_API)
         set(MINIFB_USE_X11_API ON)
-    else()
-        set(MINIFB_USE_X11_API OFF)
     endif()
 
     if (WIN32 OR MINIFB_USE_X11_API)
@@ -218,15 +228,6 @@ else()
 
 endif()
 
-# unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
-if (MACOS)
-    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using Metal API code")
-    minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
-elseif (LINUX)
-    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using Wayland API code")
-    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
-elseif (WIN32)
-    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
 # Compilation configuration (library and examples)
