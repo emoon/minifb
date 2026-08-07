@@ -26,7 +26,7 @@ if (MACOS OR IOS)
 endif()
 
 include(GNUInstallDirs)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
+include("cmake/minifb_cmake_helpers.cmake")
 
 # use IDE folders in build systems that support it. enabled by default in cmake 3.26+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -43,7 +43,7 @@ minifb_compute_git_metadata(
     MINIFB_GIT_DIRTY
 )
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/minifb_version.h.in"
+    include/minifb_version.h.in
     "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
     @ONLY
 )
@@ -59,7 +59,7 @@ set(SrcLib
     include/MiniFB_types.h
 
     # remember to include generated headers as source files
-    ${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h
+    "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
@@ -455,7 +455,7 @@ function(minifb_add_example)
 
         add_custom_command(TARGET ${arg_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_SOURCE_DIR}/examples/web/${arg_NAME}.html"
+                "examples/web/${arg_NAME}.html"
                 "${CMAKE_CURRENT_BINARY_DIR}"
             )
 
@@ -465,12 +465,12 @@ function(minifb_add_example)
 
         if (${arg_IOS_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
-                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
+                MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.plist"
                 RESOURCE "examples/ios/LaunchScreen.storyboard"
             )
         elseif (${arg_IOS_NO_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
-                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
+                MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.no_storyboard.plist"
             )
         endif()
     endif()
@@ -539,7 +539,7 @@ install(EXPORT minifb
 # generate file from our template that will be found directly by find_package (<name>-config.cmake is one of file filenames it searches for)
 # the file will find dependancies and `include`s the previously created minifb-targets.cmake
 configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb-config.cmake.in"
+    "cmake/minifb-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
     INSTALL_DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
