@@ -284,9 +284,8 @@ function(minifb_configure_target target)
         target_compile_definitions(${target} PRIVATE _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
     endif()
 
-    # TODO does this even matter
+    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
     if (DJGPP)
-        # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
         set(MINIFB_C_EXTENSIONS   ON)
         set(MINIFB_CXX_EXTENSIONS ON)
     else()
