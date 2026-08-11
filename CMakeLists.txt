@@ -33,7 +33,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # directory to add generated headers (created during configuration)
 set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
-file(MAKE_DIRECTORY "${output_dir}")
+file(MAKE_DIRECTORY "${MINIFB_GENERATED_INCLUDE_DIR}")
 
 # generate the version header from the templace (.in)
 minifb_compute_git_metadata(
