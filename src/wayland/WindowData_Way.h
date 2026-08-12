@@ -50,6 +50,20 @@ typedef struct {
 } SWaylandBufferSlot;
 
 typedef struct {
+    double  continuous_x;
+    double  continuous_y;
+    int64_t discrete_x;
+    int64_t discrete_y;
+    int64_t value120_x;
+    int64_t value120_y;
+    uint8_t pending;
+    uint8_t discrete_x_valid;
+    uint8_t discrete_y_valid;
+    uint8_t value120_x_valid;
+    uint8_t value120_y_valid;
+} SWaylandPointerAxisFrame;
+
+typedef struct {
     struct wl_display       *display;
     struct wl_registry      *registry;
     struct wl_compositor    *compositor;
@@ -69,6 +83,7 @@ typedef struct {
     uint32_t                pointer_serial;
     uint32_t                pointer_enter_serial;
     uint8_t                 pointer_serial_valid;
+    SWaylandPointerAxisFrame pointer_axis_frame;
     uint8_t                 startup_state_applied;
     uint8_t                 request_fullscreen;
     uint8_t                 request_maximized;

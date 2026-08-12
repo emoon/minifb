@@ -61,6 +61,7 @@ void init_keycodes();
 // but defined later in the file.
 static void slot_destroy(SWaylandBufferSlot *slot);
 static bool slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window_data_specific, uint32_t surface_w, uint32_t surface_h);
+static void clear_pointer_axis_frame(SWindowData_Way *window_data_specific);
 
 //-------------------------------------
 static inline void
@@ -724,6 +725,7 @@ destroy(SWindowData *window_data) {
     }
 
     if (window_data_specific->pointer) {
+        clear_pointer_axis_frame(window_data_specific);
         wl_pointer_destroy(window_data_specific->pointer);
         window_data_specific->pointer = NULL;
     }
@@ -784,6 +786,27 @@ invalidate_pointer_serial_state(SWindowData_Way *window_data_specific) {
     window_data_specific->pointer_serial = 0;
     window_data_specific->pointer_enter_serial = 0;
     window_data_specific->pointer_serial_valid = 0;
+}
+
+//-------------------------------------
+static void
+clear_pointer_axis_frame(SWindowData_Way *window_data_specific) {
+    if (window_data_specific != NULL) {
+        memset(&window_data_specific->pointer_axis_frame, 0,
+               sizeof(window_data_specific->pointer_axis_frame));
+    }
+}
+
+//-------------------------------------
+static bool
+pointer_uses_frame_events(struct wl_pointer *pointer) {
+#if defined(WL_POINTER_FRAME_SINCE_VERSION)
+    return pointer != NULL
+        && wl_proxy_get_version((struct wl_proxy *) pointer) >= WL_POINTER_FRAME_SINCE_VERSION;
+#else
+    kUnused(pointer);
+    return false;
+#endif
 }
 
 //-------------------------------------
@@ -1017,6 +1040,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_specific) {
         invalidate_pointer_serial_state(window_data_specific);
+        clear_pointer_axis_frame(window_data_specific);
     }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer left surface %p (serial: %d)", surface, serial);
@@ -1113,29 +1137,82 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 //-------------------------------------
 static void
 pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {
-    kUnused(pointer);
     kUnused(time);
-    kUnused(axis);
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer handle axis: axis: %d (0x%x)", axis, value);
     SWindowData *window_data = (SWindowData *) data;
-    if (axis == 0) {
-        window_data->mouse_wheel_y = -(value / 256.0f);
-        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
     }
-    else if (axis == 1) {
-        window_data->mouse_wheel_x = -(value / 256.0f);
-        kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
+
+    float delta = -(float) wl_fixed_to_double(value);
+
+    if (pointer_uses_frame_events(pointer) == false) {
+        if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+            window_data->mouse_wheel_y = delta;
+            kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, 0.0f, delta);
+        }
+        else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
+            window_data->mouse_wheel_x = delta;
+            kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, delta, 0.0f);
+        }
+        return;
     }
+
+    SWaylandPointerAxisFrame *axis_frame = &window_data_specific->pointer_axis_frame;
+    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+        axis_frame->continuous_y += delta;
+    }
+    else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
+        axis_frame->continuous_x += delta;
+    }
+    else {
+        return;
+    }
+    axis_frame->pending = 1;
 }
 
 #if defined(WL_POINTER_FRAME_SINCE_VERSION)
 
 //-------------------------------------
 static void
-frame(void *data, struct wl_pointer *pointer) {
-    kUnused(data);
+pointer_frame(void *data, struct wl_pointer *pointer) {
     kUnused(pointer);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    SWaylandPointerAxisFrame *axis_frame = &window_data_specific->pointer_axis_frame;
+    if (axis_frame->pending == 0) {
+        return;
+    }
+
+    float delta_x = (float) axis_frame->continuous_x;
+    float delta_y = (float) axis_frame->continuous_y;
+
+    if (axis_frame->value120_x_valid != 0) {
+        delta_x = (float) axis_frame->value120_x / 120.0f;
+    }
+    else if (axis_frame->discrete_x_valid != 0) {
+        delta_x = (float) axis_frame->discrete_x;
+    }
+
+    if (axis_frame->value120_y_valid != 0) {
+        delta_y = (float) axis_frame->value120_y / 120.0f;
+    }
+    else if (axis_frame->discrete_y_valid != 0) {
+        delta_y = (float) axis_frame->discrete_y;
+    }
+
+    window_data->mouse_wheel_x = delta_x;
+    window_data->mouse_wheel_y = delta_y;
+    kCall(mouse_wheel_func, (mfb_key_mod) window_data->mod_keys, delta_x, delta_y);
+
+    clear_pointer_axis_frame(window_data_specific);
 }
 
 #endif
@@ -1170,10 +1247,27 @@ axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) 
 //-------------------------------------
 static void
 axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
-    kUnused(data);
     kUnused(pointer);
-    kUnused(axis);
-    kUnused(discrete);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    SWaylandPointerAxisFrame *axis_frame = &window_data_specific->pointer_axis_frame;
+    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+        axis_frame->discrete_y = -(int64_t) discrete;
+        axis_frame->discrete_y_valid = 1;
+    }
+    else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
+        axis_frame->discrete_x = -(int64_t) discrete;
+        axis_frame->discrete_x_valid = 1;
+    }
+    else {
+        return;
+    }
+    axis_frame->pending = 1;
 }
 
 #endif
@@ -1181,15 +1275,32 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
 #if defined(WL_POINTER_AXIS_VALUE120_SINCE_VERSION)
 
 //-------------------------------------
-// High-resolution wheel scroll information.
-// Currently unused; MiniFB keeps handling scroll through axis/axis_discrete.
+// High-resolution wheel scroll information. A value of 120 is one logical
+// wheel step; multiple values in the same frame are accumulated.
 //-------------------------------------
 static void
 axis_value120(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t value120) {
-    kUnused(data);
     kUnused(pointer);
-    kUnused(axis);
-    kUnused(value120);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    SWaylandPointerAxisFrame *axis_frame = &window_data_specific->pointer_axis_frame;
+    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+        axis_frame->value120_y -= (int64_t) value120;
+        axis_frame->value120_y_valid = 1;
+    }
+    else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
+        axis_frame->value120_x -= (int64_t) value120;
+        axis_frame->value120_x_valid = 1;
+    }
+    else {
+        return;
+    }
+    axis_frame->pending = 1;
 }
 
 #endif
@@ -1219,7 +1330,7 @@ wl_pointer_listener pointer_listener = {
     .button        = pointer_button,
     .axis          = pointer_axis,
 #if defined(WL_POINTER_FRAME_SINCE_VERSION)
-    .frame         = frame,
+    .frame         = pointer_frame,
 #endif
 #if defined(WL_POINTER_AXIS_SOURCE_SINCE_VERSION)
     .axis_source   = axis_source,
@@ -1266,6 +1377,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         wl_pointer_destroy(window_data_specific->pointer);
         window_data_specific->pointer = NULL;
         invalidate_pointer_serial_state(window_data_specific);
+        clear_pointer_axis_frame(window_data_specific);
 
         // Release any buttons still marked as pressed; otherwise getters would
         // report them as held forever now that we won't receive release events.
