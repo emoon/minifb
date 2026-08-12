@@ -64,6 +64,82 @@ static bool slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window
 static void clear_pointer_axis_frame(SWindowData_Way *window_data_specific);
 
 //-------------------------------------
+static void
+release_pointer(struct wl_pointer **pointer) {
+    if (pointer == NULL || *pointer == NULL) {
+        return;
+    }
+
+#if defined(WL_POINTER_RELEASE_SINCE_VERSION)
+    if (wl_proxy_get_version((struct wl_proxy *) *pointer) >= WL_POINTER_RELEASE_SINCE_VERSION) {
+        wl_pointer_release(*pointer);
+        *pointer = NULL;
+        return;
+    }
+#endif
+
+    wl_pointer_destroy(*pointer);
+    *pointer = NULL;
+}
+
+//-------------------------------------
+static void
+release_keyboard(struct wl_keyboard **keyboard) {
+    if (keyboard == NULL || *keyboard == NULL) {
+        return;
+    }
+
+#if defined(WL_KEYBOARD_RELEASE_SINCE_VERSION)
+    if (wl_proxy_get_version((struct wl_proxy *) *keyboard) >= WL_KEYBOARD_RELEASE_SINCE_VERSION) {
+        wl_keyboard_release(*keyboard);
+        *keyboard = NULL;
+        return;
+    }
+#endif
+
+    wl_keyboard_destroy(*keyboard);
+    *keyboard = NULL;
+}
+
+//-------------------------------------
+static void
+release_output(struct wl_output **output) {
+    if (output == NULL || *output == NULL) {
+        return;
+    }
+
+#if defined(WL_OUTPUT_RELEASE_SINCE_VERSION)
+    if (wl_proxy_get_version((struct wl_proxy *) *output) >= WL_OUTPUT_RELEASE_SINCE_VERSION) {
+        wl_output_release(*output);
+        *output = NULL;
+        return;
+    }
+#endif
+
+    wl_output_destroy(*output);
+    *output = NULL;
+}
+
+//-------------------------------------
+static void
+release_seat(struct wl_seat **seat) {
+    if (seat == NULL || *seat == NULL) {
+        return;
+    }
+
+#if defined(WL_SEAT_RELEASE_SINCE_VERSION)
+    if (wl_proxy_get_version((struct wl_proxy *) *seat) >= WL_SEAT_RELEASE_SINCE_VERSION) {
+        wl_seat_release(*seat);
+        *seat = NULL;
+        return;
+    }
+#endif
+
+    wl_seat_destroy(*seat);
+    *seat = NULL;
+}
+
+//-------------------------------------
 static inline void
 surface_damage(struct wl_surface *surface,
                uint32_t compositor_version,
@@ -706,8 +782,7 @@ destroy(SWindowData *window_data) {
 
     for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
         if (window_data_specific->outputs[i]) {
-            wl_output_destroy(window_data_specific->outputs[i]);
-            window_data_specific->outputs[i] = NULL;
+            release_output(&window_data_specific->outputs[i]);
         }
     }
 
@@ -720,19 +795,16 @@ destroy(SWindowData *window_data) {
     }
 
     if (window_data_specific->keyboard) {
-        wl_keyboard_destroy(window_data_specific->keyboard);
-        window_data_specific->keyboard = NULL;
+        release_keyboard(&window_data_specific->keyboard);
     }
 
     if (window_data_specific->pointer) {
         clear_pointer_axis_frame(window_data_specific);
-        wl_pointer_destroy(window_data_specific->pointer);
-        window_data_specific->pointer = NULL;
+        release_pointer(&window_data_specific->pointer);
     }
 
     if (window_data_specific->seat) {
-        wl_seat_destroy(window_data_specific->seat);
-        window_data_specific->seat = NULL;
+        release_seat(&window_data_specific->seat);
     }
 
     if (window_data_specific->registry) {
@@ -1362,8 +1434,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
     }
 
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
-        wl_keyboard_destroy(window_data_specific->keyboard);
-        window_data_specific->keyboard = NULL;
+        release_keyboard(&window_data_specific->keyboard);
         wayland_clear_keyboard_focus_state(window_data, window_data_specific);
     }
 
@@ -1374,8 +1445,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         }
     }
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_specific->pointer) {
-        wl_pointer_destroy(window_data_specific->pointer);
-        window_data_specific->pointer = NULL;
+        release_pointer(&window_data_specific->pointer);
         invalidate_pointer_serial_state(window_data_specific);
         clear_pointer_axis_frame(window_data_specific);
 
@@ -1750,7 +1820,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
                 window_data_specific->output_scales[idx] = 1;
             }
             else {
-                wl_output_destroy(output);
+                release_output(&output);
             }
         }
     }
@@ -1790,11 +1860,9 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
 
     for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
         if (window_data_specific->output_ids[i] == name) {
-            struct wl_output *removed = window_data_specific->outputs[i];
-
             bool was_entered = window_data_specific->output_entered[i];
 
-            wl_output_destroy(removed);
+            release_output(&window_data_specific->outputs[i]);
 
             // Compact arrays by moving the last element into the gap
             uint32_t last = window_data_specific->output_count - 1;
