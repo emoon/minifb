@@ -2564,6 +2564,11 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_INTERNAL_ERROR;
     }
 
+    // Reset scroll deltas before this event pump so newly dispatched values
+    // remain observable after mfb_update_ex returns.
+    window_data->mouse_wheel_x = 0.0f;
+    window_data->mouse_wheel_y = 0.0f;
+
     // 1. Dispatch window events (input, resize, close) non-blocking.
     if (dispatch_owned_non_blocking(window_data) == false) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed in mfb_update_ex.");
@@ -2605,10 +2610,6 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     SWaylandBufferSlot *active_slot = NULL;
     EWaylandSlotAcquireStatus slot_status =
         acquire_presentation_slot(window_data, window_data_specific, &metrics, &active_slot);
-
-    // Always reset per-frame input state.
-    window_data->mouse_wheel_x = 0.0f;
-    window_data->mouse_wheel_y = 0.0f;
 
     if (slot_status != WAYLAND_SLOT_ACQUIRE_OK || active_slot == NULL) {
         if (window_data->close == true) {
