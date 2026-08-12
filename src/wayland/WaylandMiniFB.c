@@ -99,6 +99,9 @@ get_window_data(struct mfb_window *window, const char *func_name, SWindowData **
 }
 
 //-------------------------------------
+extern double g_time_for_frame;
+
+//-------------------------------------
 // Dual-queue dispatch infrastructure.
 //
 // MiniFB uses two Wayland event queues (following Mesa's eglSwapBuffers pattern):
@@ -464,7 +467,16 @@ dispatch_render_blocking(SWindowData *window_data) {
         return false;
     }
 
-    return dispatch_queue_timeout(window_data, window_data_specific->render_queue, NULL);
+    // Use a finite wait so window events can be processed and close/configure
+    // state can be re-checked when frame callbacks or buffer releases are delayed.
+    double frame_seconds = g_time_for_frame;
+    if (frame_seconds <= 0.0f) {
+        frame_seconds = 1.0 / 60.0;
+    }
+
+    struct timespec timeout = ms_to_ts(frame_seconds * 1000.0);
+
+    return dispatch_queue_timeout(window_data, window_data_specific->render_queue, &timeout);
 }
 
 //-------------------------------------
@@ -480,7 +492,6 @@ dispatch_render_blocking(SWindowData *window_data) {
 //-------------------------------------
 
 //-------------------------------------
-extern double g_time_for_frame;
 extern bool   g_use_hardware_sync;
 bool          g_use_wayland_frame_callback_throttle = true;
 //-------------------------------------
@@ -515,6 +526,11 @@ surface_throttle(SWindowData *window_data) {
     }
 
     while (window_data_specific->throttle_callback != NULL) {
+        // Drain window_queue so xdg_toplevel.close / configure can break the wait.
+        if (dispatch_owned_non_blocking(window_data) == false) {
+            return false;
+        }
+
         if (window_data->close == true) {
             return false;
         }
@@ -2408,6 +2424,11 @@ acquire_presentation_slot(SWindowData *window_data,
         }
 
         // All slots busy - block until a release event arrives.
+        // Drain window_queue so xdg_toplevel.close / configure can break the wait.
+        if (dispatch_owned_non_blocking(window_data) == false) {
+            return WAYLAND_SLOT_ACQUIRE_ERROR;
+        }
+
         if (window_data->close == true) {
             return WAYLAND_SLOT_ACQUIRE_ERROR;
         }
