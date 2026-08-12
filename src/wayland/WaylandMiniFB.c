@@ -363,6 +363,16 @@ flush_display(struct wl_display *display) {
 }
 
 //-------------------------------------
+static void
+flush_request(struct wl_display *display, const char *request_name) {
+    if (flush_display(display) == false) {
+        int error_code = errno;
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to flush %s: %s (%d).",
+                request_name, strerror(error_code), error_code);
+    }
+}
+
+//-------------------------------------
 static int
 dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
@@ -1058,6 +1068,7 @@ static void
 refresh_cursor_surface(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_specific == NULL ||
+        window_data_specific->display == NULL ||
         window_data_specific->pointer == NULL ||
         window_data_specific->cursor_surface == NULL ||
         window_data_specific->pointer_serial_valid == 0) {
@@ -1067,6 +1078,7 @@ refresh_cursor_surface(SWindowData *window_data) {
     uint32_t serial = window_data_specific->pointer_enter_serial;
     if (window_data->is_cursor_visible == false) {
         wl_pointer_set_cursor(window_data_specific->pointer, serial, NULL, 0, 0);
+        flush_request(window_data_specific->display, "cursor update");
         return;
     }
 
@@ -1135,6 +1147,7 @@ refresh_cursor_surface(SWindowData *window_data) {
                    0, 0,
                    image->width, image->height);
     wl_surface_commit(window_data_specific->cursor_surface);
+    flush_request(window_data_specific->display, "cursor update");
 }
 
 //-------------------------------------
@@ -3210,8 +3223,13 @@ mfb_set_title(struct mfb_window *window, const char *title) {
     }
 
     kUnused(window_data);
+    if (window_data_specific->display == NULL || window_data_specific->toplevel == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_set_title cannot update a window without an active Wayland toplevel.");
+        return;
+    }
+
     xdg_toplevel_set_title(window_data_specific->toplevel, title);
-    wl_surface_commit(window_data_specific->surface);
+    flush_request(window_data_specific->display, "title update");
 }
 
 //-------------------------------------
