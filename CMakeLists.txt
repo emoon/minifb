@@ -9,7 +9,7 @@ message(STATUS "Processing " ${PROJECT_NAME})
 # prefer these over general `UNIX` or `APPLE`
 # `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(LINUX TRUE)
+    set(LINUX TRUE) # this is a default variable in cmake 3.25 and over
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(MACOS TRUE)
 endif()
