@@ -54,6 +54,60 @@
 #define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
 #define WAYLAND_DEFAULT_CURSOR_SIZE 32
 
+// Core protocol interface descriptors come from the libwayland loaded at
+// runtime. Cap them to the requests and listener entries available in the
+// headers used to compile MiniFB, otherwise an older binary can bind events its
+// listener structs do not contain when run with a newer libwayland.
+#if defined(WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION
+#elif defined(WL_SURFACE_OFFSET_SINCE_VERSION)
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION WL_SURFACE_OFFSET_SINCE_VERSION
+#elif defined(WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION
+#elif defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION
+#elif defined(WL_SURFACE_SET_BUFFER_TRANSFORM_SINCE_VERSION)
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION WL_SURFACE_SET_BUFFER_TRANSFORM_SINCE_VERSION
+#else
+    #define WAYLAND_COMPILED_COMPOSITOR_VERSION 1u
+#endif
+
+#if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION
+#elif defined(WL_POINTER_AXIS_RELATIVE_DIRECTION_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_POINTER_AXIS_RELATIVE_DIRECTION_SINCE_VERSION
+#elif defined(WL_POINTER_AXIS_VALUE120_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_POINTER_AXIS_VALUE120_SINCE_VERSION
+#elif defined(WL_POINTER_AXIS_SOURCE_WHEEL_TILT_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_POINTER_AXIS_SOURCE_WHEEL_TILT_SINCE_VERSION
+#elif defined(WL_POINTER_FRAME_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_POINTER_FRAME_SINCE_VERSION
+#elif defined(WL_KEYBOARD_REPEAT_INFO_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_KEYBOARD_REPEAT_INFO_SINCE_VERSION
+#elif defined(WL_POINTER_RELEASE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_POINTER_RELEASE_SINCE_VERSION
+#elif defined(WL_SEAT_NAME_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SEAT_VERSION WL_SEAT_NAME_SINCE_VERSION
+#else
+    #define WAYLAND_COMPILED_SEAT_VERSION 1u
+#endif
+
+#if defined(WL_OUTPUT_NAME_SINCE_VERSION)
+    #define WAYLAND_COMPILED_OUTPUT_VERSION WL_OUTPUT_NAME_SINCE_VERSION
+#elif defined(WL_OUTPUT_RELEASE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_OUTPUT_VERSION WL_OUTPUT_RELEASE_SINCE_VERSION
+#elif defined(WL_OUTPUT_SCALE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_OUTPUT_VERSION WL_OUTPUT_SCALE_SINCE_VERSION
+#else
+    #define WAYLAND_COMPILED_OUTPUT_VERSION 1u
+#endif
+
+#if defined(WL_SHM_RELEASE_SINCE_VERSION)
+    #define WAYLAND_COMPILED_SHM_VERSION WL_SHM_RELEASE_SINCE_VERSION
+#else
+    #define WAYLAND_COMPILED_SHM_VERSION 1u
+#endif
+
 //-------------------------------------
 void init_keycodes();
 
@@ -62,6 +116,31 @@ void init_keycodes();
 static void slot_destroy(SWaylandBufferSlot *slot);
 static bool slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window_data_specific, uint32_t surface_w, uint32_t surface_h);
 static void clear_pointer_axis_frame(SWindowData_Way *window_data_specific);
+
+//-------------------------------------
+static uint32_t
+negotiate_protocol_version(uint32_t server_version, const struct wl_interface *interface, uint32_t compiled_version) {
+    uint32_t runtime_version = (uint32_t) interface->version;
+    uint32_t use_version = server_version;
+
+    if (use_version > runtime_version) {
+        use_version = runtime_version;
+    }
+    if (use_version > compiled_version) {
+        use_version = compiled_version;
+    }
+
+    MFB_LOG(MFB_LOG_TRACE,
+            "%s: server=%u runtime=%u compiled=%u using=%u",
+            interface->name,
+            server_version,
+            runtime_version,
+            compiled_version,
+            use_version
+    );
+
+    return use_version;
+}
 
 //-------------------------------------
 static void
@@ -1430,10 +1509,18 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         window_data_specific->keyboard = wl_seat_get_keyboard(seat);
         if (window_data_specific->keyboard) {
             wl_keyboard_add_listener(window_data_specific->keyboard, &g_wayland_keyboard_listener, window_data);
+            MFB_LOG(MFB_LOG_TRACE,
+                    "WaylandMiniFB: keyboard capability acquired (wl_keyboard version %u).",
+                    wl_proxy_get_version((struct wl_proxy *) window_data_specific->keyboard)
+            );
         }
     }
 
     else if (!(caps & WL_SEAT_CAPABILITY_KEYBOARD) && window_data_specific->keyboard) {
+        MFB_LOG(MFB_LOG_TRACE,
+                "WaylandMiniFB: keyboard capability removed (wl_keyboard version %u).",
+                wl_proxy_get_version((struct wl_proxy *) window_data_specific->keyboard)
+        );
         release_keyboard(&window_data_specific->keyboard);
         wayland_clear_keyboard_focus_state(window_data, window_data_specific);
     }
@@ -1442,9 +1529,17 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
         window_data_specific->pointer = wl_seat_get_pointer(seat);
         if (window_data_specific->pointer) {
             wl_pointer_add_listener(window_data_specific->pointer, &pointer_listener, window_data);
+            MFB_LOG(MFB_LOG_TRACE,
+                    "WaylandMiniFB: pointer capability acquired (wl_pointer version %u).",
+                    wl_proxy_get_version((struct wl_proxy *) window_data_specific->pointer)
+            );
         }
     }
     else if (!(caps & WL_SEAT_CAPABILITY_POINTER) && window_data_specific->pointer) {
+        MFB_LOG(MFB_LOG_TRACE,
+                "WaylandMiniFB: pointer capability removed (wl_pointer version %u).",
+                wl_proxy_get_version((struct wl_proxy *) window_data_specific->pointer)
+        );
         release_pointer(&window_data_specific->pointer);
         invalidate_pointer_serial_state(window_data_specific);
         clear_pointer_axis_frame(window_data_specific);
@@ -1768,49 +1863,44 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (strcmp(iface, "wl_compositor") == 0) {
-        uint32_t client_version = (uint32_t) wl_compositor_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t use_version = negotiate_protocol_version(version, &wl_compositor_interface,
+                                                          WAYLAND_COMPILED_COMPOSITOR_VERSION);
         window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, use_version);
         window_data_specific->compositor_version = use_version;
-        MFB_LOG(MFB_LOG_TRACE, "wl_compositor: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
     else if (strcmp(iface, "wl_shm") == 0) {
-        uint32_t client_version = (uint32_t) wl_shm_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t use_version = negotiate_protocol_version(version, &wl_shm_interface,
+                                                          WAYLAND_COMPILED_SHM_VERSION);
         window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "wl_shm: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->shm) {
             wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
         }
     }
 
     else if (strcmp(iface, "xdg_wm_base") == 0) {
-        uint32_t client_version = (uint32_t) xdg_wm_base_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t compiled_version = (uint32_t) xdg_wm_base_interface.version;
+        uint32_t use_version = negotiate_protocol_version(version, &xdg_wm_base_interface, compiled_version);
         window_data_specific->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "xdg_wm_base: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->shell) {
             xdg_wm_base_add_listener(window_data_specific->shell, &shell_listener, NULL);
         }
     }
 
     else if (strcmp(iface, "wl_seat") == 0) {
-        uint32_t client_version = (uint32_t) wl_seat_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t use_version = negotiate_protocol_version(version, &wl_seat_interface,
+                                                          WAYLAND_COMPILED_SEAT_VERSION);
         window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, use_version);
         window_data_specific->seat_version = use_version;
-        MFB_LOG(MFB_LOG_TRACE, "wl_seat: server=%u client=%u using=%u", version, client_version, use_version);
         if (window_data_specific->seat) {
             wl_seat_add_listener(window_data_specific->seat, &seat_listener, window_data);
         }
     }
 
     else if (strcmp(iface, "wl_output") == 0) {
-        uint32_t client_version = (uint32_t) wl_output_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t use_version = negotiate_protocol_version(version, &wl_output_interface,
+                                                          WAYLAND_COMPILED_OUTPUT_VERSION);
         struct wl_output *output = (struct wl_output *) wl_registry_bind(registry, id, &wl_output_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "wl_output: server=%u client=%u using=%u", version, client_version, use_version);
         if (output) {
             wl_output_add_listener(output, &output_listener, window_data);
             if (window_data_specific->output_count < WAYLAND_MAX_OUTPUTS) {
@@ -1826,27 +1916,26 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 
     else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0) {
-        uint32_t client_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t compiled_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
+        uint32_t use_version = negotiate_protocol_version(version, &wp_fractional_scale_manager_v1_interface,
+                                                          compiled_version);
         window_data_specific->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
             wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "wp_fractional_scale_manager_v1: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
     else if (strcmp(iface, "wp_viewporter") == 0) {
-        uint32_t client_version = (uint32_t) wp_viewporter_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t compiled_version = (uint32_t) wp_viewporter_interface.version;
+        uint32_t use_version = negotiate_protocol_version(version, &wp_viewporter_interface, compiled_version);
         window_data_specific->viewporter = (struct wp_viewporter *)
             wl_registry_bind(registry, id, &wp_viewporter_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "wp_viewporter: server=%u client=%u using=%u", version, client_version, use_version);
     }
 
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
-        uint32_t client_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
-        uint32_t use_version = version < client_version ? version : client_version;
+        uint32_t compiled_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
+        uint32_t use_version = negotiate_protocol_version(version, &zxdg_decoration_manager_v1_interface,
+                                                          compiled_version);
         window_data_specific->decoration_manager = (struct zxdg_decoration_manager_v1 *)
             wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
-        MFB_LOG(MFB_LOG_TRACE, "zxdg_decoration_manager_v1: server=%u client=%u using=%u", version, client_version, use_version);
     }
 }
 
@@ -1862,6 +1951,11 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
         if (window_data_specific->output_ids[i] == name) {
             bool was_entered = window_data_specific->output_entered[i];
 
+            MFB_LOG(MFB_LOG_TRACE,
+                    "WaylandMiniFB: output removed (registry id %u, wl_output version %u).",
+                    name,
+                    wl_proxy_get_version((struct wl_proxy *) window_data_specific->outputs[i])
+            );
             release_output(&window_data_specific->outputs[i]);
 
             // Compact arrays by moving the last element into the gap
