@@ -259,7 +259,7 @@ extern const struct wl_interface xdg_surface_interface;
  * id, and well as trigger user interactive operations such as interactive
  * resize and move.
  *
- * A xdg_toplevel by default is responsible for providing the full intended
+ * An xdg_toplevel by default is responsible for providing the full intended
  * visual representation of the toplevel, which depending on the window
  * state, may mean things like a title bar, window controls and drop shadow.
  *
@@ -286,7 +286,7 @@ extern const struct wl_interface xdg_surface_interface;
  * id, and well as trigger user interactive operations such as interactive
  * resize and move.
  *
- * A xdg_toplevel by default is responsible for providing the full intended
+ * An xdg_toplevel by default is responsible for providing the full intended
  * visual representation of the toplevel, which depending on the window
  * state, may mean things like a title bar, window controls and drop shadow.
  *
@@ -526,16 +526,15 @@ xdg_wm_base_create_positioner(struct xdg_wm_base *xdg_wm_base)
 /**
  * @ingroup iface_xdg_wm_base
  *
- * This creates an xdg_surface for the given surface. While xdg_surface
- * itself is not a role, the corresponding surface may only be assigned
- * a role extending xdg_surface, such as xdg_toplevel or xdg_popup. It is
- * illegal to create an xdg_surface for a wl_surface which already has an
- * assigned role and this will result in a role error.
- *
  * This creates an xdg_surface for the given surface. An xdg_surface is
  * used as basis to define a role to a given surface, such as xdg_toplevel
  * or xdg_popup. It also manages functionality shared between xdg_surface
  * based surface roles.
+ *
+ * While xdg_surface itself is not a role, the corresponding surface may
+ * only be assigned a role extending xdg_surface, such as xdg_toplevel or
+ * xdg_popup. It is illegal to create an xdg_surface for a wl_surface which
+ * already has anassigned role and this will result in a role error.
  *
  * See the documentation of xdg_surface for more details about what an
  * xdg_surface is and how it is used.
@@ -839,7 +838,7 @@ xdg_positioner_set_anchor_rect(struct xdg_positioner *xdg_positioner, int32_t x,
  * @ingroup iface_xdg_positioner
  *
  * Defines the anchor point for the anchor rectangle. The specified anchor
- * is used derive an anchor point that the child surface will be
+ * is used to derive an anchor point that the child surface will be
  * positioned relative to. If a corner anchor is set (e.g. 'top_left' or
  * 'bottom_right'), the anchor point will be at the specified corner;
  * otherwise, the derived anchor point will be centered on the specified
@@ -1520,9 +1519,15 @@ struct xdg_toplevel_listener {
 	 * arguments should be interpreted, and possibly how it should be
 	 * drawn.
 	 *
+	 * The states are sent as an array of 32-bit unsigned integers in
+	 * native endianness. State values are defined in the state enum.
+	 *
 	 * Clients must send an ack_configure in response to this event.
 	 * See xdg_surface.configure and xdg_surface.ack_configure for
 	 * details.
+	 * @param width suggested width of window
+	 * @param height suggested height of window
+	 * @param states suggested states of the window
 	 */
 	void (*configure)(void *data,
 			  struct xdg_toplevel *xdg_toplevel,
@@ -1562,6 +1567,8 @@ struct xdg_toplevel_listener {
 	 * The bounds may change at any point, and in such a case, a new
 	 * xdg_toplevel.configure_bounds will be sent, followed by
 	 * xdg_toplevel.configure and xdg_surface.configure.
+	 * @param width suggested maximum width of surface
+	 * @param height suggested maximum height of surface
 	 * @since 4
 	 */
 	void (*configure_bounds)(void *data,
@@ -1591,7 +1598,8 @@ struct xdg_toplevel_listener {
 	 * xdg_surface.configure for details.
 	 *
 	 * The capabilities are sent as an array of 32-bit unsigned
-	 * integers in native endianness.
+	 * integers in native endianness. Capability values are defined in
+	 * the wm_capabilities enum.
 	 * @param capabilities array of 32-bit capabilities
 	 * @since 5
 	 */
@@ -1942,7 +1950,7 @@ xdg_toplevel_resize(struct xdg_toplevel *xdg_toplevel, struct wl_seat *seat, uin
  * a surface is illegal and will result in an invalid_size error.
  *
  * The width and height must be greater than or equal to zero. Using
- * strictly negative values for width or height will result in a
+ * strictly negative values for width or height will result in an
  * invalid_size error.
  */
 static inline void
@@ -1986,7 +1994,7 @@ xdg_toplevel_set_max_size(struct xdg_toplevel *xdg_toplevel, int32_t width, int3
  * a surface is illegal and will result in an invalid_size error.
  *
  * The width and height must be greater than or equal to zero. Using
- * strictly negative values for width and height will result in a
+ * strictly negative values for width and height will result in an
  * invalid_size error.
  */
 static inline void
@@ -2076,7 +2084,7 @@ xdg_toplevel_unset_maximized(struct xdg_toplevel *xdg_toplevel)
  *
  * If the surface doesn't cover the whole output, the compositor will
  * position the surface in the center of the output and compensate with
- * with border fill covering the rest of the output. The content of the
+ * border fill covering the rest of the output. The content of the
  * border fill is undefined, but should be assumed to be in some way that
  * attempts to blend into the surrounding area (e.g. solid black).
  *

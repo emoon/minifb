@@ -92,8 +92,6 @@ set(SrcWayland
     src/wayland/generated/xdg-shell-client-protocol.h
     src/wayland/generated/xdg-decoration-protocol.c
     src/wayland/generated/xdg-decoration-client-protocol.h
-    src/wayland/generated/xdg-output-unstable-v1-protocol.c
-    src/wayland/generated/xdg-output-unstable-v1-client-protocol.h
     src/wayland/generated/fractional-scale-v1-protocol.c
     src/wayland/generated/fractional-scale-v1-client-protocol.h
     src/wayland/generated/viewporter-protocol.c

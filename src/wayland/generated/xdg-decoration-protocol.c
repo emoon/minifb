@@ -53,7 +53,7 @@ static const struct wl_message zxdg_decoration_manager_v1_requests[] = {
 };
 
 WL_PRIVATE const struct wl_interface zxdg_decoration_manager_v1_interface = {
-	"zxdg_decoration_manager_v1", 1,
+	"zxdg_decoration_manager_v1", 2,
 	2, zxdg_decoration_manager_v1_requests,
 	0, NULL,
 };
@@ -69,7 +69,7 @@ static const struct wl_message zxdg_toplevel_decoration_v1_events[] = {
 };
 
 WL_PRIVATE const struct wl_interface zxdg_toplevel_decoration_v1_interface = {
-	"zxdg_toplevel_decoration_v1", 1,
+	"zxdg_toplevel_decoration_v1", 2,
 	3, zxdg_toplevel_decoration_v1_requests,
 	1, zxdg_toplevel_decoration_v1_events,
 };

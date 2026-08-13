@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Project root is two levels up from tools/wayland/
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-PROTOCOL_DIR="wayland-protocols-1.47"
+PROTOCOL_DIR="wayland-protocols-1.49"
 OUTPUT_DIR="$PROJECT_ROOT/src/wayland/generated"
 
 # Verify we're in the correct project (check for CMakeLists.txt or other project files)
@@ -39,8 +39,14 @@ echo "Output directory: $OUTPUT_DIR"
 
 # Check wayland-scanner version
 if command -v wayland-scanner >/dev/null 2>&1; then
-    echo "wayland-scanner version:"
-    wayland-scanner --version 2>/dev/null || echo "  (version info not available)"
+    # wayland-scanner prints its version to stderr, so stderr must be redirected
+    # into the capture instead of being discarded.
+    SCANNER_VERSION="$(wayland-scanner --version 2>&1)" || true
+    if [ -n "$SCANNER_VERSION" ]; then
+        echo "Using $SCANNER_VERSION"
+    else
+        echo "wayland-scanner version: (version info not available)"
+    fi
     echo ""
 else
     echo "Error: wayland-scanner not found. Please install wayland development packages."
@@ -81,18 +87,6 @@ if [ -f "$PROTOCOL_DIR/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml" ]
     wayland-scanner private-code \
       "$PROTOCOL_DIR/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml" \
       "$OUTPUT_DIR/xdg-decoration-protocol.c"
-fi
-
-# XDG output (unstable)
-if [ -f "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" ]; then
-    echo "Generating xdg-output-unstable-v1..."
-    wayland-scanner client-header \
-      "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" \
-      "$OUTPUT_DIR/xdg-output-unstable-v1-client-protocol.h"
-
-    wayland-scanner private-code \
-      "$PROTOCOL_DIR/unstable/xdg-output/xdg-output-unstable-v1.xml" \
-      "$OUTPUT_DIR/xdg-output-unstable-v1-protocol.c"
 fi
 
 # Fractional scale (staging)

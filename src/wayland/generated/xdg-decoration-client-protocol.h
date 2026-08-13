@@ -183,11 +183,26 @@ zxdg_decoration_manager_v1_destroy(struct zxdg_decoration_manager_v1 *zxdg_decor
  *
  * Create a new decoration object associated with the given toplevel.
  *
- * Creating an xdg_toplevel_decoration from an xdg_toplevel which has a
- * buffer attached or committed is a client error, and any attempts by a
- * client to attach or manipulate a buffer prior to the first
- * xdg_toplevel_decoration.configure event must also be treated as
- * errors.
+ * For objects of version 1, creating an xdg_toplevel_decoration from an
+ * xdg_toplevel which has a buffer attached or committed is a client
+ * error, and any attempts by a client to attach or manipulate a buffer
+ * prior to the first xdg_toplevel_decoration.configure event must also be
+ * treated as errors.
+ *
+ * For objects of version 2 or newer, creating an xdg_toplevel_decoration
+ * from an xdg_toplevel which has a buffer attached or committed is
+ * allowed. The initial decoration mode of the surface if a buffer is
+ * already attached depends on whether a xdg_toplevel_decoration object
+ * has been associated with the surface or not prior to this request.
+ *
+ * If an xdg_toplevel_decoration was associated with the surface, then
+ * destroyed without a surface commit, the previous decoration mode is
+ * retained.
+ *
+ * If no xdg_toplevel_decoration was associated with the surface prior to
+ * this request, or if a surface commit has been performed after a previous
+ * xdg_toplevel_decoration object associated with the surface was
+ * destroyed, the decoration mode is assumed to be client-side.
  */
 static inline struct zxdg_toplevel_decoration_v1 *
 zxdg_decoration_manager_v1_get_toplevel_decoration(struct zxdg_decoration_manager_v1 *zxdg_decoration_manager_v1, struct xdg_toplevel *toplevel)
@@ -321,7 +336,8 @@ zxdg_toplevel_decoration_v1_get_version(struct zxdg_toplevel_decoration_v1 *zxdg
  * @ingroup iface_zxdg_toplevel_decoration_v1
  *
  * Switch back to a mode without any server-side decorations at the next
- * commit.
+ * commit, unless a new xdg_toplevel_decoration is created for the surface
+ * first.
  */
 static inline void
 zxdg_toplevel_decoration_v1_destroy(struct zxdg_toplevel_decoration_v1 *zxdg_toplevel_decoration_v1)
