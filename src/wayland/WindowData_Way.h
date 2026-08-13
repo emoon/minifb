@@ -39,10 +39,8 @@ struct xkb_compose_table;
 struct xkb_compose_state;
 
 typedef struct {
-    struct wl_shm_pool  *pool;
     struct wl_buffer    *wl_buf;
     uint32_t            *shm_ptr;       // mmap'd pointer for this slot
-    int                  fd;
     size_t               pool_size;
     unsigned             width;         // dimensions this wl_buf was created with
     unsigned             height;

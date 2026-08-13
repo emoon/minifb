@@ -27,6 +27,7 @@
 #include <xkbcommon/xkbcommon-compose.h>
 
 #include <inttypes.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,7 @@
 #include <linux/limits.h>
 #include <linux/input.h>
 #include <linux/input-event-codes.h>
+#include <linux/memfd.h>
 
 #include <sys/mman.h>
 
@@ -2138,7 +2140,92 @@ static const struct wl_buffer_listener buffer_listener = {
 };
 
 //-------------------------------------
-// Destroy a slot's resources (pool, buffer, mmap, fd).
+static int
+create_temporary_shm_file(void) {
+    const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
+    char path[PATH_MAX];
+    int path_length;
+    int fd;
+
+    if (runtime_dir == NULL || runtime_dir[0] == '\0') {
+        errno = ENOENT;
+        return -1;
+    }
+
+    path_length = snprintf(path, sizeof(path), "%s/mfb-shm-XXXXXX", runtime_dir);
+    if (path_length < 0 || path_length >= (int) sizeof(path)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+#if defined(O_CLOEXEC)
+    fd = mkostemp(path, O_CLOEXEC);
+#else
+    fd = mkstemp(path);
+#endif
+    if (fd == -1) {
+        return -1;
+    }
+
+    if (unlink(path) == -1) {
+        int error_code = errno;
+        close(fd);
+        errno = error_code;
+        return -1;
+    }
+
+#if !defined(O_CLOEXEC)
+    int fd_flags = fcntl(fd, F_GETFD);
+    if (fd_flags == -1 || fcntl(fd, F_SETFD, fd_flags | FD_CLOEXEC) == -1) {
+        int error_code = errno;
+        close(fd);
+        errno = error_code;
+        return -1;
+    }
+#endif
+
+    return fd;
+}
+
+//-------------------------------------
+static int
+create_anonymous_shm_file(size_t size) {
+    int fd = -1;
+    int result;
+
+#if defined(MFD_CLOEXEC) && defined(MFD_ALLOW_SEALING)
+    fd = memfd_create("minifb-shm", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd >= 0) {
+#if defined(F_ADD_SEALS) && defined(F_SEAL_SHRINK)
+        // Best effort: prevent later shrinking while mappings may be in use.
+        (void) fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK);
+#endif
+    }
+#endif
+
+    if (fd == -1) {
+        fd = create_temporary_shm_file();
+        if (fd == -1) {
+            return -1;
+        }
+    }
+
+    do {
+        result = ftruncate(fd, (off_t) size);
+    } while (result == -1 && errno == EINTR);
+
+    if (result == -1) {
+        int error_code = errno;
+        close(fd);
+        errno = error_code;
+        return -1;
+    }
+
+    return fd;
+}
+
+//-------------------------------------
+// Destroy the resources retained for a slot after buffer creation.
 //-------------------------------------
 static void
 slot_destroy(SWaylandBufferSlot *slot) {
@@ -2146,18 +2233,10 @@ slot_destroy(SWaylandBufferSlot *slot) {
         wl_buffer_destroy(slot->wl_buf);
         slot->wl_buf = NULL;
     }
-    if (slot->pool) {
-        wl_shm_pool_destroy(slot->pool);
-        slot->pool = NULL;
-    }
     if (slot->shm_ptr && slot->shm_ptr != MAP_FAILED && slot->pool_size > 0) {
         munmap(slot->shm_ptr, slot->pool_size);
-        slot->shm_ptr = NULL;
     }
-    if (slot->fd >= 0) {
-        close(slot->fd);
-        slot->fd = -1;
-    }
+    slot->shm_ptr   = NULL;
     slot->pool_size = 0;
     slot->width     = 0;
     slot->height    = 0;
@@ -2165,8 +2244,7 @@ slot_destroy(SWaylandBufferSlot *slot) {
 }
 
 //-------------------------------------
-// Rebuild a slot's pool+buffer if its dimensions are stale.
-// Each slot owns its own fd, mmap, and wl_shm_pool - no shared offsets.
+// Rebuild a slot's mapping and buffer if its dimensions are stale.
 // Returns true on success (or if no rebuild was needed).
 //-------------------------------------
 static bool
@@ -2192,68 +2270,71 @@ slot_ensure_buffer(SWaylandBufferSlot *slot,
         return false;
     }
 
-    // Create anonymous shared memory.
-    char const *xdg_rt_dir = getenv("XDG_RUNTIME_DIR");
-    if (xdg_rt_dir == NULL) {
-        return false;
-    }
-    char shmfile[PATH_MAX];
-    if (snprintf(shmfile, sizeof(shmfile), "%s/mfb-slot-XXXXXX", xdg_rt_dir) >= (int) sizeof(shmfile)) {
-        return false;
-    }
-    slot->fd = mkstemp(shmfile);
-    if (slot->fd == -1) {
-        return false;
-    }
-    unlink(shmfile);
-
-    if (ftruncate(slot->fd, (off_t) pool_size) == -1) {
-        close(slot->fd);
-        slot->fd = -1;
+    if (window_data_specific->shm == NULL || window_data_specific->render_queue == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: cannot create a SHM buffer without wl_shm and render_queue.");
         return false;
     }
 
-    slot->shm_ptr = (uint32_t *) mmap(NULL, pool_size, PROT_WRITE, MAP_SHARED, slot->fd, 0);
-    if (slot->shm_ptr == MAP_FAILED) {
-        slot->shm_ptr = NULL;
-        close(slot->fd);
-        slot->fd = -1;
+    int fd = create_anonymous_shm_file(pool_size);
+    if (fd == -1) {
+        int error_code = errno;
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create %zu-byte anonymous SHM file: %s (%d).",
+                pool_size, strerror(error_code), error_code);
         return false;
     }
-    slot->pool_size = pool_size;
 
-    slot->pool = wl_shm_create_pool(window_data_specific->shm, slot->fd, (int) pool_size);
-    if (slot->pool == NULL) {
-        munmap(slot->shm_ptr, pool_size);
-        slot->shm_ptr = NULL;
-        close(slot->fd);
-        slot->fd = -1;
-        slot->pool_size = 0;
+    uint32_t *shm_ptr = (uint32_t *) mmap(NULL, pool_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (shm_ptr == MAP_FAILED) {
+        int error_code = errno;
+        close(fd);
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to map %zu-byte SHM file: %s (%d).",
+                pool_size, strerror(error_code), error_code);
+        return false;
+    }
+
+    struct wl_shm_pool *pool = wl_shm_create_pool(window_data_specific->shm, fd, (int) pool_size);
+    if (pool == NULL) {
+        munmap(shm_ptr, pool_size);
+        close(fd);
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_create_pool returned NULL.");
         return false;
     }
 
     // Route pool to render_queue so buffer release events go there.
-    if (window_data_specific->render_queue != NULL) {
-        wl_proxy_set_queue((struct wl_proxy *) slot->pool, window_data_specific->render_queue);
-    }
+    wl_proxy_set_queue((struct wl_proxy *) pool, window_data_specific->render_queue);
 
-    slot->wl_buf = wl_shm_pool_create_buffer(slot->pool, 0,
-                        surface_w, surface_h,
-                        stride, window_data_specific->shm_format);
-    if (slot->wl_buf == NULL) {
-        wl_shm_pool_destroy(slot->pool);
-        slot->pool = NULL;
-        munmap(slot->shm_ptr, pool_size);
-        slot->shm_ptr = NULL;
-        close(slot->fd);
-        slot->fd = -1;
-        slot->pool_size = 0;
+    struct wl_buffer *wl_buf = wl_shm_pool_create_buffer(pool, 0,
+                                                        surface_w, surface_h,
+                                                        stride, window_data_specific->shm_format);
+    if (wl_buf == NULL) {
+        wl_shm_pool_destroy(pool);
+        munmap(shm_ptr, pool_size);
+        close(fd);
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_shm_pool_create_buffer returned NULL.");
         return false;
     }
 
-    wl_buffer_add_listener(slot->wl_buf, &buffer_listener, slot);
-    slot->width  = surface_w;
-    slot->height = surface_h;
+    // Keep release events on render_queue even after the temporary pool proxy
+    // is destroyed below.
+    wl_proxy_set_queue((struct wl_proxy *) wl_buf, window_data_specific->render_queue);
+
+    if (wl_buffer_add_listener(wl_buf, &buffer_listener, slot) != 0) {
+        wl_buffer_destroy(wl_buf);
+        wl_shm_pool_destroy(pool);
+        munmap(shm_ptr, pool_size);
+        close(fd);
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to add the SHM buffer listener.");
+        return false;
+    }
+
+    wl_shm_pool_destroy(pool);
+    close(fd);
+
+    slot->wl_buf    = wl_buf;
+    slot->shm_ptr   = shm_ptr;
+    slot->pool_size = pool_size;
+    slot->width     = surface_w;
+    slot->height    = surface_h;
 
     return true;
 }
@@ -2278,7 +2359,6 @@ create_shm_buffer(SWindowData *window_data, SWindowData_Way *window_data_specifi
     for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
         SWaylandBufferSlot *slot = &window_data_specific->slots[i];
         memset(slot, 0, sizeof(*slot));
-        slot->fd = -1;
         if (!slot_ensure_buffer(slot, window_data_specific, width, height)) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: initial buffer creation failed for slot %d.", i);
             return false;
@@ -2414,9 +2494,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Way));
     window_data_specific->integer_output_scale = 1;
-    for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
-        window_data_specific->slots[i].fd = -1;
-    }
     window_data->specific = window_data_specific;
 
     window_data_specific->shm_format = -1u;
