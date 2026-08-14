@@ -31,7 +31,9 @@ struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned heig
 //   that always produces RGBA bytes (e.g. stb_image, libpng), you must swizzle R<->B
 //   before passing the buffer to mfb_update_ex on non-Android platforms.
 //
-// On Wayland, mfb_update_ex may block until the compositor grants a frame callback.
+// On Wayland, mfb_update_ex briefly waits for the previous compositor frame callback.
+// If that callback remains pending (for example while minimized), the update returns
+// MFB_STATE_OK without presenting that frame and resumes presentation after callback delivery.
 // On Android, mfb_update_ex returns MFB_STATE_OK without rendering when ANativeWindow
 //   is temporarily unavailable during lifecycle transitions (pause / surface lost).
 mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);

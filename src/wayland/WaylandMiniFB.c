@@ -55,6 +55,8 @@
 
 #define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
 #define WAYLAND_DEFAULT_CURSOR_SIZE 32
+#define WAYLAND_THROTTLE_DEADLINE_MS 100.0
+#define WAYLAND_THROTTLE_POLL_SLICE_MS (1000.0 / 60.0)
 
 // Core protocol interface descriptors come from the libwayland loaded at
 // runtime. Cap them to the requests and listener entries available in the
@@ -307,6 +309,22 @@ ts_sub_sat(struct timespec *out, const struct timespec *a, const struct timespec
         out->tv_sec = 0;
         out->tv_nsec = 0;
     }
+}
+
+//-------------------------------------
+static bool
+ts_less(const struct timespec *a, const struct timespec *b) {
+    if (a->tv_sec != b->tv_sec) {
+        return a->tv_sec < b->tv_sec;
+    }
+
+    return a->tv_nsec < b->tv_nsec;
+}
+
+//-------------------------------------
+static bool
+ts_is_zero(const struct timespec *value) {
+    return value->tv_sec == 0 && value->tv_nsec == 0;
 }
 
 //-------------------------------------
@@ -659,10 +677,10 @@ dispatch_render_blocking(SWindowData *window_data) {
 //-------------------------------------
 // Throttle infrastructure.
 //
-// surface_throttle() waits for the PREVIOUS frame's callback before starting
-// the next frame. This is the key difference from the old inline-wait pattern:
-// the CPU can prepare the next frame while the compositor presents the current
-// one (pipelined rendering).
+// surface_throttle_wait() waits briefly for the PREVIOUS frame's callback.
+// If the compositor keeps a committed callback pending (for example while the
+// surface is minimized), the current update is skipped after an absolute
+// per-callback deadline instead of blocking the application's main loop.
 //
 // g_use_wayland_frame_callback_throttle controls whether wl_surface_frame is
 // used (vsync-like) or skipped (mailbox-style, throttled only by wl_display_sync).
@@ -680,8 +698,12 @@ throttle_done(void *data, struct wl_callback *callback, uint32_t time) {
 
     kUnused(time);
 
-    if (window_data_specific != NULL) {
+    if (window_data_specific != NULL
+        && window_data_specific->throttle_callback == callback) {
         window_data_specific->throttle_callback = NULL;
+        window_data_specific->throttle_deadline_seconds = 0;
+        window_data_specific->throttle_deadline_nanoseconds = 0;
+        window_data_specific->throttle_deadline_valid = 0;
     }
 
     wl_callback_destroy(callback);
@@ -694,39 +716,119 @@ wl_callback_listener g_throttle_listener = {
 };
 
 //-------------------------------------
+typedef enum {
+    WAYLAND_THROTTLE_READY = 0,
+    WAYLAND_THROTTLE_SKIP,
+    WAYLAND_THROTTLE_ERROR,
+} EWaylandThrottleStatus;
+
+//-------------------------------------
 static bool
-surface_throttle(SWindowData *window_data) {
+make_throttle_deadline(struct timespec *deadline) {
+    struct timespec now;
+    struct timespec timeout = ms_to_ts(WAYLAND_THROTTLE_DEADLINE_MS);
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return false;
+    }
+
+    ts_add(deadline, &now, &timeout);
+    return true;
+}
+
+//-------------------------------------
+static EWaylandThrottleStatus
+surface_throttle_wait(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
-    if (window_data_specific->surface_wrapper == NULL) {
-        return false;
+    if (window_data_specific->surface_wrapper == NULL
+        || window_data_specific->render_queue == NULL) {
+        return WAYLAND_THROTTLE_ERROR;
     }
 
     while (window_data_specific->throttle_callback != NULL) {
-        // Drain window_queue so xdg_toplevel.close / configure can break the wait.
+        // Drain both queues so done, close and configure events can break the wait.
         if (dispatch_owned_non_blocking(window_data) == false) {
-            return false;
+            return WAYLAND_THROTTLE_ERROR;
         }
 
         if (window_data->close == true) {
-            return false;
+            return WAYLAND_THROTTLE_ERROR;
         }
 
-        if (dispatch_render_blocking(window_data) == false) {
-            return false;
+        if (window_data_specific->throttle_callback == NULL) {
+            return WAYLAND_THROTTLE_READY;
+        }
+
+        if (window_data_specific->throttle_deadline_valid == 0) {
+            return WAYLAND_THROTTLE_ERROR;
+        }
+
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+            return WAYLAND_THROTTLE_ERROR;
+        }
+
+        struct timespec deadline = {
+            .tv_sec = (time_t) window_data_specific->throttle_deadline_seconds,
+            .tv_nsec = (long) window_data_specific->throttle_deadline_nanoseconds,
+        };
+        struct timespec remaining;
+        ts_sub_sat(&remaining, &deadline, &now);
+        if (ts_is_zero(&remaining) == true) {
+            return WAYLAND_THROTTLE_SKIP;
+        }
+
+        struct timespec poll_slice = ms_to_ts(WAYLAND_THROTTLE_POLL_SLICE_MS);
+        if (ts_less(&remaining, &poll_slice) == true) {
+            poll_slice = remaining;
+        }
+
+        if (dispatch_queue_timeout(window_data,
+                                   window_data_specific->render_queue,
+                                   &poll_slice) == false) {
+            return WAYLAND_THROTTLE_ERROR;
         }
     }
 
-    if (g_use_wayland_frame_callback_throttle == false) {
-        return true;
-    }
+    return WAYLAND_THROTTLE_READY;
+}
 
-    window_data_specific->throttle_callback = wl_surface_frame(window_data_specific->surface_wrapper);
-    if (window_data_specific->throttle_callback == NULL) {
+//-------------------------------------
+// Requests the throttle signal for the frame about to be committed. Must be
+// called after all fallible buffer work has completed, and immediately
+// before the commit that makes a requested frame callback effective.
+//
+// When frame callback throttling is enabled, requests wl_surface_frame and
+// stores its deadline. Otherwise, only computes the deadline that the
+// caller must apply to a wl_display_sync fallback requested after the
+// commit.
+//-------------------------------------
+static bool
+surface_throttle_request(SWindowData_Way *window_data_specific, struct timespec *out_deadline) {
+    if (g_use_wayland_frame_callback_throttle == true) {
+        if (make_throttle_deadline(out_deadline) == false) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create a frame throttle deadline.");
+            return false;
+        }
+
+        window_data_specific->throttle_callback = wl_surface_frame(window_data_specific->surface_wrapper);
+        if (window_data_specific->throttle_callback == NULL) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
+            return false;
+        }
+
+        window_data_specific->throttle_deadline_seconds = (int64_t) out_deadline->tv_sec;
+        window_data_specific->throttle_deadline_nanoseconds = (int32_t) out_deadline->tv_nsec;
+        window_data_specific->throttle_deadline_valid = 1;
+        wl_callback_add_listener(window_data_specific->throttle_callback,
+                                 &g_throttle_listener, window_data_specific);
+    }
+    else if (make_throttle_deadline(out_deadline) == false) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create a sync throttle deadline.");
         return false;
     }
 
-    wl_callback_add_listener(window_data_specific->throttle_callback, &g_throttle_listener, window_data_specific);
     return true;
 }
 
@@ -2754,6 +2856,12 @@ present_presentation_buffer(SWindowData *window_data,
                             const SWaylandPresentationMetrics *metrics) {
     kUnused(window_data);
 
+    if (window_data_specific->throttle_callback != NULL) {
+        MFB_LOG(MFB_LOG_ERROR,
+                "WaylandMiniFB: cannot present while another throttle callback is pending.");
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
     // Attach buffer via surface_wrapper (render-path proxy).
     wl_surface_attach(window_data_specific->surface_wrapper, active_slot->wl_buf, 0, 0);
 
@@ -2781,11 +2889,19 @@ present_presentation_buffer(SWindowData *window_data,
                    (int32_t) metrics->physical_surface_width,
                    (int32_t) metrics->physical_surface_height);
 
+    // Request the throttle signal only after all fallible buffer work has
+    // completed, and immediately before the commit that makes a requested
+    // frame callback effective.
+    struct timespec callback_deadline;
+    if (surface_throttle_request(window_data_specific, &callback_deadline) == false) {
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
     wl_surface_commit(window_data_specific->surface_wrapper);
     active_slot->busy = 1;
 
-    // Sync fallback: when no frame callback is pending (throttle off or first
-    // frame), use wl_display_sync as a minimal throttle to avoid runaway submits.
+    // When no frame callback was requested, create a sync barrier after the
+    // surface commit so completion cannot precede server processing of that commit.
     if (window_data_specific->throttle_callback == NULL) {
         window_data_specific->throttle_callback =
             wl_display_sync(window_data_specific->render_display_wrapper);
@@ -2793,6 +2909,9 @@ present_presentation_buffer(SWindowData *window_data,
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_sync returned NULL.");
             return MFB_STATE_INTERNAL_ERROR;
         }
+        window_data_specific->throttle_deadline_seconds = (int64_t) callback_deadline.tv_sec;
+        window_data_specific->throttle_deadline_nanoseconds = (int32_t) callback_deadline.tv_nsec;
+        window_data_specific->throttle_deadline_valid = 1;
         wl_callback_add_listener(window_data_specific->throttle_callback,
                                  &g_throttle_listener, window_data_specific);
     }
@@ -2912,14 +3031,22 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         window_data->buffer_stride = buffer_stride;
     }
 
-    // 2. Wait for PREVIOUS frame's callback (pipelined throttle).
-    if (surface_throttle(window_data) == false) {
+    // 2. Wait briefly for the PREVIOUS frame's callback. If the callback is
+    // still pending at its absolute deadline, skip this update instead of
+    // blocking indefinitely while the surface is not being presented.
+    EWaylandThrottleStatus throttle_status = surface_throttle_wait(window_data);
+    if (throttle_status == WAYLAND_THROTTLE_ERROR) {
         if (window_data->close == true) {
             destroy(window_data);
             return MFB_STATE_EXIT;
         }
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: frame throttle failed.");
         return MFB_STATE_INTERNAL_ERROR;
+    }
+
+    if (throttle_status == WAYLAND_THROTTLE_SKIP) {
+        emit_pending_resize(window_data);
+        return MFB_STATE_OK;
     }
 
     if (window_data->close == true) {
