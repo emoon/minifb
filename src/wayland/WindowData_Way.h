@@ -3,6 +3,7 @@
 #include <MiniFB_enums.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #define WAYLAND_MAX_OUTPUTS 16
 #define WAYLAND_BUFFER_SLOTS 3
@@ -68,6 +69,14 @@ typedef struct {
     struct xdg_wm_base      *shell;
     struct wl_seat          *seat;
     struct wl_keyboard      *keyboard;
+
+    // Key repeat. repeat_key is the raw wl_keyboard key code (not mfb_key or
+    // the xkb keycode). repeat_rate_cps <= 0 means repeat is disabled.
+    int32_t                  repeat_rate_cps;
+    int32_t                  repeat_delay_ms;
+    uint32_t                 repeat_key;
+    struct timespec          repeat_deadline;
+    uint8_t                  repeat_active;
 
     struct wl_pointer       *pointer;
     struct wl_cursor_theme  *cursor_theme;

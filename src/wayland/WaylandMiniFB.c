@@ -20,6 +20,7 @@
 #include "WindowData.h"
 #include "WindowData_Way.h"
 #include "WaylandMiniFB_input_keyboard.h"
+#include "WaylandMiniFB_time.h"
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -283,71 +284,6 @@ extern double g_time_for_frame;
 //-------------------------------------
 
 //-------------------------------------
-static void
-ts_add(struct timespec *out, const struct timespec *a, const struct timespec *b) {
-    out->tv_sec = a->tv_sec + b->tv_sec;
-    out->tv_nsec = a->tv_nsec + b->tv_nsec;
-
-    if (out->tv_nsec >= 1000000000L) {
-        out->tv_sec += 1;
-        out->tv_nsec -= 1000000000L;
-    }
-}
-
-//-------------------------------------
-static void
-ts_sub_sat(struct timespec *out, const struct timespec *a, const struct timespec *b) {
-    out->tv_sec = a->tv_sec - b->tv_sec;
-    out->tv_nsec = a->tv_nsec - b->tv_nsec;
-
-    if (out->tv_nsec < 0) {
-        out->tv_sec -= 1;
-        out->tv_nsec += 1000000000L;
-    }
-
-    if (out->tv_sec < 0) {
-        out->tv_sec = 0;
-        out->tv_nsec = 0;
-    }
-}
-
-//-------------------------------------
-static bool
-ts_less(const struct timespec *a, const struct timespec *b) {
-    if (a->tv_sec != b->tv_sec) {
-        return a->tv_sec < b->tv_sec;
-    }
-
-    return a->tv_nsec < b->tv_nsec;
-}
-
-//-------------------------------------
-static bool
-ts_is_zero(const struct timespec *value) {
-    return value->tv_sec == 0 && value->tv_nsec == 0;
-}
-
-//-------------------------------------
-static struct timespec
-ms_to_ts(double ms) {
-    struct timespec out = { 0, 0 };
-
-    if (ms <= 0.0) {
-        return out;
-    }
-
-    out.tv_sec = (time_t) (ms / 1000.0);
-    out.tv_nsec = (long) ((ms - ((double) out.tv_sec * 1000.0)) * 1000000.0);
-
-    if (out.tv_nsec >= 1000000000L) {
-        out.tv_sec += out.tv_nsec / 1000000000L;
-        out.tv_nsec %= 1000000000L;
-    }
-
-    return out;
-}
-
-//-------------------------------------
 static int
 poll_display_fd(struct wl_display *display, short events, const struct timespec *timeout) {
     struct pollfd pfd;
@@ -359,7 +295,7 @@ poll_display_fd(struct wl_display *display, short events, const struct timespec 
 
     if (timeout != NULL) {
         clock_gettime(CLOCK_MONOTONIC, &now);
-        ts_add(&deadline, &now, timeout);
+        deadline = ts_add(now, *timeout);
     }
 
     pfd.fd = wl_display_get_fd(display);
@@ -369,7 +305,7 @@ poll_display_fd(struct wl_display *display, short events, const struct timespec 
     do {
         if (timeout != NULL) {
             clock_gettime(CLOCK_MONOTONIC, &now);
-            ts_sub_sat(&remaining, &deadline, &now);
+            remaining = ts_sub_sat(deadline, now);
             effective_timeout = &remaining;
         }
 
@@ -474,7 +410,7 @@ dispatch_queue_timeout(SWindowData *window_data,
 
     if (timeout != NULL) {
         clock_gettime(CLOCK_MONOTONIC, &now);
-        ts_add(&deadline, &now, timeout);
+        deadline = ts_add(now, *timeout);
     }
 
     if (wl_display_prepare_read_queue(window_data_specific->display, read_queue) == -1) {
@@ -490,7 +426,7 @@ dispatch_queue_timeout(SWindowData *window_data,
 
         if (timeout != NULL) {
             clock_gettime(CLOCK_MONOTONIC, &now);
-            ts_sub_sat(&remaining, &deadline, &now);
+            remaining = ts_sub_sat(deadline, now);
             timeout_ptr = &remaining;
         }
         else {
@@ -517,7 +453,7 @@ dispatch_queue_timeout(SWindowData *window_data,
     while (true) {
         if (timeout != NULL) {
             clock_gettime(CLOCK_MONOTONIC, &now);
-            ts_sub_sat(&remaining, &deadline, &now);
+            remaining = ts_sub_sat(deadline, now);
             timeout_ptr = &remaining;
         }
         else {
@@ -732,7 +668,7 @@ make_throttle_deadline(struct timespec *deadline) {
         return false;
     }
 
-    ts_add(deadline, &now, &timeout);
+    *deadline = ts_add(now, timeout);
     return true;
 }
 
@@ -774,13 +710,13 @@ surface_throttle_wait(SWindowData *window_data) {
             .tv_nsec = (long) window_data_specific->throttle_deadline_nanoseconds,
         };
         struct timespec remaining;
-        ts_sub_sat(&remaining, &deadline, &now);
-        if (ts_is_zero(&remaining) == true) {
+        remaining = ts_sub_sat(deadline, now);
+        if (ts_is_zero(remaining) == true) {
             return WAYLAND_THROTTLE_SKIP;
         }
 
         struct timespec poll_slice = ms_to_ts(WAYLAND_THROTTLE_POLL_SLICE_MS);
-        if (ts_less(&remaining, &poll_slice) == true) {
+        if (ts_less(remaining, poll_slice) == true) {
             poll_slice = remaining;
         }
 
@@ -3024,6 +2960,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return status;
     }
 
+    // Not called from mfb_wait_sync(), which would get a second chance to
+    // fire it in the same loop iteration.
+    wayland_emit_due_key_repeats(window_data, (SWindowData_Way *) window_data->specific);
+
     // Update buffer dimensions.
     if (window_data->buffer_width != width || window_data->buffer_height != height) {
         window_data->buffer_width  = width;
@@ -3098,6 +3038,9 @@ mfb_update_events(struct mfb_window *window) {
     if (status != MFB_STATE_OK) {
         return status;
     }
+
+    // See mfb_update_ex().
+    wayland_emit_due_key_repeats(window_data, (SWindowData_Way *) window_data->specific);
 
     emit_pending_resize(window_data);
 
@@ -3248,6 +3191,12 @@ init_keycodes() {
     g_keycodes[KEY_NUMLOCK]    = MFB_KB_KEY_NUM_LOCK;
     g_keycodes[KEY_CAPSLOCK]   = MFB_KB_KEY_CAPS_LOCK;
     g_keycodes[KEY_PRINT]      = MFB_KB_KEY_PRINT_SCREEN;
+    // The kernel's HID table maps the physical keys below to these codes,
+    // not to KEY_PRINT/KEY_MENU above; keep both so devices that do emit the
+    // legacy codes still work.
+    g_keycodes[KEY_SYSRQ]      = MFB_KB_KEY_PRINT_SCREEN;
+    g_keycodes[KEY_COMPOSE]    = MFB_KB_KEY_MENU;
+    g_keycodes[KEY_102ND]      = MFB_KB_KEY_WORLD_2;
     g_keycodes[KEY_SCROLLLOCK] = MFB_KB_KEY_SCROLL_LOCK;
     g_keycodes[KEY_PAUSE]      = MFB_KB_KEY_PAUSE;
     g_keycodes[KEY_DELETE]     = MFB_KB_KEY_DELETE;

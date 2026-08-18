@@ -1,4 +1,9 @@
+#ifndef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE 700  // for clock_gettime/CLOCK_MONOTONIC
+#endif
+
 #include "WaylandMiniFB_input_keyboard.h"
+#include "WaylandMiniFB_time.h"
 
 #include "MiniFB_internal.h"
 #include "MiniFB_utf8.h"
@@ -10,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <sys/mman.h>
 
@@ -55,6 +61,17 @@ update_mod_keys_from_xkb(SWindowData *window_data, SWindowData_Way *window_data_
     if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_LOGO, XKB_STATE_MODS_EFFECTIVE) > 0) {
         window_data->mod_keys |= MFB_KB_MOD_SUPER;
     }
+
+    // Lock modifiers report toggle state (XKB_STATE_MODS_LOCKED), not
+    // EFFECTIVE: EFFECTIVE also includes depressed, so it would still report
+    // Caps Lock as active while the key is held right after toggling it off.
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_CAPS, XKB_STATE_MODS_LOCKED) > 0) {
+        window_data->mod_keys |= MFB_KB_MOD_CAPS_LOCK;
+    }
+
+    if (xkb_state_mod_name_is_active(window_data_specific->xkb_state, XKB_MOD_NAME_NUM, XKB_STATE_MODS_LOCKED) > 0) {
+        window_data->mod_keys |= MFB_KB_MOD_NUM_LOCK;
+    }
 }
 
 //-------------------------------------
@@ -81,6 +98,12 @@ reset_keyboard_state(SWindowData *window_data, SWindowData_Way *window_data_spec
             xkb_compose_state_reset(window_data_specific->xkb_compose_state);
         }
         window_data_specific->compose_sequence_count = 0;
+
+        // Losing focus or the keyboard capability (both routes into this
+        // function) must cancel any in-flight repeat; keyboard_enter also
+        // routes here first, so a stale repeat never survives into a new
+        // focus context either.
+        window_data_specific->repeat_active = false;
     }
 }
 
@@ -111,6 +134,11 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     kUnused(keyboard);
+
+    // Any keymap event, valid or not, may invalidate an in-flight repeat.
+    if (window_data_specific != NULL) {
+        window_data_specific->repeat_active = false;
+    }
 
     if (window_data_specific == NULL) {
         if (fd >= 0) {
@@ -282,6 +310,48 @@ emit_char_input_from_xkb_state(SWindowData *window_data, SWindowData_Way *window
 }
 
 //-------------------------------------
+// Emits at most one due repeated key-press callback, plus its character,
+// for the key armed by keyboard_key(). Rescheduling from "now" instead of
+// the missed deadline means a long stall produces one catch-up repeat, not
+// a burst.
+//-------------------------------------
+void
+wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    if (window_data_specific->repeat_active == false) {
+        return;
+    }
+
+    struct timespec now;
+    struct timespec remaining;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    remaining = ts_sub_sat(window_data_specific->repeat_deadline, now);
+
+    if (remaining.tv_sec != 0 || remaining.tv_nsec != 0) {
+        return; // Deadline not reached yet.
+    }
+
+    // Same order and side effects as the WL_KEYBOARD_KEY_STATE_REPEATED path
+    // in keyboard_key(): character callback first, then key_status and the
+    // key-press callback, so compositor-driven (version 10, rate == 0) and
+    // client-driven repeats are indistinguishable to the application.
+    if (window_data_specific->xkb_state != NULL) {
+        xkb_keycode_t xkb_keycode = (xkb_keycode_t) window_data_specific->repeat_key + 8;
+        emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
+    }
+
+    mfb_key key_code = (mfb_key) g_keycodes[window_data_specific->repeat_key];
+    if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
+        window_data->key_status[key_code] = true;
+        kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, true);
+    }
+
+    // Reschedule from "now", not from the missed deadline: see the function
+    // comment above for why a stall must not produce a catch-up burst.
+    struct timespec interval = ms_to_ts(1000.0 / (double) window_data_specific->repeat_rate_cps);
+    window_data_specific->repeat_deadline = ts_add(now, interval);
+}
+
+//-------------------------------------
 // A key changed logical state. The time argument is a timestamp with
 // millisecond granularity, with an undefined base.
 // serial: serial number of the key event
@@ -302,6 +372,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
         bool   is_pressed = false;
         bool   should_emit_key_press = false;
         bool   should_update_xkb_state = false;
+        bool   should_check_repeat_arm = false;
 #if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
         bool   is_repeated = false;
 #endif
@@ -315,6 +386,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 is_pressed = true;
                 should_emit_key_press = true;
                 should_update_xkb_state = true;
+                should_check_repeat_arm = true;
                 break;
 
 #if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
@@ -404,6 +476,27 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                     emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
                 }
             }
+
+            // Arm or cancel the repeat timer. Never for is_repeated: that's
+            // the compositor already driving repeat itself.
+            if (should_check_repeat_arm == true) {
+                if (window_data_specific->repeat_rate_cps > 0
+                    && xkb_keymap_key_repeats(window_data_specific->xkb_keymap, xkb_keycode) != 0) {
+                    struct timespec now;
+                    struct timespec delay = ms_to_ts((double) window_data_specific->repeat_delay_ms);
+
+                    clock_gettime(CLOCK_MONOTONIC, &now);
+                    window_data_specific->repeat_deadline = ts_add(now, delay);
+                    window_data_specific->repeat_key = key;
+                    window_data_specific->repeat_active = true;
+                }
+            }
+            else if (is_pressed == false) {
+                if (window_data_specific->repeat_active == true
+                    && window_data_specific->repeat_key == key) {
+                    window_data_specific->repeat_active = false;
+                }
+            }
         }
 
         else {
@@ -485,10 +578,25 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
 //-------------------------------------
 static void
 keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay) {
-    kUnused(data);
     kUnused(keyboard);
-    kUnused(rate);
-    kUnused(delay);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    // The protocol declares negative rate/delay illegal; do not trust the
+    // compositor to honour that. Treat rate <= 0 as "repeat disabled" and
+    // clamp a negative delay to zero. A later repeat_info updates the rate a
+    // pending repeat reschedules with (wayland_emit_due_key_repeats always
+    // reads the current rate), or disables an active repeat outright.
+    window_data_specific->repeat_rate_cps = (rate > 0) ? rate : 0;
+    window_data_specific->repeat_delay_ms = (delay > 0) ? delay : 0;
+
+    if (window_data_specific->repeat_rate_cps <= 0) {
+        window_data_specific->repeat_active = false;
+    }
 }
 
 #endif
