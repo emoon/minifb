@@ -1954,10 +1954,34 @@ wl_registry_listener registry_listener = {
 
 //-------------------------------------
 static void
+apply_pending_toplevel_configure(SWindowData *window_data,
+                                 SWindowData_Way *window_data_specific) {
+    SWaylandPendingConfigure *pending_configure = &window_data_specific->pending_configure;
+
+    if (pending_configure->has_toplevel == 0) {
+        return;
+    }
+
+    if (pending_configure->has_size != 0
+        && (window_data->window_width != pending_configure->width
+        || window_data->window_height != pending_configure->height)) {
+        window_data->window_width  = pending_configure->width;
+        window_data->window_height = pending_configure->height;
+        resize_dst(window_data, pending_configure->width, pending_configure->height);
+        window_data->must_resize_context = true;
+    }
+
+    pending_configure->has_toplevel = 0;
+    pending_configure->has_size = 0;
+}
+
+//-------------------------------------
+static void
 handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial) {
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
 
+    apply_pending_toplevel_configure(window_data, window_data_specific);
     xdg_surface_ack_configure(shell_surface, serial);
 
     // Some compositors apply startup states (fullscreen/maximized) more reliably
@@ -2008,13 +2032,23 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     kUnused(states);
 
     SWindowData *window_data = (SWindowData *) data;
-    if (window_data && width > 0 && height > 0) {
-        if (window_data->window_width != (unsigned) width || window_data->window_height != (unsigned) height) {
-            window_data->window_width  = (unsigned) width;
-            window_data->window_height = (unsigned) height;
-            resize_dst(window_data, (unsigned) width, (unsigned) height);
-            window_data->must_resize_context = true;
-        }
+    if (window_data == NULL || window_data->specific == NULL) {
+        return;
+    }
+
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    SWaylandPendingConfigure *pending_configure = &window_data_specific->pending_configure;
+
+    // xdg_toplevel state is latched until the terminal xdg_surface.configure.
+    pending_configure->has_toplevel = 1;
+    pending_configure->has_size = (width > 0 && height > 0) ? 1 : 0;
+    if (pending_configure->has_size != 0) {
+        pending_configure->width = (uint32_t) width;
+        pending_configure->height = (uint32_t) height;
+    }
+    else {
+        pending_configure->width = 0;
+        pending_configure->height = 0;
     }
 
     MFB_LOG(MFB_LOG_DEBUG, "Toplevel configure: width=%d, height=%d", width, height);

@@ -63,6 +63,13 @@ typedef struct {
 } SWaylandPointerAxisFrame;
 
 typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint8_t  has_toplevel;
+    uint8_t  has_size;
+} SWaylandPendingConfigure;
+
+typedef struct {
     struct wl_display       *display;
     struct wl_registry      *registry;
     struct wl_compositor    *compositor;
@@ -116,6 +123,7 @@ typedef struct {
     struct wl_surface       *surface_wrapper;
     struct xdg_surface      *shell_surface;
     struct xdg_toplevel     *toplevel;
+    SWaylandPendingConfigure pending_configure;
     struct zxdg_decoration_manager_v1 *decoration_manager;
     struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
 
