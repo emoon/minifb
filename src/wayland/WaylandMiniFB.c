@@ -17,10 +17,10 @@
 #include "generated/viewporter-client-protocol.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
+#include "MiniFB_timespec.h"
 #include "WindowData.h"
 #include "WindowData_Way.h"
 #include "WaylandMiniFB_input_keyboard.h"
-#include "WaylandMiniFB_time.h"
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -287,7 +287,7 @@ extern double g_time_for_frame;
 static int
 poll_display_fd(struct wl_display *display, short events, const struct timespec *timeout) {
     struct pollfd pfd;
-    struct timespec now;
+    struct timespec now = { 0, 0 };
     struct timespec deadline = { 0, 0 };
     struct timespec remaining;
     const struct timespec *effective_timeout = timeout;
@@ -395,7 +395,7 @@ dispatch_queue_timeout(SWindowData *window_data,
                        struct wl_event_queue *read_queue,
                        const struct timespec *timeout) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
-    struct timespec now;
+    struct timespec now = { 0, 0 };
     struct timespec deadline = { 0, 0 };
     struct timespec remaining = { 0, 0 };
     const struct timespec *timeout_ptr = NULL;
@@ -716,7 +716,7 @@ surface_throttle_wait(SWindowData *window_data) {
         }
 
         struct timespec poll_slice = ms_to_ts(WAYLAND_THROTTLE_POLL_SLICE_MS);
-        if (ts_less(remaining, poll_slice) == true) {
+        if (ts_is_less(remaining, poll_slice) == true) {
             poll_slice = remaining;
         }
 

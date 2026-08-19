@@ -1,7 +1,7 @@
 #if defined(__linux__) || defined(linux)
 
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 199309L  // for clock_gettime, CLOCK_MONOTONIC
+#ifndef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE 700
 #endif
 
 #include <time.h>

@@ -100,10 +100,10 @@ set(SrcWayland
     src/wayland/WaylandMiniFB.c
     src/wayland/WaylandMiniFB_input_keyboard.c
     src/wayland/WaylandMiniFB_input_keyboard.h
-    src/wayland/WaylandMiniFB_time.c
-    src/wayland/WaylandMiniFB_time.h
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
+    src/MiniFB_timespec.c
+    src/MiniFB_timespec.h
     src/MiniFB_utf8.c
     src/MiniFB_utf8.h
 )

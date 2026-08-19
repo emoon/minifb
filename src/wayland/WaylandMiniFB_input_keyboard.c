@@ -3,8 +3,8 @@
 #endif
 
 #include "WaylandMiniFB_input_keyboard.h"
-#include "WaylandMiniFB_time.h"
 
+#include "MiniFB_timespec.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_utf8.h"
 
@@ -321,7 +321,7 @@ wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_d
         return;
     }
 
-    struct timespec now;
+    struct timespec now = { 0, 0 };
     struct timespec remaining;
     clock_gettime(CLOCK_MONOTONIC, &now);
     remaining = ts_sub_sat(window_data_specific->repeat_deadline, now);
@@ -482,7 +482,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
             if (should_check_repeat_arm == true) {
                 if (window_data_specific->repeat_rate_cps > 0
                     && xkb_keymap_key_repeats(window_data_specific->xkb_keymap, xkb_keycode) != 0) {
-                    struct timespec now;
+                    struct timespec now = { 0, 0 };
                     struct timespec delay = ms_to_ts((double) window_data_specific->repeat_delay_ms);
 
                     clock_gettime(CLOCK_MONOTONIC, &now);
