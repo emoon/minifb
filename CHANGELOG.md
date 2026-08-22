@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.0]
+
+### Changed
+
+- **Wayland backend modernization**: promoted Wayland to a first-class desktop backend alongside Windows, macOS, and X11, with reworked SHM presentation, event dispatch, frame pacing, scaling, input, and resource lifecycle handling.
+- Updated the bundled Wayland protocol bindings to 1.49 and added viewporter-based fractional and per-surface HiDPI scaling.
+- **CMake restructure**: build options are now prefixed (`MINIFB_USE_WAYLAND_API`, `MINIFB_USE_OPENGL_API`, `MINIFB_USE_METAL_API`, `MINIFB_BUILD_EXAMPLES`, ...), with fixes to the exported package config, the generated version header, and the Emscripten, iOS, and macOS build paths.
+
+### Deprecated
+
+- Unprefixed CMake options (`USE_WAYLAND_API`, `USE_OPENGL_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`). They still work but emit a deprecation warning; use their `MINIFB_*` equivalents.
+
+### Fixed
+
+- Improved Wayland reliability and responsiveness during initial mapping, resize, minimize, multi-output scale changes, buffer reuse, and compositor-driven configure sequences.
+- Completed Wayland keyboard, pointer, and scroll behavior, including compose/dead keys, key repeat, modifier and focus synchronization, stuck-input cleanup, and safe seat/global removal.
+- Hardened Wayland protocol negotiation and version-dependent object cleanup across older and newer environments.
+- Fixed macOS `flagsChanged` events produced by focus synchronization toggling alphanumeric keys.
+
 ## [0.10.1]
 
 ### Added
