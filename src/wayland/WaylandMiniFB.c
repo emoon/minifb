@@ -287,9 +287,10 @@ extern double g_time_for_frame;
 //   window_queue  - shell, input, output, decoration events
 //   render_queue  - buffer release, frame callback, sync callback events
 //
-// This separation prevents input callbacks from firing during blocking waits
-// for frame presentation, which would otherwise cause re-entrant updates or
-// stalls when the compositor holds buffers.
+// This separation preserves ordering between presentation and window state
+// while allowing waits to target the queue that can satisfy them. Wait paths
+// still drain both owned queues so input, close, and configure events are not
+// delayed behind presentation callbacks.
 //-------------------------------------
 
 //-------------------------------------
@@ -404,6 +405,7 @@ dispatch_queue_timeout(SWindowData *window_data,
                        struct wl_event_queue *read_queue,
                        const struct timespec *timeout) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    struct wl_event_queue *other_queue;
     struct timespec now = { 0, 0 };
     struct timespec deadline = { 0, 0 };
     struct timespec remaining = { 0, 0 };
@@ -414,6 +416,16 @@ dispatch_queue_timeout(SWindowData *window_data,
         window_data_specific->window_queue == NULL ||
         window_data_specific->render_queue == NULL ||
         read_queue == NULL) {
+        return false;
+    }
+
+    if (read_queue == window_data_specific->window_queue) {
+        other_queue = window_data_specific->render_queue;
+    }
+    else if (read_queue == window_data_specific->render_queue) {
+        other_queue = window_data_specific->window_queue;
+    }
+    else {
         return false;
     }
 
@@ -483,6 +495,17 @@ dispatch_queue_timeout(SWindowData *window_data,
         }
 
         result = dispatch_queue_pending_count(window_data, read_queue);
+        if (result < 0) {
+            return false;
+        }
+
+        if (result != 0) {
+            return true;
+        }
+
+        // A display read can enqueue events on either owned queue. Do not
+        // block again while the other queue has callbacks ready to dispatch.
+        result = dispatch_queue_pending_count(window_data, other_queue);
         if (result < 0) {
             return false;
         }
@@ -2536,6 +2559,19 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
 
     if (window_data->close) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: initialization failed during configure handshake.");
+        return false;
+    }
+
+    // Ensure the mapping requests issued by the configure handler have been
+    // sent and processed before mfb_open_ex returns.
+    if (wl_display_roundtrip_queue(window_data_specific->display,
+                                   window_data_specific->window_queue) == -1) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to complete the initial surface mapping.");
+        return false;
+    }
+
+    if (window_data->close == true) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: initialization was cancelled while completing the initial surface mapping.");
         return false;
     }
 
