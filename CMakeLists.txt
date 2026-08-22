@@ -1,36 +1,58 @@
 cmake_minimum_required(VERSION 3.16)
+
+# despite the OSX_ prefix, this is the minimum system version for all apple targets, such as ios
+# must be set before `projet` is set. can sometimes be configured by the user, if not, we set a default
+if (IOS AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum iOS deployment target")
+endif()
+
 project(MiniFB VERSION 0.10.1 LANGUAGES C CXX)
 
-if (APPLE)
+message(STATUS "Processing " ${PROJECT_NAME})
+
+# CMake configuration
+#--------------------------------------
+
+# prefer these over general `UNIX` or `APPLE`
+# `UNIX` also overlaps MacOS, iOS, and Emscripten, which we don't want
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX TRUE) # this is a default variable in cmake 3.25 and over
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(MACOS TRUE)
+endif()
+
+# ensure that an objective-c compiler exists when attempting to compile on any target that uses objective-c
+if (MACOS OR IOS)
     include(CheckLanguage)
     check_language(OBJC)
-    if (CMAKE_OBJC_COMPILER)
+    if (CMAKE_OBJC_COMPILER STREQUAL "NOTFOUND")
+        message(FATAL "No OBJC compiler could be found.")
+    else()
         enable_language(OBJC)
     endif()
 endif()
 
-message(STATUS "Processing " ${PROJECT_NAME})
-
 include(GNUInstallDirs)
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioning.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb_cmake_helpers.cmake")
-if (POLICY CMP0072)
-    cmake_policy(SET CMP0072 NEW)  # Prefer GLVND
-endif()
-set(OpenGL_GL_PREFERENCE "GLVND")
+include("cmake/minifb_cmake_helpers.cmake")
 
+# use IDE folders in build systems that support it. enabled by default in cmake 3.26+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# directory to add generated headers (created during configuration)
+set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${MINIFB_GENERATED_INCLUDE_DIR}")
+
+# generate the version header from the templace (.in)
 minifb_compute_git_metadata(
     MINIFB_COMMITS_SINCE_TAG
     MINIFB_COMMIT_COUNT
     MINIFB_GIT_SHA
     MINIFB_GIT_DIRTY
 )
-
-set(MINIFB_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
-minifb_configure_version_header(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/minifb_version.h.in"
-    "${MINIFB_GENERATED_INCLUDE_DIR}"
+configure_file(
+    include/minifb_version.h.in
     "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
+    @ONLY
 )
 
 # Sources
@@ -42,6 +64,9 @@ set(SrcLib
     include/MiniFB_keylist.h
     include/MiniFB_macros.h
     include/MiniFB_types.h
+
+    # remember to include generated headers as source files
+    "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h"
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
@@ -122,232 +147,307 @@ set(SrcDOS
     src/dos/vesa.c
 )
 
-# Set features
-#--------------------------------------
-set(MINIFB_C_STANDARD 11)
-set(MINIFB_CXX_STANDARD 11)
-
-set(MINIFB_COMPILE_OPTIONS)
-set(MINIFB_COMPILE_DEFINITIONS)
-set(MINIFB_LINK_OPTIONS_LIB)
-set(MINIFB_LINK_OPTIONS_EXE)
-
-if (DJGPP)
-    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
-    set(MINIFB_C_EXTENSIONS   ON)
-    set(MINIFB_CXX_EXTENSIONS ON)
-else()
-    set(MINIFB_C_EXTENSIONS   OFF)
-    set(MINIFB_CXX_EXTENSIONS OFF)
-endif()
-
 # Options
 #--------------------------------------
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
 
-if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
-    option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
-else()
-    set(MINIFB_BUILD_VERSION_INFO OFF)
-endif()
+# purely for internal use, never exposed to the user
+set(MINIFB_USE_X11_API OFF)
 
-if (APPLE AND NOT IOS)
-    option(MINIFB_USE_METAL_API "Build the project using metal API code" ON)
-    option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using metal API code")
+# unfortunatly these old deprecated options can't fit nicely into dependent options due to our custom function, but when we remove these, we can remove this whole block
+if (MACOS)
+    minifb_apply_deprecated_option(USE_METAL_API MINIFB_USE_METAL_API "Build the project using Metal API code")
     minifb_apply_deprecated_option(USE_INVERTED_Y_ON_MACOS MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)")
-elseif (UNIX AND NOT EMSCRIPTEN)
-    option(MINIFB_USE_WAYLAND_API "Build the project using wayland API code" OFF)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
-    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using wayland API code")
-    minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+elseif (LINUX)
+    minifb_apply_deprecated_option(USE_WAYLAND_API MINIFB_USE_WAYLAND_API "Build the project using Wayland API code")
+    if (NOT MINIFB_USE_WAYLAND_API)
+        set(MINIFB_USE_X11_API ON)
+        minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
+    endif()
 elseif (WIN32)
-    option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
     minifb_apply_deprecated_option(USE_OPENGL_API MINIFB_USE_OPENGL_API "Build the project using OpenGL API code")
 endif()
 
-# Set compile flags depending on the compiler
-#--------------------------------------
-if (NOT MSVC)
+if (NOT MINIFB_HAVE_SET_LEGACY_OPTION) # only use new options if no legacy options are used to prevent conflicts
 
-    # GCC/Clang
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
 
-    if (DJGPP)
-        list(APPEND MINIFB_COMPILE_OPTIONS
-            "$<$<CONFIG:Debug>:-gdwarf>"
-            "$<$<CONFIG:Debug>:-save-temps>"
-        )
+    # requires 3.22+ to use full condition syntax, technically could use in 3.16, but it would be a lot worse
+    include(CMakeDependentOption)
+
+    # cmake_dependent_option is used to create a default value for options in case their specific condition isn't met.
+    # the first 3 args are the same as a normal option(), but the 4th is a condition, where if it's true, expose the option, and if it isn't, the 5th argument is a default value to use.
+    # setting the default value lets us de-nest `if(<platform>) if(<option>)` type stuff, into just `if(<option>)`.
+
+    cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
+        "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
+
+    cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
+        "MACOS" OFF)
+    cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
+        "MACOS" OFF)
+
+    cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
+        "LINUX" OFF)
+
+    if (NOT MINIFB_USE_WAYLAND_API AND LINUX)
+        set(MINIFB_USE_X11_API ON)
+    endif()
+
+    cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON
+        "MINIFB_USE_X11_API OR WIN32" OFF)
+
+else()
+
+    # even if an `option()` isn't reached, if it's been reached in previous configurations then the old value still exists as a cache variable
+    # this means it can still be seen and edited by tools such as cmake-gui, without any indication that it's not meant to be enabled
+    # this can lead to cases where two conflicting options are active, so we need to manually `set()` values OFF if they're not reached
+    # dependent options fix this, which is why they should be prioritised if available
+
+    if (NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN)
+        option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON)
     else()
-        list(APPEND MINIFB_COMPILE_OPTIONS
+        set(MINIFB_BUILD_VERSION_INFO OFF)
+    endif()
+
+    if (MACOS)
+        option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON)
+        option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    else()
+        set(MINIFB_USE_METAL_API OFF)
+        set(MINIFB_USE_INVERTED_Y_ON_MACOS OFF)
+    endif()
+
+    if (LINUX)
+        option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF)
+    else()
+        set(MINIFB_USE_WAYLAND_API OFF)
+        set(MINIFB_USE_X11_API ON)
+    endif()
+
+    if (WIN32 OR MINIFB_USE_X11_API)
+        option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
+    else()
+        set(MINIFB_USE_OPENGL_API OFF)
+    endif()
+
+endif()
+
+endif()
+
+# Compilation configuration (will be ran on library and examples)
+#--------------------------------------
+function(minifb_configure_target target)
+    if (NOT MSVC)
+        # GCC/Clang
+        target_compile_options(${target} PRIVATE
+            -Wall
+            -Wextra
+            -Wno-switch
+            -Wno-unused-function
+            -Wno-unused-parameter
+            -Wno-implicit-fallthrough
+            "$<IF:$<CONFIG:Debug>,-O0,-O2>"
             "$<$<CONFIG:Debug>:-g>"
         )
-    endif()
 
-    list(APPEND MINIFB_COMPILE_OPTIONS
-        -Wall
-        -Wextra
-        -Wno-switch
-        -Wno-unused-function
-        -Wno-unused-parameter
-        -Wno-implicit-fallthrough
-        "$<IF:$<CONFIG:Debug>,-O0,-O2>"
-    )
+    else()
+        # MSVC
+        target_compile_options(${target} PRIVATE
+            # Security check
+            /GS
+            # Function level linking
+            /Gy
+            # Exceptions
+            /EHsc
+            # Fast floating point maths
+            /fp:fast
+            # Force Visual Studio to actualize __cplusplus version macro
+            /Zc:__cplusplus
+            # Additional security checks
+            /sdl
 
-    if (NOT APPLE)
-        list(APPEND MINIFB_COMPILE_OPTIONS
-            -Wno-cast-function-type
+            # Program database (edit and continue in debug mode)
+            "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
+            # Optimizations
+            "$<IF:$<CONFIG:Debug>,/Od,/O2>"
+            # Inline function expansion
+            "$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>"
+            # Basic runtime checks
+            "$<$<CONFIG:Debug>:/RTC1>"
         )
+
+        # prevent annoying c standard lib unsafety msvc warnings
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
     endif()
 
-else()
-
-    # MSVC
-    #--------------------------------------
-
-    list(APPEND MINIFB_COMPILE_OPTIONS
-        # Security check
-        /GS
-        # Function level linking
-        /Gy
-        # Exceptions
-        /EHsc
-        # Fast floating point maths
-        /fp:fast
-        # Force Visual Studio to actualize __cplusplus version macro
-        /Zc:__cplusplus
-
-        # Program database for edit and continue
-        "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
-        # Optimizations
-        "$<IF:$<CONFIG:Debug>,/Od,/O2>"
-        # Inline function expansion
-        "$<IF:$<CONFIG:Debug>,/Ob0,/Ob2>"
-        # Basic runtime checks
-        "$<$<CONFIG:Debug>:/RTC1>"
+    target_compile_definitions(${target} PRIVATE
+        "$<$<CONFIG:Debug>:_DEBUG>"
+        "$<$<CONFIG:Debug>:DEBUG>"
     )
 
-    if (MSVC_VERSION GREATER_EQUAL 1900)
-        # SDL checks 2015+
-        list(APPEND MINIFB_COMPILE_OPTIONS /sdl)
+    if (WIN32)
+        target_compile_definitions(${target} PRIVATE _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
     endif()
 
-    if (MSVC_VERSION LESS_EQUAL 1920)
-        # Enable Minimal Rebuild (required for Edit and Continue) (deprecated)
-        list(APPEND MINIFB_COMPILE_OPTIONS /Gm)
+    # DJGPP headers expose key DOS APIs only in GNU (non-strict ANSI) mode.
+    if (DJGPP)
+        set(MINIFB_C_EXTENSIONS   ON)
+        set(MINIFB_CXX_EXTENSIONS ON)
+    else()
+        set(MINIFB_C_EXTENSIONS   OFF)
+        set(MINIFB_CXX_EXTENSIONS OFF)
     endif()
 
-endif()
-
-list(APPEND MINIFB_COMPILE_DEFINITIONS
-    "$<$<CONFIG:Debug>:_DEBUG>"
-    "$<$<CONFIG:Debug>:DEBUG>"
-)
-
-if (EMSCRIPTEN)
-    list(APPEND MINIFB_LINK_OPTIONS_EXE
-        "$<$<CONFIG:Debug>:-g>"
+    set_target_properties(${target} PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
     )
-endif()
 
-# Set compiler/platform specific flags and dependencies
+endfunction()
+
+# Create library target and configure
 #--------------------------------------
+add_library(minifb STATIC ${SrcLib})
+add_library(minifb::minifb ALIAS minifb) # cmake installing will install the "minifb::" namespace
+
+set_property(TARGET minifb PROPERTY FOLDER "Libs")
+minifb_configure_target(minifb)
+
+# headers required for users (differs depending on if it's been built or installed)
+target_include_directories(minifb PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>  # most headers
+    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>    # auto-generated headers
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)     # (both of those are in the same location if installed)
+
+target_include_directories(minifb PRIVATE src)  # include internal headers
+
+# conditional main library target configuration
+
+if (MINIFB_USE_INVERTED_Y_ON_MACOS)
+    target_compile_definitions(minifb PRIVATE USE_INVERTED_Y_ON_MACOS)
+endif()
+
+# Add GL/Metal code if we're using GL/Metal, no matter the specific platform
+if (MINIFB_USE_OPENGL_API)
+    target_sources(minifb PRIVATE ${SrcGL})
+    target_compile_definitions(minifb PRIVATE USE_OPENGL_API)
+endif()
+if (MINIFB_USE_METAL_API)
+    target_compile_definitions(minifb PRIVATE USE_METAL_API)
+    target_sources(minifb PRIVATE ${SrcMacOSMetal})
+endif()
+
 if (WIN32)
-
-    if (MSVC)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS _CRT_SECURE_NO_WARNINGS)
-    endif()
-    list(APPEND MINIFB_COMPILE_DEFINITIONS _WIN32_WINNT=0x0601)  # Windows 7 (we are in 2026)
-
-    if (USE_OPENGL_API)
-        list(APPEND SrcLib ${SrcGL})
-
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-    endif()
-
-    list(APPEND SrcLib ${SrcWindows})
+    target_sources(minifb PRIVATE ${SrcWindows})
 
 elseif (IOS)
+    target_sources(minifb PRIVATE ${SrcIOS})
 
-    list(APPEND SrcLib ${SrcIOS})
+elseif (MACOS)
+    target_sources(minifb PRIVATE ${SrcMacOS})
 
-elseif (APPLE)
+elseif (MINIFB_USE_WAYLAND_API)
+    target_sources(minifb PRIVATE ${SrcWayland})
 
-    if (USE_METAL_API)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_METAL_API)
-        list(APPEND SrcLib ${SrcMacOSMetal})
-    endif()
+elseif (MINIFB_USE_X11_API)
+    target_sources(minifb PRIVATE ${SrcX11})
 
-    if (USE_INVERTED_Y_ON_MACOS)
-        list(APPEND MINIFB_COMPILE_DEFINITIONS USE_INVERTED_Y_ON_MACOS)
-    endif()
-
-    list(APPEND SrcLib ${SrcMacOS})
-
-elseif (UNIX)
-
-    if (USE_WAYLAND_API)
-        list(APPEND SrcLib ${SrcWayland})
-    elseif (EMSCRIPTEN)
-        list(APPEND SrcLib ${SrcWeb})
-    else()
-        if (USE_OPENGL_API)
-            list(APPEND SrcLib ${SrcGL})
-
-            list(APPEND MINIFB_COMPILE_DEFINITIONS USE_OPENGL_API)
-        endif()
-        list(APPEND SrcLib ${SrcX11})
-    endif()
+elseif (EMSCRIPTEN)
+    target_sources(minifb PRIVATE ${SrcWeb})
 
 elseif (DJGPP)
+    target_sources(minifb PRIVATE ${SrcDOS})
+endif()
 
-    list(APPEND SrcLib ${SrcDOS})
+# Link main library
+#--------------------------------------
+if (MINIFB_USE_OPENGL_API)
+    find_package(OpenGL)
+    if (NOT OpenGL_FOUND)
+        if (WIN32)
+            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
+        elseif (MINIFB_USE_X11_API)
+            message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
+        endif()
+    endif()
+
+    target_link_libraries(minifb PRIVATE OpenGL::GL)
+endif()
+
+if (IOS)
+    target_link_libraries(minifb PRIVATE
+        "-framework UIKit"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+    )
+
+elseif (MACOS)
+    target_link_libraries(minifb PRIVATE "-framework Cocoa")
+
+    if (MINIFB_USE_METAL_API)
+        target_link_libraries(minifb PRIVATE
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+        )
+    endif()
+
+elseif (MINIFB_USE_WAYLAND_API)
+    # wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
+    find_package(PkgConfig)
+    if (NOT PKG_CONFIG_FOUND)
+        message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
+    endif()
+    pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
+
+    target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
+    target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
+    target_link_libraries(minifb PRIVATE ${WAYLAND_LIBRARIES})
+
+elseif(MINIFB_USE_X11_API)
+    find_package(X11)
+    if (NOT X11_FOUND)
+        message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
+    endif()
+    target_link_libraries(minifb PRIVATE X11::X11)
+
+    if (X11_Xrandr_FOUND)
+        target_link_libraries(minifb PRIVATE X11::Xrandr)
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
+    endif()
+
+elseif (EMSCRIPTEN)
+    # emscripten has no dedicated linking code
+
+elseif (WIN32)
+    target_link_libraries(minifb PRIVATE "winmm.lib")  # windows multimedia library, used in our case for precise timing
 
 endif()
 
-# Library
+# Examples and other targets
 #--------------------------------------
-add_library(minifb STATIC
-    ${SrcLib}
-)
-add_library(minifb::minifb ALIAS minifb)
 
-# Link
-#--------------------------------------
-if (APPLE)
+# example use: minifb_add_example(NAME noise SOURCE examples/noise.c)
+function(minifb_add_example)
+    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD;IOS_NO_STORYBOARD" "NAME" "SOURCE")
 
-    if (IOS)
-        target_link_libraries(minifb PRIVATE
-            "-framework UIKit"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
-        )
-    else()
-        target_link_libraries(minifb PRIVATE
-            "-framework Cocoa"
-            "-framework QuartzCore"
-            "-framework Metal"
-            "-framework MetalKit"
-        )
-    endif()
+    add_executable(${arg_NAME} ${arg_SOURCE})
+    target_link_libraries(${arg_NAME} PRIVATE minifb)
+    minifb_configure_target(${arg_NAME})
 
-elseif (UNIX)
+    set_property(TARGET ${arg_NAME} PROPERTY FOLDER "Examples")
 
-    if (USE_WAYLAND_API)
-        find_package(PkgConfig)
-        if (NOT PKG_CONFIG_FOUND)
-            message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
-        endif()
-        pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
-
-        target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
-        target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})
-        target_link_libraries(minifb PRIVATE
-            ${WAYLAND_LIBRARIES}
-        )
-    elseif (EMSCRIPTEN)
-        list(APPEND MINIFB_LINK_OPTIONS_EXE
+    # conditional configuration
+    if (EMSCRIPTEN)
+        target_link_options(${arg_NAME} PRIVATE
+            "-sEXPORT_NAME=${arg_NAME}"
             "-sSTRICT=1"
             "-sENVIRONMENT=web"
             "-sMODULARIZE=1"
@@ -361,265 +461,112 @@ elseif (UNIX)
             "--no-entry"
             "-sSINGLE_FILE"
         )
-    else()
-        find_package(X11)
-        if (NOT X11_FOUND)
-            message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
-        endif()
 
-        target_link_libraries(minifb PRIVATE
-            X11::X11
-            #"-lxkbcommon"
-        )
-        if (X11_Xrandr_FOUND)
-            if (TARGET X11::Xrandr)
-                target_link_libraries(minifb PRIVATE X11::Xrandr)
-            else()
-                target_link_libraries(minifb PRIVATE ${X11_Xrandr_LIB})
-            endif()
-            target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
-        endif()
-        if (USE_OPENGL_API)
-            find_package(OpenGL)
-            if (NOT OpenGL_FOUND)
-                message(FATAL_ERROR "OpenGL development files not found (install OpenGL headers/libs, e.g. mesa-common-dev/libgl1-mesa-dev)")
-            endif()
-            target_link_libraries(minifb PRIVATE
-                OpenGL::GL
+        # copy the example's .html file into the build directory after the example is built
+        add_custom_command(TARGET ${arg_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                "examples/web/${arg_NAME}.html"
+                "${CMAKE_CURRENT_BINARY_DIR}"
+            )
+
+    elseif (IOS)
+        if (${arg_IOS_STORYBOARD})
+            # CMAKE_CURRENT_SOURCE_DIR needed as the paths are serched from the build directory
+            set_target_properties(${arg_NAME} PROPERTIES
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
+                RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/LaunchScreen.storyboard"
+
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.minifb.noise"
+                XCODE_ATTRIBUTE_PRODUCT_NAME "MiniFB Noise"
+                XCODE_ATTRIBUTE_MARKETING_VERSION "1.0.0"
+                XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "1"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+            )
+        elseif (${arg_IOS_NO_STORYBOARD})
+            set_target_properties(${arg_NAME} PROPERTIES
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
+
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.minifb.noise-nsb"
+                XCODE_ATTRIBUTE_PRODUCT_NAME "MiniFB Noise NSB"
+                XCODE_ATTRIBUTE_MARKETING_VERSION "1.0.0"
+                XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "1"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
             )
         endif()
+
     endif()
-
-elseif (WIN32)
-
-    if (USE_OPENGL_API)
-        find_package(OpenGL)
-        if (NOT OpenGL_FOUND)
-            message(FATAL_ERROR "OpenGL not found for Windows; install the required SDK components")
-        endif()
-        target_link_libraries(minifb PRIVATE
-            "opengl32.lib"
-        )
-    endif()
-
-    target_link_libraries(minifb PRIVATE
-        "winmm.lib"
-    )
-
-endif()
-
-# For all projects
-#--------------------------------------
-set_target_properties(minifb PROPERTIES
-    C_STANDARD ${MINIFB_C_STANDARD}
-    C_STANDARD_REQUIRED ON
-    C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
-    CXX_STANDARD ${MINIFB_CXX_STANDARD}
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
-)
-
-if (MINIFB_COMPILE_OPTIONS)
-    target_compile_options(minifb PRIVATE ${MINIFB_COMPILE_OPTIONS})
-endif()
-
-if (MINIFB_COMPILE_DEFINITIONS)
-    target_compile_definitions(minifb PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-endif()
-
-if (MINIFB_LINK_OPTIONS_LIB)
-    target_link_options(minifb PRIVATE ${MINIFB_LINK_OPTIONS_LIB})
-endif()
-
-target_include_directories(minifb PUBLIC
-    $<BUILD_INTERFACE:${MINIFB_GENERATED_INCLUDE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(minifb PRIVATE src)
-
-# Other targets
-#--------------------------------------
-set(MINIFB_EXAMPLE_TARGETS)
+endfunction()
 
 if (MINIFB_BUILD_VERSION_INFO)
-    add_executable(minifb_version_info examples/version_info.c)
-    list(APPEND MINIFB_EXAMPLE_TARGETS minifb_version_info)
+    minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
 endif()
 
-# Examples
-#--------------------------------------
 if (MINIFB_BUILD_EXAMPLES)
     if (NOT IOS)
-
-        add_executable(noise examples/noise.c)
-        add_executable(input_events examples/input_events.c)
-        add_executable(input_events_cpp examples/input_events_cpp.cpp)
-        add_executable(multiple_windows examples/multiple_windows.c)
-        add_executable(hidpi examples/hidpi.c)
-        add_executable(fullscreen examples/fullscreen.c)
-        add_executable(timer examples/timer.c)
-        add_executable(hide_cursor examples/hide_cursor.c)
-
-        list(APPEND MINIFB_EXAMPLE_TARGETS
-            noise
-            input_events
-            input_events_cpp
-            multiple_windows
-            hidpi
-            fullscreen
-            timer
-            hide_cursor
-        )
-
-        if (EMSCRIPTEN)
-
-            add_custom_target(web_assets
-                COMMAND ${CMAKE_COMMAND} -E copy_directory
-                    ${CMAKE_CURRENT_SOURCE_DIR}/examples/web
-                    ${CMAKE_CURRENT_BINARY_DIR}
-            )
-
-            add_dependencies(noise web_assets)
-            add_dependencies(input_events web_assets)
-            add_dependencies(hidpi web_assets)
-            add_dependencies(multiple_windows web_assets)
-            add_dependencies(timer web_assets)
-
-            target_link_options(noise PRIVATE "-sEXPORT_NAME=noise")
-            target_link_options(input_events PRIVATE "-sEXPORT_NAME=input_events")
-            target_link_options(hidpi PRIVATE "-sEXPORT_NAME=hidpi")
-            target_link_options(multiple_windows PRIVATE "-sEXPORT_NAME=multiple_windows")
-            target_link_options(timer PRIVATE "-sEXPORT_NAME=timer")
-
+        minifb_add_example(NAME noise                SOURCE examples/noise.c)
+        minifb_add_example(NAME input_events         SOURCE examples/input_events.c)
+        minifb_add_example(NAME hidpi                SOURCE examples/hidpi.c)
+        minifb_add_example(NAME multiple_windows     SOURCE examples/multiple_windows.c)
+        minifb_add_example(NAME timer                SOURCE examples/timer.c)
+        if (NOT EMSCRIPTEN)
+            minifb_add_example(NAME fullscreen       SOURCE examples/fullscreen.c)
+            minifb_add_example(NAME hide_cursor      SOURCE examples/hide_cursor.c)
+            minifb_add_example(NAME input_events_cpp SOURCE examples/input_events_cpp.cpp)
         endif()
-
         if (DJGPP)
-
-            add_executable(debug_dos
-                examples/dos/debug_dos.c
-            )
-            list(APPEND MINIFB_EXAMPLE_TARGETS debug_dos)
-
+            minifb_add_example(NAME debug_dos        SOURCE examples/dos/debug_dos.c)
         endif()
 
     else() # iOS
-
         set(IOS_NOISE_COMMON_SOURCES
             examples/ios/main.m
             examples/ios/AppDelegate.h
             examples/ios/AppDelegate.m
         )
 
-        add_executable(noise
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
-        add_executable(noise_no_storyboard
-            ${IOS_NOISE_COMMON_SOURCES}
-        )
-        list(APPEND MINIFB_EXAMPLE_TARGETS noise noise_no_storyboard)
-
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
-
-        foreach(ios_noise_target IN ITEMS noise noise_no_storyboard)
-            target_include_directories(${ios_noise_target} PRIVATE src)
-            target_include_directories(${ios_noise_target} PRIVATE src/ios)
-        endforeach()
-
-        set_target_properties(noise PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
-            RESOURCE "examples/ios/LaunchScreen.storyboard"
-        )
-        set_target_properties(noise_no_storyboard PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
-        )
+        minifb_add_example(NAME noise               SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_STORYBOARD)
+        minifb_add_example(NAME noise_no_storyboard SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_NO_STORYBOARD)
 
     endif()
 
+    # example that will be ran on actions such as f5 in visual studio
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
 endif()
 
-# Add options to targets
+# Configure installation
 #--------------------------------------
-foreach(minifb_test_target IN LISTS MINIFB_EXAMPLE_TARGETS)
-    target_link_libraries(${minifb_test_target} PRIVATE minifb)
 
-    set_target_properties(${minifb_test_target} PROPERTIES
-        C_STANDARD ${MINIFB_C_STANDARD}
-        C_STANDARD_REQUIRED ON
-        C_EXTENSIONS ${MINIFB_C_EXTENSIONS}
-        CXX_STANDARD ${MINIFB_CXX_STANDARD}
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS ${MINIFB_CXX_EXTENSIONS}
-    )
-
-    if (MINIFB_COMPILE_OPTIONS)
-        target_compile_options(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_OPTIONS})
-    endif()
-
-    if (MINIFB_COMPILE_DEFINITIONS)
-        target_compile_definitions(${minifb_test_target} PRIVATE ${MINIFB_COMPILE_DEFINITIONS})
-    endif()
-
-    if (MINIFB_LINK_OPTIONS_EXE)
-        target_link_options(${minifb_test_target} PRIVATE ${MINIFB_LINK_OPTIONS_EXE})
-    endif()
-endforeach()
-
-# Organize IDE Folders
-#--------------------------------------
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set_property(TARGET minifb PROPERTY FOLDER "Libs")
-
-if (MINIFB_BUILD_EXAMPLES AND NOT IOS)
-    set_property(TARGET noise PROPERTY FOLDER "Examples")
-    set_property(TARGET timer PROPERTY FOLDER "Examples")
-    set_property(TARGET fullscreen PROPERTY FOLDER "Examples")
-    set_property(TARGET input_events PROPERTY FOLDER "Examples")
-    set_property(TARGET input_events_cpp PROPERTY FOLDER "Examples")
-    set_property(TARGET multiple_windows PROPERTY FOLDER "Examples")
-    set_property(TARGET hidpi PROPERTY FOLDER "Examples")
-    set_property(TARGET hide_cursor PROPERTY FOLDER "Examples")
-endif()
-
-if (MINIFB_BUILD_VERSION_INFO)
-    set_property(TARGET minifb_version_info PROPERTY FOLDER "Examples")
-endif()
-
-#--------------------------------------
+# install the library, and all headers
 install(TARGETS minifb EXPORT minifb)
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/"
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/include/" "${MINIFB_GENERATED_INCLUDE_DIR}"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    FILES_MATCHING
-    PATTERN "*.h"
-    PATTERN "*.hpp"
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
-install(FILES "${MINIFB_GENERATED_INCLUDE_DIR}/minifb_version.h" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
+# generate and install files required to find_package minifb
+include(CMakePackageConfigHelpers)
 set(MINIFB_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/minifb")
-set(MINIFB_PACKAGE_FIND_OPENGL FALSE)
-set(MINIFB_PACKAGE_FIND_X11 FALSE)
 
-if (WIN32 AND USE_OPENGL_API)
-    set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-elseif (UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-    if (NOT USE_WAYLAND_API)
-        set(MINIFB_PACKAGE_FIND_X11 TRUE)
-        if (USE_OPENGL_API)
-            set(MINIFB_PACKAGE_FIND_OPENGL TRUE)
-        endif()
-    endif()
-endif()
+# generate the cmake code that will create the minifb:: target when found, to minifb-targets.cmake
+install(EXPORT minifb
+    FILE minifb-targets.cmake
+    DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+    NAMESPACE minifb::
+)
 
-minifb_configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/minifb-config.cmake.in"
+# generate file from our template that will be found directly by find_package (<name>-config.cmake is one of file filenames it searches for)
+# the file will find dependancies and `include`s the previously created minifb-targets.cmake
+configure_package_config_file(
+    "cmake/minifb-config.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
-    "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
+    INSTALL_DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}"
 )
-
-minifb_write_package_version_file(
+# in case find_package is called with the VERSION flag, generate the file that checks the version
+write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
+    COMPATIBILITY SameMajorVersion
 )
-
-install(EXPORT minifb FILE minifb-targets.cmake DESTINATION "${MINIFB_CMAKE_CONFIG_INSTALL_DIR}" NAMESPACE minifb::)
+# install the previous two files
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/minifb-config-version.cmake"
@@ -627,7 +574,3 @@ install(FILES
 )
 
 message(STATUS "Done " ${PROJECT_NAME})
-
-if (MSVC AND MINIFB_BUILD_EXAMPLES)
-    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
-endif()
