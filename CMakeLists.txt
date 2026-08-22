@@ -382,13 +382,15 @@ if (IOS)
     )
 
 elseif (MACOS)
-    # TODO: do we need to link cocoa if we're using metal, or metal if we're using cocoa?
-    target_link_libraries(minifb PRIVATE
-        "-framework Cocoa"
-        "-framework QuartzCore"
-        "-framework Metal"
-        "-framework MetalKit"
-    )
+    target_link_libraries(minifb PRIVATE "-framework Cocoa")
+
+    if (MINIFB_USE_METAL_API)
+        target_link_libraries(minifb PRIVATE
+            "-framework QuartzCore"
+            "-framework Metal"
+            "-framework MetalKit"
+        )
+    endif()
 
 elseif (MINIFB_USE_WAYLAND_API)
     # wayland doesn't as of yet have a built-in cmake finder, so we use PkgConfig instead
