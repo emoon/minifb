@@ -106,6 +106,7 @@ typedef struct {
     struct wp_fractional_scale_manager_v1 *fractional_scale_manager;
     struct wp_fractional_scale_v1 *fractional_scale;
     uint32_t                preferred_scale_120;
+    uint32_t                surface_preferred_scale;
     struct wp_viewporter    *viewporter;
     struct wp_viewport      *viewport;
     struct wl_output        *outputs[WAYLAND_MAX_OUTPUTS];

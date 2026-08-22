@@ -54,7 +54,10 @@
 #define MFB_STR_IMPL(x) #x
 #define MFB_STR(x) MFB_STR_IMPL(x)
 
-#define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120.0f
+#define WAYLAND_FRACTIONAL_SCALE_DENOMINATOR 120u
+// Bound compositor-provided scales before they amplify SHM and cursor resources.
+#define WAYLAND_MAX_BUFFER_SCALE 10u
+#define WAYLAND_MAX_FRACTIONAL_SCALE_120 (WAYLAND_MAX_BUFFER_SCALE * WAYLAND_FRACTIONAL_SCALE_DENOMINATOR)
 #define WAYLAND_DEFAULT_CURSOR_SIZE 32
 #define WAYLAND_THROTTLE_DEADLINE_MS 100.0
 #define WAYLAND_THROTTLE_POLL_SLICE_MS (1000.0 / 60.0)
@@ -245,7 +248,13 @@ surface_damage(struct wl_surface *surface,
         return;
     }
 #endif
-    wl_surface_damage(surface, x, y, w, h);
+    // Legacy wl_surface.damage takes surface-local coordinates while callers
+    // pass buffer coordinates, so invalidate the whole surface instead.
+    kUnused(x);
+    kUnused(y);
+    kUnused(w);
+    kUnused(h);
+    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
 }
 
 //-------------------------------------
@@ -922,19 +931,87 @@ pointer_uses_frame_events(struct wl_pointer *pointer) {
 }
 
 //-------------------------------------
+typedef struct {
+    uint32_t numerator;
+    uint32_t denominator;
+    bool     use_fractional;
+} SWaylandResolvedScale;
+
+//-------------------------------------
+static SWaylandResolvedScale
+resolve_surface_scale(const SWindowData_Way *window_data_specific) {
+    SWaylandResolvedScale scale = {
+        .numerator = 1u,
+        .denominator = 1u,
+        .use_fractional = false,
+    };
+
+    if (window_data_specific == NULL) {
+        return scale;
+    }
+
+    if (window_data_specific->viewport != NULL
+        && window_data_specific->preferred_scale_120 > 0) {
+        scale.numerator = window_data_specific->preferred_scale_120;
+        scale.denominator = WAYLAND_FRACTIONAL_SCALE_DENOMINATOR;
+        scale.use_fractional = true;
+        return scale;
+    }
+
+#if defined(WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION)
+    if (window_data_specific->compositor_version >= WL_SURFACE_PREFERRED_BUFFER_SCALE_SINCE_VERSION) {
+        scale.numerator = window_data_specific->surface_preferred_scale > 0
+            ? window_data_specific->surface_preferred_scale
+            : 1u;
+        return scale;
+    }
+#endif
+
+    if (window_data_specific->integer_output_scale > 0) {
+        scale.numerator = window_data_specific->integer_output_scale;
+    }
+
+    return scale;
+}
+
+//-------------------------------------
+static bool
+scale_logical_to_physical(uint32_t value, uint32_t scale_numerator, uint32_t scale_denominator,
+                          uint32_t *physical_value) {
+    if (scale_numerator == 0 || scale_denominator == 0 || physical_value == NULL) {
+        return false;
+    }
+
+    uint64_t scaled_value = (uint64_t) value * scale_numerator;
+    uint64_t rounded_value = scaled_value / scale_denominator;
+    uint64_t remainder = scaled_value % scale_denominator;
+    if (remainder * 2u >= scale_denominator) {
+        ++rounded_value;
+    }
+
+    if (rounded_value > UINT32_MAX) {
+        return false;
+    }
+
+    *physical_value = (uint32_t) rounded_value;
+    return true;
+}
+
+//-------------------------------------
 static uint32_t
 get_cursor_buffer_scale(const SWindowData_Way *window_data_specific) {
     uint32_t scale = 1;
 
 #if defined(WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION)
     if (window_data_specific->compositor_version >= WL_SURFACE_SET_BUFFER_SCALE_SINCE_VERSION) {
-        if (window_data_specific->preferred_scale_120 > 0) {
-            scale = (window_data_specific->preferred_scale_120 + 119u) / 120u;
-        }
-        else if (window_data_specific->integer_output_scale > 0) {
-            scale = window_data_specific->integer_output_scale;
+        SWaylandResolvedScale surface_scale = resolve_surface_scale(window_data_specific);
+        scale = surface_scale.numerator / surface_scale.denominator;
+        if (surface_scale.numerator % surface_scale.denominator != 0) {
+            ++scale;
         }
     }
+#else
+    kUnused(window_data_specific);
 #endif
 
     if (scale == 0) {
@@ -1584,8 +1661,17 @@ fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *frac
     if (window_data_specific == NULL) {
         return;
     }
-    window_data_specific->preferred_scale_120 = scale;
-    refresh_cursor_surface(window_data);
+
+    if (scale == 0 || scale > WAYLAND_MAX_FRACTIONAL_SCALE_120) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: ignoring unsupported fractional scale %u/120.", scale);
+        return;
+    }
+
+    if (window_data_specific->preferred_scale_120 != scale) {
+        window_data_specific->preferred_scale_120 = scale;
+        refresh_cursor_surface(window_data);
+    }
 }
 
 //-------------------------------------
@@ -1611,7 +1697,7 @@ find_output_index(SWindowData_Way *window_data_specific, struct wl_output *outpu
 //-------------------------------------
 // Recompute the integer output scale from all outputs the surface currently
 // overlaps.  Uses the maximum scale so content is never blurry on any of them.
-// Only meaningful when fractional scale is unavailable.
+// Used as a fallback when no applicable per-surface scale preference exists.
 //-------------------------------------
 static void
 recompute_output_scale(SWindowData_Way *window_data_specific) {
@@ -1678,8 +1764,13 @@ output_scale(void *data, struct wl_output *output, int32_t factor) {
         return;
     }
 
-    uint32_t scale = (factor > 0) ? (uint32_t) factor : 1;
-    window_data_specific->output_scales[idx] = scale;
+    if (factor <= 0 || factor > (int32_t) WAYLAND_MAX_BUFFER_SCALE) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: ignoring unsupported output buffer scale %d.", factor);
+        return;
+    }
+
+    window_data_specific->output_scales[idx] = (uint32_t) factor;
     if (window_data_specific->output_entered[idx]) {
         recompute_output_scale(window_data_specific);
         refresh_cursor_surface(window_data);
@@ -1770,13 +1861,28 @@ surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) 
 
 //-------------------------------------
 // Compositor-preferred integer buffer scale for this surface.
-// Currently unused; the backend derives scale from fractional-scale/output data.
 //-------------------------------------
 static void
 surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t factor) {
-    kUnused(data);
     kUnused(surface);
-    kUnused(factor);
+
+    SWindowData *window_data = (SWindowData *) data;
+    SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    if (factor <= 0 || factor > (int32_t) WAYLAND_MAX_BUFFER_SCALE) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: ignoring unsupported preferred buffer scale %d.", factor);
+        return;
+    }
+
+    uint32_t preferred_scale = (uint32_t) factor;
+    if (window_data_specific->surface_preferred_scale != preferred_scale) {
+        window_data_specific->surface_preferred_scale = preferred_scale;
+        refresh_cursor_surface(window_data);
+    }
 }
 
 #endif
@@ -2537,8 +2643,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.");
     }
 
-    if (!window_data_specific->fractional_scale_manager) {
-        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: wp_fractional_scale_manager_v1 is unavailable; falling back to integer wl_output scale.");
+    if (!window_data_specific->fractional_scale_manager || !window_data_specific->viewporter) {
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: fractional surface scaling is unavailable; using integer surface scaling.");
     }
 
     if (!window_data_specific->seat) {
@@ -2658,17 +2764,19 @@ typedef enum {
 } EWaylandSlotAcquireStatus;
 
 //-------------------------------------
-static void
+static bool
 compute_presentation_metrics(const SWindowData *window_data,
                              const SWindowData_Way *window_data_specific,
                              SWaylandPresentationMetrics *metrics) {
+    SWaylandResolvedScale surface_scale = resolve_surface_scale(window_data_specific);
+
     metrics->logical_surface_width  = window_data->window_width;
     metrics->logical_surface_height = window_data->window_height;
     metrics->logical_dst_offset_x   = window_data->dst_offset_x;
     metrics->logical_dst_offset_y   = window_data->dst_offset_y;
     metrics->logical_dst_width      = window_data->dst_width;
     metrics->logical_dst_height     = window_data->dst_height;
-    metrics->integer_scale          = window_data_specific->integer_output_scale;
+    metrics->integer_scale          = surface_scale.use_fractional == true ? 1u : surface_scale.numerator;
     metrics->use_buffer_scale       = false;
     metrics->use_fractional         = false;
 
@@ -2677,16 +2785,32 @@ compute_presentation_metrics(const SWindowData *window_data,
     }
 
     // 4B: fractional HiDPI via wp_viewporter - takes priority over 4A.
-    if (window_data_specific->viewport != NULL
-        && window_data_specific->preferred_scale_120 > 0) {
-        float fscale = (float) window_data_specific->preferred_scale_120 / 120.0f;
-        metrics->use_fractional          = true;
-        metrics->physical_surface_width  = (uint32_t) ((float) metrics->logical_surface_width  * fscale + 0.5f);
-        metrics->physical_surface_height = (uint32_t) ((float) metrics->logical_surface_height * fscale + 0.5f);
-        metrics->physical_dst_offset_x   = (uint32_t) ((float) metrics->logical_dst_offset_x   * fscale + 0.5f);
-        metrics->physical_dst_offset_y   = (uint32_t) ((float) metrics->logical_dst_offset_y   * fscale + 0.5f);
-        metrics->physical_dst_width      = (uint32_t) ((float) metrics->logical_dst_width      * fscale + 0.5f);
-        metrics->physical_dst_height     = (uint32_t) ((float) metrics->logical_dst_height     * fscale + 0.5f);
+    if (surface_scale.use_fractional == true) {
+        if (scale_logical_to_physical(metrics->logical_surface_width,
+                                      surface_scale.numerator, surface_scale.denominator,
+                                      &metrics->physical_surface_width) == false
+            || scale_logical_to_physical(metrics->logical_surface_height,
+                                         surface_scale.numerator, surface_scale.denominator,
+                                         &metrics->physical_surface_height) == false
+            || scale_logical_to_physical(metrics->logical_dst_offset_x,
+                                         surface_scale.numerator, surface_scale.denominator,
+                                         &metrics->physical_dst_offset_x) == false
+            || scale_logical_to_physical(metrics->logical_dst_offset_y,
+                                         surface_scale.numerator, surface_scale.denominator,
+                                         &metrics->physical_dst_offset_y) == false
+            || scale_logical_to_physical(metrics->logical_dst_width,
+                                         surface_scale.numerator, surface_scale.denominator,
+                                         &metrics->physical_dst_width) == false
+            || scale_logical_to_physical(metrics->logical_dst_height,
+                                         surface_scale.numerator, surface_scale.denominator,
+                                         &metrics->physical_dst_height) == false) {
+            MFB_LOG(MFB_LOG_ERROR,
+                    "WaylandMiniFB: fractional presentation metrics exceed the supported uint32 range at scale %u/120.",
+                    surface_scale.numerator);
+            return false;
+        }
+
+        metrics->use_fractional = true;
         if (metrics->physical_surface_width  == 0) { metrics->physical_surface_width  = 1; }
         if (metrics->physical_surface_height == 0) { metrics->physical_surface_height = 1; }
         // Clamp dst rect to physical surface bounds to prevent stretch_image
@@ -2698,13 +2822,13 @@ compute_presentation_metrics(const SWindowData *window_data,
         if (metrics->physical_dst_offset_y > metrics->physical_surface_height) {
             metrics->physical_dst_offset_y = metrics->physical_surface_height;
         }
-        if (metrics->physical_dst_offset_x + metrics->physical_dst_width > metrics->physical_surface_width) {
+        if (metrics->physical_dst_width > metrics->physical_surface_width - metrics->physical_dst_offset_x) {
             metrics->physical_dst_width = metrics->physical_surface_width - metrics->physical_dst_offset_x;
         }
-        if (metrics->physical_dst_offset_y + metrics->physical_dst_height > metrics->physical_surface_height) {
+        if (metrics->physical_dst_height > metrics->physical_surface_height - metrics->physical_dst_offset_y) {
             metrics->physical_dst_height = metrics->physical_surface_height - metrics->physical_dst_offset_y;
         }
-        return;
+        return true;
     }
 
     // 4A: integer HiDPI via wl_surface_set_buffer_scale.
@@ -2733,6 +2857,7 @@ compute_presentation_metrics(const SWindowData *window_data,
     metrics->physical_dst_offset_y   = metrics->logical_dst_offset_y   * applied_scale;
     metrics->physical_dst_width      = metrics->logical_dst_width      * applied_scale;
     metrics->physical_dst_height     = metrics->logical_dst_height     * applied_scale;
+    return true;
 }
 
 //-------------------------------------
@@ -3040,7 +3165,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     // Wayland events has completed. No event dispatch is allowed from this
     // point through the surface commit in present_presentation_buffer().
     SWaylandPresentationMetrics metrics;
-    compute_presentation_metrics(window_data, window_data_specific, &metrics);
+    if (compute_presentation_metrics(window_data, window_data_specific, &metrics) == false) {
+        return MFB_STATE_INTERNAL_ERROR;
+    }
 
     if (slot_ensure_buffer(active_slot, window_data_specific,
                            metrics.physical_surface_width,
@@ -3343,16 +3470,11 @@ mfb_get_monitor_scale(struct mfb_window *window, float *scale_x, float *scale_y)
         SWindowData *window_data = (SWindowData *) window;
         SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
         if (window_data_specific) {
-            if (window_data_specific->preferred_scale_120 > 0) {
-                float scale = (float) window_data_specific->preferred_scale_120 / WAYLAND_FRACTIONAL_SCALE_DENOMINATOR;
-                if (scale > 0.0f) {
-                    x = scale;
-                    y = scale;
-                }
-            }
-            else if (window_data_specific->integer_output_scale > 0) {
-                x = (float) window_data_specific->integer_output_scale;
-                y = (float) window_data_specific->integer_output_scale;
+            SWaylandResolvedScale surface_scale = resolve_surface_scale(window_data_specific);
+            float scale = (float) surface_scale.numerator / (float) surface_scale.denominator;
+            if (scale > 0.0f) {
+                x = scale;
+                y = scale;
             }
         }
     }
