@@ -468,10 +468,22 @@ function(minifb_add_example)
             set_target_properties(${arg_NAME} PROPERTIES
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
                 RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/LaunchScreen.storyboard"
+
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.minifb.noise"
+                XCODE_ATTRIBUTE_PRODUCT_NAME "MiniFB Noise"
+                XCODE_ATTRIBUTE_MARKETING_VERSION "1.0.0"
+                XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "1"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
             )
         elseif (${arg_IOS_NO_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
                 MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
+
+                XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.minifb.noise-nsb"
+                XCODE_ATTRIBUTE_PRODUCT_NAME "MiniFB Noise NSB"
+                XCODE_ATTRIBUTE_MARKETING_VERSION "1.0.0"
+                XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "1"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
             )
         endif()
 
