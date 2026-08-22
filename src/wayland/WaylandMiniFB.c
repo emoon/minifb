@@ -1603,7 +1603,7 @@ release_pointer_input_state(SWindowData *window_data, SWindowData_Way *window_da
 
 //-------------------------------------
 static void
-release_active_seat(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+release_keyboard_input_state(SWindowData *window_data, SWindowData_Way *window_data_specific) {
     release_keyboard(&window_data_specific->keyboard);
 
     // Emit releases for keys whose real release events can no longer arrive.
@@ -1615,6 +1615,12 @@ release_active_seat(SWindowData *window_data, SWindowData_Way *window_data_speci
     }
 
     wayland_clear_keyboard_focus_state(window_data, window_data_specific);
+}
+
+//-------------------------------------
+static void
+release_active_seat(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    release_keyboard_input_state(window_data, window_data_specific);
     release_pointer_input_state(window_data, window_data_specific);
     release_seat(&window_data_specific->seat);
     window_data_specific->seat_id = 0;
@@ -1646,8 +1652,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
                 "WaylandMiniFB: keyboard capability removed (wl_keyboard version %u).",
                 wl_proxy_get_version((struct wl_proxy *) window_data_specific->keyboard)
         );
-        release_keyboard(&window_data_specific->keyboard);
-        wayland_clear_keyboard_focus_state(window_data, window_data_specific);
+        release_keyboard_input_state(window_data, window_data_specific);
     }
 
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !window_data_specific->pointer) {
@@ -3233,7 +3238,7 @@ begin_window_call(struct mfb_window *window, const char *func_name,
     }
 
     if ((*window_data)->close == true) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s aborted because the window is marked for close.", func_name);
+        MFB_LOG(MFB_LOG_DEBUG, "WaylandMiniFB: %s: window requested close.", func_name);
         destroy(*window_data);
         return MFB_STATE_EXIT;
     }
@@ -3269,7 +3274,7 @@ pump_window_events(SWindowData *window_data, const char *func_name) {
     }
 
     if (window_data->close == true) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s detected close request after event dispatch.", func_name);
+        MFB_LOG(MFB_LOG_DEBUG, "WaylandMiniFB: %s: window closed after event processing.", func_name);
         destroy(window_data);
         return MFB_STATE_EXIT;
     }
@@ -3477,7 +3482,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
 
         if (window_data->close == true) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
+            MFB_LOG(MFB_LOG_DEBUG, "WaylandMiniFB: mfb_wait_sync: window closed during the sync loop.");
             destroy(window_data);
             return false;
         }
