@@ -464,13 +464,14 @@ function(minifb_add_example)
 
     elseif (IOS)
         if (${arg_IOS_STORYBOARD})
+            # CMAKE_CURRENT_SOURCE_DIR needed as the paths are serched from the build directory
             set_target_properties(${arg_NAME} PROPERTIES
-                MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.plist"
-                RESOURCE "examples/ios/LaunchScreen.storyboard"
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.plist"
+                RESOURCE "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/LaunchScreen.storyboard"
             )
         elseif (${arg_IOS_NO_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
-                MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.no_storyboard.plist"
+                MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/examples/ios/Info.no_storyboard.plist"
             )
         endif()
 
