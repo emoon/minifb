@@ -463,9 +463,6 @@ function(minifb_add_example)
             )
 
     elseif (IOS)
-        # TODO: why do examples need to include internal headers?
-        target_include_directories(${arg_NAME} PRIVATE src src/ios)
-
         if (${arg_IOS_STORYBOARD})
             set_target_properties(${arg_NAME} PROPERTIES
                 MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.plist"
@@ -476,6 +473,7 @@ function(minifb_add_example)
                 MACOSX_BUNDLE_INFO_PLIST "examples/ios/Info.no_storyboard.plist"
             )
         endif()
+
     endif()
 endfunction()
 
