@@ -429,7 +429,7 @@ endif()
 
 # example use: minifb_add_example(NAME noise SOURCE examples/noise.c)
 function(minifb_add_example)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD IOS_NO_STORYBOARD" "NAME" "SOURCE")
+    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD;IOS_NO_STORYBOARD" "NAME" "SOURCE")
 
     add_executable(${arg_NAME} ${arg_SOURCE})
     target_link_libraries(${arg_NAME} PRIVATE minifb)
