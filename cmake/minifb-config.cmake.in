@@ -1,15 +1,18 @@
 @PACKAGE_INIT@
 
-include(CMakeFindDependencyMacro)
+# filled and installed by cmake
+# once filled, this file will be found by find_package
 
-if(@MINIFB_PACKAGE_FIND_OPENGL@)
+# depending on the configuration minifb was built with, make sure it has the required dependencies
+include(CMakeFindDependencyMacro)
+if(@MINIFB_USE_OPENGL_API@)
     find_dependency(OpenGL)
 endif()
-
-if(@MINIFB_PACKAGE_FIND_X11@)
+if(@MINIFB_USE_X11_API@)
     find_dependency(X11)
 endif()
 
+# run the auto-generated file to create the exported minifb:: target
 include("${CMAKE_CURRENT_LIST_DIR}/minifb-targets.cmake")
 
 check_required_components(minifb)
