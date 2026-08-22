@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
+
+# despite the OSX_ prefix, this is the minimum system version for all apple targets, such as ios
+# must be set before `projet` is set. can sometimes be configured by the user, if not, we set a default
+if (IOS AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum iOS deployment target")
+endif()
+
 project(MiniFB VERSION 0.10.1 LANGUAGES C CXX)
 
 message(STATUS "Processing " ${PROJECT_NAME})
@@ -519,9 +526,6 @@ if (MINIFB_BUILD_EXAMPLES)
 
         minifb_add_example(NAME noise               SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_STORYBOARD)
         minifb_add_example(NAME noise_no_storyboard SOURCE ${IOS_NOISE_COMMON_SOURCES} IOS_NO_STORYBOARD)
-
-        # TODO: this is an IOS build, why do we need to set a minimum macos version?
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Set CMake deployment target" ${FORCE_CACHE})
 
     endif()
 
