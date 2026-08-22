@@ -128,9 +128,17 @@ typedef struct {
     struct zxdg_decoration_manager_v1 *decoration_manager;
     struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
 
+    uint32_t                compositor_id;
+    uint32_t                shell_id;
+    uint32_t                seat_id;
+    uint32_t                shm_id;
+    uint32_t                fractional_scale_manager_id;
+    uint32_t                viewporter_id;
+    uint32_t                decoration_manager_id;
     uint32_t                compositor_version;
     uint32_t                seat_version;
     uint32_t                shm_format;
+    uint8_t                 backend_unusable;
     struct wl_callback      *throttle_callback;
     int64_t                 throttle_deadline_seconds;
     int32_t                 throttle_deadline_nanoseconds;

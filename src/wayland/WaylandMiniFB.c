@@ -236,6 +236,25 @@ release_seat(struct wl_seat **seat) {
 }
 
 //-------------------------------------
+static void
+release_shm(struct wl_shm **shm) {
+    if (shm == NULL || *shm == NULL) {
+        return;
+    }
+
+#if defined(WL_SHM_RELEASE_SINCE_VERSION)
+    if (wl_proxy_get_version((struct wl_proxy *) *shm) >= WL_SHM_RELEASE_SINCE_VERSION) {
+        wl_shm_release(*shm);
+        *shm = NULL;
+        return;
+    }
+#endif
+
+    wl_shm_destroy(*shm);
+    *shm = NULL;
+}
+
+//-------------------------------------
 static inline void
 surface_damage(struct wl_surface *surface,
                uint32_t compositor_version,
@@ -720,7 +739,8 @@ surface_throttle_wait(SWindowData *window_data) {
             return WAYLAND_THROTTLE_ERROR;
         }
 
-        if (window_data->close == true) {
+        if (window_data->close == true
+            || window_data_specific->backend_unusable != 0) {
             return WAYLAND_THROTTLE_ERROR;
         }
 
@@ -881,7 +901,7 @@ destroy(SWindowData *window_data) {
     window_data_specific->default_cursor = NULL;
     window_data_specific->cursor_theme_scale = 0;
 
-    kWaylandDestroy(window_data_specific->shm, wl_shm_destroy);
+    release_shm(&window_data_specific->shm);
 
     // The release_* helpers already ignore a null field, so they need no guard.
     for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
@@ -1566,9 +1586,50 @@ wl_pointer_listener pointer_listener = {
 
 //-------------------------------------
 static void
+release_pointer_input_state(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    release_pointer(&window_data_specific->pointer);
+    invalidate_pointer_serial_state(window_data_specific);
+    clear_pointer_axis_frame(window_data_specific);
+
+    // Release any buttons still marked as pressed; otherwise getters would
+    // report them as held forever now that we won't receive release events.
+    for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
+        if (window_data->mouse_button_status[button] != 0) {
+            window_data->mouse_button_status[button] = 0;
+            kCall(mouse_btn_func, (mfb_mouse_button) button, (mfb_key_mod) window_data->mod_keys, false);
+        }
+    }
+}
+
+//-------------------------------------
+static void
+release_active_seat(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    release_keyboard(&window_data_specific->keyboard);
+
+    // Emit releases for keys whose real release events can no longer arrive.
+    for (uint32_t key = 0; key < MFB_MAX_KEYS; ++key) {
+        if (window_data->key_status[key] != 0) {
+            window_data->key_status[key] = 0;
+            kCall(keyboard_func, (mfb_key) key, (mfb_key_mod) window_data->mod_keys, false);
+        }
+    }
+
+    wayland_clear_keyboard_focus_state(window_data, window_data_specific);
+    release_pointer_input_state(window_data, window_data_specific);
+    release_seat(&window_data_specific->seat);
+    window_data_specific->seat_id = 0;
+    window_data_specific->seat_version = 0;
+}
+
+//-------------------------------------
+static void
 seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps) {
     SWindowData       *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (seat != window_data_specific->seat) {
+        return;
+    }
+
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !window_data_specific->keyboard) {
         window_data_specific->keyboard = wl_seat_get_keyboard(seat);
         if (window_data_specific->keyboard) {
@@ -1604,18 +1665,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
                 "WaylandMiniFB: pointer capability removed (wl_pointer version %u).",
                 wl_proxy_get_version((struct wl_proxy *) window_data_specific->pointer)
         );
-        release_pointer(&window_data_specific->pointer);
-        invalidate_pointer_serial_state(window_data_specific);
-        clear_pointer_axis_frame(window_data_specific);
-
-        // Release any buttons still marked as pressed; otherwise getters would
-        // report them as held forever now that we won't receive release events.
-        for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
-            if (window_data->mouse_button_status[button] != 0) {
-                window_data->mouse_button_status[button] = 0;
-                kCall(mouse_btn_func, (mfb_mouse_button) button, (mfb_key_mod) window_data->mod_keys, false);
-            }
-        }
+        release_pointer_input_state(window_data, window_data_specific);
     }
 }
 
@@ -1955,38 +2005,61 @@ static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version) {
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific->backend_unusable != 0) {
+        return;
+    }
+
     if (strcmp(iface, "wl_compositor") == 0) {
-        uint32_t use_version = negotiate_protocol_version(version, &wl_compositor_interface,
-                                                          WAYLAND_COMPILED_COMPOSITOR_VERSION);
-        window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, use_version);
-        window_data_specific->compositor_version = use_version;
+        if (window_data_specific->compositor == NULL) {
+            uint32_t use_version = negotiate_protocol_version(version, &wl_compositor_interface,
+                                                              WAYLAND_COMPILED_COMPOSITOR_VERSION);
+            window_data_specific->compositor = (struct wl_compositor *) wl_registry_bind(registry, id, &wl_compositor_interface, use_version);
+            if (window_data_specific->compositor != NULL) {
+                window_data_specific->compositor_id = id;
+                window_data_specific->compositor_version = use_version;
+            }
+        }
     }
 
     else if (strcmp(iface, "wl_shm") == 0) {
-        uint32_t use_version = negotiate_protocol_version(version, &wl_shm_interface,
-                                                          WAYLAND_COMPILED_SHM_VERSION);
-        window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, use_version);
-        if (window_data_specific->shm) {
-            wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
+        if (window_data_specific->shm == NULL) {
+            uint32_t use_version = negotiate_protocol_version(version, &wl_shm_interface,
+                                                              WAYLAND_COMPILED_SHM_VERSION);
+            window_data_specific->shm = (struct wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, use_version);
+            if (window_data_specific->shm != NULL) {
+                window_data_specific->shm_id = id;
+                wl_shm_add_listener(window_data_specific->shm, &shm_listener, window_data);
+            }
         }
     }
 
     else if (strcmp(iface, "xdg_wm_base") == 0) {
-        uint32_t compiled_version = (uint32_t) xdg_wm_base_interface.version;
-        uint32_t use_version = negotiate_protocol_version(version, &xdg_wm_base_interface, compiled_version);
-        window_data_specific->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
-        if (window_data_specific->shell) {
-            xdg_wm_base_add_listener(window_data_specific->shell, &shell_listener, NULL);
+        if (window_data_specific->shell == NULL) {
+            uint32_t compiled_version = (uint32_t) xdg_wm_base_interface.version;
+            uint32_t use_version = negotiate_protocol_version(version, &xdg_wm_base_interface, compiled_version);
+            window_data_specific->shell = (struct xdg_wm_base *) wl_registry_bind(registry, id, &xdg_wm_base_interface, use_version);
+            if (window_data_specific->shell != NULL) {
+                window_data_specific->shell_id = id;
+                xdg_wm_base_add_listener(window_data_specific->shell, &shell_listener, NULL);
+            }
         }
     }
 
     else if (strcmp(iface, "wl_seat") == 0) {
-        uint32_t use_version = negotiate_protocol_version(version, &wl_seat_interface,
-                                                          WAYLAND_COMPILED_SEAT_VERSION);
-        window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, use_version);
-        window_data_specific->seat_version = use_version;
-        if (window_data_specific->seat) {
-            wl_seat_add_listener(window_data_specific->seat, &seat_listener, window_data);
+        if (window_data_specific->seat == NULL) {
+            uint32_t use_version = negotiate_protocol_version(version, &wl_seat_interface,
+                                                              WAYLAND_COMPILED_SEAT_VERSION);
+            window_data_specific->seat = (struct wl_seat *) wl_registry_bind(registry, id, &wl_seat_interface, use_version);
+            if (window_data_specific->seat != NULL) {
+                window_data_specific->seat_id = id;
+                window_data_specific->seat_version = use_version;
+                wl_seat_add_listener(window_data_specific->seat, &seat_listener, window_data);
+            }
+        }
+        else {
+            MFB_LOG(MFB_LOG_WARNING,
+                    "WaylandMiniFB: ignoring additional wl_seat global %u; the backend uses the first announced seat.",
+                    id);
         }
     }
 
@@ -2009,26 +2082,41 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     }
 
     else if (strcmp(iface, "wp_fractional_scale_manager_v1") == 0) {
-        uint32_t compiled_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
-        uint32_t use_version = negotiate_protocol_version(version, &wp_fractional_scale_manager_v1_interface,
-                                                          compiled_version);
-        window_data_specific->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
-            wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
+        if (window_data_specific->fractional_scale_manager == NULL) {
+            uint32_t compiled_version = (uint32_t) wp_fractional_scale_manager_v1_interface.version;
+            uint32_t use_version = negotiate_protocol_version(version, &wp_fractional_scale_manager_v1_interface,
+                                                              compiled_version);
+            window_data_specific->fractional_scale_manager = (struct wp_fractional_scale_manager_v1 *)
+                wl_registry_bind(registry, id, &wp_fractional_scale_manager_v1_interface, use_version);
+            if (window_data_specific->fractional_scale_manager != NULL) {
+                window_data_specific->fractional_scale_manager_id = id;
+            }
+        }
     }
 
     else if (strcmp(iface, "wp_viewporter") == 0) {
-        uint32_t compiled_version = (uint32_t) wp_viewporter_interface.version;
-        uint32_t use_version = negotiate_protocol_version(version, &wp_viewporter_interface, compiled_version);
-        window_data_specific->viewporter = (struct wp_viewporter *)
-            wl_registry_bind(registry, id, &wp_viewporter_interface, use_version);
+        if (window_data_specific->viewporter == NULL) {
+            uint32_t compiled_version = (uint32_t) wp_viewporter_interface.version;
+            uint32_t use_version = negotiate_protocol_version(version, &wp_viewporter_interface, compiled_version);
+            window_data_specific->viewporter = (struct wp_viewporter *)
+                wl_registry_bind(registry, id, &wp_viewporter_interface, use_version);
+            if (window_data_specific->viewporter != NULL) {
+                window_data_specific->viewporter_id = id;
+            }
+        }
     }
 
     else if (strcmp(iface, "zxdg_decoration_manager_v1") == 0) {
-        uint32_t compiled_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
-        uint32_t use_version = negotiate_protocol_version(version, &zxdg_decoration_manager_v1_interface,
-                                                          compiled_version);
-        window_data_specific->decoration_manager = (struct zxdg_decoration_manager_v1 *)
-            wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
+        if (window_data_specific->decoration_manager == NULL) {
+            uint32_t compiled_version = (uint32_t) zxdg_decoration_manager_v1_interface.version;
+            uint32_t use_version = negotiate_protocol_version(version, &zxdg_decoration_manager_v1_interface,
+                                                              compiled_version);
+            window_data_specific->decoration_manager = (struct zxdg_decoration_manager_v1 *)
+                wl_registry_bind(registry, id, &zxdg_decoration_manager_v1_interface, use_version);
+            if (window_data_specific->decoration_manager != NULL) {
+                window_data_specific->decoration_manager_id = id;
+            }
+        }
     }
 }
 
@@ -2039,6 +2127,75 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
 
     SWindowData     *window_data          = (SWindowData *) data;
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+
+    if (name == window_data_specific->seat_id) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: active wl_seat global %u was removed; keyboard and pointer input are now unavailable.",
+                name);
+        release_active_seat(window_data, window_data_specific);
+        flush_request(window_data_specific->display, "seat removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->decoration_manager_id) {
+        kWaylandDestroy(window_data_specific->toplevel_decoration, zxdg_toplevel_decoration_v1_destroy);
+        kWaylandDestroy(window_data_specific->decoration_manager, zxdg_decoration_manager_v1_destroy);
+        window_data_specific->decoration_manager_id = 0;
+        flush_request(window_data_specific->display, "decoration manager removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->fractional_scale_manager_id) {
+        kWaylandDestroy(window_data_specific->fractional_scale, wp_fractional_scale_v1_destroy);
+        kWaylandDestroy(window_data_specific->fractional_scale_manager, wp_fractional_scale_manager_v1_destroy);
+        window_data_specific->fractional_scale_manager_id = 0;
+        window_data_specific->preferred_scale_120 = 0;
+        refresh_cursor_surface(window_data);
+        flush_request(window_data_specific->display, "fractional scale manager removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->viewporter_id) {
+        kWaylandDestroy(window_data_specific->viewport, wp_viewport_destroy);
+        kWaylandDestroy(window_data_specific->viewporter, wp_viewporter_destroy);
+        window_data_specific->viewporter_id = 0;
+        window_data_specific->preferred_scale_120 = 0;
+        refresh_cursor_surface(window_data);
+        flush_request(window_data_specific->display, "viewporter removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->shell_id) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: required xdg_wm_base global %u was removed.", name);
+        kWaylandDestroy(window_data_specific->toplevel_decoration, zxdg_toplevel_decoration_v1_destroy);
+        kWaylandDestroy(window_data_specific->toplevel, xdg_toplevel_destroy);
+        kWaylandDestroy(window_data_specific->shell_surface, xdg_surface_destroy);
+        kWaylandDestroy(window_data_specific->shell, xdg_wm_base_destroy);
+        window_data_specific->shell_id = 0;
+        window_data_specific->backend_unusable = 1;
+        flush_request(window_data_specific->display, "xdg_wm_base removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->shm_id) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: required wl_shm global %u was removed.", name);
+        release_shm(&window_data_specific->shm);
+        window_data_specific->shm_id = 0;
+        window_data_specific->shm_format = -1u;
+        window_data_specific->backend_unusable = 1;
+        flush_request(window_data_specific->display, "wl_shm removal cleanup");
+        return;
+    }
+
+    if (name == window_data_specific->compositor_id) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: required wl_compositor global %u was removed.", name);
+        kWaylandDestroy(window_data_specific->compositor, wl_compositor_destroy);
+        window_data_specific->compositor_id = 0;
+        window_data_specific->compositor_version = 0;
+        window_data_specific->backend_unusable = 1;
+        flush_request(window_data_specific->display, "wl_compositor removal cleanup");
+        return;
+    }
 
     for (uint32_t i = 0; i < window_data_specific->output_count; ++i) {
         if (window_data_specific->output_ids[i] == name) {
@@ -2069,6 +2226,7 @@ registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) 
                 recompute_output_scale(window_data_specific);
                 refresh_cursor_surface(window_data);
             }
+            flush_request(window_data_specific->display, "output removal cleanup");
             break;
         }
     }
@@ -2912,6 +3070,11 @@ acquire_presentation_slot(SWindowData *window_data,
     }
 
     while (true) {
+        if (window_data->close == true
+            || window_data_specific->backend_unusable != 0) {
+            return WAYLAND_SLOT_ACQUIRE_ERROR;
+        }
+
         int start = window_data_specific->front_slot;
         for (int i = 0; i < WAYLAND_BUFFER_SLOTS; ++i) {
             int idx = (start + i) % WAYLAND_BUFFER_SLOTS;
@@ -2932,7 +3095,8 @@ acquire_presentation_slot(SWindowData *window_data,
             return WAYLAND_SLOT_ACQUIRE_ERROR;
         }
 
-        if (window_data->close == true) {
+        if (window_data->close == true
+            || window_data_specific->backend_unusable != 0) {
             return WAYLAND_SLOT_ACQUIRE_ERROR;
         }
 
@@ -3080,6 +3244,11 @@ begin_window_call(struct mfb_window *window, const char *func_name,
         return MFB_STATE_INTERNAL_ERROR;
     }
 
+    if ((*window_data_specific)->backend_unusable != 0) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s cannot continue after a required Wayland global was removed.", func_name);
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
     return MFB_STATE_OK;
 }
 
@@ -3103,6 +3272,12 @@ pump_window_events(SWindowData *window_data, const char *func_name) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s detected close request after event dispatch.", func_name);
         destroy(window_data);
         return MFB_STATE_EXIT;
+    }
+
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    if (window_data_specific->backend_unusable != 0) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: %s cannot continue after a required Wayland global was removed.", func_name);
+        return MFB_STATE_INTERNAL_ERROR;
     }
 
     return MFB_STATE_OK;
@@ -3304,6 +3479,11 @@ mfb_wait_sync(struct mfb_window *window) {
         if (window_data->close == true) {
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync aborted during sync loop because the window is marked for close.");
             destroy(window_data);
+            return false;
+        }
+
+        if (window_data_specific->backend_unusable != 0) {
+            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync cannot continue after a required Wayland global was removed.");
             return false;
         }
 
