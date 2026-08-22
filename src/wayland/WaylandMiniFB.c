@@ -2736,10 +2736,12 @@ compute_presentation_metrics(const SWindowData *window_data,
 }
 
 //-------------------------------------
+// Wait for and select a free slot without sizing it. Waiting may dispatch
+// presentation-state changes, so the required dimensions are computed later.
+//-------------------------------------
 static EWaylandSlotAcquireStatus
 acquire_presentation_slot(SWindowData *window_data,
                           SWindowData_Way *window_data_specific,
-                          const SWaylandPresentationMetrics *metrics,
                           SWaylandBufferSlot **out_slot) {
     *out_slot = NULL;
 
@@ -2756,13 +2758,6 @@ acquire_presentation_slot(SWindowData *window_data,
 
             if (slot->busy) {
                 continue;
-            }
-
-            if (slot_ensure_buffer(slot, window_data_specific,
-                                   metrics->physical_surface_width,
-                                   metrics->physical_surface_height) == false) {
-                MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed for slot %d.", idx);
-                return WAYLAND_SLOT_ACQUIRE_ERROR;
             }
 
             *out_slot = slot;
@@ -3028,20 +3023,29 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
         return MFB_STATE_EXIT;
     }
 
-    // 3. Compute metrics AFTER dispatch (captures latest size from resize events).
-    SWaylandPresentationMetrics metrics;
-    compute_presentation_metrics(window_data, window_data_specific, &metrics);
-
-    // 4. Acquire a free buffer slot (blocks on render_queue if all busy).
+    // 3. Acquire a free buffer slot (blocks on render_queue if all busy).
     SWaylandBufferSlot *active_slot = NULL;
     EWaylandSlotAcquireStatus slot_status =
-        acquire_presentation_slot(window_data, window_data_specific, &metrics, &active_slot);
+        acquire_presentation_slot(window_data, window_data_specific, &active_slot);
 
     if (slot_status != WAYLAND_SLOT_ACQUIRE_OK || active_slot == NULL) {
         if (window_data->close == true) {
             destroy(window_data);
             return MFB_STATE_EXIT;
         }
+        return MFB_STATE_INTERNAL_ERROR;
+    }
+
+    // 4. Snapshot presentation state only after every path that can dispatch
+    // Wayland events has completed. No event dispatch is allowed from this
+    // point through the surface commit in present_presentation_buffer().
+    SWaylandPresentationMetrics metrics;
+    compute_presentation_metrics(window_data, window_data_specific, &metrics);
+
+    if (slot_ensure_buffer(active_slot, window_data_specific,
+                           metrics.physical_surface_width,
+                           metrics.physical_surface_height) == false) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_buffer recreation failed for selected presentation slot.");
         return MFB_STATE_INTERNAL_ERROR;
     }
 
