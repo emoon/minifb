@@ -61,6 +61,10 @@
 #define WAYLAND_DEFAULT_CURSOR_SIZE 32
 #define WAYLAND_THROTTLE_DEADLINE_MS 100.0
 #define WAYLAND_THROTTLE_POLL_SLICE_MS (1000.0 / 60.0)
+// Surface-local units per wheel notch in wl_pointer.axis. The core protocol
+// does not define one, so clients follow Weston's ratio to keep a notch worth
+// 1.0 like the other MiniFB backends.
+#define WAYLAND_WHEEL_AXIS_UNIT 10.0f
 
 // Core protocol interface descriptors come from the libwayland loaded at
 // runtime. Cap them to the requests and listener entries available in the
@@ -1381,7 +1385,7 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
         return;
     }
 
-    float delta = -(float) wl_fixed_to_double(value);
+    float delta = -(float) wl_fixed_to_double(value) / WAYLAND_WHEEL_AXIS_UNIT;
 
     if (pointer_uses_frame_events(pointer) == false) {
         if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
@@ -1493,11 +1497,11 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
     SWaylandPointerAxisFrame *axis_frame = &window_data_specific->pointer_axis_frame;
     if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
         axis_frame->discrete_y = -(int64_t) discrete;
-        axis_frame->discrete_y_valid = 1;
+        axis_frame->discrete_y_valid = discrete != 0;
     }
     else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
         axis_frame->discrete_x = -(int64_t) discrete;
-        axis_frame->discrete_x_valid = 1;
+        axis_frame->discrete_x_valid = discrete != 0;
     }
     else {
         return;
