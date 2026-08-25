@@ -129,6 +129,7 @@ wayland_clear_keyboard_focus_state(SWindowData *window_data, SWindowData_Way *wi
 // fd:     keymap file descriptor
 // size:   keymap size, in bytes
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.keymap, since v1.
 static void
 keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int fd, uint32_t size) {
     SWindowData *window_data = (SWindowData *) data;
@@ -266,6 +267,7 @@ rebuild_keyboard_state_from_keys(SWindowData *window_data, SWindowData_Way *wind
 // surface: surface gaining keyboard focus
 // keys:    the currently pressed keys
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.enter, since v1.
 static void
 keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {
     kUnused(keyboard);
@@ -286,6 +288,7 @@ keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct
 // serial:  serial number of the leave event
 // surface: surface that lost keyboard focus
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.leave, since v1.
 static void
 keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial, struct wl_surface *surface) {
     kUnused(keyboard);
@@ -359,6 +362,7 @@ wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_d
 // key:    key that produced the event
 // state:  logical key state reported by the compositor
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.key, since v1.
 static void
 keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
     kUnused(keyboard);
@@ -551,6 +555,7 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 // mods_locked:    locked modifiers
 // group:          keyboard layout
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.modifiers, since v1.
 static void
 keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
     kUnused(keyboard);
@@ -576,6 +581,7 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
 // rate:  the rate of repeating keys in characters per second
 // delay: delay in milliseconds since key down until repeating starts
 //-------------------------------------
+// Protocol: wayland / wl_keyboard.repeat_info, since v4.
 static void
 keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int32_t delay) {
     kUnused(keyboard);

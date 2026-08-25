@@ -683,6 +683,7 @@ bool          g_use_wayland_frame_callback_throttle = true;
 //-------------------------------------
 
 //-------------------------------------
+// Protocol: wayland / wl_callback.done, since v1.
 static void
 throttle_done(void *data, struct wl_callback *callback, uint32_t time) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) data;
@@ -937,6 +938,7 @@ destroy(SWindowData *window_data) {
 }
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_wm_base.ping, since v1.
 static void
 handle_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
     kUnused(data);
@@ -1237,6 +1239,7 @@ refresh_cursor_surface(SWindowData *window_data) {
 // sx:      surface-local x coordinate
 // sy:      surface-local y coordinate
 //-------------------------------------
+// Protocol: wayland / wl_pointer.enter, since v1.
 static void
 pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy) {
     kUnused(pointer);
@@ -1269,6 +1272,7 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 // serial:  serial number of the leave event
 // surface: surface left by the pointer
 //-------------------------------------
+// Protocol: wayland / wl_pointer.leave, since v1.
 static void
 pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface) {
     kUnused(pointer);
@@ -1294,6 +1298,7 @@ pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 // sx:    surface-local x coordinate
 // sy:    surface-local y coordinate
 //-------------------------------------
+// Protocol: wayland / wl_pointer.motion, since v1.
 static void
 pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
     kUnused(pointer);
@@ -1328,6 +1333,7 @@ pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t
 // button: button that produced the event
 // state:  physical state of the button
 //-------------------------------------
+// Protocol: wayland / wl_pointer.button, since v1.
 static void
 pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
     kUnused(pointer);
@@ -1374,6 +1380,7 @@ pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t
 //  axis:  axis type
 //  value: length of vector in surface-local coordinate space
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis, since v1.
 static void
 pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {
     kUnused(time);
@@ -1415,6 +1422,7 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
 #if defined(WL_POINTER_FRAME_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_pointer.frame, since v5.
 static void
 pointer_frame(void *data, struct wl_pointer *pointer) {
     kUnused(pointer);
@@ -1459,6 +1467,7 @@ pointer_frame(void *data, struct wl_pointer *pointer) {
 #if defined(WL_POINTER_AXIS_SOURCE_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis_source, since v5.
 static void
 axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
     kUnused(data);
@@ -1471,6 +1480,7 @@ axis_source(void *data, struct wl_pointer *pointer, uint32_t axis_source) {
 #if defined(WL_POINTER_AXIS_STOP_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis_stop, since v5.
 static void
 axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) {
     kUnused(data);
@@ -1484,6 +1494,7 @@ axis_stop(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis) 
 #if defined(WL_POINTER_AXIS_DISCRETE_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis_discrete, since v5, deprecated since v8.
 static void
 axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t discrete) {
     kUnused(pointer);
@@ -1517,6 +1528,7 @@ axis_discrete(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t dis
 // High-resolution wheel scroll information. A value of 120 is one logical
 // wheel step; multiple values in the same frame are accumulated.
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis_value120, since v8.
 static void
 axis_value120(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t value120) {
     kUnused(pointer);
@@ -1550,6 +1562,7 @@ axis_value120(void *data, struct wl_pointer *pointer, uint32_t axis, int32_t val
 // Physical direction of the entity causing the axis motion.
 // Currently unused; MiniFB consumes logical scroll direction only.
 //-------------------------------------
+// Protocol: wayland / wl_pointer.axis_relative_direction, since v9.
 static void
 axis_relative_direction(void *data, struct wl_pointer *pointer, uint32_t axis, uint32_t direction) {
     kUnused(data);
@@ -1632,6 +1645,7 @@ release_active_seat(SWindowData *window_data, SWindowData_Way *window_data_speci
 }
 
 //-------------------------------------
+// Protocol: wayland / wl_seat.capabilities, since v1.
 static void
 seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps) {
     SWindowData       *window_data     = (SWindowData *) data;
@@ -1681,6 +1695,7 @@ seat_capabilities(void *data, struct wl_seat *seat, enum wl_seat_capability caps
 #if defined(WL_SEAT_NAME_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_seat.name, since v2.
 static void
 seat_name(void *data, struct wl_seat *seat, const char *name) {
     kUnused(data);
@@ -1708,6 +1723,7 @@ wl_seat_listener seat_listener = {
 //
 // format: buffer pixel format
 //-------------------------------------
+// Protocol: wayland / wl_shm.format, since v1.
 static void
 shm_format(void *data, struct wl_shm *shm, uint32_t format) {
     kUnused(shm);
@@ -1735,6 +1751,7 @@ wl_shm_listener shm_listener = {
 };
 
 //-------------------------------------
+// Protocol: fractional-scale-v1 / wp_fractional_scale_v1.preferred_scale, since v1.
 static void
 fractional_scale_preferred_scale(void *data, struct wp_fractional_scale_v1 *fractional_scale, uint32_t scale) {
     kUnused(fractional_scale);
@@ -1793,6 +1810,7 @@ recompute_output_scale(SWindowData_Way *window_data_specific) {
 }
 
 //-------------------------------------
+// Protocol: wayland / wl_output.geometry, since v1.
 static void
 output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
                 int32_t subpixel, const char *make, const char *model, int32_t transform) {
@@ -1809,6 +1827,7 @@ output_geometry(void *data, struct wl_output *output, int32_t x, int32_t y, int3
 }
 
 //-------------------------------------
+// Protocol: wayland / wl_output.mode, since v1.
 static void
 output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
     kUnused(data);
@@ -1822,6 +1841,7 @@ output_mode(void *data, struct wl_output *output, uint32_t flags, int32_t width,
 #if defined(WL_OUTPUT_DONE_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_output.done, since v2.
 static void
 output_done(void *data, struct wl_output *output) {
     kUnused(data);
@@ -1833,6 +1853,7 @@ output_done(void *data, struct wl_output *output) {
 #if defined(WL_OUTPUT_SCALE_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_output.scale, since v2.
 static void
 output_scale(void *data, struct wl_output *output, int32_t factor) {
     SWindowData *window_data = (SWindowData *) data;
@@ -1864,6 +1885,7 @@ output_scale(void *data, struct wl_output *output, int32_t factor) {
 #if defined(WL_OUTPUT_NAME_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_output.name, since v4.
 static void
 output_name(void *data, struct wl_output *output, const char *name) {
     kUnused(data);
@@ -1876,6 +1898,7 @@ output_name(void *data, struct wl_output *output, const char *name) {
 #if defined(WL_OUTPUT_DESCRIPTION_SINCE_VERSION)
 
 //-------------------------------------
+// Protocol: wayland / wl_output.description, since v4.
 static void
 output_description(void *data, struct wl_output *output, const char *description) {
     kUnused(data);
@@ -1904,6 +1927,7 @@ static const struct wl_output_listener output_listener = {
 };
 
 //-------------------------------------
+// Protocol: wayland / wl_surface.enter, since v1.
 static void
 surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
@@ -1922,6 +1946,7 @@ surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) 
 }
 
 //-------------------------------------
+// Protocol: wayland / wl_surface.leave, since v1.
 static void
 surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) {
     kUnused(surface);
@@ -1944,6 +1969,7 @@ surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) 
 //-------------------------------------
 // Compositor-preferred integer buffer scale for this surface.
 //-------------------------------------
+// Protocol: wayland / wl_surface.preferred_buffer_scale, since v6.
 static void
 surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t factor) {
     kUnused(surface);
@@ -1975,6 +2001,7 @@ surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t f
 // Compositor-preferred buffer transform for this surface.
 // Currently unused; the backend does not render with transformed buffers.
 //-------------------------------------
+// Protocol: wayland / wl_surface.preferred_buffer_transform, since v6.
 static void
 surface_preferred_buffer_transform(void *data, struct wl_surface *surface, uint32_t transform) {
     kUnused(data);
@@ -1997,6 +2024,7 @@ static const struct wl_surface_listener surface_listener = {
 };
 
 //-------------------------------------
+// Protocol: xdg-decoration-unstable-v1 / zxdg_toplevel_decoration_v1.configure, since v1.
 static void
 toplevel_decoration_configure(void *data, struct zxdg_toplevel_decoration_v1 *decoration, uint32_t mode) {
     kUnused(data);
@@ -2010,6 +2038,7 @@ static const struct zxdg_toplevel_decoration_v1_listener toplevel_decoration_lis
 };
 
 //-------------------------------------
+// Protocol: wayland / wl_registry.global, since v1.
 static void
 registry_global(void *data, struct wl_registry *registry, uint32_t id, char const *iface, uint32_t version) {
     SWindowData         *window_data     = (SWindowData *) data;
@@ -2130,6 +2159,7 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
 }
 
 //-------------------------------------
+// Protocol: wayland / wl_registry.global_remove, since v1.
 static void
 registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
     kUnused(registry);
@@ -2272,6 +2302,7 @@ apply_pending_toplevel_configure(SWindowData *window_data,
 }
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_surface.configure, since v1.
 static void
 handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, uint32_t serial) {
     SWindowData *window_data = (SWindowData *) data;
@@ -2322,6 +2353,7 @@ static const struct xdg_surface_listener shell_surface_listener = {
 };
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_toplevel.configure, since v1.
 static void
 handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states) {
     kUnused(xdg_toplevel);
@@ -2351,6 +2383,7 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
 }
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_toplevel.close, since v1.
 static void
 handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
     kUnused(xdg_toplevel);
@@ -2373,6 +2406,7 @@ handle_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
 }
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_toplevel.configure_bounds, since v4.
 static void
 handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height) {
     kUnused(data);
@@ -2384,6 +2418,7 @@ handle_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, 
 }
 
 //-------------------------------------
+// Protocol: xdg-shell / xdg_toplevel.wm_capabilities, since v5.
 static void
 handle_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel, struct wl_array *capabilities) {
     kUnused(data);
@@ -2407,6 +2442,7 @@ static const struct xdg_toplevel_listener toplevel_listener = {
 };
 
 //-------------------------------------
+// Protocol: wayland / wl_buffer.release, since v1.
 static void
 buffer_release(void *data, struct wl_buffer *wl_buf) {
     kUnused(wl_buf);
