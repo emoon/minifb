@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -429,6 +430,78 @@ mfb_get_drawable_bounds(struct mfb_window *window, unsigned *offset_x, unsigned 
 #endif
 
 //-------------------------------------
+// MINIFB_LOG_LEVEL deliberately wins over mfb_set_log_level(): it exists to
+// raise the level of a program that cannot be rebuilt, which a hardcoded call
+// would otherwise defeat. MiniFB has no initialization entry point, so the
+// variable is resolved on the first log call instead.
+//-------------------------------------
+static mfb_log_level g_mfb_log_level_env          = MFB_LOG_TRACE;
+static bool          g_mfb_log_level_env_valid    = false;
+static bool          g_mfb_log_level_env_resolved = false;
+
+//-------------------------------------
+// Level names are matched instead of numbers so that reordering mfb_log_level
+// cannot silently change what an existing script means.
+//-------------------------------------
+static bool
+log_level_name_matches(const char *value, const char *name) {
+    size_t i = 0;
+
+    for (; value[i] != '\0' && name[i] != '\0'; ++i) {
+        char letter = value[i];
+        if (letter >= 'A' && letter <= 'Z') {
+            letter = (char) (letter - 'A' + 'a');
+        }
+        if (letter != name[i]) {
+            return false;
+        }
+    }
+
+    return value[i] == '\0' && name[i] == '\0';
+}
+
+//-------------------------------------
+static void
+resolve_env_log_level(void) {
+    static const char *level_names[] = { "trace", "debug", "info", "warning", "error" };
+
+    // Marked resolved before anything is logged: the complaint below re-enters
+    // mfb_log(), which would otherwise recurse.
+    g_mfb_log_level_env_resolved = true;
+
+    const char *value = getenv("MINIFB_LOG_LEVEL");
+    if (value == NULL || value[0] == '\0') {
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(level_names) / sizeof(level_names[0]); ++i) {
+        if (log_level_name_matches(value, level_names[i]) == true) {
+            g_mfb_log_level_env = (mfb_log_level) i;
+            g_mfb_log_level_env_valid = true;
+            return;
+        }
+    }
+
+    MFB_LOG(MFB_LOG_ERROR,
+            "MINIFB_LOG_LEVEL=\"%s\" is not a level name; expected trace, debug, info, warning or error. Ignored.",
+            value);
+}
+
+//-------------------------------------
+static mfb_log_level
+current_log_level(void) {
+    if (g_mfb_log_level_env_resolved == false) {
+        resolve_env_log_level();
+    }
+
+    if (g_mfb_log_level_env_valid == true) {
+        return g_mfb_log_level_env;
+    }
+
+    return g_mfb_log_level;
+}
+
+//-------------------------------------
 void
 mfb_log_default(const mfb_log_info *info, const char *tag, const char *message) {
     static const char *level_str[] = { "TRACE", "DEBUG", "INFO", "WARNING", "ERROR" };
@@ -465,7 +538,7 @@ void
 mfb_log(const mfb_log_info *info, const char *tag, const char *message, ...) {
     char buffer[1024];
 
-    if (info->level < g_mfb_log_level) {
+    if (info->level < current_log_level()) {
         return;
     }
 

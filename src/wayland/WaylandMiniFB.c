@@ -130,6 +130,116 @@ static bool slot_ensure_buffer(SWaylandBufferSlot *slot, SWindowData_Way *window
 static void clear_pointer_axis_frame(SWindowData_Way *window_data_specific);
 
 //-------------------------------------
+// Protocol negotiation overrides, read from the environment while globals are
+// bound. They exist so the version-dependent and missing-global fallback paths
+// can be exercised against a single compositor, which otherwise needs an older
+// compositor or a rebuild against older headers. See docs/wayland-testing.md.
+//-------------------------------------
+
+//-------------------------------------
+// Looks interface_name up in a comma-separated list whose entries are either
+// "name" or "name=value". Spaces around entries and around '=' are ignored.
+// out_value receives the text after '=', or NULL when the entry carries none.
+//-------------------------------------
+static bool
+env_list_lookup(const char *env_name, const char *interface_name, const char **out_value) {
+    const char *list = getenv(env_name);
+
+    if (list == NULL || interface_name == NULL) {
+        return false;
+    }
+
+    size_t name_length = strlen(interface_name);
+
+    while (*list != '\0') {
+        while (*list == ' ' || *list == ',') {
+            ++list;
+        }
+        if (*list == '\0') {
+            break;
+        }
+
+        const char *entry = list;
+        while (*list != '\0' && *list != ',') {
+            ++list;
+        }
+
+        const char *entry_end = list;
+        const char *separator = entry;
+        while (separator < entry_end && *separator != '=') {
+            ++separator;
+        }
+
+        const char *key_end = separator;
+        while (key_end > entry && key_end[-1] == ' ') {
+            --key_end;
+        }
+
+        if ((size_t) (key_end - entry) == name_length
+            && strncmp(entry, interface_name, name_length) == 0) {
+            if (out_value != NULL) {
+                *out_value = (separator < entry_end) ? separator + 1 : NULL;
+            }
+            return true;
+        }
+    }
+
+    return false;
+}
+
+//-------------------------------------
+static bool
+env_forced_version(const char *interface_name, uint32_t *out_version) {
+    const char *value = NULL;
+
+    if (env_list_lookup("MINIFB_WAYLAND_FORCE_VERSIONS", interface_name, &value) == false) {
+        return false;
+    }
+
+    if (value == NULL) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: MINIFB_WAYLAND_FORCE_VERSIONS entry for %s has no \"=version\"; ignored.",
+                interface_name);
+        return false;
+    }
+
+    const char *number_start = value;
+    while (*number_start == ' ') {
+        ++number_start;
+    }
+
+    errno = 0;
+
+    char          *parse_end = NULL;
+    unsigned long  parsed    = strtoul(number_start, &parse_end, 10);
+
+    while (*parse_end == ' ') {
+        ++parse_end;
+    }
+
+    if (*number_start < '0'
+        || *number_start > '9'
+        || errno == ERANGE
+        || parsed == 0
+        || parsed > 0xFFFFFFFFul
+        || (*parse_end != '\0' && *parse_end != ',')) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: MINIFB_WAYLAND_FORCE_VERSIONS has an invalid version for %s; ignored.",
+                interface_name);
+        return false;
+    }
+
+    *out_version = (uint32_t) parsed;
+    return true;
+}
+
+//-------------------------------------
+static bool
+env_global_disabled(const char *interface_name) {
+    return env_list_lookup("MINIFB_WAYLAND_DISABLE_GLOBALS", interface_name, NULL);
+}
+
+//-------------------------------------
 static uint32_t
 negotiate_protocol_version(uint32_t server_version, const struct wl_interface *interface, uint32_t compiled_version) {
     uint32_t runtime_version = (uint32_t) interface->version;
@@ -140,6 +250,27 @@ negotiate_protocol_version(uint32_t server_version, const struct wl_interface *i
     }
     if (use_version > compiled_version) {
         use_version = compiled_version;
+    }
+
+    uint32_t forced_version = 0;
+    if (env_forced_version(interface->name, &forced_version) == true) {
+        if (forced_version < use_version) {
+            MFB_LOG(MFB_LOG_WARNING,
+                    "WaylandMiniFB: MINIFB_WAYLAND_FORCE_VERSIONS caps %s from v%u to v%u.",
+                    interface->name,
+                    use_version,
+                    forced_version
+            );
+            use_version = forced_version;
+        }
+        else {
+            MFB_LOG(MFB_LOG_WARNING,
+                    "WaylandMiniFB: MINIFB_WAYLAND_FORCE_VERSIONS asks for %s v%u but v%u is already the maximum available; ignored.",
+                    interface->name,
+                    forced_version,
+                    use_version
+            );
+        }
     }
 
     MFB_LOG(MFB_LOG_TRACE,
@@ -2044,6 +2175,15 @@ registry_global(void *data, struct wl_registry *registry, uint32_t id, char cons
     SWindowData         *window_data     = (SWindowData *) data;
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (window_data_specific->backend_unusable != 0) {
+        return;
+    }
+
+    if (env_global_disabled(iface) == true) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: MINIFB_WAYLAND_DISABLE_GLOBALS hides %s (registry id %u).",
+                iface,
+                id
+        );
         return;
     }
 

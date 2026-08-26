@@ -302,6 +302,31 @@ void mfb_set_log_level(mfb_log_level level);
 - Custom loggers receive the message already formatted (`level` + `message`).
 - The built-in logger writes `TRACE`/`DEBUG`/`INFO` to `stdout` and `WARNING`/`ERROR` to `stderr` as `[MiniFB (LEVEL)] message`.
 
+#### Setting the level from the environment
+
+`MINIFB_LOG_LEVEL` sets the threshold without touching the code:
+
+```sh
+MINIFB_LOG_LEVEL=trace ./my_program
+```
+
+Use a level name, not a number: `trace`, `debug`, `info`, `warning` or `error`.
+Case does not matter. Names keep working if the `mfb_log_level` enum is ever
+reordered, which numbers would not.
+
+**The variable wins over `mfb_set_log_level()`.** This is on purpose. The point
+of the variable is to get more output from a program you cannot rebuild, and a
+hardcoded call in that program would otherwise block you. If you need the
+program to stay in control, do not set the variable.
+
+An unknown value is reported as an error and then ignored, so the threshold
+stays where the program left it. Nothing changes without a message.
+
+Since the built-in logger writes low levels to `stdout` and high levels to
+`stderr`, the two streams can interleave out of order when you pipe them into
+one file. Redirect them separately, or send both to the same place with `2>&1`
+and accept the ordering.
+
 ### Cursor Control
 
 ```c
@@ -563,6 +588,41 @@ cd build-wayland
 cmake .. -DMINIFB_USE_WAYLAND_API=ON
 ```
 `USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
+
+#### Wayland Testing and Diagnostics
+
+Which code path the Wayland backend takes depends on the compositor it runs
+against. MiniFB binds each protocol global at the lowest version the compositor,
+libwayland and the build headers all support. If a global is missing, or its
+version is too low for some event, MiniFB falls back to other code.
+
+One machine only ever gives you one of those combinations. Two environment
+variables let you test the others without changing compositor:
+
+| Variable | What it does | Example |
+| --- | --- | --- |
+| `MINIFB_WAYLAND_FORCE_VERSIONS` | Lowers the version used for one or more interfaces | `wl_seat=4,wl_output=1` |
+| `MINIFB_WAYLAND_DISABLE_GLOBALS` | Hides globals, as if the compositor never offered them | `wp_viewporter` |
+
+Both work in every build, not only in debug builds. MiniFB reads them once, while
+it binds globals, so they cost nothing after the window opens. Every override is
+written to the log, and a value that cannot be applied is reported and ignored
+rather than dropped in silence.
+
+They combine with libwayland's own `WAYLAND_DEBUG=client`, which prints all
+protocol traffic to stderr:
+
+```sh
+MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> trace.txt
+```
+
+Together these answer the two halves of one question: the trace shows what the
+compositor sent, and your program's output shows what MiniFB made of it.
+
+See [docs/wayland-testing.md](docs/wayland-testing.md) for the interfaces each
+variable accepts, the versions actually worth testing and what each one covers,
+the other useful variables from libwayland and xkbcommon, and what this approach
+cannot test.
 
 ### macOS
 
