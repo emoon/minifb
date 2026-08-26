@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.0]
+
+### Added
+
+- **Log level from the environment**: `MINIFB_LOG_LEVEL` sets the log threshold by name (`trace`, `debug`, `info`, `warning`, `error`) without touching the code. It deliberately wins over `mfb_set_log_level()`, so you can get more output from a program you cannot rebuild. An unknown value is reported as an error and then ignored, leaving the threshold where the program left it.
+- **Wayland fallback testing**: `MINIFB_WAYLAND_FORCE_VERSIONS` lowers the version MiniFB binds for one or more protocol globals, and `MINIFB_WAYLAND_DISABLE_GLOBALS` hides globals as if the compositor never advertised them. Both work in every build and are read only while globals are bound, so a single machine can exercise fallback paths that would otherwise need another compositor.
+
+### Changed
+
+- Wayland mouse wheel: the continuous `wl_pointer.axis` value is now divided by the ratio Weston uses, which SDL and GLFW follow as well, so one wheel notch reports `1.0` like the other backends. This only affects compositors that fall back to the continuous value; those that send `axis_value120` or `axis_discrete` already reported `1.0`.
+- Every Wayland listener callback now carries a comment with its protocol interface and the version that introduced it, so the version-dependent paths can be found with grep.
+- Added `docs/wayland-testing.md`: the interfaces each variable accepts, which versions are worth testing and what each one covers, the related variables from libwayland and xkbcommon, and what this approach cannot test.
+- Rewrote `README.md` in plainer English and corrected stale details: `mfb_update` return values, ESC handling, the macOS Metal default, the X11 default on Linux, the Wayland dependencies, and Web monitor scale and cursor support. Added a CMake options table, and replaced the per-platform "Beta" labels with what each backend actually supports.
+
+### Fixed
+
+- Wayland: `wl_pointer.axis_discrete` no longer marks an axis as valid when the compositor reports a discrete step of `0`.
+
 ## [0.11.0]
 
 ### Changed
@@ -88,9 +106,12 @@ All notable changes to this project are documented in this file.
 - Fixed X11: initial normal-window placement now centers on a real monitor instead of the combined virtual desktop.
 - Fixed C++ wrapper: callback stubs are released when windows are destroyed, preventing stale callback reuse after recreating windows.
 - Fixed Web: initialization/teardown robustness when `document.body` is not yet available.
-- Fixed Wayland: dynamic resize and resource reallocation paths.
-- Fixed MS-DOS: multiple rendering and input handling issues.
-- Fixed multiple lifecycle and event-loop edge cases across all backends.
+- Fixed Wayland `wl_surface_attach`: the viewport offset was passed as the buffer offset, so buffers are now attached at `0, 0`.
+- Fixed Wayland seat and output handling: pointer and keyboard listeners are added only when the seat really provides the object, and a removed `wl_output` is compared with the current one before it is destroyed.
+- Fixed MS-DOS keyboard: completed the scancode table (numpad keys, F11/F12), read the initial Caps Lock state from the BIOS, applied Caps Lock to letters only, and stopped an out-of-bounds write for keys mapped to `KB_KEY_UNKNOWN` (`-1`, seen as `0xFFFFFFFF` when indexing the key table).
+- Fixed MS-DOS mouse: the driver presence check uses the documented `0xFFFF` reply, the pointer range follows the real VESA resolution instead of the requested window size, and the middle button fires its callback.
+- Fixed MS-DOS input under DPMI by locking the ring-buffer code used from the interrupt handler (`_go32_dpmi_lock_code`).
+- Fixed use-after-free during teardown: macOS clears the `MTKView` delegate before closing the window, the OpenGL path no longer closes the X11 display it does not own, and the DOS backend no longer frees `window_data` while the caller is still using it.
 
 ## [0.9.3]
 

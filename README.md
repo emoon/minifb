@@ -1,10 +1,10 @@
 # MiniFB
 
-MiniFB (Mini FrameBuffer) is a small cross-platform library that makes it easy to render (32-bit) pixels in a window.
+MiniFB (Mini FrameBuffer) is a small cross-platform C library. You give it a buffer of 32-bit pixels, it copies that buffer to a window, and it reports keyboard and mouse events back to you. Your code draws everything: MiniFB never draws for you. It only needs the system libraries of each platform.
 
 ## Quick Start
 
-An example is the best way to show how it works:
+The shortest useful program looks like this:
 
 ```c
 int main() {
@@ -35,34 +35,38 @@ int main() {
 
 ### How it works
 
-1. First the application creates a **window** calling **mfb_open** or **mfb_open_ex**.
-2. Next, it's the application's responsibility to allocate a buffer to work with.
-3. Next, call **mfb_update** or **mfb_update_ex** to copy the buffer to the window and display it. If this function returns a value lower than 0, the window has been destroyed internally and cannot be used anymore.
-4. Last the code waits to synchronize with the monitor calling **mfb_wait_sync**.
+1. Create a window with `mfb_open()` or `mfb_open_ex()`.
+2. Allocate the buffer yourself: one 32-bit value per pixel, `width * height` pixels. MiniFB never allocates or frees it.
+3. Draw into the buffer, then call `mfb_update()` or `mfb_update_ex()` to copy it to the window.
+4. Call `mfb_wait_sync()` to wait until it is time to draw the next frame.
 
-**Note:** By default, if ESC key is pressed, **mfb_update** / **mfb_update_ex** will return -1 (and the window will have been destroyed internally).
+`MFB_STATE_OK` means the frame was accepted. `MFB_STATE_EXIT` means the window was closed and destroyed internally: leave the loop and do not use the handle again. The other values report an error for that frame (invalid window, invalid buffer, backend failure) and leave the window alive.
 
-See <https://github.com/emoon/minifb/blob/master/examples/noise.c> for a complete example.
+**Note:** By default, releasing the ESC key closes the window, so the next update returns `MFB_STATE_EXIT`. Install your own keyboard callback if you do not want that.
+
+See `examples/noise.c` for a complete example.
 
 ## Supported Platforms
 
 | Platform | Backends | Status |
 |----------|----------|--------|
-| **Windows** | GDI, OpenGL | Fully supported |
-| **macOS** | Cocoa, Metal | Fully supported |
-| **Linux/Unix** | X11, Wayland | Fully supported (X11, Wayland) |
-| **iOS** | Metal | Beta |
-| **Android** | Native | Beta |
-| **Web** | WASM | Beta |
-| **DOS** | DJGPP | Beta |
+| **Windows** | GDI, OpenGL | Full API |
+| **macOS** | Cocoa, Metal | Full API |
+| **Linux/Unix** | X11, Wayland | Full API |
+| **iOS** | Metal | Reduced API: single window, touch input |
+| **Android** | Native | Reduced API: single window, touch input |
+| **Web** | WASM | Partial: some calls are accepted but not applied |
+| **DOS** | DJGPP | Reduced API: single window, partial keyboard |
 
-MiniFB has been tested on Windows, macOS, Linux, iOS, Android, web, and DOSBox-x. Compatibility may vary depending on your setup. Currently, the library does not perform any data conversion if a proper 32-bit display cannot be created.
+Build instructions and platform notes: [Windows](#windows), [X11](#x11-freebsd-linux-nix), [Wayland](#wayland-linux), [macOS](#macos), [iOS](#ios), [Android](#android), [Web](#web-wasm), [MS-DOS](#ms-dos-djgpp). [Feature support by platform](#feature-support-by-platform) lists what each backend implements.
+
+MiniFB has been tested on Windows, macOS, Linux, iOS, Android, browsers and DOSBox-x. Results depend on your setup. The library does not convert pixel data: if the system cannot provide a proper 32-bit display, MiniFB does not work around it.
 
 ## Features
 
 - Window creation and management
 - Event callbacks (keyboard, mouse, window lifecycle)
-- Direct window state queries
+- Window and input state queries, as an alternative to callbacks
 - Per-window custom data
 - Built-in timers and FPS control
 - C and C++ interfaces
@@ -108,11 +112,11 @@ If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_W
 - `width == 0` or `height == 0`
 - `width * 4` would overflow internal stride calculations
 
-`mfb_update_ex()` runtime behavior is backend-specific:
+`mfb_update_ex()` behaves differently on two backends:
 - Wayland waits for compositor frame callback inside `mfb_update_ex()` (can block).
 - Android may return `MFB_STATE_OK` without presenting when `ANativeWindow` is temporarily unavailable during lifecycle transitions.
 
-Open-time readiness is backend-specific:
+What is ready when `mfb_open_ex()` returns also depends on the backend:
 - Wayland waits for the initial configure handshake before returning from `mfb_open_ex()`.
 - Android may return a window handle before `ANativeWindow` is ready (rendering starts once the native window becomes available).
 
@@ -192,7 +196,7 @@ void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, flo
 
 #### C++ Callback Interface
 
-If you are using C++, you can set callbacks to class methods or lambda expressions:
+In C++ you can also point a callback at a class method or a lambda:
 
 ```cpp
 // Using object and pointer to member
@@ -209,7 +213,7 @@ mfb_set_active_callback([](struct mfb_window *window, bool is_active) {
 
 ### Window State Queries
 
-Query window and input state directly (alternative to callbacks):
+Read window and input state directly, instead of using callbacks:
 
 ```c
 // Window state
@@ -240,12 +244,13 @@ const uint8_t *     mfb_get_mouse_button_buffer(struct mfb_window *window); // 1
 const uint8_t *     mfb_get_key_buffer(struct mfb_window *window);          // 1=pressed, 0=released
 ```
 
-On Android/iOS touch paths, `mfb_get_mouse_x()` and `mfb_get_mouse_y()` include an encoded touch pointer id in the upper bits.
-Use `mfb_decode_touch()` to decode both at once, or `mfb_decode_touch_pos()` / `mfb_decode_touch_id()` individually. On desktop/Web/DOS, `id` is always `0`.
-For touch callbacks, the pointer id is also exposed as `button` in `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
-On Android/iOS touch move callbacks, `mfb_mouse_move_func` receives packed `x/y` values (same encoding as getters).
-On Android, external `HOVER_MOVE` also uses packed `x/y`; if Android does not provide a valid pointer id, MiniFB uses fallback id `15`.
-`mfb_get_mouse_scroll_x/y()` are pump-local values: MiniFB resets them to `0.0f` before each backend event pump, then writes the delta if a scroll event is received during that pump.
+On Android and iOS, touch positions carry the pointer id in their upper bits:
+
+- `mfb_get_mouse_x()`, `mfb_get_mouse_y()` and the `x`/`y` given to `mfb_mouse_move_func` are packed values. Decode them with `mfb_decode_touch()`, or one at a time with `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`. On desktop, Web and DOS the id is always `0`.
+- The pointer id also arrives as the `button` argument of `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
+- On Android, `HOVER_MOVE` events from external devices use the same packing. When Android reports no valid pointer id, MiniFB uses `15`.
+
+`mfb_get_mouse_scroll_x()` and `mfb_get_mouse_scroll_y()` only hold the delta of the last event pump: MiniFB sets them to `0.0f` before pumping events, then writes the delta if a scroll event arrives during that pump.
 
 ### Per-Window Data
 
@@ -282,7 +287,7 @@ unsigned            mfb_get_target_fps(void);
 bool                mfb_wait_sync(struct mfb_window *window); // Frame sync point
 ```
 
-**Note:** Hardware-accelerated syncing (OpenGL / Metal, where supported) will use vertical sync. Other platforms use software pacing.
+**Note:** Where MiniFB renders through OpenGL or Metal, `mfb_wait_sync()` relies on vertical sync. The other backends pace frames in software.
 
 ### Logging
 
@@ -310,22 +315,13 @@ void mfb_set_log_level(mfb_log_level level);
 MINIFB_LOG_LEVEL=trace ./my_program
 ```
 
-Use a level name, not a number: `trace`, `debug`, `info`, `warning` or `error`.
-Case does not matter. Names keep working if the `mfb_log_level` enum is ever
-reordered, which numbers would not.
+Use a level name, not a number: `trace`, `debug`, `info`, `warning` or `error`. Case does not matter. Names keep working if the `mfb_log_level` enum is ever reordered, which numbers would not.
 
-**The variable wins over `mfb_set_log_level()`.** This is on purpose. The point
-of the variable is to get more output from a program you cannot rebuild, and a
-hardcoded call in that program would otherwise block you. If you need the
-program to stay in control, do not set the variable.
+**The variable wins over `mfb_set_log_level()`.** This is on purpose. The point of the variable is to get more output from a program you cannot rebuild, and a hardcoded call in that program would otherwise block you. If you need the program to stay in control, do not set the variable.
 
-An unknown value is reported as an error and then ignored, so the threshold
-stays where the program left it. Nothing changes without a message.
+An unknown value is reported as an error and then ignored, so the threshold stays where the program left it. Nothing changes without a message.
 
-Since the built-in logger writes low levels to `stdout` and high levels to
-`stderr`, the two streams can interleave out of order when you pipe them into
-one file. Redirect them separately, or send both to the same place with `2>&1`
-and accept the ordering.
+Since the built-in logger writes low levels to `stdout` and high levels to `stderr`, the two streams can interleave out of order when you pipe them into one file. Redirect them separately, or send both to the same place with `2>&1` and accept the ordering.
 
 ### Cursor Control
 
@@ -347,9 +343,9 @@ void                mfb_get_monitor_dpi(struct mfb_window *window, float *dpi_x,
 - Returns scale multipliers (`1.0` = 100%).
 - If `window == NULL`, outputs still receive a safe fallback (`1.0`) when their pointers are non-`NULL`.
 - Some backends provide real scale values (for example Retina/HiDPI); others currently return fixed `1.0`.
-- On X11, scale detection is implemented (Xresources/XRandR/fallbacks), but in many desktop setups the value is effectively startup-time and may not update dynamically after changing global scale while the app is running.
+- On X11 the scale comes from Xresources, XRandR or a fallback. In most desktops it is read at startup, so changing the global scale while the program runs may have no effect until you restart it.
 
-If you define layout in logical units and need drawable-coordinate values for `mfb_set_viewport()`, convert explicitly:
+If your layout is defined in logical units, convert it to drawable coordinates before calling `mfb_set_viewport()`:
 
 ```c
 float sx = 1.0f, sy = 1.0f;
@@ -360,7 +356,7 @@ unsigned margin_y_viewport = (unsigned) lroundf(margin_logical_y * sy);
 
 ### Display Insets
 
-Two C functions let you query display insets from native code:
+Two functions report the display insets from C:
 
 ```c
 // Physical cutout/notch area only.
@@ -411,7 +407,7 @@ void on_resize(struct mfb_window *window, int width, int height) {
     int safe_w = width  - left - right;
     int safe_h = height - top  - bottom;
 
-    // Clamp defensive, in case platform values arrive before resize settles.
+    // Clamp: platform values can arrive before the resize settles.
     if (safe_w < 0) safe_w = 0;
     if (safe_h < 0) safe_h = 0;
 
@@ -419,11 +415,9 @@ void on_resize(struct mfb_window *window, int width, int height) {
 }
 ```
 
-## Integration
+## Adding MiniFB to Your Project
 
-### Adding MiniFB to Your Project
-
-Add this **repository as a submodule** in your dependencies folder:
+Add the repository as a submodule in your dependencies folder:
 
 ```sh
 git submodule add https://github.com/emoon/minifb.git dependencies/minifb
@@ -440,46 +434,49 @@ target_link_libraries(${PROJECT_NAME} minifb)
 
 ## Build Instructions
 
-The build system is **CMake**.
+MiniFB is built with CMake:
 
-## Versioning
+```sh
+cmake -B build .
+cmake --build build
+```
 
-MiniFB existed for many years without an official release version. Starting from this codebase, the project now uses SemVer and declares **v0.9.0** as the official baseline version.
+The sections below describe what each platform needs and which backend it uses by default.
 
-Builds expose public version/build metadata for C/C++ consumers via `minifb_version.h` (generated at configure time and installed with the public headers). This includes:
+### CMake Options
 
-- `MINIFB_VERSION_STRING` / major-minor-patch macros
-- packed `MINIFB_VERSION_NUMERIC` and extraction helpers
-- optional Git-derived metadata (`MINIFB_COMMIT_COUNT`, `MINIFB_COMMITS_SINCE_TAG`, `MINIFB_GIT_SHA`, `MINIFB_GIT_DIRTY`)
+| Option | Default | Applies to | What it does |
+|--------|---------|------------|--------------|
+| `MINIFB_USE_OPENGL_API` | `ON` | Windows, X11 | Render through OpenGL 1.5 instead of GDI or XImage |
+| `MINIFB_USE_WAYLAND_API` | `OFF` | Linux | Use the Wayland backend instead of X11 |
+| `MINIFB_USE_METAL_API` | `ON` | macOS | Render through Metal instead of Cocoa |
+| `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
+| `MINIFB_BUILD_EXAMPLES` | `ON` | all | Build the example programs |
+| `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
 
-When building from a source archive without `.git` metadata, defaults are used (`unknown` SHA, counters `0`) and the build still succeeds.
-
-Some projects use date-based versions when retrofitting versioning. MiniFB now uses SemVer to keep compatibility expectations clearer for users and downstream integrations.
+The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
 
 ### Windows
 
-If you use **CMake**, a Visual Studio project will be generated.
-
-Furthermore you can also use **MinGW** instead of Visual Studio.
+CMake generates a Visual Studio project by default. MinGW works as well.
 
 #### OpenGL API backend (Windows)
 
-By default, the OpenGL backend is used instead of Windows GDI because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
+MiniFB renders through OpenGL instead of GDI by default, because it is faster. The context is OpenGL 1.5, so it needs no shaders and still works on old machines.
 
-To enable or disable OpenGL just use a CMake flag:
+One CMake flag turns it on or off:
 
 ```sh
 cmake .. -DMINIFB_USE_OPENGL_API=ON
 # or
 cmake .. -DMINIFB_USE_OPENGL_API=OFF
 ```
-`USE_OPENGL_API` is still accepted for compatibility, but deprecated.
 
 ### X11 (FreeBSD, Linux, *nix)
 
 #### Dependencies for X11 on Ubuntu/Debian
 
-To compile MiniFB with X11 backend on Ubuntu/Debian, install the following packages:
+To build the X11 backend on Ubuntu/Debian, install these packages:
 
 ```bash
 sudo apt-get update
@@ -501,8 +498,7 @@ sudo apt-get install -y \
 - **libgl1-mesa-dev**: OpenGL libraries (required if using OpenGL backend, which is default)
 - **libxrandr-dev** *(optional)*: Enables XRandR-based monitor scale/DPI queries on X11 (`mfb_get_monitor_scale` fallback path and diagnostics)
 
-If you prefer to use X11 without OpenGL (XImage rendering), you can omit `libgl1-mesa-dev`.
-If you do not need XRandR-assisted scale/DPI detection, you can omit `libxrandr-dev`.
+Omit `libgl1-mesa-dev` if you want X11 without OpenGL (XImage rendering), and `libxrandr-dev` if you do not need XRandR-assisted scale/DPI detection.
 
 Equivalent packages for other distros:
 
@@ -512,36 +508,33 @@ Equivalent packages for other distros:
 
 #### Building with CMake
 
-If you use **CMake**, just disable the flag:
+X11 is the default backend on Linux, so no flag is needed. To be explicit:
 
 ```sh
 mkdir build-x11
 cd build-x11
 cmake .. -DMINIFB_USE_WAYLAND_API=OFF
 ```
-`USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
 
 #### OpenGL API backend (X11)
 
-By default, the OpenGL backend is used instead of X11 XImages because it is faster. To maintain compatibility with older computers, an OpenGL 1.5 context is created (no shaders needed).
+MiniFB renders through OpenGL instead of XImages by default, because it is faster. The context is OpenGL 1.5, so it needs no shaders and still works on old machines.
 
-To enable or disable OpenGL just use a CMake flag:
+One CMake flag turns it on or off:
 
 ```sh
 cmake .. -DMINIFB_USE_OPENGL_API=ON -DMINIFB_USE_WAYLAND_API=OFF
 # or
 cmake .. -DMINIFB_USE_OPENGL_API=OFF -DMINIFB_USE_WAYLAND_API=OFF
 ```
-`USE_OPENGL_API` and `USE_WAYLAND_API` are still accepted for compatibility, but deprecated.
 
 ### Wayland (Linux)
 
-Depends on gcc and wayland-client and wayland-cursor. Built using the wayland-gcc variants.
-The Wayland backend supports the same core MiniFB API surface as the other primary desktop backends (Windows, macOS, X11).
+The Wayland backend needs `wayland-client`, `wayland-cursor` and `xkbcommon`, which CMake locates with `pkg-config`. It covers the same core API as the other desktop backends (Windows, macOS, X11).
 
 #### Dependencies for Wayland on Ubuntu/Debian
 
-To compile MiniFB with Wayland backend on Ubuntu/Debian, install the following packages:
+To build the Wayland backend on Ubuntu/Debian, install these packages:
 
 ```bash
 sudo apt-get update
@@ -569,78 +562,59 @@ Equivalent packages for other distros:
 
 #### Wayland Protocol Compatibility
 
-Different Linux distributions and versions may ship with different versions of Wayland and its protocols. MiniFB includes pre-generated protocol headers and code that work with most common setups. However, if you encounter compatibility issues or want to ensure optimal compatibility with your specific Wayland version, you can regenerate the protocol files using your system's Wayland version.
-
-To regenerate Wayland protocol files for your system you must run first the protocol generation script:
+Distributions ship different versions of Wayland and its protocols. MiniFB includes pre-generated protocol headers and code that work with most setups. If you hit a version mismatch, or you simply want the files to match your system, regenerate them:
 
 ```sh
 chmod +x ./tools/wayland/generate-protocols.sh
 ./tools/wayland/generate-protocols.sh
 ```
 
-This script will generate protocol headers and code that are specifically compatible with your installed Wayland version, potentially resolving any version mismatch issues.
+The script writes headers and code for the Wayland version installed on your machine.
 
-If you use **CMake**, just enable the flag:
+Then enable the Wayland backend:
 
 ```sh
 mkdir build-wayland
 cd build-wayland
 cmake .. -DMINIFB_USE_WAYLAND_API=ON
 ```
-`USE_WAYLAND_API` is still accepted for compatibility, but deprecated.
 
 #### Wayland Testing and Diagnostics
 
-Which code path the Wayland backend takes depends on the compositor it runs
-against. MiniFB binds each protocol global at the lowest version the compositor,
-libwayland and the build headers all support. If a global is missing, or its
-version is too low for some event, MiniFB falls back to other code.
+Which code path the Wayland backend takes depends on the compositor it runs against. MiniFB binds each protocol global at the lowest version the compositor, libwayland and the build headers all support. If a global is missing, or its version is too low for some event, MiniFB falls back to other code.
 
-One machine only ever gives you one of those combinations. Two environment
-variables let you test the others without changing compositor:
+One machine only ever gives you one of those combinations. Two environment variables let you test the others without changing compositor:
 
 | Variable | What it does | Example |
 | --- | --- | --- |
 | `MINIFB_WAYLAND_FORCE_VERSIONS` | Lowers the version used for one or more interfaces | `wl_seat=4,wl_output=1` |
 | `MINIFB_WAYLAND_DISABLE_GLOBALS` | Hides globals, as if the compositor never offered them | `wp_viewporter` |
 
-Both work in every build, not only in debug builds. MiniFB reads them once, while
-it binds globals, so they cost nothing after the window opens. Every override is
-written to the log, and a value that cannot be applied is reported and ignored
-rather than dropped in silence.
+Both work in every build, not only in debug builds. MiniFB reads them once, while it binds globals, so they cost nothing after the window opens. Every override is written to the log, and a value that cannot be applied is reported and ignored rather than dropped in silence.
 
-They combine with libwayland's own `WAYLAND_DEBUG=client`, which prints all
-protocol traffic to stderr:
+They combine with libwayland's own `WAYLAND_DEBUG=client`, which prints all protocol traffic to stderr:
 
 ```sh
 MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> trace.txt
 ```
 
-Together these answer the two halves of one question: the trace shows what the
-compositor sent, and your program's output shows what MiniFB made of it.
+Together these answer the two halves of one question: the trace shows what the compositor sent, and your program's output shows what MiniFB made of it.
 
-See [docs/wayland-testing.md](docs/wayland-testing.md) for the interfaces each
-variable accepts, the versions actually worth testing and what each one covers,
-the other useful variables from libwayland and xkbcommon, and what this approach
-cannot test.
+See [docs/wayland-testing.md](docs/wayland-testing.md) for the interfaces each variable accepts, the versions actually worth testing and what each one covers, the other useful variables from libwayland and xkbcommon, and what this approach cannot test.
 
 ### macOS
 
-Cocoa and clang are assumed to be installed on the system (downloading the latest Xcode and installing the command line tools should do the trick).
+You need Xcode and its command line tools, which provide clang and the Cocoa framework.
 
-Note that macOS Mojave+ does not support the Cocoa framework as expected. For that reason, you can switch to the Metal API.
-To enable it with CMake, use the `MINIFB_USE_METAL_API` option.
-
-If you use **CMake**, just enable the flag:
+On macOS Mojave and later, the Cocoa framework no longer behaves as MiniFB expects, so the library renders through Metal by default:
 
 ```sh
 mkdir build-macos-metal
 cd build-macos-metal
 cmake .. -DMINIFB_USE_METAL_API=ON
 ```
-`USE_METAL_API` is still accepted for compatibility, but deprecated.
 
-Or, if you don't want to use the Metal API:
+To use Cocoa instead:
 
 ```sh
 mkdir build-macos-cocoa
@@ -650,29 +624,27 @@ cmake .. -DMINIFB_USE_METAL_API=OFF
 
 #### Coordinate system
 
-On macOS, the default mouse coordinate system is (0, 0) → (left, bottom). But since we want to create a multiplatform library, we invert the coordinates so that (0, 0) → (left, top), like on the other platforms.
+macOS places the mouse origin (0, 0) at (left, bottom). MiniFB flips it to (left, top) so that every platform behaves the same way.
 
-In any case, if you want to get the default coordinate system you can use the CMake flag: `MINIFB_USE_INVERTED_Y_ON_MACOS=ON`
+To keep the native macOS origin, use the CMake flag `MINIFB_USE_INVERTED_Y_ON_MACOS=ON`:
 
 ```sh
 mkdir build-macos-inverted-y
 cd build-macos-inverted-y
 cmake .. -DMINIFB_USE_INVERTED_Y_ON_MACOS=ON
 ```
-`USE_INVERTED_Y_ON_MACOS` is still accepted for compatibility, but deprecated.
 
-**Note**: In the future, we may use a global option so that all platforms behave in the same way. Probably: -DUSE_INVERTED_Y
+**Note**: a global option affecting every platform (probably `-DUSE_INVERTED_Y`) may replace this one later.
 
-### iOS (beta)
+### iOS
 
-It works with and without a `UIWindow`.
-If you create the window/view hierarchy through Storyboard, set the `UIViewController` to `iOSViewController` and the root `UIView` to `iOSView`.
+It works with and without a `UIWindow`. If you create the window/view hierarchy through Storyboard, set the `UIViewController` to `iOSViewController` and the root `UIView` to `iOSView`.
 
 **Launch screen / storyboard requirement**:
 
 For App Store distribution, Apple requires a launch storyboard (legacy static launch images are deprecated). Without a launch storyboard, iOS can start in a compatibility layout and you may see top/bottom black bands or an incorrect initial drawable size.
 
-That is why there are now two iOS example targets:
+That is why there are two iOS example targets:
 
 - `noise`: uses `examples/ios/Info.plist` + `examples/ios/LaunchScreen.storyboard` (recommended, App Store-ready).
 - `noise_no_storyboard`: uses `examples/ios/Info.no_storyboard.plist` without launch storyboard (useful for legacy/manual setups and behavior comparison).
@@ -697,12 +669,9 @@ Apple references:
 - Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_decode_touch()` / `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`
 - No mouse wheel/scroll callback support on iOS
 
-`mfb_set_active_callback()` is triggered from iOS app lifecycle notifications
-(active/inactive transitions).
-`mfb_set_close_callback()` is called as a termination notification only; iOS does not allow canceling app termination.
+iOS calls `mfb_set_active_callback()` from the app lifecycle notifications (active/inactive transitions). It calls `mfb_set_close_callback()` only as a termination notice: iOS does not let an app cancel its own termination.
 
-`mfb_set_target_fps()` / `mfb_get_target_fps()` are supported on iOS for software pacing via `mfb_wait_sync()`.
-If your app is driven by `CADisplayLink` (like the example), frame pacing is display-driven by iOS.
+`mfb_set_target_fps()` and `mfb_get_target_fps()` work on iOS for software pacing through `mfb_wait_sync()`. If your app runs on `CADisplayLink` (like the example), iOS paces the frames instead.
 
 Core rendering, viewport, timers, and user data management work normally.
 
@@ -762,9 +731,9 @@ Then choose the Xcode scheme you want to run:
 - `noise` (with launch storyboard, recommended)
 - `noise_no_storyboard` (without launch storyboard)
 
-### Android (beta)
+### Android
 
-Take a look at the example in examples/android. You need **Android Studio** to build and run it.
+See the example in `examples/android`. You need **Android Studio** to build and run it.
 
 **Limitations**:
 
@@ -776,16 +745,15 @@ Take a look at the example in examples/android. You need **Android Studio** to b
 - Touch pointer id is packed into upper bits of `mfb_get_mouse_x()` / `mfb_get_mouse_y()` values; decode with `mfb_decode_touch()` / `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`
 - `mfb_get_monitor_scale()` reports Android density scale (same value for X/Y, from `AConfiguration_getDensity()` with `160dpi = 1.0`)
 
-**Note**: On Android, pressing `BACK` should close the app by default. In some emulators, right-click may be mapped to `BACK`. For debugging this case, the Android example CMake option `MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC` can be enabled to map `BACK` to `ESC` instead (default: `OFF`).
+**Note**: pressing `BACK` closes the app by default. Some emulators map right-click to `BACK`. To debug that case, enable the Android example CMake option `MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC` (default `OFF`), which maps `BACK` to `ESC` instead.
 
-`mfb_set_target_fps()` / `mfb_get_target_fps()` are supported on Android for software pacing via `mfb_wait_sync()`.
+`mfb_set_target_fps()` and `mfb_get_target_fps()` work on Android for software pacing through `mfb_wait_sync()`.
 
 All other MiniFB functions work normally, including timers, viewports, and user data management.
 
 #### Pixel format on Android
 
-MiniFB uses a **32-bit pixel buffer** on all platforms, but the byte order in memory
-differs between Android and desktop/iOS:
+MiniFB uses a **32-bit pixel buffer** on all platforms, but the byte order in memory differs between Android and desktop/iOS:
 
 | Platform | Byte order in memory | Equivalent uint32_t (LE) |
 |----------|----------------------|--------------------------|
@@ -793,19 +761,13 @@ differs between Android and desktop/iOS:
 | iOS | B · G · R · A | `0x00RRGGBB` |
 | **Android** | **R · G · B · X** | **`0x00BBGGRR`** |
 
-**You do not need to think about this** as long as you construct pixels with the
-`MFB_RGB` / `MFB_ARGB` macros, they expand to the correct bit layout automatically
-on every platform:
+**You do not need to think about this** if you build pixels with the `MFB_RGB` / `MFB_ARGB` macros: they expand to the correct layout on every platform:
 
 ```c
 buffer[i] = MFB_RGB(255, 0, 0);   // always displays red, on every platform
 ```
 
-**Where it matters: external pixel data.**
-If you load an image with a library that always produces RGBA bytes in memory
-(e.g. `stb_image`, `libpng`, browser canvas), and you pass that data directly
-to `mfb_update_ex`, the colors will be correct on Android but **red and blue will
-be swapped on desktop/iOS** (and vice-versa if you adapt for desktop).
+**Where it matters: external pixel data.** If you load an image with a library that always produces RGBA bytes in memory (e.g. `stb_image`, `libpng`, browser canvas), and you pass that data directly to `mfb_update_ex`, the colors will be correct on Android but **red and blue will be swapped on desktop/iOS** (and vice-versa if you adapt for desktop).
 
 ```c
 // stb_image / libpng give RGBA bytes in memory:
@@ -815,17 +777,11 @@ be swapped on desktop/iOS** (and vice-versa if you adapt for desktop).
 // On desktop/iOS you must swap R <-> B before calling mfb_update_ex.
 ```
 
-**Why can't Android just accept the same format as desktop?**
-`ANativeWindow` (the Android NDK surface API) does not expose a BGRA format in its
-public interface, only `WINDOW_FORMAT_RGBX_8888` (RGBA bytes) and `WINDOW_FORMAT_RGB_565`
-are guaranteed on all devices. Doing a full-buffer swizzle per frame inside the library
-would add CPU cost for every rendered frame. The current design avoids that cost by
-adjusting the macro at compile time instead.
+**Why can't Android just accept the same format as desktop?** `ANativeWindow` (the Android NDK surface API) does not expose a BGRA format in its public interface, only `WINDOW_FORMAT_RGBX_8888` (RGBA bytes) and `WINDOW_FORMAT_RGB_565` are guaranteed on all devices. Swizzling the whole buffer inside the library would cost CPU time on every frame. MiniFB avoids that by adjusting the macros at compile time.
 
 #### Display cutout / Notch (API 32-34)
 
-Android's handling of the display cutout (notch, punch-hole camera) changed across API levels
-and can cause a framebuffer-size mismatch if not handled explicitly:
+Android's handling of the display cutout (notch, punch-hole camera) changed across API levels and can cause a framebuffer-size mismatch if not handled explicitly:
 
 | API level | Default behaviour                               | Result                        |
 |-----------|-------------------------------------------------|-------------------------------|
@@ -833,8 +789,7 @@ and can cause a framebuffer-size mismatch if not handled explicitly:
 | 32-34     | System reserves space for the cutout by default | **Content shifted / clipped** |
 | ≥ 35      | Edge-to-edge is forced by the OS                | Works out of the box          |
 
-Two approaches are provided in the example (`examples/android/native2026`); pick whichever fits
-your project.
+The example (`examples/android/native2026`) shows two approaches; pick the one that fits your project.
 
 ##### Option A - Manifest + theme (no Java code)
 
@@ -858,17 +813,15 @@ Then reference it in `AndroidManifest.xml`:
     ...>
 ```
 
-**Pros**: zero Java code, takes effect before the native thread starts.
-**Cons**: limited runtime control; no way to query inset values from C.
+- **Pros**: zero Java code, takes effect before the native thread starts.
+- **Cons**: limited runtime control; no way to query inset values from C.
 
 ##### Option B - Java subclass (recommended)
 
-Subclass `NativeActivity` in `MiniFBActivity.java` and override `onCreate` /
-`onWindowFocusChanged` to call `setupFullscreen()`, which:
+Subclass `NativeActivity` in `MiniFBActivity.java` and override `onCreate` / `onWindowFocusChanged` to call `setupFullscreen()`, which:
 
 - Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 31+) or `SHORT_EDGES` (API 28-30).
-- Hides system bars via `WindowInsetsController` (API 30+) or the legacy
-  `setSystemUiVisibility` flags (API 24-29).
+- Hides system bars via `WindowInsetsController` (API 30+) or the legacy `setSystemUiVisibility` flags (API 24-29).
 - Re-applies on focus changes (bars can reappear after an edge-swipe gesture).
 
 In `AndroidManifest.xml` replace the activity class name:
@@ -882,22 +835,20 @@ In `AndroidManifest.xml` replace the activity class name:
 
 The theme is kept as an early fallback; the Java code overrides it once the Activity starts.
 
-**Pros**: robust, handles all API levels, re-applies after gesture-triggered bar visibility.
-**Cons**: requires one Java source file.
+- **Pros**: robust, handles all API levels, re-applies after gesture-triggered bar visibility.
+- **Cons**: requires one Java source file.
 
 Both options can coexist (the theme fires first, the Java code reinforces it).
 
 #### Querying Insets from C
 
-The display inset APIs are backend-agnostic:
-`mfb_get_display_cutout_insets()` and `mfb_get_display_safe_insets()`.
+The display inset APIs are backend-agnostic: `mfb_get_display_cutout_insets()` and `mfb_get_display_safe_insets()`.
 
-See [Display Insets](#display-insets) in the API reference for exact semantics,
-return contract, and backend behavior details.
+See [Display Insets](#display-insets) in the API reference for exact semantics, return contract, and backend behavior details.
 
 ### Web (WASM)
 
-Download and install [Emscripten](https://emscripten.org/). When configuring your CMake build, specify the Emscripten toolchain file. Then proceed to build as usual.
+Download and install [Emscripten](https://emscripten.org/), then point CMake at the Emscripten toolchain file and build as usual.
 
 #### Building and running the examples (WASM)
 
@@ -906,7 +857,7 @@ cmake -DCMAKE_TOOLCHAIN_FILE=/path/to/emsdk/<version>/emscripten/cmake/Modules/P
 cmake --build build-web
 ```
 
-On Windows, you can't use Visual Studio's default CMake generator because Emscripten uses its own toolchain based on a modified version of Clang. Instead, you need to generate MinGW-compatible makefiles. If you have MinGW installed:
+On Windows you cannot use the default Visual Studio generator, because Emscripten brings its own toolchain based on a modified Clang. Generate MinGW makefiles instead:
 
 ```sh
 cmake -DCMAKE_TOOLCHAIN_FILE=C:\Path\to\emsdk\<version>\upstream\emscripten\cmake\Modules\Platform\Emscripten.cmake -G "MinGW Makefiles" -B build-web .
@@ -917,7 +868,7 @@ cmake --build build-web
 
 Then open the file `build-web/index.html` in your browser to view the example index.
 
-The examples are build using the Emscripten flag `-sSINGLE_FILE`, which will coalesce the `.js` and `.wasm` files into a single `.js` file. If you build your own apps without the `-sSINGLE_FILE` flag, you can not simply open the `.html` file in the browser from disk. Instead, you need an HTTP server to serve the build output. The simplest solution for that is Python's `http.server` module:
+The examples are built with the Emscripten flag `-sSINGLE_FILE`, which merges the `.js` and `.wasm` output into a single `.js` file. Without that flag you cannot open the `.html` file from disk: the build output has to be served over HTTP. The simplest way is Python's `http.server` module:
 
 ```sh
 python3 -m http.server --directory build-web
@@ -933,11 +884,10 @@ To build an executable target for the web, you need to add a linker option speci
 target_link_options(my_app PRIVATE "-sEXPORT_NAME=my_app")
 ```
 
-The Emscripten toolchain will then build a `my_app.wasm` and `my_app.js` file containing your app's WASM code and JavaScript glue code to load the WASM file and run it. To load and run your app, you need to:
+The Emscripten toolchain then builds `my_app.wasm` plus a `my_app.js` file with the glue code that loads the WASM file and runs it. To load and run your app:
 
 1. Call the `<my_module_name>()` in JavaScript.
-2. Optionally create a `<canvas>` element whose `id` matches the effective MiniFB title.
-   If it does not exist, the backend will create one and append it to the document, logging a warning.
+2. Optionally create a `<canvas>` element whose `id` matches the effective MiniFB title. If it does not exist, the backend will create one and append it to the document, logging a warning.
 
 Example app:
 
@@ -968,10 +918,9 @@ int main() {
 }
 ```
 
-Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.html` file to load and run the app would look like this:
+Assuming the build generates `my_app.wasm` and `my_app.js`, the simplest `.html` file to load and run the app looks like this:
 
 ```html
-<html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -995,31 +944,28 @@ Assuming the build will generate `my_app.wasm` and `my_app.js`, the simplest `.h
 
 #### Limitations & caveats
 
-The web backend has the following backend-specific behavior:
+The web backend behaves differently in these areas:
 
 - In `mfb_open_ex()`, only fullscreen flags are currently interpreted (`MFB_WF_FULLSCREEN`, `MFB_WF_FULLSCREEN_DESKTOP`); other window flags are ignored
-- `mfb_get_monitor_dpi()` / `mfb_get_monitor_scale()` report fixed values (`1.0` scale)
 - `mfb_set_target_fps()` / `mfb_get_target_fps()` store/query the target value, but do not currently control browser frame pacing (the browser event loop / RAF timing drives pacing)
-- `mfb_show_cursor()` tracks requested visibility, but hiding the browser cursor is not implemented yet
 
-Core rendering, events, viewport and timers are supported.
+Core rendering, events, viewport and timers are supported. `mfb_get_monitor_scale()` returns `window.devicePixelRatio`, and `mfb_show_cursor()` hides the canvas cursor with `cursor: none`.
 
-When calling `mfb_open()` or `mfb_open_ex()`, Web uses the effective title as canvas id.
-If `title` is `NULL` or empty, the effective title is `"minifb"`, so the backend looks for `<canvas id="minifb">`.
-If a matching canvas is not found, the backend creates one automatically and appends it to the document, and logs a warning.
+When calling `mfb_open()` or `mfb_open_ex()`, Web uses the effective title as canvas id. If `title` is `NULL` or empty, the effective title is `"minifb"`, so the backend looks for `<canvas id="minifb">`. If a matching canvas is not found, the backend creates one automatically and appends it to the document, and logs a warning.
+
 The functions modify the `width` and `height` attributes of the selected/created `<canvas>`. If not already set, they also modify CSS `width` and `height`.
 
-Setting the CSS width and height of the canvas allows you to up-scale the framebuffer arbitrarily:
+The CSS width and height of the canvas scale the framebuffer to any size. For example, to show a 320x240 window at double size:
 
-```js
-// Request a 320x240 window
+```c
 mfb_open("my_app", 320, 240);
+```
 
-// Up-scale 2x via CSS
+```html
 <canvas id="my_app" style="width: 640px; height: 480px">
-````
+```
 
-If not already set, the backend will also set a handful of CSS styles on the canvas that are good defaults for pixel graphics.
+If they are not set already, the backend also applies a few CSS defaults that suit pixel graphics:
 
 - `image-rendering: pixelated`
 - `user-select: none`
@@ -1028,7 +974,7 @@ If not already set, the backend will also set a handful of CSS styles on the can
 
 ### MS-DOS (DJGPP)
 
-Use the `tools/dos/download-dos-tools.sh` file to download all the tools needed to compile, run and debug MiniFB DOS applications. The Bash script will download the following tools:
+Run `tools/dos/download-dos-tools.sh` to download everything needed to compile, run and debug MiniFB DOS applications:
 
 - [DJGPP](https://www.delorie.com/djgpp/), a GCC fork targeting 32-bit protected mode DOS.
 - [GDB 7.1a](https://github.com/badlogic/gdb-7.1a), a GDB fork that can remotely debug 32-bit COFF executables via TCP, running in e.g. DOSBox-x, VirtualBox, or a real machine.
@@ -1036,7 +982,7 @@ Use the `tools/dos/download-dos-tools.sh` file to download all the tools needed 
 
 The tools are downloaded to the `tools/dos/` folder. The folder also contains a DOSBox-x configuration file `dosbox-x.conf` preconfigured for debugging. The `toolchain-djgpp.cmake` file is a CMake toolchain file for DJGPP.
 
-You can optionally run the script with the argument `--with-vs-code`. If you have [Visual Studio Code](https://code.visualstudio.com/) installed, the script will install extensions needed for C/C++ development and debugging, and create a `.vscode` folder in the repository root containing launch configurations, tasks, and various other settings for DOS development in VS Code.
+Run the script with `--with-vs-code` if you use [Visual Studio Code](https://code.visualstudio.com/): it installs the extensions needed for C/C++ development and debugging, and creates a `.vscode` folder in the repository root with launch configurations, tasks and other settings for DOS development.
 
 #### Building and running the examples (DOS)
 
@@ -1060,7 +1006,9 @@ This will generate DOS 32-bit `.exe` files in the `build-dos/` folder which you 
 ./tools/dos/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tools/dos/dosbox-x.conf build-dos/<executable-file>
 ```
 
-Note that the DOS backend cannot support multi-window applications. The examples `multiple-windows.c` and `hidpi.c` will thus not run correctly.
+The DOS backend cannot support multi-window applications, so the examples `multiple_windows.c` and `hidpi.c` do not run correctly.
+
+It also does not tell extended (`E0`-prefixed) scancodes apart from their base ones: the keypad and cursor-block keys that share a scancode report the same `mfb_key`, and right Ctrl and Alt report as the left ones. Extended Up/Down are the exception: they arrive as mouse wheel events, because some DOS mouse drivers emulate the wheel that way.
 
 The `dos` example target (`examples/dos/debug_dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
 
@@ -1080,7 +1028,9 @@ Running the executables in vanilla MS-DOS requires a DPMI server. Download [CWSD
 
 #### Debugging your MiniFB app in DOSBox-x
 
-The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`examples/dos/gdbstub.h`](examples/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB. Run the `tools/dos/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
+The MiniFB DOS backend comes with a [GDB stub](https://sourceware.org/gdb/onlinedocs/gdb/Remote-Stub.html) in [`examples/dos/gdbstub.h`](examples/dos/gdbstub.h) that you can incorporate into your application to enable remote debugging your app through GDB.
+
+Run the `tools/dos/download-dos-tools.sh` script as described above to get GDB and DOSBox-x versions capable of remote debugging. Then, in the source file that contains your `main()` function, include the `gdbstub.h` file and call the `gdb_start()` and `gdb_checkpoint()` functions like this:
 
 ```c
 #define GDB_IMPLEMENTATION
@@ -1106,7 +1056,7 @@ Run your application with the downloaded DOSBox-x:
 ./tools/dos/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tools/dos/dosbox-x.conf path/to/your/executable.exe
 ```
 
-DOSBox-x will start up, your application will wait for GDB to connect (`gdb_start()`).
+DOSBox-x starts up and your application waits inside `gdb_start()` for GDB to connect.
 
 Run GDB, load the debugging information from the executable and connect to your app running and waiting in DOSBox-x:
 
@@ -1120,15 +1070,20 @@ GDB will show your app being halted on the `gdb_start()` line. You can now set b
 
 If your app is executing and you press `CTRL+C` to interrupt it, you will end up inside `gdb_checkpoint()`. You can then set breakpoints, or step out to inspect your program state.
 
-Alternatively, you can use VS Code to debug via a graphical user interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag. This will install C/C++/CMake VS Code extensions and copy the `tools/dos/.vscode` folder to the project root. Open the project root folder in VS Code, select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html), select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant), and the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target), then run the `DOS debug target` launch configuration.
+You can also debug from VS Code, with a graphical interface. Run the `download-dos-tools.sh` script with the `--with-vs-code` flag: it installs the C/C++/CMake extensions and copies the `tools/dos/.vscode` folder to the project root.
+
+Then open the project root folder in VS Code and:
+
+1. Select the `djgpp` [CMake kit](https://vector-of-bool.github.io/docs/vscode-cmake-tools/kits.html).
+2. Select the `Debug` [CMake variant](https://vector-of-bool.github.io/docs/vscode-cmake-tools/getting_started.html#selecting-a-variant).
+3. Select the [CMake launch target](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html#selecting-a-launch-target).
+4. Run the `DOS debug target` launch configuration.
 
 You can use both the CLI and GUI method for debugging the MiniFB examples as well. See the example [examples/dos/debug_dos.c](examples/dos/debug_dos.c) for usage of the GDB stub.
 
-## Platform-Specific Limitations
+## Feature Support by Platform
 
-Some MiniFB features are not available on all platforms. Here's a summary of what's supported:
-
-### Feature Support Matrix
+Not every feature exists on every platform. This table summarizes what each backend does:
 
 | Feature | Windows | macOS | Linux X11 | Wayland | iOS | Android | Web | DOS |
 |---------|---------|-------|-----------|---------|-----|---------|-----|-----|
@@ -1143,10 +1098,22 @@ Some MiniFB features are not available on all platforms. Here's a summary of wha
 | Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Limited*** | Limited*** |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | Browser-driven | - |
 
-`**` On iOS, this applies when using `mfb_wait_sync()`. If your app loop is driven by `CADisplayLink`, pacing is already tied to display refresh.
+`*` X11 reports a monitor scale, but usually only the value read at startup. A global scale change while the program runs may not be visible until restart (it depends on the environment, especially under XWayland).
 
-`***` Web/DOS currently store/report the target FPS value, but frame pacing is not controlled by it.
+`**` On iOS this applies when you call `mfb_wait_sync()`. If your loop runs on `CADisplayLink`, pacing already follows the display refresh.
 
-`*` X11 monitor scale is available, but often behaves as an initial value only; runtime global-scale changes may not be reflected until restart (environment-dependent, especially under XWayland).
+`***` Web and DOS store and report the target FPS, but do not use it to pace frames.
 
-For detailed caveats and behavior differences, see each platform section above (iOS, Android, Web, DOS).
+For the details behind each entry, see the platform sections above.
+
+## Versioning
+
+MiniFB had no official release version for many years. This codebase adopts SemVer and takes **v0.9.0** as the baseline version.
+
+The build generates `minifb_version.h` at configure time and installs it with the public headers. It gives C and C++ code:
+
+- `MINIFB_VERSION_STRING` and the major/minor/patch macros
+- the packed `MINIFB_VERSION_NUMERIC` and its extraction helpers
+- Git metadata when available: `MINIFB_COMMIT_COUNT`, `MINIFB_COMMITS_SINCE_TAG`, `MINIFB_GIT_SHA`, `MINIFB_GIT_DIRTY`
+
+Building from a source archive without `.git` still works: the SHA becomes `unknown` and the counters stay at `0`.
