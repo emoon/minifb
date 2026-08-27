@@ -502,6 +502,49 @@ flush_request(struct wl_display *display, const char *request_name) {
 }
 
 //-------------------------------------
+// Reports what libwayland already knows about a failed connection. Callers can
+// only say that a dispatch failed; the compositor's reason and the object it
+// objected to are held here and would otherwise be discarded.
+//-------------------------------------
+static void
+log_display_error(struct wl_display *display, const char *context) {
+    if (display == NULL) {
+        return;
+    }
+
+    int error = wl_display_get_error(display);
+    if (error == 0) {
+        return;
+    }
+
+    // Do not key this off EPROTO. libwayland maps wl_display.invalid_object and
+    // invalid_method to EINVAL and no_memory to ENOMEM, and those are the most
+    // common protocol errors of all. The recorded interface is what tells a
+    // protocol error apart from a transport one.
+    const struct wl_interface *interface = NULL;
+    uint32_t                   object_id = 0;
+    uint32_t                   code      = wl_display_get_protocol_error(display, &interface, &object_id);
+
+    if (interface != NULL) {
+        MFB_LOG(MFB_LOG_ERROR,
+                "WaylandMiniFB: protocol error during %s: %s@%u reported error %u (%s).",
+                context,
+                interface->name,
+                object_id,
+                code,
+                strerror(error)
+        );
+        return;
+    }
+
+    MFB_LOG(MFB_LOG_ERROR,
+            "WaylandMiniFB: display error during %s: %s.",
+            context,
+            strerror(error)
+    );
+}
+
+//-------------------------------------
 static int
 dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *queue) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
@@ -553,6 +596,12 @@ dispatch_render_pending(SWindowData *window_data) {
     return true;
 }
 
+//-------------------------------------
+// Derived from libwayland's wl_display_dispatch_queue_timeout(), which cannot
+// be called directly for two reasons. It only appeared in libwayland 1.23, and
+// MiniFB still supports 1.20, the version Ubuntu 22.04 ships. It also serves a
+// single queue, while this backend must wake as soon as either of its two owned
+// queues has events. Fixes made upstream to that function belong here too.
 //-------------------------------------
 static bool
 dispatch_queue_timeout(SWindowData *window_data,
@@ -620,7 +669,10 @@ dispatch_queue_timeout(SWindowData *window_data,
         }
     }
 
-    if (result < 0) {
+    // EPIPE means the compositor closed the connection, which it does after
+    // reporting a protocol error. Keep going so the read below can still pick
+    // that error up; aborting here would leave only "broken pipe" to report.
+    if (result < 0 && errno != EPIPE) {
         wl_display_cancel_read(window_data_specific->display);
         return false;
     }
@@ -740,7 +792,10 @@ dispatch_owned_non_blocking(SWindowData *window_data) {
         }
     }
 
-    if (result == -1) {
+    // See dispatch_queue_timeout(): an EPIPE from the flush must not stop the
+    // read, or the protocol error that caused it is lost. If nothing is queued,
+    // the closed socket makes wl_display_read_events() fail and record EPIPE.
+    if (result == -1 && errno != EPIPE) {
         wl_display_cancel_read(window_data_specific->display);
         return false;
     }
@@ -3161,6 +3216,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 out:
     MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_open_ex failed and is cleaning up partially initialized resources.");
+    log_display_error(window_data_specific->display, __func__);
     destroy(window_data);
 
     return NULL;
@@ -3472,6 +3528,7 @@ begin_window_call(struct mfb_window *window, const char *func_name,
     if ((*window_data_specific)->display == NULL
         || wl_display_get_error((*window_data_specific)->display) != 0) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid Wayland display state during %s.", func_name);
+        log_display_error((*window_data_specific)->display, func_name);
         return MFB_STATE_INTERNAL_ERROR;
     }
 
@@ -3496,6 +3553,7 @@ pump_window_events(SWindowData *window_data, const char *func_name) {
 
     if (dispatch_owned_non_blocking(window_data) == false) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: event dispatch failed in %s.", func_name);
+        log_display_error(((SWindowData_Way *) window_data->specific)->display, func_name);
         return MFB_STATE_INTERNAL_ERROR;
     }
 
