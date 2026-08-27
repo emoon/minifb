@@ -140,9 +140,6 @@ typedef struct {
     uint32_t                shm_format;
     uint8_t                 backend_unusable;
     struct wl_callback      *throttle_callback;
-    int64_t                 throttle_deadline_seconds;
-    int32_t                 throttle_deadline_nanoseconds;
-    uint8_t                 throttle_deadline_valid;
     SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
     int                     front_slot;
 

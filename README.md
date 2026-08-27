@@ -113,7 +113,7 @@ If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_W
 - `width * 4` would overflow internal stride calculations
 
 `mfb_update_ex()` behaves differently on two backends:
-- Wayland waits for compositor frame callback inside `mfb_update_ex()` (can block).
+- Wayland waits for the compositor frame callback inside `mfb_update_ex()` (can block). A minimized or hidden window may stop receiving that callback. Each call then waits briefly and returns `MFB_STATE_OK` without presenting.
 - Android may return `MFB_STATE_OK` without presenting when `ANativeWindow` is temporarily unavailable during lifecycle transitions.
 
 What is ready when `mfb_open_ex()` returns also depends on the backend:

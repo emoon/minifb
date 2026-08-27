@@ -824,9 +824,6 @@ throttle_done(void *data, struct wl_callback *callback, uint32_t time) {
     if (window_data_specific != NULL
         && window_data_specific->throttle_callback == callback) {
         window_data_specific->throttle_callback = NULL;
-        window_data_specific->throttle_deadline_seconds = 0;
-        window_data_specific->throttle_deadline_nanoseconds = 0;
-        window_data_specific->throttle_deadline_valid = 0;
     }
 
     wl_callback_destroy(callback);
@@ -860,12 +857,24 @@ make_throttle_deadline(struct timespec *deadline) {
 }
 
 //-------------------------------------
+// The wait budget is per call, not per callback. An absolute deadline attached
+// to the callback stays expired once it passes, since only throttle_done() can
+// clear it, so a compositor that withholds the callback turns every later call
+// into an immediate skip that never waits: an application with no other pacing
+// then busy-loops on a full core for as long as the surface stays hidden.
+//-------------------------------------
 static EWaylandThrottleStatus
 surface_throttle_wait(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+    struct timespec  deadline;
 
     if (window_data_specific->surface_wrapper == NULL
         || window_data_specific->render_queue == NULL) {
+        return WAYLAND_THROTTLE_ERROR;
+    }
+
+    if (window_data_specific->throttle_callback != NULL
+        && make_throttle_deadline(&deadline) == false) {
         return WAYLAND_THROTTLE_ERROR;
     }
 
@@ -884,19 +893,11 @@ surface_throttle_wait(SWindowData *window_data) {
             return WAYLAND_THROTTLE_READY;
         }
 
-        if (window_data_specific->throttle_deadline_valid == 0) {
-            return WAYLAND_THROTTLE_ERROR;
-        }
-
         struct timespec now;
         if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
             return WAYLAND_THROTTLE_ERROR;
         }
 
-        struct timespec deadline = {
-            .tv_sec = (time_t) window_data_specific->throttle_deadline_seconds,
-            .tv_nsec = (long) window_data_specific->throttle_deadline_nanoseconds,
-        };
         struct timespec remaining;
         remaining = ts_sub_sat(deadline, now);
         if (ts_is_zero(remaining) == true) {
@@ -923,36 +924,23 @@ surface_throttle_wait(SWindowData *window_data) {
 // called after all fallible buffer work has completed, and immediately
 // before the commit that makes a requested frame callback effective.
 //
-// When frame callback throttling is enabled, requests wl_surface_frame and
-// stores its deadline. Otherwise, only computes the deadline that the
-// caller must apply to a wl_display_sync fallback requested after the
-// commit.
+// When frame callback throttling is enabled, requests wl_surface_frame. The
+// caller must otherwise install a wl_display_sync fallback after the commit.
 //-------------------------------------
 static bool
-surface_throttle_request(SWindowData_Way *window_data_specific, struct timespec *out_deadline) {
-    if (g_use_wayland_frame_callback_throttle == true) {
-        if (make_throttle_deadline(out_deadline) == false) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create a frame throttle deadline.");
-            return false;
-        }
-
-        window_data_specific->throttle_callback = wl_surface_frame(window_data_specific->surface_wrapper);
-        if (window_data_specific->throttle_callback == NULL) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
-            return false;
-        }
-
-        window_data_specific->throttle_deadline_seconds = (int64_t) out_deadline->tv_sec;
-        window_data_specific->throttle_deadline_nanoseconds = (int32_t) out_deadline->tv_nsec;
-        window_data_specific->throttle_deadline_valid = 1;
-        wl_callback_add_listener(window_data_specific->throttle_callback,
-                                 &g_throttle_listener, window_data_specific);
+surface_throttle_request(SWindowData_Way *window_data_specific) {
+    if (g_use_wayland_frame_callback_throttle == false) {
+        return true;
     }
-    else if (make_throttle_deadline(out_deadline) == false) {
-        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create a sync throttle deadline.");
+
+    window_data_specific->throttle_callback = wl_surface_frame(window_data_specific->surface_wrapper);
+    if (window_data_specific->throttle_callback == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_surface_frame returned NULL.");
         return false;
     }
 
+    wl_callback_add_listener(window_data_specific->throttle_callback,
+                             &g_throttle_listener, window_data_specific);
     return true;
 }
 
@@ -2493,11 +2481,71 @@ static const struct xdg_surface_listener shell_surface_listener = {
 };
 
 //-------------------------------------
+// States added after xdg_toplevel v2 are guarded because
+// tools/wayland/generate-protocols.sh can regenerate the headers from an older
+// wayland-protocols, where the newer enum values do not exist. Unknown values
+// are reported numerically so a newer compositor stays readable.
+//-------------------------------------
+static const char *
+toplevel_state_name(uint32_t state) {
+    switch (state) {
+        case XDG_TOPLEVEL_STATE_MAXIMIZED:          return "maximized";
+        case XDG_TOPLEVEL_STATE_FULLSCREEN:         return "fullscreen";
+        case XDG_TOPLEVEL_STATE_RESIZING:           return "resizing";
+        case XDG_TOPLEVEL_STATE_ACTIVATED:          return "activated";
+#if defined(XDG_TOPLEVEL_STATE_TILED_LEFT_SINCE_VERSION)
+        case XDG_TOPLEVEL_STATE_TILED_LEFT:         return "tiled_left";
+        case XDG_TOPLEVEL_STATE_TILED_RIGHT:        return "tiled_right";
+        case XDG_TOPLEVEL_STATE_TILED_TOP:          return "tiled_top";
+        case XDG_TOPLEVEL_STATE_TILED_BOTTOM:       return "tiled_bottom";
+#endif
+#if defined(XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION)
+        case XDG_TOPLEVEL_STATE_SUSPENDED:          return "suspended";
+#endif
+#if defined(XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT_SINCE_VERSION)
+        case XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT:   return "constrained_left";
+        case XDG_TOPLEVEL_STATE_CONSTRAINED_RIGHT:  return "constrained_right";
+        case XDG_TOPLEVEL_STATE_CONSTRAINED_TOP:    return "constrained_top";
+        case XDG_TOPLEVEL_STATE_CONSTRAINED_BOTTOM: return "constrained_bottom";
+#endif
+        default:                                    return NULL;
+    }
+}
+
+//-------------------------------------
+static void
+format_toplevel_states(struct wl_array *states, char *out, size_t out_size) {
+    size_t used = 0;
+
+    out[0] = '\0';
+    if (states == NULL) {
+        return;
+    }
+
+    uint32_t *state;
+    wl_array_for_each(state, states) {
+        const char *name = toplevel_state_name(*state);
+        int written;
+
+        if (name != NULL) {
+            written = snprintf(out + used, out_size - used, "%s%s", (used > 0) ? " " : "", name);
+        }
+        else {
+            written = snprintf(out + used, out_size - used, "%s%u", (used > 0) ? " " : "", *state);
+        }
+
+        if (written < 0 || (size_t) written >= out_size - used) {
+            break;
+        }
+        used += (size_t) written;
+    }
+}
+
+//-------------------------------------
 // Protocol: xdg-shell / xdg_toplevel.configure, since v1.
 static void
 handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width, int32_t height, struct wl_array *states) {
     kUnused(xdg_toplevel);
-    kUnused(states);
 
     SWindowData *window_data = (SWindowData *) data;
     if (window_data == NULL || window_data->specific == NULL) {
@@ -2519,7 +2567,9 @@ handle_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
         pending_configure->height = 0;
     }
 
-    MFB_LOG(MFB_LOG_DEBUG, "Toplevel configure: width=%d, height=%d", width, height);
+    char state_names[256];
+    format_toplevel_states(states, state_names, sizeof(state_names));
+    MFB_LOG(MFB_LOG_DEBUG, "Toplevel configure: width=%d, height=%d, states=[%s]", width, height, state_names);
 }
 
 //-------------------------------------
@@ -3367,8 +3417,7 @@ present_presentation_buffer(SWindowData *window_data,
     // Request the throttle signal only after all fallible buffer work has
     // completed, and immediately before the commit that makes a requested
     // frame callback effective.
-    struct timespec callback_deadline;
-    if (surface_throttle_request(window_data_specific, &callback_deadline) == false) {
+    if (surface_throttle_request(window_data_specific) == false) {
         return MFB_STATE_INTERNAL_ERROR;
     }
 
@@ -3384,9 +3433,6 @@ present_presentation_buffer(SWindowData *window_data,
             MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: wl_display_sync returned NULL.");
             return MFB_STATE_INTERNAL_ERROR;
         }
-        window_data_specific->throttle_deadline_seconds = (int64_t) callback_deadline.tv_sec;
-        window_data_specific->throttle_deadline_nanoseconds = (int32_t) callback_deadline.tv_nsec;
-        window_data_specific->throttle_deadline_valid = 1;
         wl_callback_add_listener(window_data_specific->throttle_callback,
                                  &g_throttle_listener, window_data_specific);
     }
