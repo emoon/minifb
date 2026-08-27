@@ -313,10 +313,10 @@ emit_char_input_from_xkb_state(SWindowData *window_data, SWindowData_Way *window
 }
 
 //-------------------------------------
-// Emits at most one due repeated key-press callback, plus its character,
-// for the key armed by keyboard_key(). Rescheduling from "now" instead of
-// the missed deadline means a long stall produces one catch-up repeat, not
-// a burst.
+// Emits at most one due repeated key-press callback, plus its character, for
+// the key armed by keyboard_key(). The next deadline advances from the previous
+// one, so the average rate matches what the compositor asked for, and a long
+// stall still produces a single catch-up repeat rather than a burst.
 //-------------------------------------
 void
 wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_data_specific) {
@@ -348,10 +348,21 @@ wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_d
         kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, true);
     }
 
-    // Reschedule from "now", not from the missed deadline: see the function
-    // comment above for why a stall must not produce a catch-up burst.
+    // Advance by whole intervals from the previous deadline. Scheduling from
+    // "now" instead rounds every interval up to the next poll, which costs
+    // about a fifth of the requested rate at a typical frame rate. Skipped
+    // intervals are dropped rather than emitted, so a stall produces no burst.
     struct timespec interval = ms_to_ts(1000.0 / (double) window_data_specific->repeat_rate_cps);
-    window_data_specific->repeat_deadline = ts_add(now, interval);
+
+    if (ts_is_zero(interval) == true) {
+        window_data_specific->repeat_deadline = now;
+    }
+    else {
+        do {
+            window_data_specific->repeat_deadline =
+                ts_add(window_data_specific->repeat_deadline, interval);
+        } while (ts_is_zero(ts_sub_sat(window_data_specific->repeat_deadline, now)) == true);
+    }
 }
 
 //-------------------------------------
@@ -603,6 +614,14 @@ keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate, int
     if (window_data_specific->repeat_rate_cps <= 0) {
         window_data_specific->repeat_active = false;
     }
+
+    MFB_LOG(MFB_LOG_DEBUG,
+            "Keyboard repeat info: rate=%d cps, delay=%d ms%s",
+            rate,
+            delay,
+            (window_data_specific->repeat_rate_cps > 0)
+                ? ""
+                : " (client-side repeat disabled; the compositor drives it or repeat is off)");
 }
 
 #endif

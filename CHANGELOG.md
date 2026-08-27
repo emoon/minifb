@@ -14,12 +14,14 @@ All notable changes to this project are documented in this file.
 - Wayland mouse wheel: the continuous `wl_pointer.axis` value is now divided by the ratio Weston uses, which SDL and GLFW follow as well, so one wheel notch reports `1.0` like the other backends. This only affects compositors that fall back to the continuous value; those that send `axis_value120` or `axis_discrete` already reported `1.0`.
 - Every Wayland listener callback now carries a comment with its protocol interface and the version that introduced it, so the version-dependent paths can be found with grep.
 - Wayland: `xdg_toplevel.configure` now logs its state array at DEBUG (`activated`, `suspended`, `maximized`, `resizing`, ...) instead of discarding it.
+- Wayland: `wl_keyboard.repeat_info` now logs the advertised rate and delay at DEBUG. It also reports when client-side repeat is off, which happens when the compositor drives it instead.
 - Added `docs/wayland-testing.md`: the interfaces each variable accepts, which versions are worth testing and what each one covers, the related variables from libwayland and xkbcommon, and what this approach cannot test.
 - Rewrote `README.md` in plainer English and corrected stale details: `mfb_update` return values, ESC handling, the macOS Metal default, the X11 default on Linux, the Wayland dependencies, and Web monitor scale and cursor support. Added a CMake options table, and replaced the per-platform "Beta" labels with what each backend actually supports.
 
 ### Fixed
 
 - Wayland: `wl_pointer.axis_discrete` no longer marks an axis as valid when the compositor reports a discrete step of `0`.
+- Wayland: key repeat now runs at the rate the compositor asks for. MiniFB computed the next deadline from the moment the previous repeat fired. Every interval then rounded up to the next poll. On KWin at 25 cps, the measured rate was 19.18 before the fix and 25.06 after.
 - Wayland: a hidden window no longer uses a whole CPU core. The frame throttle's wait budget belonged to the frame callback, and nothing refreshed it once it expired. Every later update then skipped without waiting. An application with no other frame pacing had nothing left to pace it. The budget now belongs to each update call. On KWin, a minimized window with no target FPS dropped from 100% of a core to 3.8%, and the visible frame rate did not change.
 
 ## [0.11.0]
