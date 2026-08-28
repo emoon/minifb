@@ -2,22 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
 ## [0.12.0]
 
 ### Added
 
 - **Log level from the environment**: `MINIFB_LOG_LEVEL` sets the log threshold by name (`trace`, `debug`, `info`, `warning`, `error`) without touching the code. It deliberately wins over `mfb_set_log_level()`, so you can get more output from a program you cannot rebuild. An unknown value is reported as an error and then ignored, leaving the threshold where the program left it.
 - **Wayland fallback testing**: `MINIFB_WAYLAND_FORCE_VERSIONS` lowers the version MiniFB binds for one or more protocol globals, and `MINIFB_WAYLAND_DISABLE_GLOBALS` hides globals as if the compositor never advertised them. Both work in every build and are read only while globals are bound, so a single machine can exercise fallback paths that would otherwise need another compositor.
+- Added `docs/wayland-testing.md`: the interfaces each variable accepts, which versions are worth testing and what each one covers, the related variables from libwayland and xkbcommon, and what this approach cannot test.
 
 ### Changed
 
-- Wayland mouse wheel: the continuous `wl_pointer.axis` value is now divided by the ratio Weston uses, which SDL and GLFW follow as well, so one wheel notch reports `1.0` like the other backends. This only affects compositors that fall back to the continuous value; those that send `axis_value120` or `axis_discrete` already reported `1.0`.
+- Wayland mouse wheel: the continuous `wl_pointer.axis` value is now divided by the ratio Weston uses, which SDL and GLFW follow too. One notch reports `1.0`, like the other backends. This only affects compositors that fall back to the continuous value. Those that send `axis_value120` or `axis_discrete` already reported `1.0`.
 - Every Wayland listener callback now carries a comment with its protocol interface and the version that introduced it, so the version-dependent paths can be found with grep.
 - Wayland: `xdg_toplevel.configure` now logs its state array at DEBUG (`activated`, `suspended`, `maximized`, `resizing`, ...) instead of discarding it.
 - Wayland: `wl_keyboard.repeat_info` now logs the advertised rate and delay at DEBUG. It also reports when client-side repeat is off, which happens when the compositor drives it instead.
 - Wayland: MiniFB now says when a window will have no frame. It logs the negotiated decoration mode at DEBUG. A client-side answer to a server-side request also raises a warning. The warning for a missing decoration manager now states the same fact instead of describing the protocol.
 - Wayland: a failed dispatch now reports what libwayland knows about the connection. A protocol error names the interface, the object and the error code. Any other failure reports the system error. Before, every case printed the same generic message.
-- Added `docs/wayland-testing.md`: the interfaces each variable accepts, which versions are worth testing and what each one covers, the related variables from libwayland and xkbcommon, and what this approach cannot test.
 - Rewrote `README.md` in plainer English and corrected stale details: `mfb_update` return values, ESC handling, the macOS Metal default, the X11 default on Linux, the Wayland dependencies, and Web monitor scale and cursor support. Added a CMake options table, and replaced the per-platform "Beta" labels with what each backend actually supports.
 
 ### Fixed
@@ -33,11 +35,7 @@ All notable changes to this project are documented in this file.
 
 - **Wayland backend modernization**: promoted Wayland to a first-class desktop backend alongside Windows, macOS, and X11, with reworked SHM presentation, event dispatch, frame pacing, scaling, input, and resource lifecycle handling.
 - Updated the bundled Wayland protocol bindings to 1.49 and added viewporter-based fractional and per-surface HiDPI scaling.
-- **CMake restructure**: build options are now prefixed (`MINIFB_USE_WAYLAND_API`, `MINIFB_USE_OPENGL_API`, `MINIFB_USE_METAL_API`, `MINIFB_BUILD_EXAMPLES`, ...), with fixes to the exported package config, the generated version header, and the Emscripten, iOS, and macOS build paths.
-
-### Deprecated
-
-- Unprefixed CMake options (`USE_WAYLAND_API`, `USE_OPENGL_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`). They still work but emit a deprecation warning; use their `MINIFB_*` equivalents.
+- **CMake restructure**: the build now checks the prefixed option names internally, adds `MINIFB_BUILD_EXAMPLES`, and uses `cmake_dependent_option` where one option depends on another. It also fixes the exported package config, the generated version header, and the Emscripten, iOS and macOS build paths. The unprefixed names were already deprecated in 0.9.3 and keep working.
 
 ### Fixed
 
@@ -181,3 +179,13 @@ git fetch origin --tags --force
 
 - The project has been available on GitHub since 2014.
 - Changes before version 0.9.0 were not tracked with formal release versions.
+
+[Unreleased]: https://github.com/emoon/minifb/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/emoon/minifb/releases/tag/v0.12.0
+[0.11.0]: https://github.com/emoon/minifb/releases/tag/v0.11.0
+[0.10.1]: https://github.com/emoon/minifb/releases/tag/v0.10.1
+[0.10.0]: https://github.com/emoon/minifb/releases/tag/v0.10.0
+[0.9.3]: https://github.com/emoon/minifb/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/emoon/minifb/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/emoon/minifb/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/emoon/minifb/releases/tag/v0.9.0
