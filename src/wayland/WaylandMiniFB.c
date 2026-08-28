@@ -2203,7 +2203,19 @@ static void
 toplevel_decoration_configure(void *data, struct zxdg_toplevel_decoration_v1 *decoration, uint32_t mode) {
     kUnused(data);
     kUnused(decoration);
-    kUnused(mode);
+
+    // Only windows that asked for server-side decoration listen here, so a
+    // client-side answer means the compositor declined and MiniFB draws no
+    // frame of its own. The window then has no title bar and no way to be
+    // moved, resized or minimized, which is worth saying out loud.
+    MFB_LOG(MFB_LOG_DEBUG,
+            "Toplevel decoration mode: %s",
+            (mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE) ? "server-side" : "client-side");
+
+    if (mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE) {
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: the compositor chose client-side decorations; this window will have no frame.");
+    }
 }
 
 //-------------------------------------
@@ -2954,13 +2966,15 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
         window_data_specific->toplevel_decoration =
             zxdg_decoration_manager_v1_get_toplevel_decoration(window_data_specific->decoration_manager, window_data_specific->toplevel);
         if (window_data_specific->toplevel_decoration) {
-            zxdg_toplevel_decoration_v1_add_listener(window_data_specific->toplevel_decoration,
-                                                     &toplevel_decoration_listener, window_data);
             if (effective_flags & MFB_WF_BORDERLESS) {
+                // No listener here: a borderless window draws no frame whatever
+                // the compositor answers, so its reply carries nothing to act on.
                 zxdg_toplevel_decoration_v1_set_mode(window_data_specific->toplevel_decoration,
                                                      ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
             }
             else {
+                zxdg_toplevel_decoration_v1_add_listener(window_data_specific->toplevel_decoration,
+                                                         &toplevel_decoration_listener, window_data);
                 zxdg_toplevel_decoration_v1_set_mode(window_data_specific->toplevel_decoration,
                                                      ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
             }
@@ -3124,7 +3138,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     if (!window_data_specific->decoration_manager) {
-        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; server-side decorations control may be limited.");
+        MFB_LOG(MFB_LOG_WARNING,
+                "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; this window will have no frame unless the compositor draws one.");
     }
 
     if (!window_data_specific->fractional_scale_manager || !window_data_specific->viewporter) {
