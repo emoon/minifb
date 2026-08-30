@@ -411,7 +411,7 @@ EM_JS(int, mfb_canvas_exists_js, (const char *title), {
 });
 
 //-------------------------------------
-EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen), {
+EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsigned width, unsigned height, int wants_full_screen, int wants_resizable), {
     let canvasId = UTF8ToString(title);
     let canvas = document.getElementById(canvasId);
     if (!canvas) {
@@ -463,6 +463,8 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         backCtx: null,
         window_data: window_data,
         wants_full_screen: wants_full_screen !== 0,
+        resizable: wants_resizable !== 0,
+        resizeObserver: null,
         activeTouchId: null,
         globalMouseupTarget: null,
         is_active: true,
@@ -485,6 +487,21 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         }
         w.events.push(eventObj);
     }
+
+    // A resizable canvas is sized by the page CSS, so the drawing buffer has to
+    // follow the layout box. Scaling by devicePixelRatio keeps it sharp on HiDPI.
+    function syncCanvasBackingSize() {
+        const dpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+        const cw = Math.max(1, Math.round(canvas.clientWidth * dpr));
+        const ch = Math.max(1, Math.round(canvas.clientHeight * dpr));
+        if (canvas.width === cw && canvas.height === ch) {
+            return false;
+        }
+        canvas.width = cw;
+        canvas.height = ch;
+        return true;
+    }
+    w.syncCanvasBackingSize = syncCanvasBackingSize;
 
     function requestFullscreenIfNeeded() {
         if (!w.wants_full_screen) return;
@@ -731,6 +748,13 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     canvas.addEventListener("touchend", w.handlers.touchEndOrCancel, NON_PASSIVE);
     canvas.addEventListener("touchcancel", w.handlers.touchEndOrCancel, NON_PASSIVE);
 
+    if (w.resizable === true && typeof ResizeObserver !== "undefined") {
+        w.resizeObserver = new ResizeObserver(() => {
+            enqueueEvent({ type: "resize" });
+        });
+        w.resizeObserver.observe(canvas);
+    }
+
     window._minifb.windows[id] = w;
     return id;
 });
@@ -758,6 +782,10 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
         w.canvas.removeEventListener("touchmove", w.handlers.touchmove, false);
         w.canvas.removeEventListener("touchend", w.handlers.touchEndOrCancel, false);
         w.canvas.removeEventListener("touchcancel", w.handlers.touchEndOrCancel, false);
+    }
+    if (w.resizeObserver) {
+        w.resizeObserver.disconnect();
+        w.resizeObserver = null;
     }
     delete window._minifb.windows[window_id];
 });
@@ -793,7 +821,7 @@ destroy_window_data(SWindowData *window_data) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    const unsigned supported_flags = MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP;
+    const unsigned supported_flags = MFB_WF_FULLSCREEN | MFB_WF_FULLSCREEN_DESKTOP | MFB_WF_RESIZABLE;
     unsigned effective_flags = flags;
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     uint32_t buffer_stride = 0;
@@ -821,8 +849,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     memset(window_data, 0, sizeof(SWindowData));
 
     int wants_fullscreen = ((effective_flags & MFB_WF_FULLSCREEN) || (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
+    int wants_resizable = ((effective_flags & MFB_WF_RESIZABLE) != 0u) ? 1 : 0;
     int canvas_existed = mfb_canvas_exists_js(window_title);
-    void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen);
+    void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen, wants_resizable);
     if (!specific) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);
         free(window_data);
@@ -933,6 +962,16 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
         else if (event.type == "char") {
             Module._window_data_call_char_input_func(window_data, event.code);
         }
+        else if (event.type == "resize") {
+            // Reached from mfb_update_events, which has no framebuffer to paint
+            // with, so the canvas stays blank until the application paints again.
+            // Reporting the size late instead would desync canvas.width from the
+            // window size that getMousePos uses to map pointer coordinates.
+            if (w.syncCanvasBackingSize) {
+                w.syncCanvasBackingSize();
+            }
+            Module._window_data_update_window_size(window_data, w.canvas.width, w.canvas.height);
+        }
     }
     return Module._window_data_get_close(window_data) ? MFB_STATE_EXIT : MFB_STATE_OK;
 });
@@ -989,9 +1028,14 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
         width = canvas.width;
         height = canvas.height;
     }
-    else {
+    else if (w.resizable === false) {
         if (canvas.width != width) canvas.width = width;
         if (canvas.height != height) canvas.height = height;
+    }
+    else if (w.syncCanvasBackingSize) {
+        // Resize before painting: assigning canvas.width clears the surface,
+        // so doing it afterwards would leave the frame blank until the next one.
+        w.syncCanvasBackingSize();
     }
     Module._window_data_update_window_size(window_data, canvas.width, canvas.height);
     Module._window_data_set_buffer_size(window_data, width, height);

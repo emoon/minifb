@@ -971,12 +971,69 @@ Assuming the build generates `my_app.wasm` and `my_app.js`, the simplest `.html`
 </html>
 ```
 
+#### Canvas size and resizing
+
+The canvas has two independent sizes. `canvas.width` and `canvas.height` are the
+drawing buffer in real pixels. The CSS `width` and `height` are the layout box the
+browser paints it into. MiniFB uses one or the other depending on the window flags.
+
+**Without `MFB_WF_RESIZABLE`** the backend forces the drawing buffer to the
+framebuffer size on every update. Page CSS cannot change it, and the window never
+resizes. This is the default and gives a pixel exact canvas.
+
+**With `MFB_WF_RESIZABLE`** the drawing buffer follows the CSS layout box,
+multiplied by `devicePixelRatio` so it stays sharp on HiDPI screens. A
+`ResizeObserver` reports every change through the resize callback. Give the canvas
+a relative CSS size, otherwise the layout box never changes and no resize is ever
+reported:
+
+```html
+<!-- resizes with the window -->
+<canvas id="my_app" style="width: 90vw; height: 70vh"></canvas>
+
+<!-- never resizes: a fixed size in px is the same as not being resizable -->
+<canvas id="my_app" style="width: 640px; height: 480px"></canvas>
+```
+
+MiniFB stretches the framebuffer to fill the whole canvas, exactly as the X11 and
+Windows backends do. So a resizable window has to deal with aspect ratio, and there
+are two ways:
+
+1. **Reallocate the framebuffer** in the resize callback, to the size the callback
+   reports. The buffer then always matches the canvas and nothing is ever
+   stretched. Any CSS size works. `examples/noise.c` and `examples/timer.c` do
+   this.
+2. **Keep a fixed framebuffer** and give the canvas the same aspect ratio, so the
+   stretch is uniform:
+
+   ```html
+   <canvas id="my_app" style="width: min(90vw, 93vh); aspect-ratio: 4 / 3"></canvas>
+   ```
+
+   The `93vh` is derived, not arbitrary. At 4:3 the height is 75% of the width, so
+   capping the height at `70vh` caps the width at `70 / 0.75 = 93vh`. The `min()`
+   applies whichever limit is tighter, so the canvas never overflows a wide short
+   viewport or a narrow tall one.
+
+   As an alternative, call `mfb_set_viewport_best_fit()` to letterbox the
+   framebuffer inside a canvas of any shape.
+
 #### Limitations & caveats
 
 The web backend behaves differently in these areas:
 
-- In `mfb_open_ex()`, only fullscreen flags are currently interpreted (`MFB_WF_FULLSCREEN`, `MFB_WF_FULLSCREEN_DESKTOP`); other window flags are ignored
+- In `mfb_open_ex()`, only `MFB_WF_RESIZABLE` and the fullscreen flags (`MFB_WF_FULLSCREEN`, `MFB_WF_FULLSCREEN_DESKTOP`) are interpreted; `MFB_WF_BORDERLESS` and `MFB_WF_ALWAYS_ON_TOP` are ignored
+- A resize clears the canvas, so a resize handled from `mfb_update_events()` leaves it blank until the application paints again (explained below)
 - `mfb_set_target_fps()` / `mfb_get_target_fps()` store/query the target value, but do not currently control browser frame pacing (the browser event loop / RAF timing drives pacing)
+
+Resizing writes `canvas.width`, and the browser clears the canvas whenever that
+attribute is written. `mfb_update()` resizes before it paints, so the new frame
+hides the clear. `mfb_update_events()` has no framebuffer to paint with, so the
+canvas stays blank until the application paints again. `examples/input_events.c`
+shows this: it stops painting when the canvas loses focus, so resizing the browser
+window then blanks the canvas until you click it. Other backends behave the same
+way, because a window that does not repaint after a resize also shows invalid
+content.
 
 Core rendering, events, viewport and timers are supported. `mfb_get_monitor_scale()` returns `window.devicePixelRatio`, and `mfb_show_cursor()` hides the canvas cursor with `cursor: none`.
 

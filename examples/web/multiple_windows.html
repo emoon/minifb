@@ -10,8 +10,13 @@
 <body style="background: #222; color: #bbbbbb">
 <div style="display: flex; flex-direction: column; align-items: center;">
     <h2>Multiple Windows Test</h2>
-    <canvas id="Multiple Windows Test" style="background: #000;"></canvas>
-    <canvas id="Secondary Window" style="background: #000;"></canvas>
+    <!-- A relative canvas size is what makes the window resizable on the web:
+         the drawing buffer follows this layout box. This example keeps a fixed
+         4:3 framebuffer, so the canvas declares the same ratio to avoid stretching.
+         The vh limit is derived from it: at 4:3 the height is 75% of the width,
+         so capping the height at 70vh caps the width at 70 / 0.75 = 93vh. -->
+    <canvas id="Multiple Windows Test" style="background: #000; width: min(60vw, 62vh); aspect-ratio: 4 / 3"></canvas>
+    <canvas id="Secondary Window" style="background: #000; width: min(30vw, 31vh); aspect-ratio: 4 / 3"></canvas>
 </div>
 <script>
     async function init() { await multiple_windows() }

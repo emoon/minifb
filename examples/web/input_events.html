@@ -11,7 +11,12 @@
 <div style="display: flex; flex-direction: column; align-items: center;">
     <h2>Input Events Test</h2>
     <p>Open the development console to see events.</p>
-    <canvas id="Input Events Test" style="background: #000;"></canvas>
+    <!-- A relative canvas size is what makes the window resizable on the web:
+         the drawing buffer follows this layout box. This example keeps a fixed
+         4:3 framebuffer, so the canvas declares the same ratio to avoid stretching.
+         The vh limit is derived from it: at 4:3 the height is 75% of the width,
+         so capping the height at 70vh caps the width at 70 / 0.75 = 93vh. -->
+    <canvas id="Input Events Test" style="background: #000; width: min(90vw, 93vh); aspect-ratio: 4 / 3"></canvas>
 </div>
 <script>
     async function init() { await input_events() }
