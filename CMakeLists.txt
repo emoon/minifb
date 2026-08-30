@@ -501,7 +501,7 @@ function(minifb_add_example)
         # copy the example's .html file into the build directory after the example is built
         add_custom_command(TARGET ${arg_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
-                "examples/web/${arg_NAME}.html"
+                "${CMAKE_CURRENT_SOURCE_DIR}/examples/web/${arg_NAME}.html"
                 "${CMAKE_CURRENT_BINARY_DIR}"
             )
 
