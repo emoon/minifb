@@ -498,12 +498,21 @@ function(minifb_add_example)
             "-sSINGLE_FILE"
         )
 
-        # copy the example's .html file into the build directory after the example is built
-        add_custom_command(TARGET ${arg_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_SOURCE_DIR}/examples/web/${arg_NAME}.html"
-                "${CMAKE_CURRENT_BINARY_DIR}"
+        # Copy the example's .html file next to the generated .js.
+        # This is an OUTPUT rule rather than POST_BUILD so that editing the .html
+        # re-runs the copy on its own: a POST_BUILD command only runs when the
+        # target itself is rebuilt, and the .html is not a source of any target.
+        set(html_src "${CMAKE_CURRENT_SOURCE_DIR}/examples/web/${arg_NAME}.html")
+        set(html_dst "${CMAKE_CURRENT_BINARY_DIR}/${arg_NAME}.html")
+        add_custom_command(
+            OUTPUT  "${html_dst}"
+            COMMAND ${CMAKE_COMMAND} -E copy "${html_src}" "${html_dst}"
+            DEPENDS "${html_src}"
+            COMMENT "Copying ${arg_NAME}.html"
+            VERBATIM
             )
+        add_custom_target(${arg_NAME}_html DEPENDS "${html_dst}")
+        add_dependencies(${arg_NAME} ${arg_NAME}_html)
 
     elseif (IOS)
         if (${arg_IOS_STORYBOARD})
