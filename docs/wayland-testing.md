@@ -197,11 +197,32 @@ Five globals are optional. If you hide one, the window still opens, MiniFB logs 
 
 | Hidden global | Result |
 | --- | --- |
-| `zxdg_decoration_manager_v1` | no control over server-side decorations |
+| `zxdg_decoration_manager_v1` | MiniFB draws the frame with libdecor, or leaves the window bare |
 | `wp_fractional_scale_manager_v1` | integer surface scaling only |
 | `wp_viewporter` | integer surface scaling only |
 | `wl_seat` | no keyboard and no pointer input |
 | `wl_output` | no monitor scale tracking; scale stays at 1 |
+
+#### Testing the libdecor path
+
+Hiding `zxdg_decoration_manager_v1` is the way to test client-side decorations without changing compositor. Without that global the compositor draws no frame, so MiniFB draws one itself with libdecor:
+
+```sh
+MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+```
+
+Which of the three paths you get shows up in the log:
+
+```text
+INFO:    zxdg_decoration_manager_v1 is unavailable; trying libdecor for client-side decorations.
+INFO:    libdecor draws this window's frame.
+```
+
+```text
+WARNING: libdecor is unusable; this window will have no frame.
+```
+
+The second case happens when libdecor is missing, or when it is older than the build expected. MiniFB names the missing symbol in that case. A build made without the libdecor headers only ever takes the third path, and says so with the older wording about having no frame.
 
 ### Required globals
 
@@ -289,6 +310,57 @@ These are all of them. libwayland reads no others.
 | `WAYLAND_DISPLAY` | Which compositor socket to connect to. Point it at a nested or headless compositor to test against one |
 | `XDG_RUNTIME_DIR` | Where that socket lives. MiniFB also creates its shared memory file here when `memfd_create` is not available |
 | `WAYLAND_SOCKET` | An already connected file descriptor, passed in by a parent process. Not useful for testing |
+
+### From libdecor
+
+libdecor draws the window frame when the compositor offers no `xdg-decoration`. It reads two variables of its own, and both are useful here.
+
+| Variable | What it does |
+| --- | --- |
+| `LIBDECOR_PLUGIN_DIR` | Where to look for decoration plugins. Accepts several directories separated by `:` |
+| `LIBDECOR_FORCE_CSD` | Set it to `1` and libdecor ignores the compositor's `xdg-decoration`, so it always draws the frame itself |
+
+libdecor draws nothing on its own: it loads a plugin. Upstream ships two that distributions package, `libdecor-gtk` and `libdecor-cairo`, and they do not run the same code. Both are worth testing. The GTK one drives a GLib main context, which MiniFB has to let libdecor dispatch.
+
+libdecor loads every plugin it finds and keeps the one with the highest priority. GTK declares `HIGH` and Cairo declares `MEDIUM`, and neither ties that priority to a desktop, so GTK wins whenever both are installed. Which ones you have depends on the distribution: some package both, and some only Cairo.
+
+Start by looking at what is there:
+
+```sh
+ls /usr/lib/x86_64-linux-gnu/libdecor/plugins-1/
+```
+
+To pin one plugin, make a directory that holds only that one and point `LIBDECOR_PLUGIN_DIR` at it:
+
+```sh
+PLUGINS=/usr/lib/x86_64-linux-gnu/libdecor/plugins-1
+
+# Cairo
+mkdir -p /tmp/cairo-only && ln -sf $PLUGINS/libdecor-cairo.so /tmp/cairo-only/
+LIBDECOR_PLUGIN_DIR=/tmp/cairo-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+
+# GTK
+mkdir -p /tmp/gtk-only && ln -sf $PLUGINS/libdecor-gtk.so /tmp/gtk-only/
+LIBDECOR_PLUGIN_DIR=/tmp/gtk-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+```
+
+libdecor does not log which plugin it chose, and offers no way to ask. The plugin is a shared object, so look at what the process loaded:
+
+```sh
+grep -o '/[^ ]*libdecor[^ ]*' /proc/$(pidof my_program)/maps | sort -u
+```
+
+```text
+/memfd:libdecor-cairo
+/usr/lib/x86_64-linux-gnu/libdecor-0.so.0.100.0
+/usr/lib/x86_64-linux-gnu/libdecor/plugins-1/libdecor-cairo.so
+```
+
+With the GTK plugin you will also see `libgtk-3` and `libglib-2.0` in that list.
+
+If no plugin is installed at all, libdecor prints `No plugins found, falling back on no decorations` to stderr, on its own, and the window ends up with no frame.
+
+`LIBDECOR_FORCE_CSD` is a second way to reach the libdecor path, independent of MiniFB. It works on a compositor that does offer `xdg-decoration`, such as KWin.
 
 ### From xkbcommon
 

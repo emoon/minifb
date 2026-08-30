@@ -33,6 +33,10 @@ struct wp_viewporter;
 struct wp_viewport;
 struct zxdg_decoration_manager_v1;
 struct zxdg_toplevel_decoration_v1;
+#ifdef MINIFB_HAS_LIBDECOR
+struct libdecor;
+struct libdecor_frame;
+#endif
 struct xkb_context;
 struct xkb_keymap;
 struct xkb_state;
@@ -127,6 +131,14 @@ typedef struct {
     SWaylandPendingConfigure pending_configure;
     struct zxdg_decoration_manager_v1 *decoration_manager;
     struct zxdg_toplevel_decoration_v1 *toplevel_decoration;
+#ifdef MINIFB_HAS_LIBDECOR
+    // Non-NULL only while this window draws its frame through libdecor, which
+    // means the display's default queue also carries events for it. The frame
+    // owns the xdg_surface and xdg_toplevel, so shell_surface and toplevel stay
+    // null in that case.
+    struct libdecor         *libdecor_context;
+    struct libdecor_frame   *libdecor_frame;
+#endif
 
     uint32_t                compositor_id;
     uint32_t                shell_id;

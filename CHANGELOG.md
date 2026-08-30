@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Wayland client-side decorations**: when the compositor does not implement `xdg-decoration`, MiniFB now draws the window frame with libdecor instead of leaving the window bare. libdecor is opened with `dlopen` the first time a window needs it, so it is never a link-time dependency: a binary built on a machine that has libdecor still runs on one that does not. If the library, any symbol it needs, or the compositor support is missing, the window falls back to a plain undecorated toplevel and MiniFB says so in the log. CMake finds the headers with `pkg-config` and reports which case applies, including the common one where the runtime library is installed but the development package is not.
+
+### Changed
+
+- Wayland: the surface now declares its opaque region, and refreshes it whenever the surface changes size. The buffer format has no alpha channel, so the whole surface is opaque, but a compositor that is not told this may still blend it. Declaring it lets the compositor skip that work and discard whatever the window covers. GLFW and SDL do the same.
+
+### Known issues
+
+- Wayland on WSLg: maximizing a window that libdecor decorates leaves the drop shadow of the floating window drawn over the maximized one, at its previous size and position. MiniFB removes the shadow correctly and the compositor confirms it, so this is not specific to MiniFB: the same artifact appears with GLFW and was reported against FLTK in [microsoft/wslg#914](https://github.com/microsoft/wslg/issues/914). It does not happen on native Linux compositors. Resizing the window by hand clears it.
+
 ## [0.12.0]
 
 ### Added

@@ -553,6 +553,7 @@ sudo apt-get install -y \
 - **libwayland-dev**: Wayland client libraries and headers
 - **libxkbcommon-dev**: Keyboard handling library
 - **wayland-protocols**: Wayland protocol definitions
+- **libdecor-0-dev** (optional): Client-side window decorations. See [Window Decorations](#window-decorations)
 
 Equivalent packages for other distros:
 
@@ -578,6 +579,34 @@ mkdir build-wayland
 cd build-wayland
 cmake .. -DMINIFB_USE_WAYLAND_API=ON
 ```
+
+#### Window Decorations
+
+Wayland has no window frames of its own. Who draws the title bar and the borders depends on the compositor:
+
+- If the compositor implements `xdg-decoration`, MiniFB asks it to draw the frame. KDE and most wlroots compositors do this.
+- If it does not, MiniFB draws the frame itself with [libdecor](https://gitlab.freedesktop.org/libdecor/libdecor). GNOME needs this path.
+- If libdecor is not available either, the window opens without a frame. It still works: you can move and resize it with the compositor's keyboard shortcuts.
+
+libdecor is optional and is never linked. MiniFB opens it with `dlopen` the first time a window needs it, so the same binary runs on machines that do not have it. To build with support, install the development package:
+
+```bash
+sudo apt-get install -y libdecor-0-dev     # Fedora: libdecor-devel, Arch: libdecor
+```
+
+CMake reports what it found while configuring:
+
+```text
+-- libdecor 0.2.2 found, client-side decorations will be loaded at run time
+```
+
+libdecor draws the frame through plugins that it also loads at run time (`libdecor-gtk`, `libdecor-cairo`). If the development package is installed but no plugin is, libdecor prints a warning of its own and the window ends up without a frame.
+
+##### Known issue on WSLg
+
+On WSLg, maximizing a window that libdecor decorates leaves the drop shadow of the floating window drawn on top of the maximized one, at the size and position the window had before.
+
+This is not specific to MiniFB. The same artifact appears with GLFW, and it was reported against FLTK in [microsoft/wslg#914](https://github.com/microsoft/wslg/issues/914), open since 2022. MiniFB removes the shadow when the window is maximized, and the compositor confirms it by reporting that the surface left every output, but WSLg keeps drawing it. Native Linux compositors do not show the problem. Resizing the window by hand clears it.
 
 #### Wayland Testing and Diagnostics
 

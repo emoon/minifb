@@ -123,8 +123,11 @@ set(SrcWayland
     src/wayland/generated/viewporter-client-protocol.h
 
     src/wayland/WaylandMiniFB.c
+    src/wayland/WaylandMiniFB.h
     src/wayland/WaylandMiniFB_input_keyboard.c
     src/wayland/WaylandMiniFB_input_keyboard.h
+    src/wayland/WaylandMiniFB_libdecor.c
+    src/wayland/WaylandMiniFB_libdecor.h
     src/wayland/WindowData_Way.h
     src/MiniFB_linux.c
     src/MiniFB_timespec.c
@@ -420,6 +423,25 @@ elseif (MINIFB_USE_WAYLAND_API)
         message(FATAL_ERROR "pkg-config is required to locate Wayland development files")
     endif()
     pkg_check_modules(WAYLAND REQUIRED wayland-client wayland-cursor xkbcommon)
+
+    # libdecor is opened with dlopen at run time, so only its headers are needed
+    # here. Linking against it would turn a fallback into a hard requirement.
+    pkg_check_modules(LIBDECOR libdecor-0)
+    if (LIBDECOR_FOUND)
+        message(STATUS "libdecor ${LIBDECOR_VERSION} found, client-side decorations will be loaded at run time")
+        target_include_directories(minifb PRIVATE ${LIBDECOR_INCLUDE_DIRS})
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_LIBDECOR)
+        target_link_libraries(minifb PRIVATE ${CMAKE_DL_LIBS})
+    else()
+        # The runtime library alone is common, as many toolkits pull it in. Only
+        # the headers are missing in that case, so say so instead of giving up.
+        find_library(LIBDECOR_RUNTIME NAMES libdecor-0.so.0)
+        if (LIBDECOR_RUNTIME)
+            message(STATUS "libdecor headers not found, but ${LIBDECOR_RUNTIME} is present, install libdecor-0-dev to enable client-side decorations")
+        else()
+            message(STATUS "libdecor not found, windows will be undecorated on compositors without xdg-decoration support")
+        endif()
+    endif()
 
     target_include_directories(minifb PRIVATE ${WAYLAND_INCLUDE_DIRS})
     target_link_directories(minifb PRIVATE ${WAYLAND_LIBRARY_DIRS})

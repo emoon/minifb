@@ -20,7 +20,11 @@
 #include "MiniFB_timespec.h"
 #include "WindowData.h"
 #include "WindowData_Way.h"
+#include "WaylandMiniFB.h"
 #include "WaylandMiniFB_input_keyboard.h"
+#ifdef MINIFB_HAS_LIBDECOR
+    #include "WaylandMiniFB_libdecor.h"
+#endif
 
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -558,6 +562,28 @@ dispatch_queue_pending_count(SWindowData *window_data, struct wl_event_queue *qu
 }
 
 //-------------------------------------
+// libdecor keeps its objects on the display's default queue and offers no way
+// to move them elsewhere, so that queue must be drained alongside the owned
+// ones. Returns the number of events dispatched, or a negative value on
+// failure. Every call site must be outside a pending display read.
+//-------------------------------------
+static int
+dispatch_default_pending(SWindowData *window_data) {
+#ifdef MINIFB_HAS_LIBDECOR
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+
+    if (window_data_specific->display == NULL) {
+        return 0;
+    }
+
+    return wayland_libdecor_dispatch_pending(window_data_specific);
+#else
+    kUnused(window_data);
+    return 0;
+#endif
+}
+
+//-------------------------------------
 static bool
 dispatch_owned_pending(SWindowData *window_data) {
     SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
@@ -573,6 +599,10 @@ dispatch_owned_pending(SWindowData *window_data) {
     }
 
     if (dispatch_queue_pending_count(window_data, window_data_specific->window_queue) == -1) {
+        return false;
+    }
+
+    if (dispatch_default_pending(window_data) < 0) {
         return false;
     }
 
@@ -635,6 +665,13 @@ dispatch_queue_timeout(SWindowData *window_data,
     if (timeout != NULL) {
         clock_gettime(CLOCK_MONOTONIC, &now);
         deadline = ts_add(now, *timeout);
+    }
+
+    // prepare_read_queue only reports events pending on its own queue, so the
+    // default queue has to be emptied here. Otherwise its events wait until the
+    // poll below wakes up for some other reason.
+    if (dispatch_default_pending(window_data) < 0) {
+        return false;
     }
 
     if (wl_display_prepare_read_queue(window_data_specific->display, read_queue) == -1) {
@@ -712,6 +749,15 @@ dispatch_queue_timeout(SWindowData *window_data,
         // A display read can enqueue events on either owned queue. Do not
         // block again while the other queue has callbacks ready to dispatch.
         result = dispatch_queue_pending_count(window_data, other_queue);
+        if (result < 0) {
+            return false;
+        }
+
+        if (result != 0) {
+            return true;
+        }
+
+        result = dispatch_default_pending(window_data);
         if (result < 0) {
             return false;
         }
@@ -1049,6 +1095,12 @@ destroy(SWindowData *window_data) {
     // Order: extensions first, then core objects, then connection.
     // Surface extensions and shell children must go before the surface and the
     // xdg_wm_base they were created from.
+
+#ifdef MINIFB_HAS_LIBDECOR
+    // The frame owns an xdg_surface built from our wl_surface, so it has to go
+    // before the surface does.
+    wayland_libdecor_release(window_data_specific);
+#endif
 
     kWaylandDestroy(window_data_specific->toplevel_decoration,     zxdg_toplevel_decoration_v1_destroy);
     kWaylandDestroy(window_data_specific->toplevel,                xdg_toplevel_destroy);
@@ -2474,6 +2526,49 @@ wl_registry_listener registry_listener = {
 };
 
 //-------------------------------------
+void
+wayland_update_opaque_region(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    if (window_data_specific->compositor == NULL || window_data_specific->surface == NULL) {
+        return;
+    }
+
+    struct wl_region *region = wl_compositor_create_region(window_data_specific->compositor);
+    if (region == NULL) {
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: could not create the opaque region for this surface.");
+        return;
+    }
+
+    wl_region_add(region, 0, 0, (int32_t) window_data->window_width, (int32_t) window_data->window_height);
+    wl_surface_set_opaque_region(window_data_specific->surface, region);
+    wl_region_destroy(region);
+}
+
+//-------------------------------------
+void
+wayland_attach_initial_buffer(SWindowData *window_data, SWindowData_Way *window_data_specific) {
+    uint32_t init_w = window_data->window_width;
+    uint32_t init_h = window_data->window_height;
+
+    SWaylandBufferSlot *slot = &window_data_specific->slots[0];
+    if (slot_ensure_buffer(slot, window_data_specific, init_w, init_h) == false) {
+        MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create initial buffer in first configure.");
+        window_data->close = true;
+        return;
+    }
+
+    wayland_update_opaque_region(window_data, window_data_specific);
+
+    wl_surface_attach(window_data_specific->surface, slot->wl_buf, 0, 0);
+
+    surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
+                   0, 0, init_w, init_h);
+
+    slot->busy = 1;
+    wl_surface_commit(window_data_specific->surface);
+    window_data->is_initialized = true;
+}
+
+//-------------------------------------
 static void
 apply_pending_toplevel_configure(SWindowData *window_data,
                                  SWindowData_Way *window_data_specific) {
@@ -2489,6 +2584,7 @@ apply_pending_toplevel_configure(SWindowData *window_data,
         window_data->window_width  = pending_configure->width;
         window_data->window_height = pending_configure->height;
         resize_dst(window_data, pending_configure->width, pending_configure->height);
+        wayland_update_opaque_region(window_data, window_data_specific);
         window_data->must_resize_context = true;
     }
 
@@ -2518,27 +2614,8 @@ handle_shell_surface_configure(void *data, struct xdg_surface *shell_surface, ui
         window_data_specific->startup_state_applied = 1;
     }
 
-    // On first configure, adapt slot 0 to the compositor's chosen size and
-    // attach it so the surface becomes visible.
-    if (!window_data->is_initialized) {
-        uint32_t init_w = window_data->window_width;
-        uint32_t init_h = window_data->window_height;
-
-        SWaylandBufferSlot *slot = &window_data_specific->slots[0];
-        if (slot_ensure_buffer(slot, window_data_specific, init_w, init_h) == false) {
-            MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create initial buffer in first configure.");
-            window_data->close = true;
-        }
-        else {
-            wl_surface_attach(window_data_specific->surface, slot->wl_buf, 0, 0);
-
-            surface_damage(window_data_specific->surface, window_data_specific->compositor_version,
-                           0, 0, init_w, init_h);
-
-            slot->busy = 1;
-            wl_surface_commit(window_data_specific->surface);
-            window_data->is_initialized = true;
-        }
+    if (window_data->is_initialized == false) {
+        wayland_attach_initial_buffer(window_data, window_data_specific);
     }
 }
 
@@ -2948,6 +3025,25 @@ create_shm_buffer(SWindowData *window_data, SWindowData_Way *window_data_specifi
 static bool
 create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_specific,
                     unsigned effective_flags, const char *window_title, unsigned width, unsigned height) {
+#ifdef MINIFB_HAS_LIBDECOR
+    // Without xdg-decoration the compositor draws no frame, so try to draw it
+    // here. A borderless window does not need one.
+    if (window_data_specific->decoration_manager == NULL &&
+        (effective_flags & MFB_WF_BORDERLESS) == 0) {
+        if (wayland_libdecor_create_toplevel(window_data, window_data_specific, effective_flags,
+                                             window_title, MFB_STR(MFB_APP_ID), width, height) == true) {
+            MFB_LOG(MFB_LOG_INFO, "WaylandMiniFB: libdecor draws this window's frame.");
+            return true;
+        }
+
+        if (window_data_specific->libdecor_frame != NULL) {
+            return false;
+        }
+
+        MFB_LOG(MFB_LOG_WARNING, "WaylandMiniFB: libdecor is unusable; this window will have no frame.");
+    }
+#endif
+
     window_data_specific->shell_surface = xdg_wm_base_get_xdg_surface(window_data_specific->shell, window_data_specific->surface);
     if (!window_data_specific->shell_surface) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create xdg_surface.");
@@ -3138,8 +3234,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     if (!window_data_specific->decoration_manager) {
+#ifdef MINIFB_HAS_LIBDECOR
+        MFB_LOG(MFB_LOG_INFO,
+                "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; trying libdecor for client-side decorations.");
+#else
         MFB_LOG(MFB_LOG_WARNING,
                 "WaylandMiniFB: zxdg_decoration_manager_v1 is unavailable; this window will have no frame unless the compositor draws one.");
+#endif
     }
 
     if (!window_data_specific->fractional_scale_manager || !window_data_specific->viewporter) {
@@ -3972,6 +4073,14 @@ mfb_set_title(struct mfb_window *window, const char *title) {
     }
 
     kUnused(window_data);
+#ifdef MINIFB_HAS_LIBDECOR
+    if (window_data_specific->display != NULL &&
+        wayland_libdecor_set_title(window_data_specific, title) == true) {
+        flush_request(window_data_specific->display, "title update");
+        return;
+    }
+#endif
+
     if (window_data_specific->display == NULL || window_data_specific->toplevel == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_set_title cannot update a window without an active Wayland toplevel.");
         return;
