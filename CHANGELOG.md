@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0]
+
 ### Added
 
 - **Wayland client-side decorations**: when the compositor does not implement `xdg-decoration`, MiniFB now draws the window frame with libdecor instead of leaving the window bare. libdecor is opened with `dlopen` the first time a window needs it, so it is never a link-time dependency: a binary built on a machine that has libdecor still runs on one that does not. If the library, any symbol it needs, or the compositor support is missing, the window falls back to a plain undecorated toplevel and MiniFB says so in the log. CMake finds the headers with `pkg-config` and reports which case applies, including the common one where the runtime library is installed but the development package is not.
@@ -192,7 +194,8 @@ git fetch origin --tags --force
 - The project has been available on GitHub since 2014.
 - Changes before version 0.9.0 were not tracked with formal release versions.
 
-[Unreleased]: https://github.com/emoon/minifb/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/emoon/minifb/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/emoon/minifb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/emoon/minifb/releases/tag/v0.12.0
 [0.11.0]: https://github.com/emoon/minifb/releases/tag/v0.11.0
 [0.10.1]: https://github.com/emoon/minifb/releases/tag/v0.10.1

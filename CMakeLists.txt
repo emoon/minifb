@@ -6,7 +6,7 @@ if (IOS AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum iOS deployment target")
 endif()
 
-project(MiniFB VERSION 0.12.0 LANGUAGES C CXX)
+project(MiniFB VERSION 0.13.0 LANGUAGES C CXX)
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
