@@ -466,7 +466,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_MOUSEMOVE:
-            if (window_data) {
+            if (window_data != NULL && window_data_specific != NULL) {
                 if (window_data_specific->mouse_inside == false) {
                     window_data_specific->mouse_inside = true;
                     TRACKMOUSEEVENT tme;
@@ -507,7 +507,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
 
 #if !defined(USE_OPENGL_API)
-                BitBlt(window_data_specific->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+                if (window_data_specific != NULL) {
+                    BitBlt(window_data_specific->hdc, 0, 0, window_data->window_width, window_data->window_height, 0, 0, 0, BLACKNESS);
+                }
 #else
                 resize_GL(window_data);
 #endif
