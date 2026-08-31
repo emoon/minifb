@@ -256,7 +256,7 @@ On Android and iOS, touch positions carry the pointer id in their upper bits:
 
 - `mfb_get_mouse_x()`, `mfb_get_mouse_y()` and the `x`/`y` given to `mfb_mouse_move_func` are packed values. Decode them with `mfb_decode_touch()`, or one at a time with `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`. On desktop, Web and DOS the id is always `0`.
 - The pointer id also arrives as the `button` argument of `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
-- An external mouse on Android is the exception: it reports the real button, like the desktop backends. The device goes in the packed pointer id instead. A mouse or hovering stylus always reports `MFB_POINTER_ID_MOUSE`, a finger always a lower id, so `mfb_decode_touch_id(mfb_get_mouse_x(window)) == MFB_POINTER_ID_MOUSE` tells them apart.
+- An external mouse on Android is the exception: it reports the real button, like the desktop backends. The device goes in the packed pointer id instead. A mouse or hovering stylus reports `MFB_POINTER_ID_MOUSE`, and fingers take the ids Android hands out, starting at `0`, so `mfb_decode_touch_id(mfb_get_mouse_x(window)) == MFB_POINTER_ID_MOUSE` tells them apart.
 
 `mfb_get_mouse_scroll_x()` and `mfb_get_mouse_scroll_y()` only hold the delta of the last event pump: MiniFB sets them to `0.0f` before pumping events, then writes the delta if a scroll event arrives during that pump.
 

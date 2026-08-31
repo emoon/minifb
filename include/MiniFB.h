@@ -107,7 +107,8 @@ int                 mfb_get_mouse_y(struct mfb_window *window);             // L
 // Mobile decoding preserves signed position values.
 // Output pointers may be NULL.
 // Pointer id reported for an external pointing device (mouse, trackpad or hover
-// capable stylus) instead of a finger. Fingers always report a lower id.
+// capable stylus) instead of a finger. Fingers take the ids Android hands out,
+// starting at 0.
 #define MFB_POINTER_ID_MOUSE 15
 void                mfb_decode_touch(int combined, int *pos, int *id);
 int                 mfb_decode_touch_pos(int combined);               // Extract position from a packed touch value.
