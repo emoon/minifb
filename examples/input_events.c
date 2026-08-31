@@ -34,11 +34,13 @@ print_getters(struct mfb_window *window) {
     float scroll_x = 0.0f, scroll_y = 0.0f;
     float scale_x = 0.0f, scale_y = 0.0f;
     bool is_active = false;
+    bool is_mouse_inside = false;
 
     const char *key_name = mfb_get_key_name(MFB_KB_KEY_ESCAPE);
     const uint8_t *key_buffer = mfb_get_key_buffer(window);
 
     is_active = mfb_is_window_active(window);
+    is_mouse_inside = mfb_is_mouse_inside(window);
     win_w = mfb_get_window_width(window);
     win_h = mfb_get_window_height(window);
     mfb_get_window_size(window, &win_sw, &win_sh);
@@ -67,6 +69,7 @@ print_getters(struct mfb_window *window) {
     MFB_LOGI(TEST_TAG, "[getters frame=%d]", g_frame_count);
     MFB_LOGI(TEST_TAG, "  key_name(MFB_KB_KEY_ESCAPE): %s", key_name ? key_name : "(null)");
     MFB_LOGI(TEST_TAG, "  is_window_active: %d", is_active);
+    MFB_LOGI(TEST_TAG, "  is_mouse_inside: %d", is_mouse_inside);
     MFB_LOGI(TEST_TAG, "  target_fps: %u", fps);
     MFB_LOGI(TEST_TAG, "  monitor_scale: %f, %f", scale_x, scale_y);
     MFB_LOGI(TEST_TAG, "  window_size: %u x %u", win_w, win_h);
@@ -211,7 +214,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
-    //MFB_LOGI(TEST_TAG, "mouse_move: %d, %d", x, y);
+    MFB_LOGI(TEST_TAG, "mouse_move: %d, %d", x, y);
 }
 
 //-------------------------------------
@@ -222,6 +225,16 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
         window_title = (const char *) mfb_get_user_data(window);
     }
     MFB_LOGI(TEST_TAG, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]", window_title, delta_x, delta_y, mod);
+}
+
+//-------------------------------------
+static void
+mouse_enter(struct mfb_window *window, bool is_inside) {
+    const char *window_title = "";
+    if (window) {
+        window_title = (const char *) mfb_get_user_data(window);
+    }
+    MFB_LOGI(TEST_TAG, "%s > mouse_enter: %d", window_title, is_inside);
 }
 
 //-------------------------------------
@@ -254,6 +267,7 @@ main() {
     mfb_set_mouse_button_callback(window, mouse_btn);
     mfb_set_mouse_move_callback(window, mouse_move);
     mfb_set_mouse_scroll_callback(window, mouse_scroll);
+    mfb_set_mouse_enter_callback(window, mouse_enter);
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 

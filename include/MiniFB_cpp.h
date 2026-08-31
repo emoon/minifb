@@ -23,6 +23,7 @@ void mfb_set_char_input_callback  (std::function<void(struct mfb_window *, unsig
 void mfb_set_mouse_button_callback(std::function<void(struct mfb_window *, mfb_mouse_button, mfb_key_mod, bool)> func, struct mfb_window *window);
 void mfb_set_mouse_move_callback  (std::function<void(struct mfb_window *, int, int)>                            func, struct mfb_window *window);
 void mfb_set_mouse_scroll_callback(std::function<void(struct mfb_window *, mfb_key_mod, float, float)>           func, struct mfb_window *window);
+void mfb_set_mouse_enter_callback (std::function<void(struct mfb_window *, bool)>                                func, struct mfb_window *window);
 //-------------------------------------
 
 //-------------------------------------
@@ -49,6 +50,9 @@ void mfb_set_mouse_move_callback(struct mfb_window *window, T *obj, void (T::*me
 
 template <class T>
 void mfb_set_mouse_scroll_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_key_mod, float, float));
+
+template <class T>
+void mfb_set_mouse_enter_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, bool));
 //-------------------------------------
 
 //-------------------------------------
@@ -66,6 +70,7 @@ class mfb_stub {
     friend void mfb_set_mouse_button_callback(std::function<void(struct mfb_window *, mfb_mouse_button, mfb_key_mod, bool)> func, struct mfb_window *window);
     friend void mfb_set_mouse_move_callback  (std::function<void(struct mfb_window *, int, int)>                            func, struct mfb_window *window);
     friend void mfb_set_mouse_scroll_callback(std::function<void(struct mfb_window *, mfb_key_mod, float, float)>           func, struct mfb_window *window);
+    friend void mfb_set_mouse_enter_callback (std::function<void(struct mfb_window *, bool)>                                func, struct mfb_window *window);
 
     template <class T>
     friend void mfb_set_active_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, bool));
@@ -83,6 +88,8 @@ class mfb_stub {
     friend void mfb_set_mouse_move_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, int, int));
     template <class T>
     friend void mfb_set_mouse_scroll_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, mfb_key_mod, float, float));
+    template <class T>
+    friend void mfb_set_mouse_enter_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *, bool));
 
     static mfb_stub *get_instance(struct mfb_window *window);
 
@@ -94,6 +101,7 @@ class mfb_stub {
     static void mouse_btn_stub(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed);
     static void mouse_move_stub(struct mfb_window *window, int x, int y);
     static void scroll_stub(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y);
+    static void mouse_enter_stub(struct mfb_window *window, bool is_inside);
 
     struct mfb_window                                                           *m_window;
     std::function<void(struct mfb_window *window, bool)>                        m_active;
@@ -104,6 +112,7 @@ class mfb_stub {
     std::function<void(struct mfb_window *window, mfb_mouse_button, mfb_key_mod, bool)>   m_mouse_btn;
     std::function<void(struct mfb_window *window, int, int)>                    m_mouse_move;
     std::function<void(struct mfb_window *window, mfb_key_mod, float, float)>   m_scroll;
+    std::function<void(struct mfb_window *window, bool)>                        m_mouse_enter;
 };
 
 //-------------------------------------
@@ -184,6 +193,16 @@ inline void mfb_set_mouse_scroll_callback(struct mfb_window *window, T *obj, voi
     mfb_stub    *stub = mfb_stub::get_instance(window);
     stub->m_scroll = std::bind(method, obj, _1, _2, _3, _4);
     mfb_set_mouse_scroll_callback(window, mfb_stub::scroll_stub);
+}
+
+//-------------------------------------
+template <class T>
+inline void mfb_set_mouse_enter_callback(struct mfb_window *window, T *obj, void (T::*method)(struct mfb_window *window, bool)) {
+    using namespace std::placeholders;
+
+    mfb_stub    *stub = mfb_stub::get_instance(window);
+    stub->m_mouse_enter = std::bind(method, obj, _1, _2);
+    mfb_set_mouse_enter_callback(window, mfb_stub::mouse_enter_stub);
 }
 
 #endif

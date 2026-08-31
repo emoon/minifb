@@ -82,11 +82,15 @@ void                mfb_set_char_input_callback(struct mfb_window *window, mfb_c
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback);
+// Fires when the cursor enters or leaves the window. Never fires on backends without a
+// cursor (iOS, DOS) or when no pointing device is connected (Android).
+void                mfb_set_mouse_enter_callback(struct mfb_window *window, mfb_mouse_enter_func callback);
 
 // Getters
 const char *        mfb_get_key_name(mfb_key key);
 
 bool                mfb_is_window_active(struct mfb_window *window);
+bool                mfb_is_mouse_inside(struct mfb_window *window);      // On DOS, true whenever a mouse driver is present.
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
@@ -102,6 +106,9 @@ int                 mfb_get_mouse_y(struct mfb_window *window);             // L
 // Desktop/Web/DOS: pos=combined, id=0.
 // Mobile decoding preserves signed position values.
 // Output pointers may be NULL.
+// Pointer id reported for an external pointing device (mouse, trackpad or hover
+// capable stylus) instead of a finger. Fingers always report a lower id.
+#define MFB_POINTER_ID_MOUSE 15
 void                mfb_decode_touch(int combined, int *pos, int *id);
 int                 mfb_decode_touch_pos(int combined);               // Extract position from a packed touch value.
 int                 mfb_decode_touch_id(int combined);                // Extract pointer id from a packed touch value.

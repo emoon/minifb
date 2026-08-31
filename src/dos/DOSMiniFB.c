@@ -236,6 +236,10 @@ init_mouse(SWindowData *window_data) {
 
   regs.x.ax = 2;
   __dpmi_int(0x33, &regs);
+
+  // There is no window here and the driver range covers the whole screen, so the
+  // pointer can never be outside it. The event is never emitted, only the state.
+  window_data->is_mouse_inside = true;
 }
 
 //-------------------------------------

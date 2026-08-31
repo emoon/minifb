@@ -398,6 +398,33 @@ window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, flo
 }
 
 //-------------------------------------
+// A cancelled pointer never delivers a release to the canvas or the body, the two places
+// button state is tracked from, so whatever it left pressed stays pressed unless it is
+// released here.
+EM_EXPORT void
+window_data_release_mouse_buttons(SWindowData *window_data) {
+    if (window_data == NULL) return;
+
+    for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
+        if (window_data->mouse_button_status[button] != 0) {
+            window_data->mouse_button_status[button] = 0;
+            kCall(mouse_btn_func, (mfb_mouse_button) button, (mfb_key_mod) window_data->mod_keys, false);
+        }
+    }
+}
+
+//-------------------------------------
+EM_EXPORT void
+window_data_call_mouse_enter_func(SWindowData *window_data, bool is_inside) {
+    if (window_data == NULL) return;
+    // The event queue drops its oldest entries when it overflows, so compare
+    // against the stored state instead of trusting the events to alternate.
+    if (window_data->is_mouse_inside == is_inside) return;
+    window_data->is_mouse_inside = is_inside;
+    kCall(mouse_enter_func, is_inside);
+}
+
+//-------------------------------------
 EM_EXPORT bool
 window_data_get_close(SWindowData *window_data) {
     if (!window_data) return true;
@@ -676,6 +703,37 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         w.globalMouseupTarget.addEventListener("mouseup", w.handlers.bodyMouseup, false);
     }
 
+    // Touch is ignored: a tap fires enter/leave around every contact and touch
+    // input already goes through the touch handlers, so there is no cursor
+    // hovering the canvas to report. pointercancel counts as a leave because
+    // the pointer stream ends there and the matching leave may never arrive.
+    // Capturing the pointer keeps the canvas as its target while a button is held, so no
+    // leave is reported until the drag ends. This matches the implicit grabs of X11 and
+    // Wayland, the tracking area of macOS, and what the Windows backend does with
+    // SetCapture. The browser releases the capture on pointerup and only then reports the
+    // leave, if the pointer ended up outside.
+    w.handlers.pointerDown = (event) => {
+        if (event.pointerType === "touch") return;
+        try {
+            canvas.setPointerCapture(event.pointerId);
+        }
+        catch (e) {
+            // The pointer is already gone; nothing to capture.
+        }
+    };
+    canvas.addEventListener("pointerdown", w.handlers.pointerDown);
+
+    w.handlers.pointerEnterOrLeave = (event) => {
+        if (event.pointerType === "touch") return;
+        if (event.type === "pointercancel") {
+            enqueueEvent({ type: "mousecancel" });
+        }
+        enqueueEvent({ type: "mouseenter", is_inside: event.type === "pointerenter" });
+    };
+    canvas.addEventListener("pointerenter", w.handlers.pointerEnterOrLeave);
+    canvas.addEventListener("pointerleave", w.handlers.pointerEnterOrLeave);
+    canvas.addEventListener("pointercancel", w.handlers.pointerEnterOrLeave);
+
     w.handlers.wheel = (event) => {
             event.preventDefault();
             let mod = getMfbKeyModFromEvent(event);
@@ -777,6 +835,11 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
         if (w.globalMouseupTarget) {
             w.globalMouseupTarget.removeEventListener("mouseup", w.handlers.bodyMouseup, false);
         }
+        w.canvas.removeEventListener("contextmenu", w.handlers.contextmenu);
+        w.canvas.removeEventListener("pointerdown", w.handlers.pointerDown);
+        w.canvas.removeEventListener("pointerenter", w.handlers.pointerEnterOrLeave);
+        w.canvas.removeEventListener("pointerleave", w.handlers.pointerEnterOrLeave);
+        w.canvas.removeEventListener("pointercancel", w.handlers.pointerEnterOrLeave);
         w.canvas.removeEventListener("wheel", w.handlers.wheel, false);
         w.canvas.removeEventListener("touchstart", w.handlers.touchstart, false);
         w.canvas.removeEventListener("touchmove", w.handlers.touchmove, false);
@@ -952,6 +1015,12 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
         }
         else if (event.type == "mousescroll") {
             Module._window_data_call_mouse_wheel_func(window_data, event.mod, event.x, event.y);
+        }
+        else if (event.type == "mouseenter") {
+            Module._window_data_call_mouse_enter_func(window_data, event.is_inside ? 1 : 0);
+        }
+        else if (event.type == "mousecancel") {
+            Module._window_data_release_mouse_buttons(window_data);
         }
         else if (event.type == "keydown") {
             Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 1);

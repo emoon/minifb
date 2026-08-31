@@ -55,6 +55,7 @@ struct mfb_stub_vector {
             instance->m_mouse_btn = {};
             instance->m_mouse_move = {};
             instance->m_scroll = {};
+            instance->m_mouse_enter = {};
             return;
         }
     }
@@ -139,6 +140,13 @@ mfb_stub::scroll_stub(struct mfb_window *window, mfb_key_mod mod, float delta_x,
 }
 
 //-------------------------------------
+void
+mfb_stub::mouse_enter_stub(struct mfb_window *window, bool is_inside) {
+    mfb_stub    *stub = mfb_stub::get_instance(window);
+    stub->m_mouse_enter(window, is_inside);
+}
+
+//-------------------------------------
 
 //-------------------------------------
 void
@@ -218,4 +226,14 @@ mfb_set_mouse_scroll_callback(std::function<void(struct mfb_window *, mfb_key_mo
     mfb_stub    *stub = mfb_stub::get_instance(window);
     stub->m_scroll = std::bind(func, _1, _2, _3, _4);
     mfb_set_mouse_scroll_callback(window, mfb_stub::scroll_stub);
+}
+
+//-------------------------------------
+void
+mfb_set_mouse_enter_callback(std::function<void(struct mfb_window *, bool)> func, struct mfb_window *window) {
+    using namespace std::placeholders;
+
+    mfb_stub    *stub = mfb_stub::get_instance(window);
+    stub->m_mouse_enter = std::bind(func, _1, _2);
+    mfb_set_mouse_enter_callback(window, mfb_stub::mouse_enter_stub);
 }

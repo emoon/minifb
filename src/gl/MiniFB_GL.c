@@ -179,8 +179,8 @@ create_GL_context(SWindowData *window_data) {
     MFB_LOG(MFB_LOG_DEBUG, "OpenGL context created (WGL)");
     init_GL(window_data);
 
-    SwapIntervalEXT    = (PFNWGLSWAPINTERVALEXTPROC)    wglGetProcAddress("wglSwapIntervalEXT");
-    GetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC) wglGetProcAddress("wglGetSwapIntervalEXT");
+    SwapIntervalEXT    = (PFNWGLSWAPINTERVALEXTPROC)    (mfb_proc) wglGetProcAddress("wglSwapIntervalEXT");
+    GetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC) (mfb_proc) wglGetProcAddress("wglGetSwapIntervalEXT");
     if (SwapIntervalEXT == NULL) {
         MFB_LOG(MFB_LOG_DEBUG, "WGL swap control extension not available");
     }

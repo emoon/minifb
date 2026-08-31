@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Cursor enter and leave**: `mfb_set_mouse_enter_callback` reports the cursor entering or leaving the window content area, and `mfb_is_mouse_inside` returns the same state. Works on Windows, macOS, X11, Wayland, Web and Android, and fires only on a real crossing. While a button is held the window keeps the pointer, so dragging out reports no leave until the button is released. Android needs a mouse, trackpad or hover capable stylus. iOS and DOS never fire it, but on DOS `mfb_is_mouse_inside` is true when a mouse driver is present.
+- **Web `MFB_WF_RESIZABLE`**: the canvas now follows its CSS layout box scaled by `devicePixelRatio`, so the page must give it a relative size. Without the flag the drawing buffer stays pinned to the framebuffer size, as before.
+
+### Changed
+
+- **Android external mouse buttons**: a mouse click reported the touch pointer id, always `0`, in the `button` argument. It now reports the real button, like the desktop backends. The device moves to the packed pointer id: a mouse or hovering stylus reports the new `MFB_POINTER_ID_MOUSE`, a finger a lower id. Touch is unchanged.
+
+### Fixed
+
+- **Windows: a mouse button released outside the window is now delivered.** Dragging out and releasing left the button marked as held forever, because Windows only sends button messages while the cursor is over the window. MiniFB now captures the mouse from the first press to the last release. The other backends get this from their platform.
+- Windows: a null backend window state could be dereferenced in `WM_MOUSEMOVE` and `WM_SIZE`.
+- macOS: `updateTrackingAreas` never called `[super updateTrackingAreas]`, which AppKit needs to rebuild its own tracking areas.
+- Web: the `contextmenu` listener was never removed when the window closed.
+- GCC builds are warning free again. Casting the result of `GetProcAddress` and `wglGetProcAddress` to a concrete signature trips `-Wcast-function-type`; the casts now go through `void (*)(void)`.
+- Web: the examples build again and the `.html` files are copied to the output directory.
+
 ## [0.13.0]
 
 ### Added

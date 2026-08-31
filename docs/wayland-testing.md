@@ -25,13 +25,13 @@ Both work in every build, not only in debug builds. MiniFB reads them only while
 
 ```sh
 # Use wl_seat version 4 instead of whatever the compositor offers.
-MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" ./my_program
+MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" ./input_events
 
 # Pretend the compositor has no viewporter.
-MINIFB_WAYLAND_DISABLE_GLOBALS="wp_viewporter" ./my_program
+MINIFB_WAYLAND_DISABLE_GLOBALS="wp_viewporter" ./input_events
 
 # Same, plus a full log of the Wayland traffic.
-MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> trace.txt
+MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./input_events 2> trace.txt
 ```
 
 ## `MINIFB_WAYLAND_FORCE_VERSIONS`
@@ -39,7 +39,7 @@ MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> t
 The value is a list of `interface=version` pairs, separated by commas. Spaces around the entries and around `=` are ignored.
 
 ```sh
-MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4, wl_output=1" ./my_program
+MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4, wl_output=1" ./input_events
 ```
 
 ### It can only lower the version
@@ -182,7 +182,7 @@ The list also stays this size. A new Wayland version adds a class only when Mini
 This hides globals completely, as if the compositor never advertised them. The value is a list of interface names, separated by commas.
 
 ```sh
-MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1,wp_viewporter" ./my_program
+MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1,wp_viewporter" ./input_events
 ```
 
 MiniFB logs every global it hides:
@@ -208,7 +208,7 @@ Five globals are optional. If you hide one, the window still opens, MiniFB logs 
 Hiding `zxdg_decoration_manager_v1` is the way to test client-side decorations without changing compositor. Without that global the compositor draws no frame, so MiniFB draws one itself with libdecor:
 
 ```sh
-MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./input_events
 ```
 
 Which of the three paths you get shows up in the log:
@@ -257,7 +257,7 @@ The last item has two states rather than four because step 1 needs both globals.
 `WAYLAND_DEBUG=client` is a libwayland feature. It prints every request and every event to stderr. Together with the two MiniFB variables, this is how you check a change from end to end: the trace shows what the compositor sent, and your program's own output shows what MiniFB made of it.
 
 ```sh
-MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> trace.txt
+MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./input_events 2> trace.txt
 ```
 
 `WAYLAND_DEBUG` takes a comma-separated list, and accepts `client`, `server` and `1`. For a client program, `1` means the same as `client`. Use `WAYLAND_DEBUG=client,server` when you run a nested compositor and your program in the same terminal, so you see both sides of the conversation.
@@ -287,13 +287,13 @@ libwayland colours the trace when stderr is a terminal. Writing to a file turns 
 Set `NO_COLOR=1` to be sure:
 
 ```sh
-NO_COLOR=1 WAYLAND_DEBUG=client ./my_program 2> trace.txt
+NO_COLOR=1 WAYLAND_DEBUG=client ./input_events 2> trace.txt
 ```
 
 To read the trace live instead, do the opposite:
 
 ```sh
-FORCE_COLOR=1 WAYLAND_DEBUG=client ./my_program 2>&1 | less -R
+FORCE_COLOR=1 WAYLAND_DEBUG=client ./input_events 2>&1 | less -R
 ```
 
 ## Other environment variables
@@ -337,17 +337,17 @@ PLUGINS=/usr/lib/x86_64-linux-gnu/libdecor/plugins-1
 
 # Cairo
 mkdir -p /tmp/cairo-only && ln -sf $PLUGINS/libdecor-cairo.so /tmp/cairo-only/
-LIBDECOR_PLUGIN_DIR=/tmp/cairo-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+LIBDECOR_PLUGIN_DIR=/tmp/cairo-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./input_events
 
 # GTK
 mkdir -p /tmp/gtk-only && ln -sf $PLUGINS/libdecor-gtk.so /tmp/gtk-only/
-LIBDECOR_PLUGIN_DIR=/tmp/gtk-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./my_program
+LIBDECOR_PLUGIN_DIR=/tmp/gtk-only MINIFB_WAYLAND_DISABLE_GLOBALS="zxdg_decoration_manager_v1" ./input_events
 ```
 
 libdecor does not log which plugin it chose, and offers no way to ask. The plugin is a shared object, so look at what the process loaded:
 
 ```sh
-grep -o '/[^ ]*libdecor[^ ]*' /proc/$(pidof my_program)/maps | sort -u
+grep -o '/[^ ]*libdecor[^ ]*' /proc/$(pidof input_events)/maps | sort -u
 ```
 
 ```text

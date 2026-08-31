@@ -159,6 +159,141 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
 }
 
 //-------------------------------------
+// Touchscreens also emit hover events: hover capable panels report a finger approaching and
+// the accessibility explore-by-touch mode turns finger drags into hover. Only a device that
+// owns a cursor or tracks proximity can tell that the pointer entered or left the view.
+static bool
+is_hover_capable_pointer(const AInputEvent *event, size_t index) {
+    int tool_type = AMotionEvent_getToolType(event, index);
+    if (tool_type == AMOTION_EVENT_TOOL_TYPE_MOUSE ||
+        tool_type == AMOTION_EVENT_TOOL_TYPE_STYLUS ||
+        tool_type == AMOTION_EVENT_TOOL_TYPE_ERASER) {
+        return true;
+    }
+
+    if (tool_type == AMOTION_EVENT_TOOL_TYPE_UNKNOWN) {
+        // Some devices leave the tool type unset, so fall back to the device source.
+        int source = AInputEvent_getSource(event);
+        return (source & AINPUT_SOURCE_MOUSE)  == AINPUT_SOURCE_MOUSE ||
+               (source & AINPUT_SOURCE_STYLUS) == AINPUT_SOURCE_STYLUS;
+    }
+
+    return false;
+}
+
+//-------------------------------------
+// Android sends a hover exit right before a pointer goes down, and nothing in that event
+// tells it apart from the pointer really leaving: some stylus hardware reports neither a
+// button nor a pressure there. The exit is therefore held back and any later event from a
+// hovering pointer cancels it, which is what SDL does for its pen proximity
+// (external/SDL/src/events/SDL_pen.c:497). What nothing cancels is reported once the event
+// queue has been drained.
+static void
+cancel_pending_hover_exit(SWindowData *window_data) {
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific != NULL) {
+        window_data_specific->pending_hover_exit = false;
+    }
+}
+
+//-------------------------------------
+static void
+flush_pending_hover_exit(SWindowData *window_data) {
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific == NULL || window_data_specific->pending_hover_exit == false) {
+        return;
+    }
+
+    window_data_specific->pending_hover_exit = false;
+    if (window_data->is_mouse_inside == true) {
+        window_data->is_mouse_inside = false;
+        kCall(mouse_enter_func, false);
+    }
+}
+
+//-------------------------------------
+static bool
+is_mouse_event(const AInputEvent *event) {
+    if (AMotionEvent_getToolType(event, 0) == AMOTION_EVENT_TOOL_TYPE_MOUSE) {
+        return true;
+    }
+
+    return (AInputEvent_getSource(event) & AINPUT_SOURCE_MOUSE) == AINPUT_SOURCE_MOUSE;
+}
+
+//-------------------------------------
+// A mouse reports its buttons as a bitmask, and a release arrives with the bit already
+// cleared, so the only reliable way to know what changed is to diff against the previous
+// state. Driving every mouse event through the same diff also makes the duplicated pairs
+// harmless: Android sends ACTION_DOWN and then ACTION_BUTTON_PRESS for one press, and the
+// second one finds nothing left to report.
+static void
+apply_mouse_button_state(SWindowData *window_data, uint32_t current) {
+    static const struct {
+        int32_t          android_button;
+        mfb_mouse_button button;
+    } mapping[] = {
+        { AMOTION_EVENT_BUTTON_PRIMARY,   MFB_MOUSE_BTN_1 },
+        { AMOTION_EVENT_BUTTON_SECONDARY, MFB_MOUSE_BTN_2 },
+        { AMOTION_EVENT_BUTTON_TERTIARY,  MFB_MOUSE_BTN_3 },
+        { AMOTION_EVENT_BUTTON_BACK,      MFB_MOUSE_BTN_4 },
+        { AMOTION_EVENT_BUTTON_FORWARD,   MFB_MOUSE_BTN_5 },
+    };
+
+    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    uint32_t previous = window_data_specific->mouse_button_state;
+    if (current == previous) {
+        return;
+    }
+    window_data_specific->mouse_button_state = current;
+
+    for (size_t i = 0; i < sizeof(mapping) / sizeof(mapping[0]); ++i) {
+        uint32_t bit         = (uint32_t) mapping[i].android_button;
+        bool     was_pressed = (previous & bit) != 0;
+        bool     is_pressed  = (current  & bit) != 0;
+        if (was_pressed == is_pressed) {
+            continue;
+        }
+
+        window_data->mouse_button_status[mapping[i].button] = is_pressed;
+        kCall(mouse_btn_func, mapping[i].button, 0, is_pressed);
+    }
+}
+
+//-------------------------------------
+static void
+update_mouse_buttons(SWindowData *window_data, const AInputEvent *event) {
+    apply_mouse_button_state(window_data, (uint32_t) AMotionEvent_getButtonState(event));
+}
+
+//-------------------------------------
+// The hover exit that precedes a press is ignored so the window keeps the pointer for the
+// whole gesture. Android sends no hover event to a view the pointer is no longer over, so
+// the position the gesture ends at is the only chance to report the leave. Entering is not
+// reported from here: a real crossing back in arrives as HOVER_ENTER.
+static void
+settle_mouse_inside(SWindowData *window_data, const AInputEvent *event, size_t index) {
+    // Android reports these as float, and truncating -0.4 to 0 would place a release just
+    // past the left or top edge back inside the window.
+    float x = AMotionEvent_getX(event, index);
+    float y = AMotionEvent_getY(event, index);
+    bool is_inside = x >= 0.0f && y >= 0.0f &&
+                     x < (float) window_data->window_width &&
+                     y < (float) window_data->window_height;
+
+    if (is_inside == true || window_data->is_mouse_inside == false) {
+        return;
+    }
+
+    window_data->is_mouse_inside = false;
+    kCall(mouse_enter_func, false);
+}
+
+//-------------------------------------
 static int32_t
 handle_input(struct android_app *app, AInputEvent *event) {
     if (app == NULL || event == NULL) {
@@ -198,39 +333,83 @@ handle_input(struct android_app *app, AInputEvent *event) {
                     window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
                     window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, id, 0, is_pressed);
+
+                    if (action_type == AMOTION_EVENT_ACTION_POINTER_UP &&
+                        is_hover_capable_pointer(event, (size_t) idx) == true) {
+                        settle_mouse_inside(window_data, event, (size_t) idx);
+                    }
                 }
                 break;
 
             case AMOTION_EVENT_ACTION_DOWN:
             case AMOTION_EVENT_ACTION_UP:
                 {
-                    bool is_pressed = (action_type == AMOTION_EVENT_ACTION_DOWN);
-                    int count = AMotionEvent_getPointerCount(event);
-                    for (int i=0; i < count; ++i) {
-                        int id = AMotionEvent_getPointerId(event, i);
-                        int x  = AMotionEvent_getX(event, i);
-                        int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
-                        window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
-                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
-                        kCall(mouse_btn_func, id, 0, is_pressed);
+                    if (action_type == AMOTION_EVENT_ACTION_DOWN && is_hover_capable_pointer(event, 0) == true) {
+                        cancel_pending_hover_exit(window_data);
                     }
+
+                    // A mouse reports the button it pressed, like the desktop backends do.
+                    // A finger has no button, so it keeps reporting its pointer id there.
+                    if (is_mouse_event(event)) {
+                        int x = (int) AMotionEvent_getX(event, 0);
+                        int y = (int) AMotionEvent_getY(event, 0);
+                        window_data->mouse_pos_x = mfb_pack_pos_id(x, MFB_POINTER_ID_MOUSE);
+                        window_data->mouse_pos_y = mfb_pack_pos_id(y, MFB_POINTER_ID_MOUSE);
+                        update_mouse_buttons(window_data, event);
+                    }
+                    else {
+                        bool is_pressed = (action_type == AMOTION_EVENT_ACTION_DOWN);
+                        int count = AMotionEvent_getPointerCount(event);
+                        for (int i=0; i < count; ++i) {
+                            int id = AMotionEvent_getPointerId(event, i);
+                            int x  = AMotionEvent_getX(event, i);
+                            int y  = AMotionEvent_getY(event, i);
+                            window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                            window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
+                            window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
+                            kCall(mouse_btn_func, id, 0, is_pressed);
+                        }
+                    }
+
+                    // A hover capable stylus takes the branch above but can be holding the
+                    // state just like a mouse, so the check covers both.
+                    if (action_type == AMOTION_EVENT_ACTION_UP && is_hover_capable_pointer(event, 0) == true) {
+                        settle_mouse_inside(window_data, event, 0);
+                    }
+                }
+                break;
+
+            case AMOTION_EVENT_ACTION_BUTTON_PRESS:
+            case AMOTION_EVENT_ACTION_BUTTON_RELEASE:
+                // Buttons pressed or released while another one is already down, which the
+                // ACTION_DOWN and ACTION_UP pair does not bracket.
+                if (is_mouse_event(event)) {
+                    update_mouse_buttons(window_data, event);
                 }
                 break;
 
             case AMOTION_EVENT_ACTION_MOVE:
                 {
-                    int count = AMotionEvent_getPointerCount(event);
-                    for (int i=0; i < count; ++i){
-                        int id = AMotionEvent_getPointerId(event, i);
-                        int x  = AMotionEvent_getX(event, i);
-                        int y  = AMotionEvent_getY(event, i);
-                        window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
-                        window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
-                        // MOVE events are only delivered while the pointer is down,
-                        // so the pressed state is always true by definition.
-                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
+                    if (is_mouse_event(event)) {
+                        int x = (int) AMotionEvent_getX(event, 0);
+                        int y = (int) AMotionEvent_getY(event, 0);
+                        window_data->mouse_pos_x = mfb_pack_pos_id(x, MFB_POINTER_ID_MOUSE);
+                        window_data->mouse_pos_y = mfb_pack_pos_id(y, MFB_POINTER_ID_MOUSE);
                         kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
+                    }
+                    else {
+                        int count = AMotionEvent_getPointerCount(event);
+                        for (int i=0; i < count; ++i){
+                            int id = AMotionEvent_getPointerId(event, i);
+                            int x  = AMotionEvent_getX(event, i);
+                            int y  = AMotionEvent_getY(event, i);
+                            window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
+                            window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
+                            // MOVE events are only delivered while the pointer is down,
+                            // so the pressed state is always true by definition.
+                            window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = true;
+                            kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
+                        }
                     }
                 }
                 break;
@@ -239,11 +418,25 @@ handle_input(struct android_app *app, AInputEvent *event) {
                 // Android cancelled the gesture (e.g., the system intercepted it).
                 // Release all active pointers to prevent ghost touches.
                 {
-                    int count = AMotionEvent_getPointerCount(event);
-                    for (int i = 0; i < count; ++i) {
-                        int id = AMotionEvent_getPointerId(event, i);
-                        window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = false;
-                        kCall(mouse_btn_func, id, 0, false);
+                    if (is_mouse_event(event)) {
+                        apply_mouse_button_state(window_data, 0);
+                    }
+                    else {
+                        int count = AMotionEvent_getPointerCount(event);
+                        for (int i = 0; i < count; ++i) {
+                            int id = AMotionEvent_getPointerId(event, i);
+                            window_data->mouse_button_status[id & MFB_MAX_MOUSE_BUTTONS_MASK] = false;
+                            kCall(mouse_btn_func, id, 0, false);
+                        }
+                    }
+
+                    // A cancel ends every pointer at once, and one event can carry a
+                    // finger and a stylus at different indices.
+                    int pointer_count = AMotionEvent_getPointerCount(event);
+                    for (int i = 0; i < pointer_count; ++i) {
+                        if (is_hover_capable_pointer(event, (size_t) i) == true) {
+                            settle_mouse_inside(window_data, event, (size_t) i);
+                        }
                     }
                 }
                 break;
@@ -253,16 +446,57 @@ handle_input(struct android_app *app, AInputEvent *event) {
                 // Only available when a Bluetooth/USB-OTG mouse or stylus is connected.
                 // Not a common use case on mobile; difficult to test without physical hardware.
                 {
-                    int id = AMotionEvent_getPointerId(event, 0);
-                    if (id < 0) {
-                        // Fallback id for hover events where Android does not provide a valid pointer id.
-                        id = (int) MFB_COMBINED_ID_MASK;
+                    // Touch exploration and hover capable panels report a finger here, and a
+                    // finger has to keep its own pointer id.
+                    uint32_t id = MFB_POINTER_ID_MOUSE;
+                    if (is_hover_capable_pointer(event, 0) == false) {
+                        int pointer_id = AMotionEvent_getPointerId(event, 0);
+                        id = (pointer_id >= 0) ? (uint32_t) pointer_id : 0u;
                     }
+
+                    if (id == MFB_POINTER_ID_MOUSE) {
+                        cancel_pending_hover_exit(window_data);
+                    }
+
                     int x = (int) AMotionEvent_getX(event, 0);
                     int y = (int) AMotionEvent_getY(event, 0);
-                    window_data->mouse_pos_x = mfb_pack_pos_id(x, (uint32_t) id);
-                    window_data->mouse_pos_y = mfb_pack_pos_id(y, (uint32_t) id);
+                    window_data->mouse_pos_x = mfb_pack_pos_id(x, id);
+                    window_data->mouse_pos_y = mfb_pack_pos_id(y, id);
                     kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
+                }
+                break;
+
+            case AMOTION_EVENT_ACTION_HOVER_ENTER:
+            case AMOTION_EVENT_ACTION_HOVER_EXIT:
+                // Pointer crossing the view border without pressing, reported by the same
+                // external mouse, trackpad or hover capable stylus that produces HOVER_MOVE.
+                {
+                    bool is_inside = (action_type == AMOTION_EVENT_ACTION_HOVER_ENTER);
+                    if (is_hover_capable_pointer(event, 0) == false) {
+                        break;
+                    }
+
+                    if (is_inside == false) {
+                        SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
+                        if (window_data_specific != NULL) {
+                            window_data_specific->pending_hover_exit = true;
+                        }
+                        break;
+                    }
+
+                    cancel_pending_hover_exit(window_data);
+                    if (window_data->is_mouse_inside == false) {
+                        // Entering carries the point where the pointer came in, so the
+                        // position is usable inside the callback even when no HOVER_MOVE
+                        // follows.
+                        int x = (int) AMotionEvent_getX(event, 0);
+                        int y = (int) AMotionEvent_getY(event, 0);
+                        window_data->mouse_pos_x = mfb_pack_pos_id(x, MFB_POINTER_ID_MOUSE);
+                        window_data->mouse_pos_y = mfb_pack_pos_id(y, MFB_POINTER_ID_MOUSE);
+
+                        window_data->is_mouse_inside = true;
+                        kCall(mouse_enter_func, true);
+                    }
                 }
                 break;
 
@@ -532,6 +766,8 @@ process_events(SWindowData *window_data, int timeout_ms) {
 
         poll_timeout_ms = 0;
     }
+
+    flush_pending_hover_exit(window_data);
 
     if (ident == ALOOPER_POLL_ERROR) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: ALooper_pollOnce returned ALOOPER_POLL_ERROR.");

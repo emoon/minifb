@@ -4,6 +4,30 @@
 #include <MiniFB_internal.h>
 
 //-------------------------------------
+// A drag keeps the pointer with the window, like the implicit grabs of X11 and Wayland and
+// the capture of Windows, so the exit is held back while a button is down. AppKit gives no
+// second chance once the drag ends, so whatever releases the last button settles the state
+// from the position the drag ended at.
+//
+// NSMouseInRect answers this in the view's own coordinates, so the answer does not depend
+// on which way MiniFB happens to expose Y, and it applies the edge and fractional
+// coordinate rules AppKit uses everywhere else.
+static void
+settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
+    if (mfb_any_mouse_button_pressed(window_data) == true) {
+        return;
+    }
+
+    NSPoint point = [view convertPoint:[event locationInWindow] fromView:nil];
+    if (NSMouseInRect(point, [view bounds], [view isFlipped]) == YES || window_data->is_mouse_inside == false) {
+        return;
+    }
+
+    window_data->is_mouse_inside = false;
+    kCall(mouse_enter_func, false);
+}
+
+//-------------------------------------
 @implementation OSXView
 
 //-------------------------------------
@@ -21,6 +45,10 @@
                                                    owner:self
                                                 userInfo:nil];
     [self addTrackingArea:tracking_area];
+
+    // AppKit installs its own tracking areas for cursor updates and tooltips, and it only
+    // gets the chance to rebuild them from here.
+    [super updateTrackingAreas];
 }
 
 #if !defined(USE_METAL_API)
@@ -139,6 +167,7 @@
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_1] = false;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_1, window_data->mod_keys, false);
+        settle_mouse_inside(window_data, self, event);
     }
 }
 
@@ -157,6 +186,7 @@
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_2] = false;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_2, window_data->mod_keys, false);
+        settle_mouse_inside(window_data, self, event);
     }
 }
 
@@ -189,6 +219,7 @@
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[mapped_button] = false;
         kCall(mouse_btn_func, button, window_data->mod_keys, false);
+        settle_mouse_inside(window_data, self, event);
     }
 }
 
@@ -237,12 +268,24 @@
 - (void)mouseExited:(NSEvent *)event {
     (void)event;
     MFB_LOG(MFB_LOG_TRACE, "mouse exit");
+    if (window_data == 0x0) {
+        return;
+    }
+
     // On mouse exit, refresh cursor rects so the window-specific cursor state is applied.
-    if (window_data != 0x0 && window_data->is_cursor_visible == false) {
+    if (window_data->is_cursor_visible == false) {
         OSXWindow *window = (OSXWindow *)[self window];
         if (window) {
             [window updateCursorRects];
         }
+    }
+
+    // The tracking area is rebuilt on every geometry change, and macOS can then send an exit
+    // without a matching enter, or repeat one, so only report real transitions. A drag holds
+    // the exit back; the button release settles it.
+    if (window_data->is_mouse_inside == true && mfb_any_mouse_button_pressed(window_data) == false) {
+        window_data->is_mouse_inside = false;
+        kCall(mouse_enter_func, false);
     }
 }
 
@@ -250,12 +293,21 @@
 - (void)mouseEntered:(NSEvent *)event {
     (void)event;
     MFB_LOG(MFB_LOG_TRACE, "mouse enter");
+    if (window_data == 0x0) {
+        return;
+    }
+
     // On mouse enter, refresh cursor rects so the window-specific cursor state is applied.
-    if (window_data != 0x0 && window_data->is_cursor_visible == false) {
+    if (window_data->is_cursor_visible == false) {
         OSXWindow *window = (OSXWindow *)[self window];
         if (window) {
             [window updateCursorRects];
         }
+    }
+
+    if (window_data->is_mouse_inside == false) {
+        window_data->is_mouse_inside = true;
+        kCall(mouse_enter_func, true);
     }
 }
 

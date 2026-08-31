@@ -5,6 +5,13 @@
 #include <stddef.h>
 
 //-------------------------------------
+// Loaders like GetProcAddress return a generic function pointer, and casting it
+// straight to a concrete signature is what -Wcast-function-type complains about.
+// GCC treats void (*)(void) as compatible with every function type, so going
+// through it silences the warning. GLFW and SDL use the same intermediate.
+typedef void (*mfb_proc)(void);
+
+//-------------------------------------
 #define kCall(func, ...)    if (window_data && window_data->func) window_data->func((struct mfb_window *) window_data, __VA_ARGS__);
 #define kUnused(var)        (void) var;
 
@@ -41,6 +48,26 @@ mfb_unpack_pos(uint32_t combined) {
 static inline uint32_t
 mfb_unpack_id(uint32_t combined) {
     return (combined >> MFB_COMBINED_POS_ID_SHIFT) & MFB_COMBINED_ID_MASK;
+}
+
+//-------------------------------------
+static inline bool
+mfb_any_mouse_button_pressed(SWindowData *window_data) {
+    for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
+        if (window_data->mouse_button_status[button] != 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+//-------------------------------------
+static inline bool
+mfb_is_point_inside_window(SWindowData *window_data, int x, int y) {
+    return x >= 0 && y >= 0 &&
+           (uint32_t) x < window_data->window_width &&
+           (uint32_t) y < window_data->window_height;
 }
 
 //-------------------------------------

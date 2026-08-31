@@ -104,6 +104,14 @@ public:
         }
         MFB_LOGI(TEST_TAG, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]", window_title, delta_x, delta_y, mod);
     }
+
+    void mouse_enter(struct mfb_window *window, bool is_inside) {
+        const char *window_title = "";
+        if (window) {
+            window_title = (const char *) mfb_get_user_data(window);
+        }
+        MFB_LOGI(TEST_TAG, "%s > mouse_enter: %d", window_title, is_inside);
+    }
 };
 
 //-------------------------------------
@@ -127,6 +135,7 @@ main() {
     mfb_set_mouse_button_callback(window, &e, &Events::mouse_button);
     mfb_set_mouse_move_callback(window, &e, &Events::mouse_move);
     mfb_set_mouse_scroll_callback(window, &e, &Events::mouse_scroll);
+    mfb_set_mouse_enter_callback(window, &e, &Events::mouse_enter);
 
 #elif defined(kUseLambdas)
 
@@ -218,6 +227,14 @@ main() {
         MFB_LOGI(TEST_TAG, "%s > mouse_scroll: x: %f, y: %f [key_mod: %x]", window_title, delta_x, delta_y, mod);
     }, window);
 
+    mfb_set_mouse_enter_callback([](struct mfb_window *window, bool is_inside) {
+        const char *window_title = "";
+        if (window) {
+            window_title = (const char *) mfb_get_user_data(window);
+        }
+        MFB_LOGI(TEST_TAG, "%s > mouse_enter: %d", window_title, is_inside);
+    }, window);
+
 #else
 
     using namespace std::placeholders;
@@ -230,6 +247,7 @@ main() {
     mfb_set_mouse_button_callback(std::bind(&Events::mouse_button, &e, _1, _2, _3, _4), window);
     mfb_set_mouse_move_callback  (std::bind(&Events::mouse_move,   &e, _1, _2, _3),     window);
     mfb_set_mouse_scroll_callback(std::bind(&Events::mouse_scroll, &e, _1, _2, _3, _4), window);
+    mfb_set_mouse_enter_callback (std::bind(&Events::mouse_enter,  &e, _1, _2),         window);
 
 #endif
 

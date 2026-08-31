@@ -1454,6 +1454,28 @@ refresh_cursor_surface(SWindowData *window_data) {
 }
 
 //-------------------------------------
+// The seat reports enter and leave for every surface of the window, and with
+// libdecor that includes the title bar and borders of the frame, which sit
+// outside the window content. A surface already destroyed when its event is
+// delivered arrives as NULL.
+//-------------------------------------
+static void
+update_mouse_inside(SWindowData *window_data, const struct wl_surface *surface, bool is_inside) {
+    SWindowData_Way *window_data_specific = (SWindowData_Way *) window_data->specific;
+
+    if (surface == NULL || surface != window_data_specific->surface) {
+        return;
+    }
+
+    if (window_data->is_mouse_inside == is_inside) {
+        return;
+    }
+
+    window_data->is_mouse_inside = is_inside;
+    kCall(mouse_enter_func, is_inside);
+}
+
+//-------------------------------------
 // Notification that this seat's pointer is focused on a certain surface.
 //
 // When a seat's focus enters a surface, the pointer image is
@@ -1469,7 +1491,6 @@ refresh_cursor_surface(SWindowData *window_data) {
 static void
 pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t sx, wl_fixed_t sy) {
     kUnused(pointer);
-    kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
     if (window_data == NULL)
@@ -1487,6 +1508,8 @@ pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl
 
     refresh_cursor_surface(window_data);
 
+    update_mouse_inside(window_data, surface, true);
+
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer entered surface %p at %d %d (serial: %d)", surface, sx, sy, serial);
 }
 
@@ -1503,13 +1526,14 @@ static void
 pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial, struct wl_surface *surface) {
     kUnused(pointer);
     kUnused(serial);
-    kUnused(surface);
 
     SWindowData *window_data = (SWindowData *) data;
     SWindowData_Way *window_data_specific = window_data ? (SWindowData_Way *) window_data->specific : NULL;
     if (window_data_specific) {
         invalidate_pointer_serial_state(window_data_specific);
         clear_pointer_axis_frame(window_data_specific);
+
+        update_mouse_inside(window_data, surface, false);
     }
 
     //MFB_LOG(MFB_LOG_DEBUG, "Pointer left surface %p (serial: %d)", surface, serial);
@@ -1833,6 +1857,10 @@ release_pointer_input_state(SWindowData *window_data, SWindowData_Way *window_da
     release_pointer(&window_data_specific->pointer);
     invalidate_pointer_serial_state(window_data_specific);
     clear_pointer_axis_frame(window_data_specific);
+
+    // The leave event that would close the enter never arrives now that the
+    // pointer is gone.
+    update_mouse_inside(window_data, window_data_specific->surface, false);
 
     // Release any buttons still marked as pressed; otherwise getters would
     // report them as held forever now that we won't receive release events.

@@ -128,7 +128,7 @@ What is ready when `mfb_open_ex()` returns also depends on the backend:
 | X11 | Yes | Yes* | Yes* | Yes* | Yes* |
 | Wayland | Yes | Yes | No (ignored, warning) | Yes | Yes (maximized) |
 | macOS | Yes | Yes | Yes | Yes | Yes (zoom/maximize) |
-| Web | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | Yes** | Yes** |
+| Web | Yes*** | No (ignored, warning) | No (ignored, warning) | Yes** | Yes** |
 | DOS | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
 | Android | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
 | iOS | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) | No (ignored, warning) |
@@ -136,6 +136,8 @@ What is ready when `mfb_open_ex()` returns also depends on the backend:
 \* Best effort via window-manager hints/properties; behavior depends on compositor/WM support.
 
 \** Browser-managed fullscreen; typically requires a user gesture before entering fullscreen.
+
+\*** The canvas follows its CSS layout box scaled by `devicePixelRatio`, so the page has to give it a relative size. Without the flag the drawing buffer stays pinned to the framebuffer size.
 
 ### Event Callbacks
 
@@ -151,6 +153,7 @@ void                mfb_set_char_input_callback(struct mfb_window *window, mfb_c
 void                mfb_set_mouse_button_callback(struct mfb_window *window, mfb_mouse_button_func callback);
 void                mfb_set_mouse_move_callback(struct mfb_window *window, mfb_mouse_move_func callback);
 void                mfb_set_mouse_scroll_callback(struct mfb_window *window, mfb_mouse_scroll_func callback);
+void                mfb_set_mouse_enter_callback(struct mfb_window *window, mfb_mouse_enter_func callback);
 ```
 
 #### Callback Signature Examples
@@ -192,6 +195,10 @@ void mouse_move(struct mfb_window *window, int x, int y) {
 void mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     // Mouse wheel/scroll events
 }
+
+void mouse_enter(struct mfb_window *window, bool is_inside) {
+    // Cursor entered or left the window content area
+}
 ```
 
 #### C++ Callback Interface
@@ -218,6 +225,7 @@ Read window and input state directly, instead of using callbacks:
 ```c
 // Window state
 bool                mfb_is_window_active(struct mfb_window *window);
+bool                mfb_is_mouse_inside(struct mfb_window *window);
 unsigned            mfb_get_window_width(struct mfb_window *window);
 unsigned            mfb_get_window_height(struct mfb_window *window);
 void                mfb_get_window_size(struct mfb_window *window, unsigned *width, unsigned *height);
@@ -248,7 +256,7 @@ On Android and iOS, touch positions carry the pointer id in their upper bits:
 
 - `mfb_get_mouse_x()`, `mfb_get_mouse_y()` and the `x`/`y` given to `mfb_mouse_move_func` are packed values. Decode them with `mfb_decode_touch()`, or one at a time with `mfb_decode_touch_pos()` / `mfb_decode_touch_id()`. On desktop, Web and DOS the id is always `0`.
 - The pointer id also arrives as the `button` argument of `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
-- On Android, `HOVER_MOVE` events from external devices use the same packing. When Android reports no valid pointer id, MiniFB uses `15`.
+- An external mouse on Android is the exception: it reports the real button, like the desktop backends. The device goes in the packed pointer id instead. A mouse or hovering stylus always reports `MFB_POINTER_ID_MOUSE`, a finger always a lower id, so `mfb_decode_touch_id(mfb_get_mouse_x(window)) == MFB_POINTER_ID_MOUSE` tells them apart.
 
 `mfb_get_mouse_scroll_x()` and `mfb_get_mouse_scroll_y()` only hold the delta of the last event pump: MiniFB sets them to `0.0f` before pumping events, then writes the delta if a scroll event arrives during that pump.
 

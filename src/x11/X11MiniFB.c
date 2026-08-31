@@ -294,10 +294,13 @@ process_event(SWindowData *window_data, XEvent *event) {
                     break;
             }
 
+            bool is_real_button = false;
+
             switch (button) {
                 case Button1:
                 case Button2:
                 case Button3:
+                    is_real_button = true;
                     window_data->mouse_button_status[button & MFB_MAX_MOUSE_BUTTONS_MASK] = is_pressed;
                     kCall(mouse_btn_func, button, (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
@@ -326,9 +329,19 @@ process_event(SWindowData *window_data, XEvent *event) {
                         MFB_LOG(MFB_LOG_WARNING, "Mouse button %u exceeds MFB_MOUSE_BTN_7; ignoring.", mapped);
                         break;
                     }
+                    is_real_button = true;
                     window_data->mouse_button_status[mapped] = is_pressed;
                     kCall(mouse_btn_func, (mfb_mouse_button) mapped, (mfb_key_mod) window_data->mod_keys, is_pressed);
                     break;
+                }
+            }
+
+            if (is_real_button == true && is_pressed == 0 &&
+                mfb_any_mouse_button_pressed(window_data) == false) {
+                bool is_inside = mfb_is_point_inside_window(window_data, event->xbutton.x, event->xbutton.y);
+                if (window_data->is_mouse_inside != is_inside) {
+                    window_data->is_mouse_inside = is_inside;
+                    kCall(mouse_enter_func, is_inside);
                 }
             }
         }
@@ -365,6 +378,35 @@ process_event(SWindowData *window_data, XEvent *event) {
 
         case EnterNotify:
         case LeaveNotify:
+        {
+            SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
+            if (window_data_specific == NULL || event->xany.window != window_data_specific->window)
+                break;
+
+            // A grab starting or ending (a window manager menu, or the implicit grab of a
+            // button press) makes the server synthesize a crossing even though the pointer
+            // did not move.
+            if (event->xcrossing.mode != NotifyNormal)
+                break;
+
+            // The pointer only crossed between this window and a child of it,
+            // so it never left the window.
+            if (event->xcrossing.detail == NotifyInferior)
+                break;
+
+            // While a button is held the window keeps the pointer, which is what Wayland
+            // and macOS get from their own grabs. Unlike them, X11 does deliver these
+            // crossings during the implicit grab, so they are held back here and the state
+            // is settled when the last button comes up.
+            if (mfb_any_mouse_button_pressed(window_data) == true)
+                break;
+
+            bool is_inside = (event->type == EnterNotify);
+            if (window_data->is_mouse_inside != is_inside) {
+                window_data->is_mouse_inside = is_inside;
+                kCall(mouse_enter_func, is_inside);
+            }
+        }
         break;
 
         case FocusIn:

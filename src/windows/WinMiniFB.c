@@ -64,19 +64,73 @@ load_functions() {
     if (mfb_user32_dll == NULL) {
         mfb_user32_dll = LoadLibraryA("user32.dll");
         if (mfb_user32_dll != NULL) {
-            mfb_SetProcessDPIAware = (PFN_SetProcessDPIAware) GetProcAddress(mfb_user32_dll, "SetProcessDPIAware");
-            mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
-            mfb_GetDpiForWindow = (PFN_GetDpiForWindow) GetProcAddress(mfb_user32_dll, "GetDpiForWindow");
-            mfb_EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling) GetProcAddress(mfb_user32_dll, "EnableNonClientDpiScaling");
-            mfb_AdjustWindowRectExForDpi = (PFN_AdjustWindowRectExForDpi) GetProcAddress(mfb_user32_dll, "AdjustWindowRectExForDpi");
+            mfb_SetProcessDPIAware = (PFN_SetProcessDPIAware)(mfb_proc) GetProcAddress(mfb_user32_dll, "SetProcessDPIAware");
+            mfb_SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext)(mfb_proc) GetProcAddress(mfb_user32_dll, "SetProcessDpiAwarenessContext");
+            mfb_GetDpiForWindow = (PFN_GetDpiForWindow)(mfb_proc) GetProcAddress(mfb_user32_dll, "GetDpiForWindow");
+            mfb_EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling)(mfb_proc) GetProcAddress(mfb_user32_dll, "EnableNonClientDpiScaling");
+            mfb_AdjustWindowRectExForDpi = (PFN_AdjustWindowRectExForDpi)(mfb_proc) GetProcAddress(mfb_user32_dll, "AdjustWindowRectExForDpi");
         }
     }
 
     if (mfb_shcore_dll == NULL) {
         mfb_shcore_dll = LoadLibraryA("shcore.dll");
         if (mfb_shcore_dll != NULL) {
-            mfb_SetProcessDpiAwareness = (PFN_SetProcessDpiAwareness) GetProcAddress(mfb_shcore_dll, "SetProcessDpiAwareness");
-            mfb_GetDpiForMonitor = (PFN_GetDpiForMonitor) GetProcAddress(mfb_shcore_dll, "GetDpiForMonitor");
+            mfb_SetProcessDpiAwareness = (PFN_SetProcessDpiAwareness)(mfb_proc) GetProcAddress(mfb_shcore_dll, "SetProcessDpiAwareness");
+            mfb_GetDpiForMonitor = (PFN_GetDpiForMonitor)(mfb_proc) GetProcAddress(mfb_shcore_dll, "GetDpiForMonitor");
+        }
+    }
+}
+
+//-------------------------------------
+// TME_LEAVE is a one-shot request: without arming it again on every re-entry,
+// WM_MOUSELEAVE would never arrive a second time.
+static void
+track_mouse_leave(HWND hWnd) {
+    TRACKMOUSEEVENT tme;
+    ZeroMemory(&tme, sizeof(tme));
+    tme.cbSize = sizeof(tme);
+    tme.dwFlags = TME_LEAVE;
+    tme.hwndTrack = hWnd;
+    TrackMouseEvent(&tme);
+}
+
+//-------------------------------------
+static void
+set_mouse_inside(SWindowData *window_data, bool is_inside) {
+    if (window_data->is_mouse_inside == is_inside) {
+        return;
+    }
+
+    window_data->is_mouse_inside = is_inside;
+    // ShowCursor keeps a reference count, so every hide on enter needs exactly one
+    // matching restore on leave.
+    if (window_data->is_cursor_visible == false) {
+        ShowCursor(is_inside == true ? FALSE : TRUE);
+    }
+    kCall(mouse_enter_func, is_inside);
+}
+
+//-------------------------------------
+// A leave that arrived while a button was held was dropped on purpose, and it consumed the
+// tracker. Whatever ends the drag has to re-arm it when the pointer stayed inside, and
+// report the leave when it did not.
+static void
+settle_mouse_inside(SWindowData *window_data, HWND hWnd, int x, int y) {
+    if (mfb_is_point_inside_window(window_data, x, y) == true) {
+        track_mouse_leave(hWnd);
+    }
+    else {
+        set_mouse_inside(window_data, false);
+    }
+}
+
+//-------------------------------------
+static void
+release_mouse_buttons(SWindowData *window_data) {
+    for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
+        if (window_data->mouse_button_status[button] != 0) {
+            window_data->mouse_button_status[button] = 0;
+            kCall(mouse_btn_func, (mfb_mouse_button) button, window_data->mod_keys, false);
         }
     }
 }
@@ -443,8 +497,38 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     MFB_LOG(MFB_LOG_WARNING, "Mouse button %d exceeds MFB_MOUSE_BTN_7; ignoring.", button);
                 }
                 else {
+                    // Windows only sends button messages while the cursor is over the
+                    // window, so releasing after dragging outside would never arrive and
+                    // the button would stay marked as held. Capturing from the first press
+                    // until the last release keeps the pair balanced. The other backends
+                    // get this from their platform, X11 and Wayland through an implicit
+                    // grab, macOS through AppKit, and Web through a listener on the body.
+                    if (is_pressed != 0 && mfb_any_mouse_button_pressed(window_data) == false) {
+                        SetCapture(hWnd);
+                    }
+
                     window_data->mouse_button_status[button] = is_pressed;
                     kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
+
+                    if (is_pressed == 0 && mfb_any_mouse_button_pressed(window_data) == false) {
+                        ReleaseCapture();
+                        settle_mouse_inside(window_data, hWnd,
+                                            (int)(short) LOWORD(lParam), (int)(short) HIWORD(lParam));
+                    }
+                }
+            }
+            break;
+
+        case WM_CAPTURECHANGED:
+            // Something else took the capture, so neither the release for whatever is still
+            // held nor any further movement will arrive. Our own ReleaseCapture also lands
+            // here, with nothing left to settle.
+            if (window_data != NULL) {
+                POINT cursor;
+
+                release_mouse_buttons(window_data);
+                if (GetCursorPos(&cursor) != 0 && ScreenToClient(hWnd, &cursor) != 0) {
+                    settle_mouse_inside(window_data, hWnd, cursor.x, cursor.y);
                 }
             }
             break;
@@ -466,33 +550,29 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_MOUSEMOVE:
-            if (window_data != NULL && window_data_specific != NULL) {
-                if (window_data_specific->mouse_inside == false) {
-                    window_data_specific->mouse_inside = true;
-                    TRACKMOUSEEVENT tme;
-                    ZeroMemory(&tme, sizeof(tme));
-                    tme.cbSize = sizeof(tme);
-                    tme.dwFlags = TME_LEAVE;
-                    tme.hwndTrack = hWnd;
-                    TrackMouseEvent(&tme);
-
-                    if (window_data->is_cursor_visible == false) {
-                        ShowCursor(FALSE);
-                    }
-                }
+            if (window_data != NULL) {
                 window_data->mouse_pos_x = (int)(short) LOWORD(lParam);
                 window_data->mouse_pos_y = (int)(short) HIWORD(lParam);
+
+                // Capture keeps these messages coming from outside the client area, and
+                // arming the tracker from out there posts a leave straight back, so the
+                // pair would flap once per movement.
+                if (window_data->is_mouse_inside == false &&
+                    mfb_is_point_inside_window(window_data, window_data->mouse_pos_x, window_data->mouse_pos_y) == true) {
+                    track_mouse_leave(hWnd);
+                    set_mouse_inside(window_data, true);
+                }
+
                 kCall(mouse_move_func, window_data->mouse_pos_x, window_data->mouse_pos_y);
             }
             break;
 
         case WM_MOUSELEAVE:
-            if (window_data_specific) {
-                window_data_specific->mouse_inside = false;
-            }
-
-            if (window_data && window_data->is_cursor_visible == false) {
-                ShowCursor(TRUE);
+            // While a button is held the window keeps the pointer, matching the implicit
+            // grabs of X11 and Wayland and the tracking area of macOS. The state is settled
+            // when the last button comes up.
+            if (window_data != NULL && mfb_any_mouse_button_pressed(window_data) == false) {
+                set_mouse_inside(window_data, false);
             }
             break;
 
@@ -1286,7 +1366,7 @@ mfb_show_cursor(struct mfb_window *window, bool show) {
     if (window_data_specific == NULL)
         return;
 
-    if ((window_data_specific->mouse_inside) && (window_data->is_cursor_visible != show)) {
+    if ((window_data->is_mouse_inside == true) && (window_data->is_cursor_visible != show)) {
         ShowCursor((BOOL) show);
     }
 

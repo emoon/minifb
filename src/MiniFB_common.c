@@ -192,11 +192,31 @@ mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigne
 }
 
 //-------------------------------------
+void
+mfb_set_mouse_enter_callback(struct mfb_window *window, mfb_mouse_enter_func callback) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        window_data->mouse_enter_func = callback;
+    }
+}
+
+//-------------------------------------
 bool
 mfb_is_window_active(struct mfb_window *window) {
     if (window != NULL) {
         SWindowData *window_data = (SWindowData *) window;
         return window_data->is_active;
+    }
+
+    return false;
+}
+
+//-------------------------------------
+bool
+mfb_is_mouse_inside(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        return window_data->is_mouse_inside;
     }
 
     return false;
