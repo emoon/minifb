@@ -296,6 +296,12 @@ process_event(SWindowData *window_data, XEvent *event) {
 
             bool is_real_button = false;
 
+            // X11 reports a wheel notch as a press followed by a release. Only the press
+            // is a notch, so taking both would report every scroll twice.
+            if (is_pressed == 0 && button >= Button4 && button <= 7) {
+                break;
+            }
+
             switch (button) {
                 case Button1:
                 case Button2:
@@ -383,10 +389,11 @@ process_event(SWindowData *window_data, XEvent *event) {
             if (window_data_specific == NULL || event->xany.window != window_data_specific->window)
                 break;
 
-            // A grab starting or ending (a window manager menu, or the implicit grab of a
-            // button press) makes the server synthesize a crossing even though the pointer
-            // did not move.
-            if (event->xcrossing.mode != NotifyNormal)
+            // A starting grab synthesizes a crossing without the pointer moving, so it is
+            // dropped. An ending one reports where the pointer actually is, and it is the
+            // only notice that arrives when a drag owned by another client finishes over
+            // this window. The edge check below absorbs the one our own drag produces.
+            if (event->xcrossing.mode == NotifyGrab)
                 break;
 
             // The pointer only crossed between this window and a child of it,
@@ -394,10 +401,9 @@ process_event(SWindowData *window_data, XEvent *event) {
             if (event->xcrossing.detail == NotifyInferior)
                 break;
 
-            // While a button is held the window keeps the pointer, which is what Wayland
-            // and macOS get from their own grabs. Unlike them, X11 does deliver these
-            // crossings during the implicit grab, so they are held back here and the state
-            // is settled when the last button comes up.
+            // X11 does deliver crossings during the implicit grab of a button press, so
+            // they are held back here while a button is down and the state is settled when
+            // the last one comes up.
             if (mfb_any_mouse_button_pressed(window_data) == true)
                 break;
 

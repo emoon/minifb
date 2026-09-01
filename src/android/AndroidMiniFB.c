@@ -184,10 +184,8 @@ is_hover_capable_pointer(const AInputEvent *event, size_t index) {
 //-------------------------------------
 // Android sends a hover exit right before a pointer goes down, and nothing in that event
 // tells it apart from the pointer really leaving: some stylus hardware reports neither a
-// button nor a pressure there. The exit is therefore held back and any later event from a
-// hovering pointer cancels it, which is what SDL does for its pen proximity
-// (external/SDL/src/events/SDL_pen.c:497). What nothing cancels is reported once the event
-// queue has been drained.
+// button nor a pressure there. The exit is held back, any later event from a hovering
+// pointer cancels it, and what nothing cancels is reported once the queue has been drained.
 static void
 cancel_pending_hover_exit(SWindowData *window_data) {
     SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
@@ -348,8 +346,8 @@ handle_input(struct android_app *app, AInputEvent *event) {
                         cancel_pending_hover_exit(window_data);
                     }
 
-                    // A mouse reports the button it pressed, like the desktop backends do.
-                    // A finger has no button, so it keeps reporting its pointer id there.
+                    // A finger has no button to report, so it keeps sending its pointer id
+                    // in that argument.
                     if (is_mouse_event(event)) {
                         int x = (int) AMotionEvent_getX(event, 0);
                         int y = (int) AMotionEvent_getY(event, 0);
@@ -371,8 +369,8 @@ handle_input(struct android_app *app, AInputEvent *event) {
                         }
                     }
 
-                    // A hover capable stylus takes the branch above but can be holding the
-                    // state just like a mouse, so the check covers both.
+                    // A stylus reports hover too, so it can be holding the state as well,
+                    // and it goes through the finger branch above.
                     if (action_type == AMOTION_EVENT_ACTION_UP && is_hover_capable_pointer(event, 0) == true) {
                         settle_mouse_inside(window_data, event, 0);
                     }
@@ -468,8 +466,6 @@ handle_input(struct android_app *app, AInputEvent *event) {
 
             case AMOTION_EVENT_ACTION_HOVER_ENTER:
             case AMOTION_EVENT_ACTION_HOVER_EXIT:
-                // Pointer crossing the view border without pressing, reported by the same
-                // external mouse, trackpad or hover capable stylus that produces HOVER_MOVE.
                 {
                     bool is_inside = (action_type == AMOTION_EVENT_ACTION_HOVER_ENTER);
                     if (is_hover_capable_pointer(event, 0) == false) {
@@ -486,9 +482,8 @@ handle_input(struct android_app *app, AInputEvent *event) {
 
                     cancel_pending_hover_exit(window_data);
                     if (window_data->is_mouse_inside == false) {
-                        // Entering carries the point where the pointer came in, so the
-                        // position is usable inside the callback even when no HOVER_MOVE
-                        // follows.
+                        // Entering carries the point the pointer came in through, which may
+                        // be the only position if no HOVER_MOVE follows.
                         int x = (int) AMotionEvent_getX(event, 0);
                         int y = (int) AMotionEvent_getY(event, 0);
                         window_data->mouse_pos_x = mfb_pack_pos_id(x, MFB_POINTER_ID_MOUSE);
@@ -505,8 +500,14 @@ handle_input(struct android_app *app, AInputEvent *event) {
                 // AXIS_VSCROLL = vertical scroll, AXIS_HSCROLL = horizontal scroll.
                 // Not a common use case on mobile; difficult to test without physical hardware.
                 {
-                    float h = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HSCROLL, 0);
+                    // Android counts right as positive on the horizontal axis, MiniFB counts
+                    // left. The vertical axis already agrees.
+                    float h = -AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HSCROLL, 0);
                     float v = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_VSCROLL, 0);
+                    if (h == 0.0f && v == 0.0f) {
+                        break;
+                    }
+
                     window_data->mouse_wheel_x = h;
                     window_data->mouse_wheel_y = v;
                     kCall(mouse_wheel_func, 0, h, v);

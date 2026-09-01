@@ -377,9 +377,15 @@ window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
 }
 
 //-------------------------------------
+// The listeners only queue: applying the state here keeps the getters agreeing with the
+// event the callback is being handed, instead of running ahead to the newest one.
+//-------------------------------------
 EM_EXPORT void
-window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
+window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed, int x, int y) {
     if (window_data == NULL) return;
+    window_data_set_mouse_pos(window_data, x, y);
+    window_data_set_mouse_button(window_data, (uint8_t) button, is_pressed);
+    window_data_set_mod_keys(window_data, mod);
     if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window *) window_data, button, mod, is_pressed);
 }
 
@@ -387,6 +393,7 @@ window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button butto
 EM_EXPORT void
 window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
     if (window_data == NULL) return;
+    window_data_set_mouse_pos(window_data, x, y);
     if (window_data->mouse_move_func) window_data->mouse_move_func((struct mfb_window *) window_data, x, y);
 }
 
@@ -394,6 +401,8 @@ window_data_call_mouse_move_func(SWindowData *window_data, int x, int y) {
 EM_EXPORT void
 window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
     if (window_data == NULL) return;
+    window_data_set_mouse_wheel(window_data, x, y);
+    window_data_set_mod_keys(window_data, mod);
     if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window *) window_data, mod, x, y);
 }
 
@@ -494,6 +503,10 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         resizeObserver: null,
         activeTouchId: null,
         globalMouseupTarget: null,
+        // The queued events carry the state, so the listeners keep only what they need to
+        // answer "is this release mine?" and "where was the pointer last?".
+        pressedButtons: {},
+        lastPos: { x: 0, y: 0 },
         is_active: true,
         handlers: {},
         events: [
@@ -509,8 +522,17 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
 
     function enqueueEvent(eventObj) {
         if (w.events.length >= MAX_QUEUED_EVENTS) {
-            // Drop oldest input when producer outruns consumer to cap memory growth.
-            w.events.shift();
+            // Dropped in order of what it costs: movement and resize lose nothing because
+            // the next one carries the current state, a scroll loses its delta. A button
+            // transition, a cancel or a crossing is never dropped, since losing one leaves a
+            // button held forever or a release nobody pressed, so the cap gives instead.
+            let droppable = w.events.findIndex((e) => e.type === "mousemove" || e.type === "resize");
+            if (droppable < 0) {
+                droppable = w.events.findIndex((e) => e.type === "mousescroll");
+            }
+            if (droppable >= 0) {
+                w.events.splice(droppable, 1);
+            }
         }
         w.events.push(eventObj);
     }
@@ -661,42 +683,43 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
             let btn = mapMouseButton(event.button);
-            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, btn, 1);
-            Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: true});
+            w.pressedButtons[btn] = true;
+            w.lastPos = pos;
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: true, x: pos.x, y: pos.y});
     };
     canvas.addEventListener("mousedown", w.handlers.mousedown, false);
 
     w.handlers.mousemove = (event) => {
             let pos = getMousePos(event);
-            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+            w.lastPos = pos;
             enqueueEvent({ type: "mousemove", x: pos.x, y: pos.y});
     };
     canvas.addEventListener("mousemove", w.handlers.mousemove, false);
 
     w.handlers.mouseup = (event) => {
             if (event.button > 6) return;
+            let btn = mapMouseButton(event.button);
+            // Pressing outside the canvas and releasing over it targets this element, so a
+            // release is only ours when this window is the one holding that button.
+            if (w.pressedButtons[btn] !== true) return;
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
-            let btn = mapMouseButton(event.button);
-            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, btn, 0);
-            Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false});
+            w.pressedButtons[btn] = false;
+            w.lastPos = pos;
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false, x: pos.x, y: pos.y});
     };
     canvas.addEventListener("mouseup", w.handlers.mouseup, false);
 
     w.handlers.bodyMouseup = (event) => {
             if (event.button > 6) return;
             if (event.target === canvas) return;  // already handled by canvas mouseup
-            let pos = getMousePos(event);
-            let mod = getMfbKeyModFromEvent(event);
             let btn = mapMouseButton(event.button);
-            Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-            Module._window_data_set_mouse_button(window_data, btn, 0);
-            Module._window_data_set_mod_keys(window_data, mod);
-            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false});
+            // Only the buttons this window is holding are reported. The position is left
+            // alone: it would be relative to a canvas the pointer was never over.
+            if (w.pressedButtons[btn] !== true) return;
+            w.pressedButtons[btn] = false;
+            let mod = getMfbKeyModFromEvent(event);
+            enqueueEvent({ type: "mousebutton", button: btn, mod: mod, is_pressed: false, x: w.lastPos.x, y: w.lastPos.y});
     };
     w.globalMouseupTarget = document.body || document.documentElement || document;
     if (w.globalMouseupTarget) {
@@ -708,10 +731,8 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     // hovering the canvas to report. pointercancel counts as a leave because
     // the pointer stream ends there and the matching leave may never arrive.
     // Capturing the pointer keeps the canvas as its target while a button is held, so no
-    // leave is reported until the drag ends. This matches the implicit grabs of X11 and
-    // Wayland, the tracking area of macOS, and what the Windows backend does with
-    // SetCapture. The browser releases the capture on pointerup and only then reports the
-    // leave, if the pointer ended up outside.
+    // leave is reported until the drag ends. The browser releases the capture on pointerup
+    // and only then reports the leave, if the pointer ended up outside.
     w.handlers.pointerDown = (event) => {
         if (event.pointerType === "touch") return;
         try {
@@ -726,6 +747,9 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     w.handlers.pointerEnterOrLeave = (event) => {
         if (event.pointerType === "touch") return;
         if (event.type === "pointercancel") {
+            // The C side drops every held button, so the bookkeeping here has to agree or
+            // a later release elsewhere in the document would be forwarded for nothing.
+            w.pressedButtons = {};
             enqueueEvent({ type: "mousecancel" });
         }
         enqueueEvent({ type: "mouseenter", is_inside: event.type === "pointerenter" });
@@ -750,8 +774,14 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                 dy *= 3.0;
             }
             // DOM_DELTA_LINE (mode 1, Firefox default): already ~1-3 per notch, pass through
-            Module._window_data_set_mouse_wheel(window_data, dx, dy);
-            Module._window_data_set_mod_keys(window_data, mod);
+
+            // The browser counts down and right as positive, MiniFB counts up and left.
+            dx = -dx;
+            dy = -dy;
+            // The end of a momentum scroll arrives as a wheel event that moved nothing.
+            if (dx === 0 && dy === 0) {
+                return;
+            }
             enqueueEvent({ type: "mousescroll", mod: mod, x: dx, y: dy});
     };
     canvas.addEventListener('wheel', w.handlers.wheel, NON_PASSIVE);
@@ -762,10 +792,10 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                 requestFullscreenIfNeeded();
                 let touch = event.changedTouches[0];
                 let pos = getMousePos(touch);
-                Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-                Module._window_data_set_mouse_button(window_data, 1, 1);
                 w.activeTouchId = touch.identifier;
-                enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: true});
+                w.pressedButtons[1] = true;
+                w.lastPos = pos;
+                enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: true, x: pos.x, y: pos.y});
             }
             event.preventDefault();
     };
@@ -777,7 +807,7 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                     let touch = event.changedTouches[i];
                     if (w.activeTouchId === touch.identifier) {
                         let pos = getMousePos(touch);
-                        Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
+                        w.lastPos = pos;
                         enqueueEvent({ type: "mousemove", x: pos.x, y: pos.y});
                         break;
                     }
@@ -793,10 +823,10 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                 let touch = event.changedTouches[i];
                 if (w.activeTouchId === touch.identifier) {
                     let pos = getMousePos(touch);
-                    Module._window_data_set_mouse_pos(window_data, pos.x, pos.y);
-                    Module._window_data_set_mouse_button(window_data, 1, 0);
                     w.activeTouchId = null;
-                    enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: false});
+                    w.pressedButtons[1] = false;
+                    w.lastPos = pos;
+                    enqueueEvent({ type: "mousebutton", button: 1, mod: 0, is_pressed: false, x: pos.x, y: pos.y});
                     break;
                 }
             }
@@ -1008,7 +1038,7 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
             Module._window_data_call_active_func(window_data, event.is_active ? 1 : 0);
         }
         else if (event.type == "mousebutton") {
-            Module._window_data_call_mouse_btn_func(window_data, event.button, event.mod, event.is_pressed ? 1 : 0);
+            Module._window_data_call_mouse_btn_func(window_data, event.button, event.mod, event.is_pressed ? 1 : 0, event.x, event.y);
         }
         else if (event.type == "mousemove") {
             Module._window_data_call_mouse_move_func(window_data, event.x, event.y);

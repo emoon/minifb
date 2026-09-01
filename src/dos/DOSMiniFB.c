@@ -451,8 +451,20 @@ update_mouse(SWindowData *window_data) {
   window_data->mouse_button_status[MFB_MOUSE_LEFT]   = left_pressed;
   window_data->mouse_button_status[MFB_MOUSE_RIGHT]  = right_pressed;
   window_data->mouse_button_status[MFB_MOUSE_MIDDLE] = middle_pressed;
-  window_data->mouse_pos_x = regs.x.cx;
-  window_data->mouse_pos_y = regs.x.dx;
+  // The driver range is the VESA resolution, which can be twice the size the application
+  // asked for, so its coordinates are scaled back into window units. Every other backend
+  // reports the position in the units of the window.
+  SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
+  int32_t pos_x = regs.x.cx;
+  int32_t pos_y = regs.x.dx;
+  if (window_data_specific != NULL &&
+      window_data_specific->actual_width > 0 && window_data_specific->actual_height > 0) {
+    pos_x = (int32_t) ((int64_t) pos_x * window_data->window_width  / window_data_specific->actual_width);
+    pos_y = (int32_t) ((int64_t) pos_y * window_data->window_height / window_data_specific->actual_height);
+  }
+
+  window_data->mouse_pos_x = pos_x;
+  window_data->mouse_pos_y = pos_y;
 
   mfb_key_mod mod = (mfb_key_mod) window_data->mod_keys;
 
@@ -465,8 +477,8 @@ update_mouse(SWindowData *window_data) {
   if (old_middle_pressed != middle_pressed && window_data->mouse_btn_func)
     window_data->mouse_btn_func((struct mfb_window *) window_data, MFB_MOUSE_MIDDLE, mod, middle_pressed);
 
-  if ((old_x != regs.x.cx || old_y != regs.x.dx) && window_data->mouse_move_func)
-    window_data->mouse_move_func((struct mfb_window *) window_data, regs.x.cx, regs.x.dx);
+  if ((old_x != pos_x || old_y != pos_y) && window_data->mouse_move_func)
+    window_data->mouse_move_func((struct mfb_window *) window_data, pos_x, pos_y);
 }
 
 //-------------------------------------
@@ -488,8 +500,10 @@ update_keyboard(SWindowData *window_data) {
     uint32_t key_code = scancode_to_mfb_key[scancode];
     bool is_extended = g_keyboard.last_scancode_was_extended != 0;
 
-    // Some DOS mouse drivers emulate wheel by injecting extended Up/Down keys.
-    // Translate those to mouse wheel callbacks to avoid spurious keyboard events.
+    // Some DOS mouse drivers emulate a wheel by injecting extended Up/Down keys. Reading
+    // those as scroll costs the dedicated arrow keys, which send the very same scancodes
+    // and would never reach the keyboard callback, so it has to be asked for.
+#if defined(MINIFB_DOS_WHEEL_FROM_ARROW_KEYS)
     if (is_extended && (key_code == MFB_KB_KEY_UP || key_code == MFB_KB_KEY_DOWN)) {
       if (pressed) {
         float delta_y = (key_code == MFB_KB_KEY_UP) ? 1.0f : -1.0f;
@@ -506,6 +520,7 @@ update_keyboard(SWindowData *window_data) {
       g_keyboard.last_scancode_was_extended = 0;
       continue;
     }
+#endif
 
     char ascii = 0;
     if (scancode < sizeof(scancode_to_ascii)) {

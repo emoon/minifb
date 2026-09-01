@@ -243,6 +243,13 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    // ShowCursor keeps a per-thread counter, so a window that hid the cursor has to undo it
+    // before going away or the cursor stays hidden for the rest of the process.
+    if (window_data->is_cursor_visible == false && window_data->is_mouse_inside == true) {
+        ShowCursor(TRUE);
+        window_data->is_mouse_inside = false;
+    }
+
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
     if (window_data_specific == NULL) {
         release_window_counter();
@@ -488,7 +495,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                         break;
 
                     default:
-                        button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MFB_MOUSE_BTN_5 : MFB_MOUSE_BTN_6);
+                        button = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? MFB_MOUSE_BTN_4 : MFB_MOUSE_BTN_5);
                         if (message == WM_XBUTTONDOWN) { //|| message == WM_XBUTTONDBLCLK) {
                             is_pressed = 1;
                         }
@@ -498,17 +505,19 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                 }
                 else {
                     // Windows only sends button messages while the cursor is over the
-                    // window, so releasing after dragging outside would never arrive and
-                    // the button would stay marked as held. Capturing from the first press
-                    // until the last release keeps the pair balanced. The other backends
-                    // get this from their platform, X11 and Wayland through an implicit
-                    // grab, macOS through AppKit, and Web through a listener on the body.
+                    // window, so a release after dragging outside would never arrive and the
+                    // button would stay marked as held.
                     if (is_pressed != 0 && mfb_any_mouse_button_pressed(window_data) == false) {
                         SetCapture(hWnd);
                     }
 
                     window_data->mouse_button_status[button] = is_pressed;
                     kCall(mouse_btn_func, button, window_data->mod_keys, is_pressed);
+
+                    if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) {
+                        // Win32 asks for TRUE when these are handled, unlike the other buttons.
+                        res = TRUE;
+                    }
 
                     if (is_pressed == 0 && mfb_any_mouse_button_pressed(window_data) == false) {
                         ReleaseCapture();
@@ -568,8 +577,7 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_MOUSELEAVE:
-            // While a button is held the window keeps the pointer, matching the implicit
-            // grabs of X11 and Wayland and the tracking area of macOS. The state is settled
+            // While a button is held the window keeps the pointer. The state is settled
             // when the last button comes up.
             if (window_data != NULL && mfb_any_mouse_button_pressed(window_data) == false) {
                 set_mouse_inside(window_data, false);

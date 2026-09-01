@@ -1644,6 +1644,11 @@ pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axi
 
     float delta = -(float) wl_fixed_to_double(value) / WAYLAND_WHEEL_AXIS_UNIT;
 
+    // The stop of a kinetic scroll arrives as an axis event worth nothing.
+    if (delta == 0.0f) {
+        return;
+    }
+
     if (pointer_uses_frame_events(pointer) == false) {
         if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
             window_data->mouse_wheel_y = delta;
@@ -1703,6 +1708,11 @@ pointer_frame(void *data, struct wl_pointer *pointer) {
     }
     else if (axis_frame->discrete_y_valid != 0) {
         delta_y = (float) axis_frame->discrete_y;
+    }
+
+    if (delta_x == 0.0f && delta_y == 0.0f) {
+        clear_pointer_axis_frame(window_data_specific);
+        return;
     }
 
     window_data->mouse_wheel_x = delta_x;
@@ -1858,18 +1868,20 @@ release_pointer_input_state(SWindowData *window_data, SWindowData_Way *window_da
     invalidate_pointer_serial_state(window_data_specific);
     clear_pointer_axis_frame(window_data_specific);
 
-    // The leave event that would close the enter never arrives now that the
-    // pointer is gone.
-    update_mouse_inside(window_data, window_data_specific->surface, false);
-
     // Release any buttons still marked as pressed; otherwise getters would
-    // report them as held forever now that we won't receive release events.
+    // report them as held forever now that we won't receive release events. This comes
+    // first because the window keeps the pointer while a button is down, so a leave
+    // reported before them would contradict the state its own callback can read.
     for (uint32_t button = 0; button < MFB_MAX_MOUSE_BUTTONS; ++button) {
         if (window_data->mouse_button_status[button] != 0) {
             window_data->mouse_button_status[button] = 0;
             kCall(mouse_btn_func, (mfb_mouse_button) button, (mfb_key_mod) window_data->mod_keys, false);
         }
     }
+
+    // The leave event that would close the enter never arrives now that the
+    // pointer is gone.
+    update_mouse_inside(window_data, window_data_specific->surface, false);
 }
 
 //-------------------------------------

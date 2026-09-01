@@ -4,14 +4,11 @@
 #include <MiniFB_internal.h>
 
 //-------------------------------------
-// A drag keeps the pointer with the window, like the implicit grabs of X11 and Wayland and
-// the capture of Windows, so the exit is held back while a button is down. AppKit gives no
-// second chance once the drag ends, so whatever releases the last button settles the state
-// from the position the drag ended at.
-//
-// NSMouseInRect answers this in the view's own coordinates, so the answer does not depend
-// on which way MiniFB happens to expose Y, and it applies the edge and fractional
-// coordinate rules AppKit uses everywhere else.
+// The exit is held back while a button is down, and AppKit gives no second chance once the
+// drag ends, so whatever releases the last button settles the state from the position it
+// ended at. NSMouseInRect is used because it answers in the view's own coordinates, so the
+// result does not depend on which way MiniFB exposes Y, and it applies the edge and
+// fractional rules AppKit uses everywhere else.
 static void
 settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
     if (mfb_any_mouse_button_pressed(window_data) == true) {
@@ -226,9 +223,18 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)scrollWheel:(NSEvent *)event {
     if(window_data != 0x0) {
+        CGFloat delta_x = [event deltaX];
+        CGFloat delta_y = [event deltaY];
+
+        // A trackpad also reports events that only change the phase of a gesture and carry
+        // no movement.
+        if (delta_x == 0.0 && delta_y == 0.0) {
+            return;
+        }
+
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        window_data->mouse_wheel_x = [event deltaX];
-        window_data->mouse_wheel_y = [event deltaY];
+        window_data->mouse_wheel_x = delta_x;
+        window_data->mouse_wheel_y = delta_y;
         kCall(mouse_wheel_func, window_data->mod_keys, window_data->mouse_wheel_x, window_data->mouse_wheel_y);
     }
 }

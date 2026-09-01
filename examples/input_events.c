@@ -214,7 +214,7 @@ mouse_move(struct mfb_window *window, int x, int y) {
     kUnused(window);
     kUnused(x);
     kUnused(y);
-    MFB_LOGI(TEST_TAG, "mouse_move: %d, %d", x, y);
+    //MFB_LOGI(TEST_TAG, "mouse_move: %d, %d", x, y);
 }
 
 //-------------------------------------

@@ -119,6 +119,9 @@
     }
     view->window_data = window_data;
     view.userInteractionEnabled = true;
+    // UIView defaults this to NO, which caps the view at one touch and leaves the pointer
+    // id allocation in iOSView unreachable.
+    view.multipleTouchEnabled = true;
 
     [self setView:view];
 

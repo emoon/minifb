@@ -15,12 +15,54 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
-- **Windows: a mouse button released outside the window is now delivered.** Dragging out and releasing left the button marked as held forever, because Windows only sends button messages while the cursor is over the window. MiniFB now captures the mouse from the first press to the last release. The other backends get this from their platform.
-- Windows: a null backend window state could be dereferenced in `WM_MOUSEMOVE` and `WM_SIZE`.
-- macOS: `updateTrackingAreas` never called `[super updateTrackingAreas]`, which AppKit needs to rebuild its own tracking areas.
-- Web: the `contextmenu` listener was never removed when the window closed.
-- GCC builds are warning free again. Casting the result of `GetProcAddress` and `wglGetProcAddress` to a concrete signature trips `-Wcast-function-type`; the casts now go through `void (*)(void)`.
-- Web: the examples build again and the `.html` files are copied to the output directory.
+Across backends:
+
+- **Mouse consistency across backends.** Four long standing divergences, all of them changing what an application receives:
+  - X11 reported every wheel notch twice. It arrives as a button press followed by a release, and both were forwarded.
+  - Windows reported the side buttons as `MFB_MOUSE_BTN_5` and `MFB_MOUSE_BTN_6`. X11, macOS and Android all report `MFB_MOUSE_BTN_4` and `MFB_MOUSE_BTN_5`, so Windows now does too.
+  - Web reported both wheel axes with the opposite sign. Browsers count down and right as positive, MiniFB counts up and left, as the other backends already did.
+  - Android reported the horizontal wheel axis with the opposite sign, for the same reason. The vertical axis already agreed.
+- **A scroll callback that moved nothing is no longer delivered.** The end of a kinetic scroll, and the events that only change the phase of a trackpad gesture, reached the application as a callback with both axes at zero on Web, Wayland, Android and macOS. Windows and X11 cannot produce one.
+
+Windows:
+
+- **A mouse button released outside the window is now delivered.** Dragging out and releasing left the button marked as held forever, because Windows only sends button messages while the cursor is over the window. MiniFB now captures the mouse from the first press to the last release. The other backends get this from their platform.
+- The extended mouse buttons answer their messages. `WM_XBUTTONDOWN` and `WM_XBUTTONUP` returned zero, and Win32 expects TRUE when the application handles them.
+- Closing a window no longer leaves the cursor hidden. `ShowCursor` keeps a per-thread counter, and a window destroyed while it had the cursor hidden never undid it.
+- A null backend window state could be dereferenced in `WM_MOUSEMOVE` and `WM_SIZE`.
+
+macOS:
+
+- `updateTrackingAreas` never called `[super updateTrackingAreas]`, which AppKit needs in order to rebuild its own tracking areas.
+
+X11:
+
+- Entering the window at the end of another application's drag is reported. That crossing arrives as `NotifyUngrab`, and it was dropped along with the one that starts a grab. `mfb_is_mouse_inside` stayed false until the pointer left and came back.
+
+Wayland:
+
+- Losing the pointer releases the held buttons before reporting the leave. The order was the other way round, so the leave callback could read its own button buffer and find a button still held, which no other backend does.
+
+Web:
+
+- **The getters now match the callback being delivered.** The listeners wrote the state when the browser event arrived. The callbacks run later, when the queue is drained, so during a press callback the button buffer could already say released. The wheel getters were worse: they returned zero after every pump, because the value was cleared before the drain and nothing put it back. The state now travels with each queued event and is applied right before its callback.
+- A release this window never saw pressed is no longer reported. Both the canvas listener and the one that catches releases outside it forwarded every release they saw, so a click elsewhere on the page, or a press that started outside and ended over the canvas, produced a callback with no press behind it.
+- A full event queue no longer drops button transitions. It dropped the oldest event whatever it was, which could leave a button held forever or a release with no press. Movement and resize go first, then scroll, and state transitions are kept.
+- The `contextmenu` listener was never removed when the window closed.
+- The examples build again and the `.html` files are copied to the output directory.
+
+iOS:
+
+- **Multi-touch works.** `UIView` defaults `multipleTouchEnabled` to `NO`, so UIKit delivered one contact at a time and the pointer id allocation in `iOSView` was unreachable.
+
+DOS:
+
+- **The arrow keys work.** Extended Up and Down were always turned into wheel scroll, for the mouse drivers that emulate a wheel that way. Those are the scancodes the arrow keys send, so they never reached the keyboard callback. The emulation now needs `MINIFB_DOS_WHEEL_FROM_ARROW_KEYS`.
+- The mouse position is reported in window units. VESA can pick a mode twice the size the application asked for, and the driver coordinates were passed through unscaled, so a 320x200 window on a 640x400 mode reported positions up to 639x399. Recorded as ISSUE-25 in the API audit.
+
+Build:
+
+- GCC builds are warning free again. Casting the result of `GetProcAddress` and `wglGetProcAddress` to a concrete signature trips `-Wcast-function-type`. The casts now go through `void (*)(void)`, as GLFW and SDL do.
 
 ## [0.13.0]
 
