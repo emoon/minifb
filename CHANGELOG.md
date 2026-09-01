@@ -34,7 +34,7 @@ Windows:
 
 macOS:
 
-- **One wheel notch reports the same amount as on the other backends.** The legacy `deltaY` of `NSEvent` gives a tenth of a line per notch, so an application had to scroll ten times as far on macOS. It now reads `scrollingDelta` and scales only the pixel deltas of a trackpad, as GLFW does.
+- **One wheel notch reports the same amount as on the other backends.** `NSEvent` gives a fraction of a line per notch, a tenth of one on some devices, so an application had to scroll ten times as far on macOS. Wheel deltas are now rounded away from zero, as SDL does. Trackpad deltas are unchanged.
 - `updateTrackingAreas` never called `[super updateTrackingAreas]`, which AppKit needs in order to rebuild its own tracking areas.
 
 X11:

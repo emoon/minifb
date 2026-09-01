@@ -258,6 +258,8 @@ On Android and iOS, touch positions carry the pointer id in their upper bits:
 - The pointer id also arrives as the `button` argument of `mfb_mouse_button_func` (`MFB_MOUSE_BTN_0`..`MFB_MOUSE_BTN_7`).
 - An external mouse on Android is the exception: it reports the real button, like the desktop backends. The device goes in the packed pointer id instead. A mouse or hovering stylus reports `MFB_POINTER_ID_MOUSE`, and fingers take the ids Android hands out, starting at `0`, so `mfb_decode_touch_id(mfb_get_mouse_x(window)) == MFB_POINTER_ID_MOUSE` tells them apart.
 
+Positive Y is up and positive X is left, on every backend. One wheel notch is worth about `1.0`, but the exact amount belongs to the device: a trackpad sends a stream of fractions that can add up to a fifth of a notch for a whole gesture, so read the sign and accumulate rather than comparing against a value.
+
 `mfb_get_mouse_scroll_x()` and `mfb_get_mouse_scroll_y()` only hold the delta of the last event pump: MiniFB sets them to `0.0f` before pumping events, then writes the delta if a scroll event arrives during that pump.
 
 With more than one window on Windows or macOS the pump drains the whole thread queue, so a scroll belonging to another window can be delivered there and cleared before that window reads it. `mfb_mouse_scroll_func` is not affected and is the reliable source.

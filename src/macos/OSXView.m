@@ -2,6 +2,7 @@
 #import "OSXWindow.h"
 #import "WindowData_OSX.h"
 #include <MiniFB_internal.h>
+#include <math.h>
 
 //-------------------------------------
 // The exit is held back while a button is down, and AppKit gives no second chance once the
@@ -223,21 +224,22 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)scrollWheel:(NSEvent *)event {
     if(window_data != 0x0) {
-        // The legacy deltaX/deltaY report a tenth of a line per wheel notch, which is a
-        // tenth of what every other backend reports for the same notch. scrollingDelta
-        // gives one line, and only needs scaling down for the pixel deltas of a trackpad.
-        CGFloat delta_x = [event scrollingDeltaX];
-        CGFloat delta_y = [event scrollingDeltaY];
+        CGFloat delta_x = [event deltaX];
+        CGFloat delta_y = [event deltaY];
 
-        if ([event hasPreciseScrollingDeltas] == YES) {
-            delta_x *= 0.1;
-            delta_y *= 0.1;
-        }
-
-        // A trackpad also reports events that only change the phase of a gesture and carry
-        // no movement.
+        // A trackpad reports events that only change the phase of a gesture, with no
+        // movement to hand the callback.
         if (delta_x == 0.0 && delta_y == 0.0) {
             return;
+        }
+
+        // A wheel reports fractions of a line, a tenth of one per notch on some devices, so
+        // one notch would be worth a tenth of what it is on the other backends. Rounding
+        // away from zero restores it. A trackpad already reports whole units and sets
+        // hasPreciseScrollingDeltas, so it is left alone.
+        if ([event hasPreciseScrollingDeltas] == NO) {
+            delta_x = delta_x > 0.0 ? ceil(delta_x) : floor(delta_x);
+            delta_y = delta_y > 0.0 ? ceil(delta_y) : floor(delta_y);
         }
 
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
