@@ -223,8 +223,16 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)scrollWheel:(NSEvent *)event {
     if(window_data != 0x0) {
-        CGFloat delta_x = [event deltaX];
-        CGFloat delta_y = [event deltaY];
+        // The legacy deltaX/deltaY report a tenth of a line per wheel notch, which is a
+        // tenth of what every other backend reports for the same notch. scrollingDelta
+        // gives one line, and only needs scaling down for the pixel deltas of a trackpad.
+        CGFloat delta_x = [event scrollingDeltaX];
+        CGFloat delta_y = [event scrollingDeltaY];
+
+        if ([event hasPreciseScrollingDeltas] == YES) {
+            delta_x *= 0.1;
+            delta_y *= 0.1;
+        }
 
         // A trackpad also reports events that only change the phase of a gesture and carry
         // no movement.
