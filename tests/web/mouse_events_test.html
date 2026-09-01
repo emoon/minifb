@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MiniFB mouse event contract test</title>
+    <script src="./mouse_events_test.js"></script>
+</head>
+<body style="background: #222; color: #bbb; font-family: sans-serif">
+    <main style="display: flex; flex-direction: column; align-items: center">
+        <h1>MiniFB mouse event contract test</h1>
+        <p>Open the browser developer console, then perform the printed steps.</p>
+        <canvas id="MiniFB mouse event contract test"
+                style="background: #000; width: min(90vw, 93vh); aspect-ratio: 4 / 3"
+                tabindex="0"></canvas>
+    </main>
+    <script>
+        async function init() {
+            await mouse_events_test();
+        }
+        init();
+    </script>
+</body>
+</html>

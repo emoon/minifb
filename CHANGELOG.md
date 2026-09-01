@@ -8,6 +8,7 @@ All notable changes to this project are documented in this file.
 
 - **Cursor enter and leave**: `mfb_set_mouse_enter_callback` reports the cursor entering or leaving the window content area, and `mfb_is_mouse_inside` returns the same state. Works on Windows, macOS, X11, Wayland, Web and Android, and fires only on a real crossing. While a button is held the window keeps the pointer, so dragging out reports no leave until the button is released. Android needs a mouse, trackpad or hover capable stylus. iOS and DOS never fire it, but on DOS `mfb_is_mouse_inside` is true when a mouse driver is present.
 - **Web `MFB_WF_RESIZABLE`**: the canvas now follows its CSS layout box scaled by `devicePixelRatio`, so the page must give it a relative size. Without the flag the drawing buffer stays pinned to the framebuffer size, as before.
+- An interactive test, `tests/mouse_events.c`, that walks a person through the mouse contract and ends with a summary meant to be compared between backends with `diff`.
 
 ### Changed
 

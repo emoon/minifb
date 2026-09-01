@@ -166,8 +166,9 @@ set(SrcDOS
 
 # Options
 #--------------------------------------
-option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" TRUE)
-option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" FALSE)
+option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" ON)
+option(MINIFB_BUILD_TESTS "Build interactive minifb test programs" ON)
+option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
 
 # purely for internal use, never exposed to the user
 set(MINIFB_USE_X11_API OFF)
@@ -576,6 +577,10 @@ if (MINIFB_BUILD_EXAMPLES)
 
     # example that will be ran on actions such as f5 in visual studio
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT noise)
+endif()
+
+if (MINIFB_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
 
 # Configure installation
