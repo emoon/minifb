@@ -37,18 +37,6 @@
 #define ERROR_TOUCH_POINTER_ID         (UINT64_C(1) << 21)
 #define ERROR_FINGER_USES_MOUSE_ID     (UINT64_C(1) << 22)
 
-#define PROGRESS_POINTER               (UINT32_C(1) << 0)
-#define PROGRESS_BUTTONS               (UINT32_C(1) << 1)
-#define PROGRESS_SCROLL                (UINT32_C(1) << 2)
-#define PROGRESS_DRAG                  (UINT32_C(1) << 3)
-#define PROGRESS_READY                 (UINT32_C(1) << 4)
-#define PROGRESS_LEFT_BUTTON           (UINT32_C(1) << 5)
-#define PROGRESS_RIGHT_BUTTON          (UINT32_C(1) << 6)
-#define PROGRESS_MIDDLE_BUTTON         (UINT32_C(1) << 7)
-#define PROGRESS_SCROLL_UP             (UINT32_C(1) << 8)
-#define PROGRESS_DOUBLE_CLICK          (UINT32_C(1) << 9)
-#define PROGRESS_MULTITOUCH            (UINT32_C(1) << 10)
-
 // Side buttons and a horizontal wheel are missing from plenty of mice, so they are checked
 // when they show up and reported as unexercised when they do not. Requiring them would turn
 // a common mouse into a failing run.
@@ -79,6 +67,129 @@
 #else
     #define TEST_DOS_PLATFORM 0
 #endif
+
+// The order walks the device instead of grouping by behaviour, so a run is a single sweep.
+// The required steps come first, so a run given up half way still covers the contract.
+typedef enum {
+#if TEST_TOUCH_PLATFORM
+    STEP_TOUCH,
+    STEP_MULTITOUCH,
+#else
+    STEP_POINTER,
+    STEP_BUTTONS,
+    STEP_MIDDLE_BUTTON,
+    STEP_SCROLL,
+#if !TEST_DOS_PLATFORM
+    STEP_DRAG,
+#endif
+    STEP_DOUBLE_CLICK,
+#if !TEST_DOS_PLATFORM
+    STEP_HORIZONTAL_SCROLL,
+    STEP_SIDE_BUTTONS,
+#endif
+#endif
+    STEP_COUNT
+} TestStepId;
+
+typedef struct {
+    bool        required;
+    const char *label;
+    const char *action;
+    const char *done_text;
+} TestStep;
+
+static const TestStep g_steps[STEP_COUNT] = {
+#if TEST_TOUCH_PLATFORM
+    { true,  "touch pointer",
+             "Touch the window, drag the finger and lift it.",
+             "press, movement and release observed" },
+    { true,  "two contacts",
+             "Touch with two fingers at the same time.",
+             "two contacts reported at once" },
+#else
+#if TEST_DOS_PLATFORM
+    { true,  "pointer movement",
+             "Move the pointer around the screen.",
+             "movement observed" },
+#else
+    { true,  "pointer crossings",
+             "Move the pointer into the window, move it around, out of it, and back in.",
+             "entry, movement, exit and re-entry observed" },
+#endif
+    { true,  "main buttons",
+             "Click left, then right, in that order. Wait for the OK after each one.",
+             "left and right reported as 1 and 2" },
+    // Its own step because it is the one a desktop or an emulator is most likely to keep for
+    // itself, and a run that loses it should still report the rest.
+    { true,  "middle button",
+             "Click the middle button, the one under the wheel.",
+             "reported as 3" },
+#if TEST_DOS_PLATFORM
+    // The wheel comes from the mouse driver, and a driver without the CuteMouse API has none
+    // to give, so this cannot be required here.
+    { false, "vertical scroll",
+             "Turn the wheel one way, wait for the OK, then turn it the opposite way.",
+             "two opposite directions recorded" },
+#else
+    { true,  "vertical scroll",
+             "Scroll one way, wait for the OK, then scroll the opposite way. Make the very first "
+             "movement a single notch.",
+             "two opposite directions recorded" },
+    { true,  "drag outside",
+             "Hold the left button, drag outside the window, release it there, then come back in.",
+             "outside release, leave and re-entry observed" },
+#endif
+    { true,  "double click",
+             "Double click the left button.",
+             "two press and release pairs" },
+#if !TEST_DOS_PLATFORM
+    { false, "horizontal scroll",
+             "Scroll sideways one way, wait for the OK, then the opposite way. Needs a tilt wheel "
+             "or a trackpad.",
+             "two opposite directions recorded" },
+    { false, "side buttons",
+             "Press the back and forward buttons. Needs a mouse with more than three buttons.",
+             "reported as 4 and 5" },
+#endif
+#endif
+};
+
+#define SKIP_KEY               MFB_KB_KEY_ESCAPE
+#define TEST_FPS               60u
+
+#if TEST_TOUCH_PLATFORM
+    #define TEST_FINISH_ACTION "Close the application"
+#elif TEST_DOS_PLATFORM
+    #define TEST_FINISH_ACTION "Press Escape"
+#else
+    #define TEST_FINISH_ACTION "Press Escape or close the window"
+#endif
+
+// Enough to repeat every error at the end without a dynamic array. report_error collapses
+// each class to one line through a bit of reported_errors, and the only other source is one
+// line per required step, so tying the size to the step count keeps it ahead on its own.
+#define TEST_MAX_LOGGED_ERRORS (STEP_COUNT + 16u)
+#define TEST_ERROR_TEXT        160u
+
+// Guidance for the person running the test goes to stderr, the record goes to stdout, so
+// redirecting stdout to a file leaves the steps and the progress on screen. The web has no
+// redirection, and there stderr reaches console.error, which makes the browser render the
+// whole accumulated Asyncify await chain on every line, so both share stdout there.
+#if defined(__EMSCRIPTEN__)
+    #define TEST_GUIDE_STREAM stdout
+#else
+    #define TEST_GUIDE_STREAM stderr
+#endif
+
+static void
+guide(const char *format, ...) {
+    va_list arguments;
+    va_start(arguments, format);
+    vfprintf(TEST_GUIDE_STREAM, format, arguments);
+    va_end(arguments);
+    fputc('\n', TEST_GUIDE_STREAM);
+    fflush(TEST_GUIDE_STREAM);
+}
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -175,9 +286,27 @@ typedef struct {
     unsigned           simultaneous_pointers;
     unsigned           max_simultaneous_pointers;
     unsigned           error_count;
-    uint32_t           reported_progress;
+    unsigned           reported_button_stage;
+    unsigned           reported_vertical_stage;
+    unsigned           reported_horizontal_stage;
+    bool               skipped_required;
+    bool               step_done[STEP_COUNT];
+    bool               step_skipped[STEP_COUNT];
     uint64_t           reported_errors;
+    char               error_log[TEST_MAX_LOGGED_ERRORS][TEST_ERROR_TEXT];
 } MouseTest;
+
+// Errors are printed where they happen, far above the verdict, so a copy of each one is
+// kept to repeat at the end. Past the last slot only the count grows.
+static void
+record_error(MouseTest *test, const char *text) {
+    if (test->error_count < TEST_MAX_LOGGED_ERRORS) {
+        snprintf(test->error_log[test->error_count], TEST_ERROR_TEXT, "%s", text);
+    }
+
+    test->error_count++;
+    guide("ERROR: %s", text);
+}
 
 static void
 report_error(MouseTest *test, uint64_t error, const char *format, ...) {
@@ -186,33 +315,32 @@ report_error(MouseTest *test, uint64_t error, const char *format, ...) {
     }
 
     test->reported_errors |= error;
-    test->error_count++;
 
+    char    text[TEST_ERROR_TEXT];
     va_list arguments;
     va_start(arguments, format);
-    fputs("ERROR: ", stdout);
-    vprintf(format, arguments);
-    fputc('\n', stdout);
-    fflush(stdout);
+    vsnprintf(text, sizeof(text), format, arguments);
     va_end(arguments);
+
+    record_error(test, text);
 }
 
 static void
 report_missing(MouseTest *test, const char *action) {
-    test->error_count++;
-    printf("ERROR: required action was not observed: %s\n", action);
-    fflush(stdout);
+    char text[TEST_ERROR_TEXT];
+
+    snprintf(text, sizeof(text), "required action was not observed: %s", action);
+    record_error(test, text);
 }
 
 static void
-report_progress(MouseTest *test, uint32_t progress, const char *description) {
-    if ((test->reported_progress & progress) != 0) {
+report_step_done(MouseTest *test, TestStepId step) {
+    if (test->step_done[step] == true) {
         return;
     }
 
-    test->reported_progress |= progress;
-    printf("DONE: %s\n", description);
-    fflush(stdout);
+    test->step_done[step] = true;
+    guide("DONE: %s, %s", g_steps[step].label, g_steps[step].done_text);
 }
 
 static bool
@@ -226,11 +354,7 @@ any_button_pressed(const MouseTest *test) {
     return false;
 }
 
-static bool
-required_mouse_buttons_done(const MouseTest *test) {
-    return test->main_button_stage >= 3;
-}
-
+#if !TEST_TOUCH_PLATFORM
 static const char *
 main_button_name(unsigned button) {
     switch (button) {
@@ -245,22 +369,31 @@ main_button_name(unsigned button) {
     }
 }
 
+// A step that asks for several actions is opaque while it waits: it either completes or it
+// does not, and nothing says which half has already arrived. These two speak for it.
 static void
-update_main_button_progress(MouseTest *test) {
-    if (test->main_button_stage >= 1) {
-        report_progress(test, PROGRESS_LEFT_BUTTON,
-                        "left mouse button reported as MFB_MOUSE_BTN_1");
-    }
-    if (test->main_button_stage >= 2) {
-        report_progress(test, PROGRESS_RIGHT_BUTTON,
-                        "right mouse button reported as MFB_MOUSE_BTN_2");
-    }
-    if (test->main_button_stage >= 3) {
-        report_progress(test, PROGRESS_MIDDLE_BUTTON,
-                        "middle mouse button reported as MFB_MOUSE_BTN_3");
+report_button_progress(MouseTest *test) {
+    while (test->reported_button_stage < test->main_button_stage) {
+        unsigned button = MFB_MOUSE_LEFT + test->reported_button_stage;
+        test->reported_button_stage++;
+        guide("   OK: %s", main_button_name(button));
     }
 }
 
+static void
+report_scroll_progress(MouseTest *test) {
+    if (test->vertical_scroll_stage >= 1 && test->reported_vertical_stage == 0) {
+        test->reported_vertical_stage = 1;
+        guide("   OK: first vertical direction recorded, now scroll the opposite way");
+    }
+    if (test->horizontal_scroll_stage >= 1 && test->reported_horizontal_stage == 0) {
+        test->reported_horizontal_stage = 1;
+        guide("   OK: first horizontal direction recorded, now scroll the opposite way");
+    }
+}
+#endif
+
+#if TEST_TOUCH_PLATFORM
 static bool
 any_pointer_press_and_release_done(const MouseTest *test) {
     for (unsigned button = 0; button < TEST_MOUSE_BUTTON_COUNT; ++button) {
@@ -272,63 +405,110 @@ any_pointer_press_and_release_done(const MouseTest *test) {
 
     return false;
 }
+#endif
+
+// One place decides whether a step is finished, so the NEXT line, the DONE line and the
+// final summary can never disagree about it.
+static void
+evaluate_steps(const MouseTest *test, bool *done) {
+#if TEST_TOUCH_PLATFORM
+    done[STEP_TOUCH] = test->saw_move == true &&
+                       any_pointer_press_and_release_done(test) == true;
+    done[STEP_MULTITOUCH] = test->max_simultaneous_pointers >= 2;
+#else
+#if TEST_DOS_PLATFORM
+    done[STEP_POINTER] = test->saw_move;
+#else
+    done[STEP_POINTER] = test->saw_move == true && test->saw_enter == true &&
+                         test->saw_leave == true && test->saw_reenter_after_leave == true;
+#endif
+    done[STEP_BUTTONS] = test->main_button_stage >= 2;
+    done[STEP_MIDDLE_BUTTON] = test->main_button_stage >= 3;
+    done[STEP_SCROLL] = test->vertical_scroll_stage >= 2;
+#if !TEST_DOS_PLATFORM
+    done[STEP_DRAG] = test->saw_left_release_outside == true &&
+                      test->saw_leave_after_left_release == true &&
+                      test->saw_reenter_after_left_release == true;
+#endif
+    done[STEP_DOUBLE_CLICK] = test->double_click_presses >= 2 &&
+                              test->double_click_releases >= 2;
+#if !TEST_DOS_PLATFORM
+    done[STEP_HORIZONTAL_SCROLL] = test->horizontal_scroll_stage >= 2;
+    done[STEP_SIDE_BUTTONS] = test->side_buttons_seen != 0;
+#endif
+#endif
+}
+
+static bool
+step_is_pending(const MouseTest *test, TestStepId step) {
+    return test->step_done[step] == false && test->step_skipped[step] == false;
+}
+
+static int
+pending_step(const MouseTest *test) {
+    for (unsigned step = 0; step < STEP_COUNT; ++step) {
+        if (step_is_pending(test, (TestStepId) step) == true) {
+            return (int) step;
+        }
+    }
+
+    return -1;
+}
+
+static void
+announce_next_step(MouseTest *test) {
+    int step = pending_step(test);
+
+    guide("");
+    if (step < 0) {
+        guide("NEXT: nothing left. %s to finish.", TEST_FINISH_ACTION);
+        return;
+    }
+
+    guide("NEXT: %s (step %d of %d, %s).",
+          g_steps[step].action,
+          step + 1, (int) STEP_COUNT,
+          g_steps[step].required == true ? "required" : "optional"
+    );
+#if !TEST_TOUCH_PLATFORM
+    guide("      Escape skips this step.");
+#endif
+}
+
+static void
+skip_pending_step(MouseTest *test) {
+    int step = pending_step(test);
+
+    if (step < 0) {
+        return;
+    }
+
+    test->step_skipped[step] = true;
+    guide("SKIPPED: %s", g_steps[step].action);
+    announce_next_step(test);
+}
 
 static void
 update_progress(MouseTest *test) {
-#if TEST_TOUCH_PLATFORM
-    if (test->saw_move == true && any_pointer_press_and_release_done(test) == true) {
-        report_progress(test, PROGRESS_POINTER, "touch press, movement, and release observed");
-    }
-    if (test->max_simultaneous_pointers >= 2) {
-        report_progress(test, PROGRESS_MULTITOUCH, "two contacts reported at the same time");
-    }
-    uint32_t required_progress = PROGRESS_POINTER | PROGRESS_MULTITOUCH;
-#elif TEST_DOS_PLATFORM
-    if (test->saw_move == true) {
-        report_progress(test, PROGRESS_POINTER, "pointer movement observed");
-    }
-    update_main_button_progress(test);
-    if (required_mouse_buttons_done(test) == true) {
-        report_progress(test, PROGRESS_BUTTONS,
-                        "left, right, and middle button sequence completed");
-    }
-    if (test->double_click_presses >= 2 && test->double_click_releases >= 2) {
-        report_progress(test, PROGRESS_DOUBLE_CLICK,
-                        "double click reported as two press and release pairs");
-    }
-    uint32_t required_progress = PROGRESS_POINTER | PROGRESS_BUTTONS | PROGRESS_DOUBLE_CLICK;
-#else
-    if (test->saw_move == true && test->saw_enter == true &&
-        test->saw_leave == true && test->saw_reenter_after_leave == true) {
-        report_progress(test, PROGRESS_POINTER, "pointer entry, movement, exit, and re-entry observed");
-    }
-    update_main_button_progress(test);
-    if (required_mouse_buttons_done(test) == true) {
-        report_progress(test, PROGRESS_BUTTONS,
-                        "left, right, and middle button sequence completed");
-    }
-    if (test->vertical_scroll_stage >= 1) {
-        report_progress(test, PROGRESS_SCROLL_UP, "first vertical scroll recorded");
-    }
-    if (test->vertical_scroll_stage >= 2) {
-        report_progress(test, PROGRESS_SCROLL, "opposite vertical scroll recorded");
-    }
-    if (test->saw_left_release_outside == true &&
-        test->saw_leave_after_left_release == true &&
-        test->saw_reenter_after_left_release == true) {
-        report_progress(test, PROGRESS_DRAG, "outside drag, release, leave, and re-entry observed");
-    }
-    if (test->double_click_presses >= 2 && test->double_click_releases >= 2) {
-        report_progress(test, PROGRESS_DOUBLE_CLICK,
-                        "double click reported as two press and release pairs");
-    }
-    uint32_t required_progress = PROGRESS_POINTER | PROGRESS_BUTTONS |
-                                 PROGRESS_SCROLL | PROGRESS_DRAG | PROGRESS_DOUBLE_CLICK;
-#endif
+    bool done[STEP_COUNT] = { false };
+    bool advanced = false;
 
-    if ((test->reported_progress & required_progress) == required_progress) {
-        report_progress(test, PROGRESS_READY,
-                        "all required actions observed; close the window to finish");
+#if !TEST_TOUCH_PLATFORM
+    report_button_progress(test);
+    report_scroll_progress(test);
+#endif
+    evaluate_steps(test, done);
+
+    for (unsigned step = 0; step < STEP_COUNT; ++step) {
+        if (done[step] == true && test->step_done[step] == false &&
+            test->step_skipped[step] == false) {
+            report_step_done(test, (TestStepId) step);
+            advanced = true;
+        }
+    }
+
+    if (advanced == true) {
+        announce_next_step(test);
     }
 }
 
@@ -448,8 +628,11 @@ mouse_button(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod
     }
 
 #if !TEST_TOUCH_PLATFORM
-    if (button_index == MFB_MOUSE_LEFT && required_mouse_buttons_done(test) == true &&
-        valid_transition == true) {
+    // Only while its own step is the one waiting. The drag step asks for a left press and a
+    // release of its own, and from a counter they look like the first half of a double click;
+    // and a run that skipped the button sequence could never reach this one otherwise.
+    if (button_index == MFB_MOUSE_LEFT && valid_transition == true &&
+        pending_step(test) == STEP_DOUBLE_CLICK) {
         if (is_pressed == true) {
             test->double_click_presses++;
         }
@@ -736,15 +919,58 @@ check_after_update(MouseTest *test) {
     }
 }
 
+// A step reads the same way in the summary whether it was done, skipped or never reached.
+static const char *
+step_result(const MouseTest *test, TestStepId step, const bool *done) {
+    if (test->step_skipped[step] == true) {
+        return "SKIPPED";
+    }
+    if (done[step] == true) {
+        return g_steps[step].done_text;
+    }
+
+    return g_steps[step].required == true ? "NOT DONE" : "not reached";
+}
+
+#if !TEST_TOUCH_PLATFORM
+// The signs belong to the device and to the system settings, so they are recorded rather
+// than judged. Both platforms that have a wheel print them the same way.
+static void
+print_vertical_scroll_line(const MouseTest *test) {
+    if (test->vertical_scroll_stage == 0) {
+        printf("  vertical scroll ......... %s\n",
+               test->step_skipped[STEP_SCROLL] == true ? "SKIPPED" : "NOT DONE");
+    }
+    else if (test->vertical_scroll_stage == 1) {
+        printf("  vertical scroll ......... first %cY, second one missing\n",
+               test->vertical_first_sign > 0 ? '+' : '-');
+    }
+    else {
+        printf("  vertical scroll ......... first %cY, then %cY\n",
+               test->vertical_first_sign > 0 ? '+' : '-',
+               test->vertical_second_sign > 0 ? '+' : '-');
+    }
+}
+#endif
+
 // One line per contract point, in a fixed order and wording, so two runs on two backends can
 // be compared with diff. Anything the hardware could not produce says so out loud: two runs
 // that both skip a line agree about nothing.
 static void
 print_summary(const MouseTest *test) {
+    bool     done[STEP_COUNT] = { false };
     unsigned skipped = 0;
+
+    evaluate_steps(test, done);
 
     puts("");
     puts("CONTRACT SUMMARY");
+    for (unsigned step = 0; step < STEP_COUNT; ++step) {
+        if (g_steps[step].required == true) {
+            printf("  %-24s %s\n", g_steps[step].label,
+                   step_result(test, (TestStepId) step, done));
+        }
+    }
 
 #if TEST_DOS_PLATFORM
     printf("  left button ............. %d\n", MFB_MOUSE_LEFT);
@@ -752,16 +978,13 @@ print_summary(const MouseTest *test) {
     printf("  middle button ........... %d\n", MFB_MOUSE_MIDDLE);
     printf("  double click ............ %u press / %u release\n",
            test->double_click_presses, test->double_click_releases);
+    // The tracked state, not the getter: the window is already closed when the summary is
+    // printed, and asking a closed one answers false whatever DOS reported while it was open.
     printf("  mouse inside ............ %s\n",
-           mfb_is_mouse_inside(test->window) == true ? "true" : "false");
+           test->expected_inside == true ? "true" : "false");
     puts("  window crossings ........ n/a (DOS has no window to enter or leave)");
     puts("  drag outside window ..... n/a (DOS has no window boundary)");
-#if defined(MINIFB_DOS_WHEEL_FROM_ARROW_KEYS)
-    printf("  vertical scroll ......... %s\n",
-           test->vertical_scroll_stage >= 2 ? "both directions" : "NOT DONE");
-#else
-    puts("  vertical scroll ......... n/a (needs MINIFB_DOS_WHEEL_FROM_ARROW_KEYS)");
-#endif
+    print_vertical_scroll_line(test);
 #elif TEST_TOUCH_PLATFORM
     printf("  simultaneous contacts ... %u\n", test->max_simultaneous_pointers);
     printf("  touch pointer ids .......");
@@ -792,18 +1015,7 @@ print_summary(const MouseTest *test) {
         printf("\n");
     }
 
-    if (test->vertical_scroll_stage == 0) {
-        puts("  vertical scroll ......... NOT DONE");
-    }
-    else if (test->vertical_scroll_stage == 1) {
-        printf("  vertical scroll ......... first %cY, second one missing\n",
-               test->vertical_first_sign > 0 ? '+' : '-');
-    }
-    else {
-        printf("  vertical scroll ......... first %cY, then %cY\n",
-               test->vertical_first_sign > 0 ? '+' : '-',
-               test->vertical_second_sign > 0 ? '+' : '-');
-    }
+    print_vertical_scroll_line(test);
 
     if (test->horizontal_scroll_stage == 0) {
         puts("  horizontal scroll ....... NOT EXERCISED (needs a tilt wheel or a trackpad)");
@@ -862,81 +1074,59 @@ print_summary(const MouseTest *test) {
 
 static void
 finish_test(MouseTest *test) {
+    bool     done[STEP_COUNT] = { false };
+    unsigned skipped = 0;
+
     if (test->finalized == true) {
         return;
     }
     test->finalized = true;
+    evaluate_steps(test, done);
 
-    if (test->saw_move == false) {
-        report_missing(test, "move the pointer inside the window");
+    for (unsigned step = 0; step < STEP_COUNT; ++step) {
+        if (g_steps[step].required == false || test->step_skipped[step] == true) {
+            continue;
+        }
+        if (done[step] == false) {
+            report_missing(test, g_steps[step].action);
+        }
     }
-
-#if TEST_TOUCH_PLATFORM
-    bool saw_press = false;
-    bool saw_release = false;
-    for (unsigned button = 0; button < TEST_MOUSE_BUTTON_COUNT; ++button) {
-        saw_press = saw_press || test->saw_button_press[button];
-        saw_release = saw_release || test->saw_button_release[button];
-    }
-    if (saw_press == false) {
-        report_missing(test, "touch the window");
-    }
-    if (saw_release == false) {
-        report_missing(test, "lift the finger after a touch");
-    }
-    if (test->max_simultaneous_pointers < 2) {
-        report_missing(test, "touch with two fingers at the same time");
-    }
-#else
-    if (required_mouse_buttons_done(test) == false) {
-        unsigned expected_button = MFB_MOUSE_LEFT + test->main_button_stage;
-        char action[96];
-        snprintf(action, sizeof(action), "click %s next", main_button_name(expected_button));
-        report_missing(test, action);
-    }
-
-    #if !TEST_DOS_PLATFORM
-        if (test->saw_enter == false) {
-            report_missing(test, "move the pointer into the window");
-        }
-        if (test->saw_leave == false) {
-            report_missing(test, "move the pointer out of the window");
-        }
-        if (test->saw_reenter_after_leave == false) {
-            report_missing(test, "re-enter the window after leaving it");
-        }
-        if (test->vertical_scroll_stage == 0) {
-            report_missing(test, "scroll vertically");
-        }
-        else if (test->vertical_scroll_stage == 1) {
-            report_missing(test, "scroll vertically the opposite way");
-        }
-        if (test->saw_left_release_outside == false) {
-            report_missing(test, "hold the left button, drag outside, and release outside");
-        }
-        else if (test->saw_leave_after_left_release == false) {
-            report_missing(test, "receive a leave event after releasing the left button outside");
-        }
-        else if (test->saw_reenter_after_left_release == false) {
-            report_missing(test, "re-enter the window after releasing the left button outside");
-        }
-        if (test->double_click_presses < 2 || test->double_click_releases < 2) {
-            report_missing(test, "double click the left button");
-        }
-    #endif
-#endif
 
     print_summary(test);
 
-    if (test->error_count == 0) {
-        puts("PASS: all required actions completed and no errors were detected.");
-        fflush(stdout);
+    for (unsigned step = 0; step < STEP_COUNT; ++step) {
+        if (g_steps[step].required == true && test->step_skipped[step] == true) {
+            skipped++;
+        }
+    }
+
+    if (test->error_count > 0) {
+        unsigned listed = test->error_count < TEST_MAX_LOGGED_ERRORS
+                          ? test->error_count : TEST_MAX_LOGGED_ERRORS;
+
+        printf("FAIL: %u error%s detected.\n",
+               test->error_count, test->error_count == 1 ? "" : "s");
+        for (unsigned i = 0; i < listed; ++i) {
+            printf(" - ERROR: %s\n", test->error_log[i]);
+        }
+        if (test->error_count > listed) {
+            printf(" - and %u more not kept.\n", test->error_count - listed);
+        }
+        guide("Result: FAIL, %u error%s detected.",
+              test->error_count, test->error_count == 1 ? "" : "s");
+    }
+    else if (skipped > 0) {
+        test->skipped_required = true;
+        printf("INCOMPLETE: no errors, but %u required action%s skipped.\n",
+               skipped, skipped == 1 ? " was" : "s were");
+        guide("Result: INCOMPLETE, %u required action%s skipped.",
+              skipped, skipped == 1 ? " was" : "s were");
     }
     else {
-        printf("FAIL: %u error%s detected.\n",
-                test->error_count, test->error_count == 1 ? "" : "s");
-        fflush(stdout);
+        puts("PASS: all required actions completed and no errors were detected.");
+        guide("Result: PASS.");
     }
+    fflush(stdout);
 }
 
 static bool
@@ -949,53 +1139,39 @@ static void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     (void) mod;
 
-    if (key == MFB_KB_KEY_ESCAPE && is_pressed == false) {
-        mfb_close(window);
+    // Escape always means "I am done with this". While a step is waiting that is the step,
+    // and once none are left it is the run.
+    if (key == SKIP_KEY && is_pressed == false) {
+        MouseTest *test = get_test(window);
+
+        if (pending_step(test) >= 0) {
+            skip_pending_step(test);
+        }
+        else {
+            mfb_close(window);
+        }
     }
 }
 
 static void
 print_instructions(void) {
-    puts("MiniFB interactive mouse event contract test");
-    puts("");
-    puts("Perform these actions in the test window:");
-
+    guide("MiniFB interactive mouse event contract test");
+    guide("");
 #if TEST_TOUCH_PLATFORM
-    puts("  1. Touch the window, drag the finger, and lift it.");
-    puts("  2. Touch with two fingers at the same time.");
-    puts("  3. Close the application when finished.");
-#elif TEST_DOS_PLATFORM
-    puts("  1. Move the pointer around the screen.");
-    puts("  2. Click left, then right, then middle. Wait for DONE after each click.");
-    puts("  3. Double click the left button.");
-    puts("  4. Press Escape when finished.");
+    guide("The test asks for one action at a time. Do what the NEXT line says. When none are");
+    guide("left, close the application to finish the run.");
 #else
-    puts("  1. Move the pointer into the window, move it around, leave, and re-enter.");
-    puts("  2. Click left, then right, then middle. Wait for DONE after each click.");
-    puts("     Expected MiniFB values are 1, 2, and 3, in that order.");
-    puts("  3. Scroll one way, pause until DONE appears, then scroll the opposite way.");
-    puts("     A wheel or a trackpad both work. The two must report opposite signs; which");
-    puts("     one is positive is recorded in the summary, not judged here.");
-    puts("     With a wheel, make the very first movement a SINGLE notch: that is what");
-    puts("     the callbacks per notch line measures, and two quick notches read the same");
-    puts("     as one notch reported twice.");
-    puts("  4. Hold the left button, drag outside, release outside, then re-enter.");
-    puts("  5. Double click the left button.");
-    puts("  6. If your mouse or trackpad can scroll sideways, do it one way, pause, then");
-    puts("     the opposite way. Optional, and the summary says if it was skipped.");
-    puts("     If it has back and forward buttons, press them now.");
-    puts("     Both are optional: the summary says which ones were skipped.");
-    puts("  7. Press Escape or close the window when finished.");
+    guide("The test asks for one action at a time. Do what the NEXT line says, or press Escape");
+    guide("to skip a step you cannot perform. When none are left, it finishes the run.");
+    guide("");
+    guide("Scroll signs depend on the device and on the system scroll settings, not only on the");
+    guide("backend: a trackpad and a tilt wheel report opposite signs for what feels like the");
+    guide("same direction. Compare runs made on the same machine, with the same device and the");
+    guide("same settings, or the comparison measures the hardware instead.");
 #endif
-
-    puts("");
-    puts("Scroll signs depend on the device and on the system scroll settings, not only on");
-    puts("the backend: a trackpad and a tilt wheel report opposite signs for what feels like");
-    puts("the same direction. Compare runs made on the same machine, with the same device");
-    puts("and the same settings, or the comparison measures the hardware instead.");
-    puts("");
-    puts("Progress is printed once per completed step. Errors are printed when detected.");
-    fflush(stdout);
+    guide("");
+    guide("Steps and progress go to stderr, the event log and the summary go to stdout, so");
+    guide("running it as \"mouse_events_test > log.txt\" keeps this panel on screen.");
 }
 
 static void
@@ -1020,7 +1196,7 @@ main(void) {
 
     uint32_t *buffer = (uint32_t *) malloc(TEST_WIDTH * TEST_HEIGHT * sizeof(uint32_t));
     if (buffer == NULL) {
-        fputs("ERROR: could not allocate the test framebuffer\n", stdout);
+        fputs("ERROR: could not allocate the test framebuffer\n", stderr);
         return EXIT_FAILURE;
     }
     fill_buffer(buffer);
@@ -1031,7 +1207,7 @@ main(void) {
     test.window = mfb_open_ex("MiniFB mouse event contract test",
                               TEST_WIDTH, TEST_HEIGHT, MFB_WF_RESIZABLE);
     if (test.window == NULL) {
-        fputs("ERROR: could not open the test window\n", stdout);
+        fputs("ERROR: could not open the test window\n", stderr);
         free(buffer);
         return EXIT_FAILURE;
     }
@@ -1056,7 +1232,11 @@ main(void) {
     mfb_set_mouse_move_callback(test.window, mouse_move);
     mfb_set_mouse_scroll_callback(test.window, mouse_scroll);
     mfb_set_mouse_enter_callback(test.window, mouse_enter);
-    mfb_set_target_fps(60);
+    mfb_set_target_fps(TEST_FPS);
+
+    // The first NEXT line has to come after the window is open. On DOS opening it switches to
+    // a VESA mode, which clears whatever was printed before.
+    announce_next_step(&test);
 
     for (;;) {
         // Both calls pump events, so each one gets its own counting window. Sharing one
@@ -1085,5 +1265,7 @@ main(void) {
 
     finish_test(&test);
     free(buffer);
-    return test.error_count == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+    return test.error_count == 0 && test.skipped_required == false
+         ? EXIT_SUCCESS
+         : EXIT_FAILURE;
 }

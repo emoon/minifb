@@ -1,5 +1,8 @@
 #include "MiniFB_utf8.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 //-------------------------------------
 bool
 utf8_decode_next(const unsigned char *bytes, size_t length, size_t *index, uint32_t *codepoint) {
@@ -59,4 +62,51 @@ utf8_decode_next(const unsigned char *bytes, size_t length, size_t *index, uint3
     // Skip invalid lead byte sequence and continue parsing.
     *index += 1;
     return false;
+}
+
+//-------------------------------------
+bool
+utf8_is_valid(const char *text) {
+    if (text == NULL) {
+        return false;
+    }
+
+    const unsigned char *bytes = (const unsigned char *) text;
+    size_t   length    = strlen(text);
+    size_t   index     = 0;
+    uint32_t codepoint = 0;
+
+    while (index < length) {
+        if (utf8_decode_next(bytes, length, &index, &codepoint) == false) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+//-------------------------------------
+char *
+utf8_ascii_copy(const char *text) {
+    if (text == NULL) {
+        return NULL;
+    }
+
+    size_t  length = strlen(text);
+    char   *copy   = (char *) malloc(length + 1);
+    size_t  used   = 0;
+
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    for (size_t index = 0; index < length; ++index) {
+        unsigned char byte = (unsigned char) text[index];
+        if (byte >= 0x20 && byte < 0x7f) {
+            copy[used++] = (char) byte;
+        }
+    }
+    copy[used] = '\0';
+
+    return copy;
 }

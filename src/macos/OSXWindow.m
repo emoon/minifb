@@ -295,7 +295,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     }
     else {
         // Obtain a confirmation of close
-        if (!window_data->close_func || window_data->close_func((struct mfb_window*)window_data)) {
+        if (!window_data->close_func || window_data->close_func((struct mfb_window *)window_data)) {
             destroy = true;
         }
     }

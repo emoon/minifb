@@ -6,7 +6,7 @@
 
 #include "MiniFB_timespec.h"
 #include "MiniFB_internal.h"
-#include "MiniFB_utf8.h"
+#include "MiniFB_xkb.h"
 
 #include <xkbcommon/xkbcommon.h>
 #include <xkbcommon/xkbcommon-compose.h>
@@ -18,23 +18,6 @@
 #include <time.h>
 
 #include <sys/mman.h>
-
-//-------------------------------------
-// Resolve the locale used to build the xkb compose table.
-//-------------------------------------
-static const char *
-get_compose_locale(void) {
-    const char *locale;
-
-    locale = getenv("LC_ALL");
-    if (locale && *locale) return locale;
-    locale = getenv("LC_CTYPE");
-    if (locale && *locale) return locale;
-    locale = getenv("LANG");
-    if (locale && *locale) return locale;
-
-    return "C";
-}
 
 //-------------------------------------
 // Synchronize MiniFB modifier flags from the current xkb state.
@@ -94,10 +77,7 @@ reset_keyboard_state(SWindowData *window_data, SWindowData_Way *window_data_spec
     }
 
     if (window_data_specific != NULL) {
-        if (window_data_specific->xkb_compose_state != NULL) {
-            xkb_compose_state_reset(window_data_specific->xkb_compose_state);
-        }
-        window_data_specific->compose_sequence_count = 0;
+        mfb_xkb_compose_reset(&window_data_specific->compose);
 
         // Losing focus or the keyboard capability (both routes into this
         // function) must cancel any in-flight repeat; keyboard_enter also
@@ -115,11 +95,15 @@ wayland_clear_keyboard_focus_state(SWindowData *window_data, SWindowData_Way *wi
     bool was_active = window_data->is_active;
 
     window_data->is_active = false;
-    reset_keyboard_state(window_data, window_data_specific);
 
     if (was_active == true) {
         kCall(active_func, false);
     }
+
+    // The real release happens in whatever surface took the focus and never comes back, so
+    // clearing the state in silence would leave the application holding the key for ever.
+    mfb_release_held_keys(window_data, window_data->mod_keys);
+    reset_keyboard_state(window_data, window_data_specific);
 }
 
 //-------------------------------------
@@ -200,34 +184,9 @@ keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int f
     window_data_specific->xkb_keymap = keymap;
     window_data_specific->xkb_state = state;
 
-    // (Re)create compose table and state for dead-key support
-    if (window_data_specific->xkb_compose_state) {
-        xkb_compose_state_unref(window_data_specific->xkb_compose_state);
-        window_data_specific->xkb_compose_state = NULL;
-    }
-    if (window_data_specific->xkb_compose_table) {
-        xkb_compose_table_unref(window_data_specific->xkb_compose_table);
-        window_data_specific->xkb_compose_table = NULL;
-    }
-
-    const char *locale = get_compose_locale();
-    struct xkb_compose_table *compose_table = xkb_compose_table_new_from_locale(
-        window_data_specific->xkb_context, locale, XKB_COMPOSE_COMPILE_NO_FLAGS);
-    if (compose_table != NULL) {
-        struct xkb_compose_state *compose_state = xkb_compose_state_new(
-            compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
-        if (compose_state != NULL) {
-            window_data_specific->xkb_compose_table = compose_table;
-            window_data_specific->xkb_compose_state = compose_state;
-        }
-        else {
-            xkb_compose_table_unref(compose_table);
-            MFB_LOG(MFB_LOG_WARNING, "xkb_compose_state_new failed; dead keys will not work");
-        }
-    }
-    else {
-        MFB_LOG(MFB_LOG_DEBUG, "xkb_compose_table_new_from_locale('%s') failed; dead keys will not work", locale);
-    }
+    // A new keymap can arrive at any time, and it leaves any half-typed sequence meaning
+    // something else, so composition starts again with it.
+    mfb_xkb_compose_init(&window_data_specific->compose, window_data_specific->xkb_context);
 }
 
 //-------------------------------------
@@ -258,6 +217,8 @@ rebuild_keyboard_state_from_keys(SWindowData *window_data, SWindowData_Way *wind
 
     if (window_data_specific != NULL) {
         update_mod_keys_from_xkb(window_data, window_data_specific);
+        // The call above leaves only what the layout calls a modifier, and AltGr is not one.
+        mfb_recalc_mod_keys(window_data, window_data->mod_keys);
     }
 }
 
@@ -308,7 +269,7 @@ static void
 emit_char_input_from_xkb_state(SWindowData *window_data, SWindowData_Way *window_data_specific, xkb_keycode_t xkb_keycode) {
     uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
     if (codepoint != 0) {
-        kCall(char_input_func, codepoint);
+        mfb_dispatch_char_input(window_data, codepoint);
     }
 }
 
@@ -333,19 +294,18 @@ wayland_emit_due_key_repeats(SWindowData *window_data, SWindowData_Way *window_d
         return; // Deadline not reached yet.
     }
 
-    // Same order and side effects as the WL_KEYBOARD_KEY_STATE_REPEATED path
-    // in keyboard_key(): character callback first, then key_status and the
-    // key-press callback, so compositor-driven (version 10, rate == 0) and
-    // client-driven repeats are indistinguishable to the application.
-    if (window_data_specific->xkb_state != NULL) {
-        xkb_keycode_t xkb_keycode = (xkb_keycode_t) window_data_specific->repeat_key + 8;
-        emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
-    }
-
+    // Same order and side effects as the WL_KEYBOARD_KEY_STATE_REPEATED path in
+    // keyboard_key(): the key first, then its character, so compositor-driven (version 10,
+    // rate == 0) and client-driven repeats are indistinguishable to the application.
     mfb_key key_code = (mfb_key) g_keycodes[window_data_specific->repeat_key];
     if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
         window_data->key_status[key_code] = true;
         kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, true);
+    }
+
+    if (window_data_specific->xkb_state != NULL) {
+        xkb_keycode_t xkb_keycode = (xkb_keycode_t) window_data_specific->repeat_key + 8;
+        emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
     }
 
     // Advance by whole intervals from the previous deadline. Scheduling from
@@ -417,12 +377,27 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 return;
         }
 
+        // The modifiers have to describe the state after this event before anything is
+        // reported, and the physical key has to come before the text it produces, so that a
+        // character callback can read the buffer and find that key already pressed.
+        if (window_data_specific != NULL && window_data_specific->xkb_state != NULL &&
+            should_update_xkb_state == true) {
+            xkb_state_update_key(window_data_specific->xkb_state,
+                                 (xkb_keycode_t) key + 8,
+                                 is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
+            update_mod_keys_from_xkb(window_data, window_data_specific);
+        }
+
+        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
+            window_data->key_status[key_code] = is_pressed;
+            // xkb answers about the layout, not about the keys: on a Spanish layout AltGr is
+            // ISO_Level3_Shift and no Alt at all, so the held key has to be added on top.
+            mfb_recalc_mod_keys(window_data, window_data->mod_keys);
+            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
+        }
+
         if (window_data_specific && window_data_specific->xkb_state) {
             xkb_keycode_t xkb_keycode = (xkb_keycode_t) key + 8;
-            if (should_update_xkb_state) {
-                xkb_state_update_key(window_data_specific->xkb_state, xkb_keycode, is_pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
-                update_mod_keys_from_xkb(window_data, window_data_specific);
-            }
             if (should_emit_key_press) {
 #if defined(WL_KEYBOARD_KEY_STATE_REPEATED_SINCE_VERSION)
                 if (is_repeated) {
@@ -430,65 +405,12 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                 }
                 else
 #endif
-                if (window_data_specific->xkb_compose_state) {
-                    xkb_keysym_t keysym = xkb_state_key_get_one_sym(window_data_specific->xkb_state, xkb_keycode);
-                    xkb_compose_state_feed(window_data_specific->xkb_compose_state, keysym);
-                    enum xkb_compose_status status = xkb_compose_state_get_status(window_data_specific->xkb_compose_state);
-                    if (status == XKB_COMPOSE_COMPOSED) {
-                        bool emitted = false;
-                        xkb_keysym_t composed_sym = xkb_compose_state_get_one_sym(window_data_specific->xkb_compose_state);
-                        if (composed_sym != XKB_KEY_NoSymbol) {
-                            uint32_t codepoint = xkb_keysym_to_utf32(composed_sym);
-                            if (codepoint != 0) {
-                                kCall(char_input_func, codepoint);
-                                emitted = true;
-                            }
-                        }
-                        if (emitted == false) {
-                            // Fallback: compose result has no keysym, decode UTF-8
-                            char buf[64];
-                            int len = xkb_compose_state_get_utf8(window_data_specific->xkb_compose_state, buf, sizeof(buf));
-                            if (len > 0) {
-                                size_t actual = ((size_t) len < sizeof(buf) - 1) ? (size_t) len : sizeof(buf) - 1;
-                                size_t idx = 0;
-                                uint32_t cp;
-                                while (utf8_decode_next((const unsigned char *) buf, actual, &idx, &cp)) {
-                                    if (cp != 0) {
-                                        kCall(char_input_func, cp);
-                                    }
-                                }
-                            }
-                        }
-                        window_data_specific->compose_sequence_count = 0;
-                        xkb_compose_state_reset(window_data_specific->xkb_compose_state);
-                    }
-                    else if (status == XKB_COMPOSE_CANCELLED) {
-                        // Replay buffered keycodes + cancelling key as individual characters
-                        for (uint8_t i = 0; i < window_data_specific->compose_sequence_count; ++i) {
-                            uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, window_data_specific->compose_sequence[i]);
-                            if (codepoint != 0) {
-                                kCall(char_input_func, codepoint);
-                            }
-                        }
-                        uint32_t codepoint = xkb_state_key_get_utf32(window_data_specific->xkb_state, xkb_keycode);
-                        if (codepoint != 0) {
-                            kCall(char_input_func, codepoint);
-                        }
-                        window_data_specific->compose_sequence_count = 0;
-                        xkb_compose_state_reset(window_data_specific->xkb_compose_state);
-                    }
-                    else if (status == XKB_COMPOSE_COMPOSING) {
-                        // Dead key pending - buffer keycode, don't emit
-                        if (window_data_specific->compose_sequence_count < 8) {
-                            window_data_specific->compose_sequence[window_data_specific->compose_sequence_count++] = xkb_keycode;
-                        }
-                    }
-                    else if (status == XKB_COMPOSE_NOTHING) {
+                {
+                    xkb_keysym_t keysym = xkb_state_key_get_one_sym(window_data_specific->xkb_state,
+                                                                    xkb_keycode);
+                    if (mfb_xkb_compose_feed(&window_data_specific->compose, window_data, keysym) == false) {
                         emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
                     }
-                }
-                else {
-                    emit_char_input_from_xkb_state(window_data, window_data_specific, xkb_keycode);
                 }
             }
 
@@ -512,47 +434,6 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
                     window_data_specific->repeat_active = false;
                 }
             }
-        }
-
-        else {
-            switch (key_code) {
-                case MFB_KB_KEY_LEFT_SHIFT:
-                case MFB_KB_KEY_RIGHT_SHIFT:
-                    if (is_pressed)
-                        window_data->mod_keys |= MFB_KB_MOD_SHIFT;
-                    else
-                        window_data->mod_keys &= ~MFB_KB_MOD_SHIFT;
-                    break;
-
-                case MFB_KB_KEY_LEFT_CONTROL:
-                case MFB_KB_KEY_RIGHT_CONTROL:
-                    if (is_pressed)
-                        window_data->mod_keys |= MFB_KB_MOD_CONTROL;
-                    else
-                        window_data->mod_keys &= ~MFB_KB_MOD_CONTROL;
-                    break;
-
-                case MFB_KB_KEY_LEFT_ALT:
-                case MFB_KB_KEY_RIGHT_ALT:
-                    if (is_pressed)
-                        window_data->mod_keys |= MFB_KB_MOD_ALT;
-                    else
-                        window_data->mod_keys &= ~MFB_KB_MOD_ALT;
-                    break;
-
-                case MFB_KB_KEY_LEFT_SUPER:
-                case MFB_KB_KEY_RIGHT_SUPER:
-                    if (is_pressed)
-                        window_data->mod_keys |= MFB_KB_MOD_SUPER;
-                    else
-                        window_data->mod_keys &= ~MFB_KB_MOD_SUPER;
-                    break;
-            }
-        }
-
-        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
-            window_data->key_status[key_code] = is_pressed;
-            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
         }
     }
 }
@@ -582,6 +463,8 @@ keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial, ui
                               0, 0,
                               group);
         update_mod_keys_from_xkb(window_data, window_data_specific);
+        // The call above leaves only what the layout calls a modifier, and AltGr is not one.
+        mfb_recalc_mod_keys(window_data, window_data->mod_keys);
     }
 }
 

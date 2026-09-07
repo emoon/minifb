@@ -119,6 +119,7 @@ EM_ASYNC_JS(void, setup_web_mfb, (), {
             "Backslash": 92,
             "BracketRight": 93,
             "Backquote": 96,
+            "IntlBackslash": 162,
 
             "Escape": 256,
             "Enter": 257,
@@ -343,9 +344,16 @@ window_data_get_dst_height(SWindowData *window_data) {
 
 //-------------------------------------
 EM_EXPORT void
-window_data_call_active_func(SWindowData *window_data, bool is_active) {
+window_data_call_active_func(SWindowData *window_data, bool is_active, uint32_t lock_keys) {
     if (window_data == NULL) return;
-    if (window_data->active_func) window_data->active_func((struct mfb_window *) window_data, is_active);
+    window_data->is_active = is_active;
+    kCall(active_func, is_active);
+
+    if (is_active == false) {
+        mfb_release_held_keys(window_data, lock_keys);
+        window_data->mod_keys = lock_keys & (uint32_t) (MFB_KB_MOD_CAPS_LOCK |
+                                                       MFB_KB_MOD_NUM_LOCK);
+    }
 }
 
 //-------------------------------------
@@ -366,14 +374,56 @@ window_data_call_close_func(SWindowData *window_data) {
 EM_EXPORT void
 window_data_call_keyboard_func(SWindowData *window_data, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     if (window_data == NULL) return;
-    if (window_data->keyboard_func) window_data->keyboard_func((struct mfb_window *) window_data, key, mod, is_pressed);
+    if ((int) key < 0 || (unsigned) key > (unsigned) MFB_KB_KEY_LAST) return;
+    if (is_pressed == false && window_data->key_status[(unsigned) key] == 0) return;
+
+    window_data_set_key(window_data, (unsigned) key, is_pressed);
+    uint32_t effective_mods = mfb_recalc_mod_keys(window_data, (uint32_t) mod);
+    kCall(keyboard_func, key, (mfb_key_mod) effective_mods, is_pressed);
+}
+
+//-------------------------------------
+// A browser can report a modifier with no code at all. Windows does it for every event once
+// both Shift keys are down, and the release that follows arrives just as nameless, so a key
+// still marked as held while the browser says its modifier is up has lost that release and
+// would stay pressed for good.
+EM_EXPORT void
+window_data_sync_mod_keys(SWindowData *window_data, uint32_t platform_mods) {
+    static const struct {
+        uint32_t bit;
+        unsigned sides[2];
+    } modifiers[] = {
+        { MFB_KB_MOD_SHIFT,   { MFB_KB_KEY_LEFT_SHIFT,   MFB_KB_KEY_RIGHT_SHIFT   } },
+        { MFB_KB_MOD_CONTROL, { MFB_KB_KEY_LEFT_CONTROL, MFB_KB_KEY_RIGHT_CONTROL } },
+        { MFB_KB_MOD_ALT,     { MFB_KB_KEY_LEFT_ALT,     MFB_KB_KEY_RIGHT_ALT     } },
+        { MFB_KB_MOD_SUPER,   { MFB_KB_KEY_LEFT_SUPER,   MFB_KB_KEY_RIGHT_SUPER   } },
+    };
+
+    if (window_data == NULL) return;
+
+    for (unsigned modifier = 0; modifier < sizeof(modifiers) / sizeof(modifiers[0]); ++modifier) {
+        if ((platform_mods & modifiers[modifier].bit) != 0) {
+            continue;
+        }
+
+        for (unsigned side = 0; side < 2; ++side) {
+            unsigned key = modifiers[modifier].sides[side];
+            if (window_data->key_status[key] == 0) {
+                continue;
+            }
+
+            window_data->key_status[key] = 0;
+            uint32_t effective_mods = mfb_recalc_mod_keys(window_data, platform_mods);
+            kCall(keyboard_func, (mfb_key) key, (mfb_key_mod) effective_mods, false);
+        }
+    }
 }
 
 //-------------------------------------
 EM_EXPORT void
 window_data_call_char_input_func(SWindowData *window_data, unsigned int code) {
     if (window_data == NULL) return;
-    if (window_data->char_input_func) window_data->char_input_func((struct mfb_window *) window_data, code);
+    mfb_dispatch_char_input(window_data, code);
 }
 
 //-------------------------------------
@@ -385,8 +435,9 @@ window_data_call_mouse_btn_func(SWindowData *window_data, mfb_mouse_button butto
     if (window_data == NULL) return;
     window_data_set_mouse_pos(window_data, x, y);
     window_data_set_mouse_button(window_data, (uint8_t) button, is_pressed);
-    window_data_set_mod_keys(window_data, mod);
-    if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window *) window_data, button, mod, is_pressed);
+    // The browser reports only what the layout calls a modifier, and AltGr is not one.
+    uint32_t effective_mods = mfb_recalc_mod_keys(window_data, (uint32_t) mod);
+    if (window_data->mouse_btn_func) window_data->mouse_btn_func((struct mfb_window *) window_data, button, (mfb_key_mod) effective_mods, is_pressed);
 }
 
 //-------------------------------------
@@ -402,8 +453,8 @@ EM_EXPORT void
 window_data_call_mouse_wheel_func(SWindowData *window_data, mfb_key_mod mod, float x, float y) {
     if (window_data == NULL) return;
     window_data_set_mouse_wheel(window_data, x, y);
-    window_data_set_mod_keys(window_data, mod);
-    if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window *) window_data, mod, x, y);
+    uint32_t effective_mods = mfb_recalc_mod_keys(window_data, (uint32_t) mod);
+    if (window_data->mouse_wheel_func) window_data->mouse_wheel_func((struct mfb_window *) window_data, (mfb_key_mod) effective_mods, x, y);
 }
 
 //-------------------------------------
@@ -473,6 +524,12 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
 
     const MAX_QUEUED_EVENTS = 2048;
     const NON_PASSIVE = { passive: false };
+    const MFB_KB_MOD_SHIFT     = 0x0001;
+    const MFB_KB_MOD_CONTROL   = 0x0002;
+    const MFB_KB_MOD_ALT       = 0x0004;
+    const MFB_KB_MOD_SUPER     = 0x0008;
+    const MFB_KB_MOD_CAPS_LOCK = 0x0010;
+    const MFB_KB_MOD_NUM_LOCK  = 0x0020;
 
     let id = window._minifb.nextId++;
     canvas.width = width;
@@ -491,9 +548,30 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     let ctx = canvas.getContext("2d");
     if (!ctx) return 0;
 
+    let textInput = document.createElement("textarea");
+    textInput.tabIndex = -1;
+    textInput.setAttribute("autocomplete", "off");
+    textInput.setAttribute("autocapitalize", "off");
+    textInput.setAttribute("spellcheck", "false");
+    textInput.setAttribute("aria-label", "MiniFB text input");
+    textInput.style.position = "fixed";
+    textInput.style.left = "0";
+    textInput.style.top = "0";
+    textInput.style.width = "1px";
+    textInput.style.height = "1px";
+    textInput.style.padding = "0";
+    textInput.style.border = "0";
+    textInput.style.outline = "0";
+    textInput.style.opacity = "0";
+    textInput.style.overflow = "hidden";
+    textInput.style.resize = "none";
+    textInput.style.pointerEvents = "none";
+    canvas.parentNode.insertBefore(textInput, canvas.nextSibling);
+
     let w = {
         id: id,
         canvas: canvas,
+        textInput: textInput,
         ctx: ctx,
         backCanvas: null,
         backCtx: null,
@@ -507,17 +585,19 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         // answer "is this release mine?" and "where was the pointer last?".
         pressedButtons: {},
         lastPos: { x: 0, y: 0 },
-        is_active: true,
+        lastModKeys: 0,
+        isComposing: false,
+        compositionCommit: null,
+        is_active: false,
         handlers: {},
-        events: [
-            { type: "active", is_active: true }
-        ]
+        events: []
     };
 
     Module._window_data_update_window_size(window_data, canvas.width, canvas.height);
 
     function toMfbCode(code) {
-        return window._minifb.keyMap[code] ? window._minifb.keyMap[code] : -1;
+        let keyMap = window._minifb.keyMap;
+        return keyMap && keyMap[code] !== undefined ? keyMap[code] : -1;
     }
 
     function enqueueEvent(eventObj) {
@@ -556,7 +636,7 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         if (!w.wants_full_screen) return;
         w.wants_full_screen = false;
         if (canvas.requestFullscreen) {
-            canvas.requestFullscreen().catch(() => {});
+            canvas.requestFullscreen().catch(function() {});
         }
     }
 
@@ -569,14 +649,39 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
                code === "PageDown" ||
                code === "Home" ||
                code === "End" ||
-               code === "Space";
+               code === "Enter" ||
+               code === "NumpadEnter" ||
+               code === "Tab";
+    }
+
+    function hasKeyboardFocus() {
+        let activeElement = document.activeElement;
+        let documentHasFocus = typeof document.hasFocus !== "function" || document.hasFocus();
+        return document.hidden !== true && documentHasFocus &&
+               (activeElement === canvas || activeElement === textInput);
     }
 
     function setActive(is_active) {
         if (w.is_active === is_active) return;
         w.is_active = is_active;
-        Module._window_data_set_active(window_data, is_active ? 1 : 0);
-        enqueueEvent({ type: "active", is_active: is_active });
+        let lockMods = w.lastModKeys & (MFB_KB_MOD_CAPS_LOCK | MFB_KB_MOD_NUM_LOCK);
+        enqueueEvent({ type: "active", is_active: is_active, lock_mods: lockMods });
+        if (is_active === false) {
+            w.lastModKeys = lockMods;
+            w.isComposing = false;
+            w.compositionCommit = null;
+            textInput.value = "";
+        }
+    }
+
+    function updateActive() {
+        setActive(hasKeyboardFocus());
+    }
+
+    function focusTextInput() {
+        if (document.activeElement !== textInput) {
+            textInput.focus();
+        }
     }
 
     function getMousePos(event) {
@@ -597,13 +702,6 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     }
 
     function getMfbKeyModFromEvent(event) {
-        const MFB_KB_MOD_SHIFT     = 0x0001;
-        const MFB_KB_MOD_CONTROL   = 0x0002;
-        const MFB_KB_MOD_ALT       = 0x0004;
-        const MFB_KB_MOD_SUPER     = 0x0008;
-        const MFB_KB_MOD_CAPS_LOCK = 0x0010;
-        const MFB_KB_MOD_NUM_LOCK  = 0x0020;
-
         let mod = 0;
         if (event.shiftKey) mod = mod | MFB_KB_MOD_SHIFT;
         if (event.ctrlKey) mod = mod | MFB_KB_MOD_CONTROL;
@@ -611,66 +709,142 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         if (event.metaKey) mod = mod | MFB_KB_MOD_SUPER;
         if (event.getModifierState && event.getModifierState("CapsLock")) mod = mod | MFB_KB_MOD_CAPS_LOCK;
         if (event.getModifierState && event.getModifierState("NumLock"))  mod = mod | MFB_KB_MOD_NUM_LOCK;
+        w.lastModKeys = mod;
         return mod;
     };
 
-    w.handlers.keydown = (event) => {
+    function enqueueText(text) {
+        if (typeof text !== "string" || text.length === 0) return;
+        enqueueEvent({ type: "text", text: text });
+    }
+
+    w.handlers.keydown = function(event) {
         if (shouldPreventDefaultKey(event.code)) {
             event.preventDefault();
         }
+        w.compositionCommit = null;
         let code = toMfbCode(event.code);
-        Module._window_data_set_key(window_data, code, 1);
         let mod = getMfbKeyModFromEvent(event);
-        Module._window_data_set_mod_keys(window_data, mod);
-        enqueueEvent({ type: "keydown", code: code, mod: mod });
+        if (code < 0) {
+            enqueueEvent({ type: "modsync", mod: mod });
+            return;
+        }
+        enqueueEvent({ type: "keydown", code: code, mod: mod, time: event.timeStamp });
     };
     canvas.addEventListener("keydown", w.handlers.keydown);
+    textInput.addEventListener("keydown", w.handlers.keydown);
 
-    w.handlers.keyup = (event) => {
+    w.handlers.keyup = function(event) {
         if (shouldPreventDefaultKey(event.code)) {
             event.preventDefault();
         }
         let code = toMfbCode(event.code);
-        Module._window_data_set_key(window_data, code, 0);
         let mod = getMfbKeyModFromEvent(event);
-        Module._window_data_set_mod_keys(window_data, mod);
-        enqueueEvent({ type: "keyup", code: code, mod: mod });
+        if (code < 0) {
+            enqueueEvent({ type: "modsync", mod: mod });
+            return;
+        }
+        enqueueEvent({ type: "keyup", code: code, mod: mod, time: event.timeStamp });
     };
     canvas.addEventListener("keyup", w.handlers.keyup);
+    textInput.addEventListener("keyup", w.handlers.keyup);
 
-    w.handlers.keypress = (event) => {
-        if (!event.key || event.key.length === 0) return;
-        let codePoint = event.key.codePointAt(0);
-        if (codePoint !== undefined) {
-            enqueueEvent({ type: "char", code: codePoint });
+    w.handlers.input = function(event) {
+        if (w.is_active === false) {
+            textInput.value = "";
+            return;
+        }
+        if (w.isComposing === true || event.isComposing === true) return;
+
+        let text = typeof event.data === "string" ? event.data : textInput.value;
+        if (w.compositionCommit !== null) {
+            let compositionCommit = w.compositionCommit;
+            w.compositionCommit = null;
+            textInput.value = "";
+            if (text === compositionCommit) return;
+        }
+
+        enqueueText(text);
+        textInput.value = "";
+    };
+    textInput.addEventListener("input", w.handlers.input);
+
+    w.handlers.compositionStart = function() {
+        w.isComposing = true;
+        w.compositionCommit = null;
+    };
+    textInput.addEventListener("compositionstart", w.handlers.compositionStart);
+
+    w.handlers.compositionEnd = function(event) {
+        w.isComposing = false;
+        if (w.is_active === false) {
+            w.compositionCommit = null;
+            textInput.value = "";
+            return;
+        }
+        let text = typeof event.data === "string" ? event.data : textInput.value;
+        textInput.value = "";
+        if (text.length === 0) {
+            w.compositionCommit = null;
+            return;
+        }
+
+        w.compositionCommit = text;
+        enqueueText(text);
+    };
+    textInput.addEventListener("compositionend", w.handlers.compositionEnd);
+
+    w.handlers.canvasFocus = function() {
+        focusTextInput();
+    };
+    canvas.addEventListener("focus", w.handlers.canvasFocus);
+
+    w.handlers.canvasBlur = function(event) {
+        if (event.relatedTarget !== textInput) {
+            setActive(false);
         }
     };
-    canvas.addEventListener("keypress", w.handlers.keypress);
+    canvas.addEventListener("blur", w.handlers.canvasBlur);
 
-    w.handlers.focus = () => {
-        setActive(true);
+    w.handlers.textInputFocus = function() {
+        updateActive();
     };
-    canvas.addEventListener("focus", w.handlers.focus);
+    textInput.addEventListener("focus", w.handlers.textInputFocus);
 
-    w.handlers.blur = () => {
-        setActive(false);
+    w.handlers.textInputBlur = function(event) {
+        if (event.relatedTarget !== canvas) {
+            setActive(false);
+        }
     };
-    canvas.addEventListener("blur", w.handlers.blur);
+    textInput.addEventListener("blur", w.handlers.textInputBlur);
 
-    w.handlers.windowFocus = () => {
-        setActive(true);
+    w.handlers.windowFocus = function() {
+        updateActive();
     };
     window.addEventListener("focus", w.handlers.windowFocus);
 
-    w.handlers.windowBlur = () => {
+    w.handlers.windowBlur = function() {
         setActive(false);
     };
     window.addEventListener("blur", w.handlers.windowBlur);
 
-    w.handlers.visibilityChange = () => {
-        setActive(!document.hidden);
+    w.handlers.visibilityChange = function() {
+        if (document.hidden === true) {
+            setActive(false);
+        }
+        else {
+            updateActive();
+        }
     };
     document.addEventListener("visibilitychange", w.handlers.visibilityChange);
+
+    w.handlers.fullscreenChange = function() {
+        if (document.fullscreenElement === canvas) {
+            focusTextInput();
+        }
+        updateActive();
+    };
+    document.addEventListener("fullscreenchange", w.handlers.fullscreenChange);
 
     w.handlers.contextmenu = (event) => { event.preventDefault(); };
     canvas.addEventListener("contextmenu", w.handlers.contextmenu);
@@ -678,7 +852,7 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
     w.handlers.mousedown = (event) => {
             if (event.button > 6) return;
             event.preventDefault();
-            canvas.focus();
+            focusTextInput();
             requestFullscreenIfNeeded();
             let pos = getMousePos(event);
             let mod = getMfbKeyModFromEvent(event);
@@ -788,7 +962,7 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
 
     w.handlers.touchstart = (event) => {
             if (w.activeTouchId === null) {
-                canvas.focus();
+                focusTextInput();
                 requestFullscreenIfNeeded();
                 let touch = event.changedTouches[0];
                 let pos = getMousePos(touch);
@@ -843,6 +1017,13 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         w.resizeObserver.observe(canvas);
     }
 
+    w.is_active = hasKeyboardFocus();
+    if (document.activeElement === canvas) {
+        focusTextInput();
+    }
+    w.is_active = hasKeyboardFocus();
+    Module._window_data_set_active(window_data, w.is_active ? 1 : 0);
+
     window._minifb.windows[id] = w;
     return id;
 });
@@ -853,12 +1034,19 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
     if (w.handlers) {
         w.canvas.removeEventListener("keydown", w.handlers.keydown);
         w.canvas.removeEventListener("keyup", w.handlers.keyup);
-        w.canvas.removeEventListener("keypress", w.handlers.keypress);
-        w.canvas.removeEventListener("focus", w.handlers.focus);
-        w.canvas.removeEventListener("blur", w.handlers.blur);
+        w.textInput.removeEventListener("keydown", w.handlers.keydown);
+        w.textInput.removeEventListener("keyup", w.handlers.keyup);
+        w.textInput.removeEventListener("input", w.handlers.input);
+        w.textInput.removeEventListener("compositionstart", w.handlers.compositionStart);
+        w.textInput.removeEventListener("compositionend", w.handlers.compositionEnd);
+        w.canvas.removeEventListener("focus", w.handlers.canvasFocus);
+        w.canvas.removeEventListener("blur", w.handlers.canvasBlur);
+        w.textInput.removeEventListener("focus", w.handlers.textInputFocus);
+        w.textInput.removeEventListener("blur", w.handlers.textInputBlur);
         window.removeEventListener("focus", w.handlers.windowFocus);
         window.removeEventListener("blur", w.handlers.windowBlur);
         document.removeEventListener("visibilitychange", w.handlers.visibilityChange);
+        document.removeEventListener("fullscreenchange", w.handlers.fullscreenChange);
         w.canvas.removeEventListener("mousedown", w.handlers.mousedown, false);
         w.canvas.removeEventListener("mousemove", w.handlers.mousemove, false);
         w.canvas.removeEventListener("mouseup", w.handlers.mouseup, false);
@@ -880,6 +1068,9 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
         w.resizeObserver.disconnect();
         w.resizeObserver = null;
     }
+    if (w.textInput && w.textInput.parentNode) {
+        w.textInput.parentNode.removeChild(w.textInput);
+    }
     delete window._minifb.windows[window_id];
 });
 
@@ -897,6 +1088,9 @@ destroy_window_data(SWindowData *window_data) {
         if (window_data_specific->window_id != 0) {
             mfb_close_js(window_data_specific->window_id);
         }
+
+        mfb_timer_destroy(window_data_specific->timer);
+        window_data_specific->timer = NULL;
 
         free(window_data_specific->swizzle_buffer);
         window_data_specific->swizzle_buffer = NULL;
@@ -965,6 +1159,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->window_id = (uintptr_t) specific;
     window_data->specific = window_data_specific;
 
+    window_data_specific->timer = mfb_timer_create();
+    if (window_data_specific->timer == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to create frame timer.");
+        destroy_window_data(window_data);
+        return NULL;
+    }
+
     // setup key map if not initialized yet
     if (!g_initialized) {
         setup_web_mfb();
@@ -984,7 +1185,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->dst_height = height;
     calc_dst_factor(window_data, width, height);
 
-    window_data->is_active = true;
     window_data->is_initialized = true;
     window_data->is_cursor_visible = true;
 
@@ -1025,6 +1225,9 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     const MFB_STATE_INVALID_WINDOW = -2;
     const MFB_STATE_INVALID_BUFFER = -3;
     const MFB_STATE_INTERNAL_ERROR = -4;
+    const MFB_KB_KEY_LEFT_CONTROL = 341;
+    const MFB_KB_KEY_RIGHT_ALT = 346;
+    const ALT_GR_PAIR_MS = 5;
     if (window_data == 0) return MFB_STATE_INVALID_WINDOW;
     let window_id = Module._window_data_get_specific(window_data);
     if (!window._minifb) return MFB_STATE_INTERNAL_ERROR;
@@ -1035,7 +1238,7 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
     for (let i = 0; i < events.length; i++) {
         let event = events[i];
         if (event.type == "active") {
-            Module._window_data_call_active_func(window_data, event.is_active ? 1 : 0);
+            Module._window_data_call_active_func(window_data, event.is_active ? 1 : 0, event.lock_mods);
         }
         else if (event.type == "mousebutton") {
             Module._window_data_call_mouse_btn_func(window_data, event.button, event.mod, event.is_pressed ? 1 : 0, event.x, event.y);
@@ -1052,14 +1255,39 @@ EM_JS(mfb_update_state, mfb_update_events_js, (SWindowData * window_data), {
         else if (event.type == "mousecancel") {
             Module._window_data_release_mouse_buttons(window_data);
         }
-        else if (event.type == "keydown") {
-            Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 1);
+        else if (event.type == "keydown" || event.type == "keyup") {
+            // AltGr presses a left Control of its own right before the right Alt, and both
+            // reach the queue together. Windows hides that Control so AltGr arrives as one
+            // key, and this is the same lookahead its backend does with PeekMessage. That one
+            // compares GetMessageTime, which the pair shares; a browser stamps each event on
+            // its own and they land about a millisecond apart, so what identifies them is the
+            // pairing and the window only rules out two keys pressed at different times.
+            let companion = events[i + 1];
+            if (event.code == MFB_KB_KEY_LEFT_CONTROL && companion !== undefined &&
+                companion.type == event.type && companion.code == MFB_KB_KEY_RIGHT_ALT &&
+                Math.abs(companion.time - event.time) < ALT_GR_PAIR_MS) {
+                continue;
+            }
+            Module._window_data_call_keyboard_func(window_data, event.code, event.mod,
+                                                   event.type == "keydown" ? 1 : 0);
         }
-        else if (event.type == "keyup") {
-            Module._window_data_call_keyboard_func(window_data, event.code, event.mod, 0);
+        else if (event.type == "modsync") {
+            Module._window_data_sync_mod_keys(window_data, event.mod);
         }
-        else if (event.type == "char") {
-            Module._window_data_call_char_input_func(window_data, event.code);
+        else if (event.type == "text") {
+            for (let j = 0; j < event.text.length; ++j) {
+                let codePoint = event.text.charCodeAt(j);
+                if (codePoint >= 0xd800 && codePoint <= 0xdbff &&
+                    j + 1 < event.text.length) {
+                    let lowSurrogate = event.text.charCodeAt(j + 1);
+                    if (lowSurrogate >= 0xdc00 && lowSurrogate <= 0xdfff) {
+                        codePoint = 0x10000 + ((codePoint - 0xd800) << 10) +
+                                    (lowSurrogate - 0xdc00);
+                        ++j;
+                    }
+                }
+                Module._window_data_call_char_input_func(window_data, codePoint);
+            }
         }
         else if (event.type == "resize") {
             // Reached from mfb_update_events, which has no framebuffer to paint
@@ -1244,6 +1472,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 }
 
 //-------------------------------------
+extern double g_time_for_frame;
+
+//-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
     SWindowData *window_data = (SWindowData *) window;
@@ -1257,26 +1488,66 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    emscripten_sleep(0);
-
-    window_data->mouse_wheel_x = 0.0f;
-    window_data->mouse_wheel_y = 0.0f;
-
-    mfb_update_state state = mfb_update_events_js(window_data);
-    if (state == MFB_STATE_EXIT || window_data->close) {
-        MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
-        destroy_window_data(window_data);
+    SWindowData_Web *window_data_specific = mfb_web_get_data(window_data);
+    if (window_data_specific == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync missing Web-specific window data.");
         return false;
     }
-    if (state == MFB_STATE_INVALID_WINDOW) {
-        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned invalid window.");
-        return false;
-    }
-    if (state == MFB_STATE_INTERNAL_ERROR) {
-        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned internal error.");
+    if (window_data_specific->timer == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
 
+    bool yielded_to_browser = false;
+
+    for (;;) {
+        window_data->mouse_wheel_x = 0.0f;
+        window_data->mouse_wheel_y = 0.0f;
+
+        mfb_update_state state = mfb_update_events_js(window_data);
+        if (state == MFB_STATE_EXIT || window_data->close) {
+            MFB_LOG(MFB_LOG_DEBUG, "WebMiniFB: mfb_wait_sync detected close request while waiting for sync/events.");
+            destroy_window_data(window_data);
+            return false;
+        }
+        if (state == MFB_STATE_INVALID_WINDOW) {
+            MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned invalid window.");
+            return false;
+        }
+        if (state == MFB_STATE_INTERNAL_ERROR) {
+            MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync update-events returned internal error.");
+            return false;
+        }
+
+        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        if (elapsed_time >= g_time_for_frame) {
+            if (yielded_to_browser) {
+                break;
+            }
+
+            emscripten_sleep(0);
+            yielded_to_browser = true;
+            continue;
+        }
+
+        double remaining_ms = (g_time_for_frame - elapsed_time) * 1000.0;
+
+        if (remaining_ms > 1.5) {
+            int timeout_ms = (int) (remaining_ms - 1.0);
+            if (timeout_ms < 0) {
+                timeout_ms = 0;
+            }
+
+            emscripten_sleep((unsigned) timeout_ms);
+        }
+        else {
+            emscripten_sleep(0);
+        }
+
+        yielded_to_browser = true;
+    }
+
+    mfb_timer_compensated_reset(window_data_specific->timer);
     return true;
 }
 

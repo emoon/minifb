@@ -6,7 +6,7 @@
 
 typedef struct {
     HWND                window;
-    WNDCLASS            wc;
+    WNDCLASSW           wc;
     HDC                 hdc;
 #if defined(USE_OPENGL_API)
     HGLRC               hGLRC;

@@ -4,7 +4,6 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +20,8 @@
 #include <MiniFB_internal.h>
 #include "WindowData.h"
 #include "WindowData_X11.h"
-#include "MiniFB_utf8.h"
+#include "X11MiniFB_text.h"
+#include "MiniFB_evdev_keys.h"
 #include "X11MiniFB_scale_funcs.h"
 
 #if defined(USE_OPENGL_API)
@@ -31,6 +31,10 @@
 #if defined(MINIFB_HAS_XRANDR)
     #include <X11/extensions/Xrandr.h>
 #endif
+
+// The X protocol reserves the keycodes below eight, so a server that uses the kernel numbers
+// shifts them all up by that much.
+#define X11_EVDEV_KEYCODE_OFFSET 8
 
 static Atom s_delete_window_atom;
 static bool s_x11_locale_checked;
@@ -42,208 +46,104 @@ Cursor create_blank_cursor(Display *display, Window window);
 
 //-------------------------------------
 int translate_key(int scancode);
-int translate_mod(int state);
-int translate_mod_ex(int key, int state, int is_pressed);
 void destroy_window_data(SWindowData *window_data);
 
 //-------------------------------------
-static uint32_t
-keysym_to_codepoint(KeySym keysym) {
-    // Direct Latin-1 keysyms.
-    if ((keysym >= 0x0020 && keysym <= 0x007e) ||
-        (keysym >= 0x00a0 && keysym <= 0x00ff)) {
-        return (uint32_t) keysym;
-    }
-
-    // X11 Unicode keysym encoding: 0x01000000 | UCS-24.
-    if ((keysym & 0xff000000UL) == 0x01000000UL) {
-        uint32_t codepoint = (uint32_t) (keysym & 0x00ffffffUL);
-        if (codepoint <= 0x10ffff && !(codepoint >= 0xd800 && codepoint <= 0xdfff)) {
-            return codepoint;
-        }
-    }
-
-    return 0;
-}
-
-//-------------------------------------
-static bool
-is_dead_keysym(KeySym keysym) {
-    switch (keysym) {
-        case XK_dead_grave:
-        case XK_dead_acute:
-        case XK_dead_circumflex:
-        case XK_dead_tilde:
-        case XK_dead_diaeresis:
-            return true;
-        default:
-            return false;
-    }
-}
-
-//-------------------------------------
-static uint32_t
-compose_dead_codepoint(KeySym dead_keysym, uint32_t codepoint) {
-    switch (dead_keysym) {
-        case XK_dead_acute:
-            switch (codepoint) {
-                case 'a': return 0x00e1; case 'A': return 0x00c1;
-                case 'e': return 0x00e9; case 'E': return 0x00c9;
-                case 'i': return 0x00ed; case 'I': return 0x00cd;
-                case 'o': return 0x00f3; case 'O': return 0x00d3;
-                case 'u': return 0x00fa; case 'U': return 0x00da;
-                case 'y': return 0x00fd; case 'Y': return 0x00dd;
-            }
-            break;
-        case XK_dead_grave:
-            switch (codepoint) {
-                case 'a': return 0x00e0; case 'A': return 0x00c0;
-                case 'e': return 0x00e8; case 'E': return 0x00c8;
-                case 'i': return 0x00ec; case 'I': return 0x00cc;
-                case 'o': return 0x00f2; case 'O': return 0x00d2;
-                case 'u': return 0x00f9; case 'U': return 0x00d9;
-            }
-            break;
-        case XK_dead_diaeresis:
-            switch (codepoint) {
-                case 'a': return 0x00e4; case 'A': return 0x00c4;
-                case 'e': return 0x00eb; case 'E': return 0x00cb;
-                case 'i': return 0x00ef; case 'I': return 0x00cf;
-                case 'o': return 0x00f6; case 'O': return 0x00d6;
-                case 'u': return 0x00fc; case 'U': return 0x00dc;
-                case 'y': return 0x00ff; case 'Y': return 0x0178;
-            }
-            break;
-        case XK_dead_circumflex:
-            switch (codepoint) {
-                case 'a': return 0x00e2; case 'A': return 0x00c2;
-                case 'e': return 0x00ea; case 'E': return 0x00ca;
-                case 'i': return 0x00ee; case 'I': return 0x00ce;
-                case 'o': return 0x00f4; case 'O': return 0x00d4;
-                case 'u': return 0x00fb; case 'U': return 0x00db;
-            }
-            break;
-        case XK_dead_tilde:
-            switch (codepoint) {
-                case 'a': return 0x00e3; case 'A': return 0x00c3;
-                case 'n': return 0x00f1; case 'N': return 0x00d1;
-                case 'o': return 0x00f5; case 'O': return 0x00d5;
-            }
-            break;
-    }
-
-    return 0;
-}
-
-//-------------------------------------
-static uint32_t
-dead_keysym_to_codepoint(KeySym dead_keysym) {
-    switch (dead_keysym) {
-        case XK_dead_grave:       return 0x0060; // `
-        case XK_dead_acute:       return 0x00b4; // ´
-        case XK_dead_circumflex:  return 0x005e; // ^
-        case XK_dead_tilde:       return 0x007e; // ~
-        case XK_dead_diaeresis:   return 0x00a8; // ¨
-        default:                  return 0;
-    }
-}
-
+// Old window managers read WM_NAME, which is Latin-1, and current ones read _NET_WM_NAME as
+// UTF8_STRING. Xutf8SetWMProperties encodes the legacy property from the same UTF-8 input,
+// so both stay in step.
 //-------------------------------------
 static void
-emit_codepoint_with_dead_state(SWindowData *window_data, SWindowData_X11 *window_data_specific, uint32_t codepoint) {
-    if (window_data == NULL || window_data_specific == NULL || codepoint == 0) {
+set_window_title(SWindowData_X11 *window_data_specific, const char *title) {
+    char *safe = mfb_safe_title_copy(title);
+
+    if (safe == NULL) {
         return;
     }
 
-    if (window_data_specific->pending_dead_keysym != NoSymbol) {
-        uint32_t composed = compose_dead_codepoint(window_data_specific->pending_dead_keysym, codepoint);
-        if (composed != 0) {
-            codepoint = composed;
-        }
-        else {
-            uint32_t accent = dead_keysym_to_codepoint(window_data_specific->pending_dead_keysym);
-            if (accent != 0) {
-                kCall(char_input_func, accent);
-            }
-        }
-        window_data_specific->pending_dead_keysym = NoSymbol;
+    Xutf8SetWMProperties(window_data_specific->display,
+                         window_data_specific->window,
+                         safe,
+                         safe,
+                         NULL,
+                         0,
+                         NULL,
+                         NULL,
+                         NULL);
+
+    Atom net_wm_name = XInternAtom(window_data_specific->display, "_NET_WM_NAME", False);
+    Atom utf8_string = XInternAtom(window_data_specific->display, "UTF8_STRING", False);
+    if (net_wm_name != None && utf8_string != None) {
+        XChangeProperty(window_data_specific->display,
+                        window_data_specific->window,
+                        net_wm_name,
+                        utf8_string,
+                        8,
+                        PropModeReplace,
+                        (const unsigned char *) safe,
+                        (int) strlen(safe));
     }
 
-    kCall(char_input_func, codepoint);
+    free(safe);
 }
 
 //-------------------------------------
-static void
-dispatch_text_input(SWindowData *window_data, SWindowData_X11 *window_data_specific, XEvent *event) {
-    if (window_data == NULL || window_data_specific == NULL || event == NULL) {
-        return;
+// The state field of an event describes the keyboard before it, so for the lock keys
+// themselves it is a step behind, and by how much depends on the server: some update it on
+// the press and others not until the release. Only the server knows, so it is asked, which
+// is a round trip taken just for those two keys.
+//-------------------------------------
+static uint32_t
+lock_mods_from_state(Display *display, unsigned int state, mfb_key key_code) {
+    uint32_t mods = 0;
+
+    if (key_code == MFB_KB_KEY_CAPS_LOCK || key_code == MFB_KB_KEY_NUM_LOCK) {
+        XkbStateRec xkb_state;
+
+        if (XkbGetState(display, XkbUseCoreKbd, &xkb_state) == Success) {
+            state = (unsigned int) xkb_state.locked_mods;
+        }
     }
 
-    if (window_data_specific->ic != NULL) {
-        char  stack_buffer[64];
-        char *text_buffer = stack_buffer;
-        int   text_capacity = (int) sizeof(stack_buffer);
-        KeySym keysym = NoSymbol;
-        Status status = 0;
-        int text_size = Xutf8LookupString(window_data_specific->ic, &event->xkey, text_buffer, text_capacity, &keysym, &status);
-
-        if (status == XBufferOverflow) {
-            text_capacity = text_size + 1;
-            text_buffer = (char *) malloc((size_t) text_capacity);
-            if (text_buffer == NULL) {
-                MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: failed to allocate buffer for Xutf8LookupString.");
-                return;
-            }
-
-            text_size = Xutf8LookupString(window_data_specific->ic, &event->xkey, text_buffer, text_capacity, &keysym, &status);
-        }
-
-        if ((status == XLookupChars || status == XLookupBoth) && text_size > 0) {
-            // Some XIMs still report dead-key keysyms while producing raw base chars.
-            // Keep an explicit dead-key state to force expected composition behavior.
-            if (is_dead_keysym(keysym)) {
-                window_data_specific->pending_dead_keysym = keysym;
-            }
-            else {
-                size_t index = 0;
-                while (index < (size_t) text_size) {
-                    uint32_t codepoint = 0;
-                    if (utf8_decode_next((const unsigned char *) text_buffer, (size_t) text_size, &index, &codepoint) && codepoint != 0) {
-                        emit_codepoint_with_dead_state(window_data, window_data_specific, codepoint);
-                    }
-                }
-            }
-        }
-        else if ((status == XLookupKeySym || status == XLookupBoth) && is_dead_keysym(keysym)) {
-            window_data_specific->pending_dead_keysym = keysym;
-        }
-
-        if (text_buffer != stack_buffer) {
-            free(text_buffer);
-        }
-        return;
+    if ((state & LockMask) != 0) {
+        mods |= MFB_KB_MOD_CAPS_LOCK;
+    }
+    if ((state & Mod2Mask) != 0) {
+        mods |= MFB_KB_MOD_NUM_LOCK;
     }
 
-    // Fallback when XIM/XIC is unavailable.
-    KeySym keysym = NoSymbol;
-    XLookupString(&event->xkey, NULL, 0, &keysym, NULL);
-    if (is_dead_keysym(keysym)) {
-        window_data_specific->pending_dead_keysym = keysym;
-        return;
-    }
-
-    uint32_t codepoint = keysym_to_codepoint(keysym);
-    if (codepoint == 0) {
-        window_data_specific->pending_dead_keysym = NoSymbol;
-        return;
-    }
-
-    emit_codepoint_with_dead_state(window_data, window_data_specific, codepoint);
+    return mods;
 }
 
 //-------------------------------------
+// Keys pressed while another window had the focus produce no event here, so the buffer is
+// rebuilt from the server instead of from what this window happened to see.
+//-------------------------------------
 static void
-process_event(SWindowData *window_data, XEvent *event) {
+sync_key_status(SWindowData *window_data, SWindowData_X11 *window_data_specific) {
+    char keys[32];
+
+    memset(window_data->key_status, 0, sizeof(window_data->key_status));
+    XQueryKeymap(window_data_specific->display, keys);
+
+    for (unsigned keycode = 0; keycode < 256; ++keycode) {
+        if ((keys[keycode / 8] & (1 << (keycode % 8))) == 0) {
+            continue;
+        }
+
+        mfb_key key_code = (mfb_key) translate_key((int) keycode);
+        if (key_code != MFB_KB_KEY_UNKNOWN) {
+            window_data->key_status[key_code] = 1;
+        }
+    }
+}
+
+//-------------------------------------
+// filtered says the input method consumed this event as part of a composition. The physical
+// key is still reported, only the text is left to the method, which is what every other X11
+// application does.
+static void
+process_event(SWindowData *window_data, XEvent *event, bool filtered) {
     switch (event->type) {
         case KeyPress:
         case KeyRelease:
@@ -261,17 +161,20 @@ process_event(SWindowData *window_data, XEvent *event) {
                 }
             }
 
-            mfb_key key_code      = (mfb_key) translate_key(event->xkey.keycode);
-            int is_pressed        = (event->type == KeyPress);
-            window_data->mod_keys = translate_mod_ex(key_code, event->xkey.state, is_pressed);
+            mfb_key key_code = (mfb_key) translate_key((int) event->xkey.keycode);
+            int     is_pressed = (event->type == KeyPress);
 
             if (key_code != MFB_KB_KEY_UNKNOWN) {
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
+                mfb_recalc_mod_keys(window_data,
+                                    lock_mods_from_state(window_data_specific->display,
+                                                         event->xkey.state,
+                                                         key_code));
                 kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
             }
 
-            if (event->type == KeyPress) {
-                dispatch_text_input(window_data, window_data_specific, event);
+            if (event->type == KeyPress && filtered == false) {
+                x11_text_dispatch(window_data, window_data_specific, event);
             }
         }
         break;
@@ -281,7 +184,10 @@ process_event(SWindowData *window_data, XEvent *event) {
         {
             mfb_mouse_button button = (mfb_mouse_button) event->xbutton.button;
             int          is_pressed = (event->type == ButtonPress);
-            window_data->mod_keys   = translate_mod(event->xkey.state);
+            mfb_recalc_mod_keys(window_data,
+                                lock_mods_from_state(((SWindowData_X11 *) window_data->specific)->display,
+                                                     event->xbutton.state,
+                                                     MFB_KB_KEY_UNKNOWN));
 
             // Swap mouse right and middle for parity with other platforms:
             // https://github.com/emoon/minifb/issues/65
@@ -416,25 +322,31 @@ process_event(SWindowData *window_data, XEvent *event) {
         break;
 
         case FocusIn:
+            // A grab reports focus changes the user never made: a window menu, an alt-tab
+            // switcher or dragging the window all take one.
+            if (event->xfocus.mode == NotifyGrab || event->xfocus.mode == NotifyUngrab) {
+                break;
+            }
             window_data->is_active = true;
             if (window_data->specific) {
                 SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
-                if (window_data_specific->ic != NULL) {
-                    XSetICFocus(window_data_specific->ic);
-                }
+                x11_text_focus(window_data_specific, true);
+                sync_key_status(window_data, window_data_specific);
             }
             kCall(active_func, true);
             break;
 
         case FocusOut:
+            if (event->xfocus.mode == NotifyGrab || event->xfocus.mode == NotifyUngrab) {
+                break;
+            }
             window_data->is_active = false;
             if (window_data->specific) {
                 SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
-                if (window_data_specific->ic != NULL) {
-                    XUnsetICFocus(window_data_specific->ic);
-                }
+                x11_text_focus(window_data_specific, false);
             }
             kCall(active_func, false);
+            mfb_release_held_keys(window_data, window_data->mod_keys);
             break;
 
         case DestroyNotify:
@@ -444,6 +356,10 @@ process_event(SWindowData *window_data, XEvent *event) {
 
         case ClientMessage:
         {
+            if (filtered == true) {
+                break;
+            }
+
             if ((Atom) event->xclient.data.l[0] == s_delete_window_atom) {
                 if (window_data) {
                     bool destroy = false;
@@ -484,7 +400,10 @@ update_events(SWindowData *window_data, Display *display) {
 
     while (XPending(display) > 0) {
         XNextEvent(display, &event);
-        process_event(window_data, &event);
+
+        bool filtered = x11_text_filter(&event);
+
+        process_event(window_data, &event, filtered);
     }
 }
 
@@ -624,16 +543,32 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 #endif
 
-    if (!s_x11_locale_checked) {
+    if (s_x11_locale_checked == false) {
         const char *locale = setlocale(LC_CTYPE, NULL);
+
+        // A C program starts in the "C" locale, where the input method can barely work, so
+        // the one from the environment is taken instead. Only the default is replaced: an
+        // application that chose its own locale keeps it.
         if (locale == NULL || strcmp(locale, "C") == 0 || strcmp(locale, "POSIX") == 0) {
-            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: LC_CTYPE locale is not configured for UTF-8; IME/dead-key input may be limited.");
+            locale = setlocale(LC_CTYPE, "");
         }
+
+        if (locale == NULL || strcmp(locale, "C") == 0 || strcmp(locale, "POSIX") == 0) {
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: the environment provides no usable LC_CTYPE locale; dead keys and input methods will be limited.");
+        }
+        else if (XSupportsLocale() == False) {
+            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: Xlib does not support the locale '%s'; dead keys and input methods will be limited.", locale);
+        }
+
         s_x11_locale_checked = true;
     }
 
-    if (XSetLocaleModifiers("") == NULL) {
-        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XSetLocaleModifiers failed; input method support may be limited.");
+    // Without this the server reports auto-repeat as a release followed by a press, and the
+    // application sees a key it never released. The peek that filters those only works when
+    // both events are already queued.
+    {
+        Bool supported = False;
+        XkbSetDetectableAutoRepeat(window_data_specific->display, True, &supported);
     }
 
     init_keycodes(window_data_specific);
@@ -744,24 +679,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 #endif
 
-    window_data_specific->im = XOpenIM(window_data_specific->display, NULL, NULL, NULL);
-    if (window_data_specific->im == NULL) {
-        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XOpenIM failed; falling back to basic keysym text input.");
-    }
-    else {
-        window_data_specific->ic = XCreateIC(window_data_specific->im,
-                                             XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-                                             XNClientWindow, window_data_specific->window,
-                                             XNFocusWindow, window_data_specific->window,
-                                             NULL);
-        if (window_data_specific->ic == NULL) {
-            MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: XCreateIC failed; falling back to basic keysym text input.");
-            XCloseIM(window_data_specific->im);
-            window_data_specific->im = NULL;
-        }
+    if (x11_text_init(window_data_specific) == false) {
+        MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: no text input pipeline is available; keys will still be reported.");
     }
 
-    XStoreName(window_data_specific->display, window_data_specific->window, window_title);
+    set_window_title(window_data_specific, window_title);
 
     if (effective_flags & MFB_WF_BORDERLESS) {
         struct StyleHints {
@@ -887,6 +809,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
 
     mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
+
+    // A key held while the window opens has to be there from the start. Waiting for the first
+    // FocusIn would leave the buffer empty until the application had already pumped events
+    // once, and read it as if nothing were pressed.
+    sync_key_status(window_data, window_data_specific);
 
     #if defined(USE_OPENGL_API)
         MFB_LOG(MFB_LOG_DEBUG, "Window created using OpenGL API");
@@ -1184,12 +1111,7 @@ destroy_window_data(SWindowData *window_data)  {
             }
 #endif
 
-            if (window_data_specific->ic != NULL) {
-                XDestroyIC(window_data_specific->ic);
-            }
-            if (window_data_specific->im != NULL) {
-                XCloseIM(window_data_specific->im);
-            }
+            x11_text_destroy(window_data_specific);
             if (display != NULL && window_data_specific->window != 0) {
                 XDestroyWindow(display, window_data_specific->window);
             }
@@ -1384,10 +1306,83 @@ translate_key_code_a(int key_sym) {
 }
 
 //-------------------------------------
+// An X server that loads the evdev keycode component numbers a key the way the kernel does,
+// plus eight. The physical key is then the same number the Wayland backend sees, so both can
+// name it the same. XQuartz, a VNC server or a pre-evdev Xorg number them their own way, and
+// there the only thing left is the keysym the key produces, which the layout decides.
+//
+// XKB names a key by where it is, so finding these names at these numbers is the evdev
+// numbering itself. Asking for the name of the keycodes component instead does not work:
+// Xwayland leaves it unnamed while numbering keys exactly like evdev.
+//-------------------------------------
+static bool
+server_uses_evdev_keycodes(Display *display) {
+    static const struct {
+        unsigned    keycode;
+        const char *name;
+    } probes[] = {
+        {  9, "ESC"  },
+        { 23, "TAB"  },
+        { 38, "AC01" },
+        { 50, "LFSH" },
+        { 65, "SPCE" },
+    };
+
+    // Set MINIFB_X11_DISABLE_EVDEV_KEYCODES to exercise the keysym fallback on a machine
+    // whose server does number keys the evdev way, which is otherwise only reachable on an
+    // old or unusual X server. See docs/testing-x11.md.
+    const char *disabled = getenv("MINIFB_X11_DISABLE_EVDEV_KEYCODES");
+    if (disabled != NULL && *disabled != '\0') {
+        MFB_LOG(MFB_LOG_DEBUG, "X11MiniFB: MINIFB_X11_DISABLE_EVDEV_KEYCODES is set; ignoring the evdev key numbering.");
+        return false;
+    }
+
+    XkbDescPtr description = XkbGetMap(display, 0, XkbUseCoreKbd);
+    bool       is_evdev    = false;
+
+    if (description == NULL) {
+        return false;
+    }
+
+    if (XkbGetNames(display, XkbKeyNamesMask, description) == Success &&
+        description->names != NULL &&
+        description->names->keys != NULL) {
+        is_evdev = true;
+
+        for (size_t probe = 0; probe < sizeof(probes) / sizeof(probes[0]); ++probe) {
+            char name[XkbKeyNameLength + 1] = { 0 };
+
+            if (probes[probe].keycode > (unsigned) description->max_key_code) {
+                is_evdev = false;
+                break;
+            }
+
+            memcpy(name, description->names->keys[probes[probe].keycode].name, XkbKeyNameLength);
+            if (strcmp(name, probes[probe].name) != 0) {
+                is_evdev = false;
+                break;
+            }
+        }
+    }
+
+    XkbFreeKeyboard(description, 0, True);
+
+    return is_evdev;
+}
+
+//-------------------------------------
 void
 init_keycodes(SWindowData_X11 *window_data_specific) {
     size_t  i;
     int     key_sym;
+
+    if (server_uses_evdev_keycodes(window_data_specific->display) == true &&
+        mfb_init_evdev_keycodes(X11_EVDEV_KEYCODE_OFFSET) == true) {
+        MFB_LOG(MFB_LOG_DEBUG, "X11MiniFB: naming keys by position, from the evdev keycodes.");
+        return;
+    }
+
+    MFB_LOG(MFB_LOG_DEBUG, "X11MiniFB: naming keys after the keysym they produce; the layout decides which key is which.");
 
     // Clear keys
     for (i = 0; i < MFB_MAX_KEYS; ++i) {
@@ -1413,72 +1408,6 @@ translate_key(int scancode) {
         return MFB_KB_KEY_UNKNOWN;
 
     return g_keycodes[scancode];
-}
-
-//-------------------------------------
-int
-translate_mod(int state) {
-    int mod_keys = 0;
-
-    if (state & ShiftMask)
-        mod_keys |= MFB_KB_MOD_SHIFT;
-    if (state & ControlMask)
-        mod_keys |= MFB_KB_MOD_CONTROL;
-    if (state & Mod1Mask)
-        mod_keys |= MFB_KB_MOD_ALT;
-    if (state & Mod4Mask)
-        mod_keys |= MFB_KB_MOD_SUPER;
-    if (state & LockMask)
-        mod_keys |= MFB_KB_MOD_CAPS_LOCK;
-    if (state & Mod2Mask)
-        mod_keys |= MFB_KB_MOD_NUM_LOCK;
-
-    return mod_keys;
-}
-
-//-------------------------------------
-int
-translate_mod_ex(int key, int state, int is_pressed) {
-    int mod_keys = 0;
-
-    mod_keys = translate_mod(state);
-
-    switch (key)
-    {
-        case MFB_KB_KEY_LEFT_SHIFT:
-        case MFB_KB_KEY_RIGHT_SHIFT:
-            if (is_pressed)
-                mod_keys |= MFB_KB_MOD_SHIFT;
-            else
-                mod_keys &= ~MFB_KB_MOD_SHIFT;
-            break;
-
-        case MFB_KB_KEY_LEFT_CONTROL:
-        case MFB_KB_KEY_RIGHT_CONTROL:
-            if (is_pressed)
-                mod_keys |= MFB_KB_MOD_CONTROL;
-            else
-                mod_keys &= ~MFB_KB_MOD_CONTROL;
-            break;
-
-        case MFB_KB_KEY_LEFT_ALT:
-        case MFB_KB_KEY_RIGHT_ALT:
-            if (is_pressed)
-                mod_keys |= MFB_KB_MOD_ALT;
-            else
-                mod_keys &= ~MFB_KB_MOD_ALT;
-            break;
-
-        case MFB_KB_KEY_LEFT_SUPER:
-        case MFB_KB_KEY_RIGHT_SUPER:
-            if (is_pressed)
-                mod_keys |= MFB_KB_MOD_SUPER;
-            else
-                mod_keys &= ~MFB_KB_MOD_SUPER;
-            break;
-    }
-
-    return mod_keys;
 }
 
 //-------------------------------------
@@ -1512,7 +1441,7 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    XStoreName(window_data_specific->display, window_data_specific->window, title);
+    set_window_title(window_data_specific, title);
     XFlush(window_data_specific->display);
 }
 

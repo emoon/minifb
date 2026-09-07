@@ -16,35 +16,50 @@ PRIVATE
     minifb
 )
 minifb_configure_target(mouse_events_test)
+minifb_set_dos_name(mouse_events_test mouseevt)
 
 set_property(TARGET mouse_events_test PROPERTY FOLDER "Tests")
 
-if (EMSCRIPTEN)
-    target_link_options(mouse_events_test PRIVATE
-        "-sEXPORT_NAME=mouse_events_test"
-        "-sSTRICT=1"
-        "-sENVIRONMENT=web"
-        "-sMODULARIZE=1"
-        "-sALLOW_MEMORY_GROWTH=1"
-        "-sALLOW_TABLE_GROWTH"
-        "-sMALLOC=emmalloc"
-        "-sEXPORT_ALL=1"
-        "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
-        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
-        "-sASYNCIFY"
-        "--no-entry"
-        "-sSINGLE_FILE"
-    )
+add_executable(keyboard_events_test
+    keyboard_events.c
+)
+target_link_libraries(keyboard_events_test
+PRIVATE
+    minifb
+)
+minifb_configure_target(keyboard_events_test)
+minifb_set_dos_name(keyboard_events_test keyevent)
 
-    set(html_src "${CMAKE_CURRENT_SOURCE_DIR}/web/mouse_events_test.html")
-    set(html_dst "${CMAKE_CURRENT_BINARY_DIR}/mouse_events_test.html")
-    add_custom_command(
-        OUTPUT  "${html_dst}"
-        COMMAND ${CMAKE_COMMAND} -E copy "${html_src}" "${html_dst}"
-        DEPENDS "${html_src}"
-        COMMENT "Copying mouse_events_test.html"
-        VERBATIM
-    )
-    add_custom_target(mouse_events_test_html DEPENDS "${html_dst}")
-    add_dependencies(mouse_events_test mouse_events_test_html)
+set_property(TARGET keyboard_events_test PROPERTY FOLDER "Tests")
+
+if (EMSCRIPTEN)
+    foreach(test_target IN ITEMS mouse_events_test keyboard_events_test)
+        target_link_options(${test_target} PRIVATE
+            "-sEXPORT_NAME=${test_target}"
+            "-sSTRICT=1"
+            "-sENVIRONMENT=web"
+            "-sMODULARIZE=1"
+            "-sALLOW_MEMORY_GROWTH=1"
+            "-sALLOW_TABLE_GROWTH"
+            "-sMALLOC=emmalloc"
+            "-sEXPORT_ALL=1"
+            "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
+            "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+            "-sASYNCIFY"
+            "--no-entry"
+            "-sSINGLE_FILE"
+        )
+
+        set(html_src "${CMAKE_CURRENT_SOURCE_DIR}/web/${test_target}.html")
+        set(html_dst "${CMAKE_CURRENT_BINARY_DIR}/${test_target}.html")
+        add_custom_command(
+            OUTPUT  "${html_dst}"
+            COMMAND ${CMAKE_COMMAND} -E copy "${html_src}" "${html_dst}"
+            DEPENDS "${html_src}"
+            COMMENT "Copying ${test_target}.html"
+            VERBATIM
+        )
+        add_custom_target(${test_target}_html DEPENDS "${html_dst}")
+        add_dependencies(${test_target} ${test_target}_html)
+    endforeach()
 endif()

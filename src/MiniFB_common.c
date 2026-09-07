@@ -8,6 +8,7 @@
 #include "WindowData.h"
 #include "MiniFB_internal.h"
 #include "MiniFB_keylist.h"
+#include "MiniFB_utf8.h"
 
 #if defined(__APPLE__)
     #include <TargetConditionals.h>
@@ -152,6 +153,112 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
         if (!window_data->close_func || window_data->close_func((struct mfb_window *) window_data)) {
             window_data->close = true;
         }
+    }
+}
+
+//-------------------------------------
+// Titles crossing the public API are UTF-8. A caller passing a legacy code page used to get
+// mojibake on Windows, a Latin-1 title with no window title at all on macOS, and a protocol
+// violation on Wayland, all without a word. Say it once, here.
+//-------------------------------------
+char *
+mfb_safe_title_copy(const char *title) {
+    if (title == NULL) {
+        return NULL;
+    }
+
+    if (utf8_is_valid(title) == false) {
+        MFB_LOG(MFB_LOG_WARNING, "the window title is not valid UTF-8; every non-ASCII byte will be dropped.");
+        return utf8_ascii_copy(title);
+    }
+
+    size_t  length = strlen(title);
+    char   *copy   = (char *) malloc(length + 1);
+
+    if (copy != NULL) {
+        memcpy(copy, title, length + 1);
+    }
+
+    return copy;
+}
+
+//-------------------------------------
+// Every backend text pipeline ends here, so what the application receives does not depend
+// on which backend produced it.
+//-------------------------------------
+void
+mfb_dispatch_char_input(SWindowData *window_data, uint32_t codepoint) {
+    if (window_data == NULL || window_data->char_input_func == NULL) {
+        return;
+    }
+
+    if (mfb_is_text_codepoint(codepoint) == false) {
+        return;
+    }
+
+    window_data->char_input_func((struct mfb_window *) window_data, codepoint);
+}
+
+//-------------------------------------
+// A bit is set when either source says so: the physical key is held, or the platform reports
+// that modifier active. Neither alone is enough. A key held on one side keeps the aggregate
+// set while the other side is released, which the platform state of a single event cannot
+// tell; and a layout can activate a modifier without its own key, as a keyboard that remaps
+// Caps Lock to Control does, which the key state cannot tell either.
+//-------------------------------------
+uint32_t
+mfb_recalc_mod_keys(SWindowData *window_data, uint32_t platform_mods) {
+    if (window_data == NULL) {
+        return 0;
+    }
+
+    uint32_t mod_keys = platform_mods;
+
+    if (window_data->key_status[MFB_KB_KEY_LEFT_SHIFT] != 0 ||
+        window_data->key_status[MFB_KB_KEY_RIGHT_SHIFT] != 0) {
+        mod_keys |= MFB_KB_MOD_SHIFT;
+    }
+    if (window_data->key_status[MFB_KB_KEY_LEFT_CONTROL] != 0 ||
+        window_data->key_status[MFB_KB_KEY_RIGHT_CONTROL] != 0) {
+        mod_keys |= MFB_KB_MOD_CONTROL;
+    }
+    if (window_data->key_status[MFB_KB_KEY_LEFT_ALT] != 0 ||
+        window_data->key_status[MFB_KB_KEY_RIGHT_ALT] != 0) {
+        mod_keys |= MFB_KB_MOD_ALT;
+    }
+    if (window_data->key_status[MFB_KB_KEY_LEFT_SUPER] != 0 ||
+        window_data->key_status[MFB_KB_KEY_RIGHT_SUPER] != 0) {
+        mod_keys |= MFB_KB_MOD_SUPER;
+    }
+
+    window_data->mod_keys = mod_keys;
+
+    return mod_keys;
+}
+
+//-------------------------------------
+// The real release happens in whatever window took the focus and never comes back, so an
+// application that tracks state from callbacks would keep the key held forever. Each key is
+// cleared before its own callback, so the buffer always matches what has been reported.
+//-------------------------------------
+void
+mfb_release_held_keys(SWindowData *window_data, uint32_t lock_keys) {
+    if (window_data == NULL) {
+        return;
+    }
+
+    for (uint32_t key = 0; key < MFB_MAX_KEYS; ++key) {
+        if (window_data->key_status[key] == 0) {
+            continue;
+        }
+
+        window_data->key_status[key] = 0;
+        // Only the locks survive the drain: asking the platform here would report the keys
+        // the user is still physically holding in whatever window took the focus.
+        uint32_t mod_keys = mfb_recalc_mod_keys(window_data,
+                                                lock_keys & (uint32_t) (MFB_KB_MOD_CAPS_LOCK |
+                                                                        MFB_KB_MOD_NUM_LOCK));
+        kCall(keyboard_func, (mfb_key) key, (mfb_key_mod) mod_keys, false);
     }
 }
 

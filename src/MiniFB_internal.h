@@ -71,10 +71,29 @@ mfb_is_point_inside_window(SWindowData *window_data, int x, int y) {
 }
 
 //-------------------------------------
+// Text input carries Unicode scalar values only. Controls, DEL and the C1 range are not
+// text: the application gets those keys through the keyboard callback instead.
+//-------------------------------------
+static inline bool
+mfb_is_text_codepoint(uint32_t codepoint) {
+    if (codepoint < 0x20 || codepoint == 0x7f) {
+        return false;
+    }
+    if (codepoint >= 0x80 && codepoint <= 0x9f) {
+        return false;
+    }
+    if (codepoint >= 0xd800 && codepoint <= 0xdfff) {
+        return false;
+    }
+
+    return codepoint <= 0x10ffff;
+}
+
+//-------------------------------------
 typedef struct mfb_timer {
     int64_t     start_ticks;
     int64_t     last_delta_ticks;
-    uint64_t    accumulated_ticks;
+    int64_t     accumulated_ticks;
     int64_t     accumulated_error_ticks;
 } mfb_timer;
 
@@ -96,6 +115,10 @@ extern "C" {
     extern short int g_keycodes[MFB_MAX_KEYS];
 
     void keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed);
+    void mfb_dispatch_char_input(SWindowData *window_data, uint32_t codepoint);
+    uint32_t mfb_recalc_mod_keys(SWindowData *window_data, uint32_t platform_mods);
+    void mfb_release_held_keys(SWindowData *window_data, uint32_t lock_keys);
+    char *mfb_safe_title_copy(const char *title);
     void release_cpp_stub(struct mfb_window *window);
 
     bool calculate_buffer_layout(uint32_t width, uint32_t height, uint32_t *stride_out, size_t *total_bytes_out);

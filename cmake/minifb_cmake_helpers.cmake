@@ -56,3 +56,19 @@ function(minifb_compute_git_metadata out_commits_since_tag out_commit_count out_
     set(${out_git_sha} "${_git_sha}" PARENT_SCOPE)
     set(${out_git_dirty} "${_git_dirty}" PARENT_SCOPE)
 endfunction()
+
+# DOSBox-X hands a DJGPP program a plain truncation of its own path instead of the
+# 8.3 alias the file really has. The go32 stub reopens the executable to load its
+# COFF image, so a name that does not already fit 8.3 dies with "can't open".
+function(minifb_set_dos_name target short_name)
+    if (NOT DJGPP)
+        return()
+    endif()
+
+    string(LENGTH "${short_name}" _name_length)
+    if (_name_length GREATER 8)
+        message(FATAL_ERROR "DOS output name '${short_name}' for target ${target} is longer than 8 characters")
+    endif()
+
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME "${short_name}")
+endfunction()

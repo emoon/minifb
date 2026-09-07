@@ -105,6 +105,8 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 
 If `title` is `NULL` or empty, MiniFB uses `"minifb"` as the effective window/canvas title.
 
+The title is UTF-8 on every backend. One that is not valid UTF-8 is reported once in the log, and every non-ASCII byte is dropped from it.
+
 If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_WF_FULLSCREEN` takes precedence.
 
 `mfb_update_ex()` returns `MFB_STATE_INVALID_BUFFER` if:
@@ -200,6 +202,10 @@ void mouse_enter(struct mfb_window *window, bool is_inside) {
     // Cursor entered or left the window content area
 }
 ```
+
+The keyboard callback and the text callback report different things. `keyboard` reports a physical key going down or up, and `char_input` reports the text that key produced. Control characters, DEL and lone surrogates are never text, so Enter, Tab and Backspace reach `keyboard` only. When a key does produce text, the key is reported first and the text right after.
+
+When a window loses the focus, MiniFB releases every key still held, one `keyboard` callback each, and those callbacks carry only the lock keys in `mod`. The real release goes to whatever window took the focus, so without this an application that tracks state from callbacks would keep the key held for ever.
 
 #### C++ Callback Interface
 
@@ -463,7 +469,9 @@ The sections below describe what each platform needs and which backend it uses b
 | `MINIFB_USE_WAYLAND_API` | `OFF` | Linux | Use the Wayland backend instead of X11 |
 | `MINIFB_USE_METAL_API` | `ON` | macOS | Render through Metal instead of Cocoa |
 | `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
+| `MINIFB_X11_USE_IME` | `OFF` | X11 | Put an X11 input method (XIM) in front of xkbcommon for text input |
 | `MINIFB_BUILD_EXAMPLES` | `ON` | all | Build the example programs |
+| `MINIFB_BUILD_TESTS` | `ON` | all | Build the interactive tests in `tests/` |
 | `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
@@ -506,7 +514,7 @@ sudo apt-get install -y \
 - **cmake**: Build system
 - **pkg-config**: Helper tool for compiling applications and libraries
 - **libx11-dev**: X11 core libraries and headers
-- **libxkbcommon-dev**: Keyboard handling library
+- **libxkbcommon-dev** *(optional, recommended)*: Text input. It turns keysyms into Unicode and reads dead keys and Compose sequences from the system Compose file. Without it the backend falls back to an X11 input method and to its own small tables, which cover much less
 - **libgl1-mesa-dev**: OpenGL libraries (required if using OpenGL backend, which is default)
 - **libxrandr-dev** *(optional)*: Enables XRandR-based monitor scale/DPI queries on X11 (`mfb_get_monitor_scale` fallback path and diagnostics)
 
@@ -539,6 +547,20 @@ cmake .. -DMINIFB_USE_OPENGL_API=ON -DMINIFB_USE_WAYLAND_API=OFF
 # or
 cmake .. -DMINIFB_USE_OPENGL_API=OFF -DMINIFB_USE_WAYLAND_API=OFF
 ```
+
+#### X11 Testing and Diagnostics
+
+How MiniFB names a physical key depends on the X server. Current servers, Xorg and Xwayland alike, number keys the way the kernel does, so MiniFB names a key by where it is and reports the same `mfb_key` as the Wayland backend, whatever the layout. XQuartz, some VNC servers and Xorg from before the evdev driver number keys their own way, and there MiniFB falls back to naming a key after the keysym it produces, which the layout decides.
+
+One machine only ever gives you one of the two. An environment variable exercises the other:
+
+| Variable | What it does |
+| --- | --- |
+| `MINIFB_X11_DISABLE_EVDEV_KEYCODES` | Ignores the evdev key numbering, as if the server did not use it |
+
+Any non-empty value turns it on, in every build, not only in debug builds. MiniFB reads it once, while the window opens, and logs at `MFB_LOG_DEBUG` which of the two paths it took.
+
+See [docs/testing-x11.md](docs/testing-x11.md) for what changes between them and which keys are worth checking.
 
 ### Wayland (Linux)
 
@@ -641,7 +663,7 @@ MINIFB_WAYLAND_FORCE_VERSIONS="wl_seat=4" WAYLAND_DEBUG=client ./my_program 2> t
 
 Together these answer the two halves of one question: the trace shows what the compositor sent, and your program's output shows what MiniFB made of it.
 
-See [docs/wayland-testing.md](docs/wayland-testing.md) for the interfaces each variable accepts, the versions actually worth testing and what each one covers, the other useful variables from libwayland and xkbcommon, and what this approach cannot test.
+See [docs/testing-wayland.md](docs/testing-wayland.md) for the interfaces each variable accepts, the versions actually worth testing and what each one covers, the other useful variables from libwayland and xkbcommon, and what this approach cannot test.
 
 ### macOS
 
@@ -1036,7 +1058,8 @@ The web backend behaves differently in these areas:
 
 - In `mfb_open_ex()`, only `MFB_WF_RESIZABLE` and the fullscreen flags (`MFB_WF_FULLSCREEN`, `MFB_WF_FULLSCREEN_DESKTOP`) are interpreted; `MFB_WF_BORDERLESS` and `MFB_WF_ALWAYS_ON_TOP` are ignored
 - A resize clears the canvas, so a resize handled from `mfb_update_events()` leaves it blank until the application paints again (explained below)
-- `mfb_set_target_fps()` / `mfb_get_target_fps()` store/query the target value, but do not currently control browser frame pacing (the browser event loop / RAF timing drives pacing)
+- `mfb_wait_sync()` paces to the target frame rate, but the browser decides when a frame reaches the screen, so the rate it holds is approximate
+- The backend adds a hidden text field next to the canvas and keeps the keyboard focus on it, which is what makes dead keys, input methods and mobile keyboards work. Keys reach the window only while that element or the canvas has the focus
 
 Resizing writes `canvas.width`, and the browser clears the canvas whenever that
 attribute is written. `mfb_update()` resizes before it paints, so the new frame
@@ -1082,6 +1105,21 @@ The tools are downloaded to the `tools/dos/` folder. The folder also contains a 
 
 Run the script with `--with-vs-code` if you use [Visual Studio Code](https://code.visualstudio.com/): it installs the extensions needed for C/C++ development and debugging, and creates a `.vscode` folder in the repository root with launch configurations, tasks and other settings for DOS development.
 
+#### Running the download script
+
+The script is a bash script, and it picks the tools for the system it runs on. Run it from the same environment you will build from.
+
+- **Windows**: run it from Git Bash or Cygwin. It downloads the Windows builds of DJGPP, GDB and DOSBox-x, which is what the CMake toolchain file expects when you later configure the project from PowerShell, cmd or Git Bash. `curl` and `unzip` must be on the PATH.
+- **Linux**: run it from your usual shell. It downloads the Linux builds and then prints the list of packages you have to install with your distribution's package manager.
+- **macOS**: run it from Terminal. It downloads the x86_64 builds, so on Apple Silicon they run through Rosetta 2.
+- **WSL**: WSL is detected as Linux, so you get the Linux builds. Use it only if you also build and run DOSBox-x inside WSL, which needs those extra packages and a graphical environment (WSLg or an X server). Do not download the tools from WSL and then build from Windows: the toolchain file looks for `i586-pc-msdosdjgpp-gcc.exe`, and only the Linux binaries would be there.
+
+The script finds its own location, so the working directory does not matter:
+
+```sh
+bash tools/dos/download-dos-tools.sh
+```
+
 #### Building and running the examples (DOS)
 
 ```sh
@@ -1104,11 +1142,19 @@ This will generate DOS 32-bit `.exe` files in the `build-dos/` folder which you 
 ./tools/dos/dosbox-x/dosbox-x -fastlaunch -exit -conf ./tools/dos/dosbox-x.conf build-dos/<executable-file>
 ```
 
+DOS has no long filenames, so the DJGPP build shortens the output names to 8 characters: `inpevent.exe`, `multiwin.exe`, `fullscrn.exe`, `hidecurs.exe`, `inpevcpp.exe`, `debugdos.exe`, `verinfo.exe`, and the tests `keyevent.exe` and `mouseevt.exe`. Names that already fit, such as `noise` or `timer`, are left alone.
+
+If you mount a drive yourself instead of passing the executable to DOSBox-x, mount the directory that holds the executable. DOSBox-x gives a program a plain truncation of its own path instead of the 8.3 alias the file really has, and the DJGPP stub, which reopens the executable to load its code, then fails with `can't open`. [docs/testing-dos.md](docs/testing-dos.md) explains this in full, together with the parts of the input tests that DOS cannot exercise.
+
+```sh
+./tools/dos/dosbox-x/dosbox-x -fastlaunch -conf ./tools/dos/dosbox-x.conf -c "mount c /path/to/build-dos/tests" -c "c:" -c "keyevent.exe > key_dos.txt" -c "exit"
+```
+
 The DOS backend cannot support multi-window applications, so the examples `multiple_windows.c` and `hidpi.c` do not run correctly.
 
-It also does not tell extended (`E0`-prefixed) scancodes apart from their base ones: the keypad and cursor-block keys that share a scancode report the same `mfb_key`, and right Ctrl and Alt report as the left ones.
+With Num Lock off the keypad reports Home, the arrows, Page Up and the rest, which is what a program written for DOS expects. Define `MINIFB_DOS_KEYPAD_POSITIONAL` when building MiniFB to always report the physical keypad key, as the other backends do.
 
-Some DOS mouse drivers emulate a wheel by injecting extended Up/Down keys. Reading those as scroll costs the arrow keys, which send the same scancodes, so it is off by default. Define `MINIFB_DOS_WHEEL_FROM_ARROW_KEYS` when building MiniFB to turn it on.
+The wheel is read from the mouse driver through the CuteMouse API, which most DOS drivers implement. Some older ones emulate a wheel by injecting extended Up/Down keys instead. Reading those as scroll costs the arrow keys, which send the same scancodes, so it is off by default: define `MINIFB_DOS_WHEEL_FROM_ARROW_KEYS` to turn it on.
 
 The `dos` example target (`examples/dos/debug_dos.c`) is a GDB-stub debugging sample. In a `Debug` build it calls `gdb_start()` and waits for a debugger connection. If you want a regular visual test, run `noise` or `input_events` instead.
 
@@ -1195,14 +1241,12 @@ Not every feature exists on every platform. This table summarizes what each back
 | Viewport | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Cursor hiding | Yes | Yes | Yes | Yes | No-op | No-op | Yes | No-op |
 | Monitor DPI / scale | Yes | Yes | Yes* | Yes | Yes | Yes | Yes | Fixed |
-| Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Limited*** | Limited*** |
+| Target FPS | Yes | Yes | Yes | Yes | Yes** | Yes | Yes | Yes |
 | Hardware sync | OpenGL | Metal | OpenGL | - | Metal | - | Browser-driven | - |
 
 `*` X11 reports a monitor scale, but usually only the value read at startup. A global scale change while the program runs may not be visible until restart (it depends on the environment, especially under XWayland).
 
 `**` On iOS this applies when you call `mfb_wait_sync()`. If your loop runs on `CADisplayLink`, pacing already follows the display refresh.
-
-`***` Web and DOS store and report the target FPS, but do not use it to pace frames.
 
 For the details behind each entry, see the platform sections above.
 

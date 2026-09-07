@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 //-------------------------------------
 // The versioned soname is deliberate: plain libdecor-0.so is a symlink that
@@ -329,7 +330,12 @@ wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *ti
         return false;
     }
 
-    g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, title);
+    char *safe_title = mfb_safe_title_copy(title);
+
+    if (safe_title != NULL) {
+        g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
+        free(safe_title);
+    }
 
     return true;
 }
@@ -382,7 +388,12 @@ wayland_libdecor_create_toplevel(SWindowData *window_data, SWindowData_Way *wind
     window_data_specific->startup_state_applied = 0;
 
     g_libdecor->libdecor_frame_set_app_id(window_data_specific->libdecor_frame, app_id);
-    g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, window_title);
+    char *safe_title = mfb_safe_title_copy(window_title);
+
+    if (safe_title != NULL) {
+        g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
+        free(safe_title);
+    }
 
     // A libdecor frame is unconstrained and fully capable by default, so only
     // the fixed-size case needs saying. These bounds are content sizes, so the

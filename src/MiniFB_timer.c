@@ -81,13 +81,16 @@ mfb_timer_reset(struct mfb_timer *tmr) {
 //-------------------------------------
 double
 mfb_timer_now(struct mfb_timer *tmr) {
-    uint64_t    current_ticks;
+    int64_t     current_ticks;
 
     if (tmr == NULL)
         return 0.0;
 
-    current_ticks           = mfb_timer_tick();
-    tmr->accumulated_ticks += (current_ticks - tmr->start_ticks);
+    // The compensated reset can leave the start in the future, which means
+    // this frame owes time to the last one, and an unsigned subtraction turns that debt into
+    // almost 2^64 ticks and stops the pacing for good.
+    current_ticks           = (int64_t) mfb_timer_tick();
+    tmr->accumulated_ticks += current_ticks - tmr->start_ticks;
     tmr->start_ticks        = current_ticks;
 
     return tmr->accumulated_ticks * g_timer_resolution;

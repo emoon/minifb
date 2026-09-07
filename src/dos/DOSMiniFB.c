@@ -18,6 +18,29 @@
 #include "vesa.h"
 
 //-------------------------------------
+// The 101 key keyboard gave its new keys the scancode of the key they replaced, prefixed
+// with E0, so the prefix is the only thing telling a dedicated arrow from a keypad one.
+static const uint32_t extended_scancode_to_mfb_key[] = {
+    [0x1c] = MFB_KB_KEY_KP_ENTER,
+    [0x1d] = MFB_KB_KEY_RIGHT_CONTROL,
+    [0x35] = MFB_KB_KEY_KP_DIVIDE,
+    [0x37] = MFB_KB_KEY_PRINT_SCREEN,
+    [0x38] = MFB_KB_KEY_RIGHT_ALT,
+    [0x47] = MFB_KB_KEY_HOME,
+    [0x48] = MFB_KB_KEY_UP,
+    [0x49] = MFB_KB_KEY_PAGE_UP,
+    [0x4b] = MFB_KB_KEY_LEFT,
+    [0x4d] = MFB_KB_KEY_RIGHT,
+    [0x4f] = MFB_KB_KEY_END,
+    [0x50] = MFB_KB_KEY_DOWN,
+    [0x51] = MFB_KB_KEY_PAGE_DOWN,
+    [0x52] = MFB_KB_KEY_INSERT,
+    [0x53] = MFB_KB_KEY_DELETE,
+    [0x5b] = MFB_KB_KEY_LEFT_SUPER,
+    [0x5c] = MFB_KB_KEY_RIGHT_SUPER,
+    [0x5d] = MFB_KB_KEY_MENU,
+};
+
 static const uint32_t scancode_to_mfb_key[] = {
     MFB_KB_KEY_UNKNOWN,
     MFB_KB_KEY_ESCAPE,
@@ -90,22 +113,22 @@ static const uint32_t scancode_to_mfb_key[] = {
     MFB_KB_KEY_F10,
     MFB_KB_KEY_NUM_LOCK,
     MFB_KB_KEY_SCROLL_LOCK,
-    MFB_KB_KEY_HOME,
-    MFB_KB_KEY_UP,
-    MFB_KB_KEY_PAGE_UP,
+    MFB_KB_KEY_KP_7,          // 0x47
+    MFB_KB_KEY_KP_8,          // 0x48
+    MFB_KB_KEY_KP_9,          // 0x49
     MFB_KB_KEY_KP_SUBTRACT,   // 0x4A (numpad -)
-    MFB_KB_KEY_LEFT,
-    MFB_KB_KEY_KP_5,          // 0x4C (numpad 5, center)
-    MFB_KB_KEY_RIGHT,
+    MFB_KB_KEY_KP_4,          // 0x4B
+    MFB_KB_KEY_KP_5,          // 0x4C
+    MFB_KB_KEY_KP_6,          // 0x4D
     MFB_KB_KEY_KP_ADD,
-    MFB_KB_KEY_END,
-    MFB_KB_KEY_DOWN,
-    MFB_KB_KEY_PAGE_DOWN,
-    MFB_KB_KEY_INSERT,
-    MFB_KB_KEY_DELETE,
+    MFB_KB_KEY_KP_1,          // 0x4F
+    MFB_KB_KEY_KP_2,          // 0x50
+    MFB_KB_KEY_KP_3,          // 0x51
+    MFB_KB_KEY_KP_0,          // 0x52
+    MFB_KB_KEY_KP_DECIMAL,    // 0x53
     MFB_KB_KEY_UNKNOWN,       // 0x54 (SysRq / Alt+PrScr)
     MFB_KB_KEY_UNKNOWN,       // 0x55 (undefined)
-    MFB_KB_KEY_UNKNOWN,       // 0x56 (ISO extra key between LShift and Z)
+    MFB_KB_KEY_WORLD_2,       // 0x56 (ISO extra key between LShift and Z)
     MFB_KB_KEY_F11,           // 0x57
     MFB_KB_KEY_F12,           // 0x58
 };
@@ -176,6 +199,8 @@ typedef struct keyboard_state {
   _go32_dpmi_seginfo new_keyboard_handler;
   uint8_t last_scancode_was_extended; // 0=no, 1=E0, 2=E1, 3=E2
   bool caps_lock;
+  bool num_lock;
+  uint8_t pause_bytes_left;
 } keyboard_state;
 
 //-------------------------------------
@@ -186,10 +211,12 @@ typedef struct SWindowData_DOS {
   uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
   uint32_t *scale_buffer;
   uint8_t *scanline_buffer;
+  struct mfb_timer *timer;
 } SWindowData_DOS;
 
 //-------------------------------------
 static SWindowData *g_window = NULL;
+static bool g_mouse_wheel_present = false;
 static bool g_mouse_present = false;
 
 //-------------------------------------
@@ -205,18 +232,38 @@ tear_down() {
 }
 
 //-------------------------------------
+// The driver writes only the registers it answers with, and whatever the struct held on the
+// way in is read back as if the driver had put it there. That is not academic here: the
+// wheel counter of function 0x0b comes back in BX, which nothing else sets, so an
+// uninitialised call read the button mask left by the previous frame and turned a held
+// button into a wheel notch per frame.
+//-------------------------------------
+static void
+mouse_call(__dpmi_regs *regs, unsigned function) {
+  memset(regs, 0, sizeof(*regs));
+  regs->x.ax = (unsigned short) function;
+  __dpmi_int(0x33, regs);
+}
+
+//-------------------------------------
 static void
 init_mouse(SWindowData *window_data) {
   __dpmi_regs regs;
 
   // AX=0: reset driver and check presence; returns AX=0xFFFF if driver present
-  regs.x.ax = 0;
-  __dpmi_int(0x33, &regs);
+  mouse_call(&regs, 0x00);
   if (regs.x.ax == 0) {
     MFB_LOG(MFB_LOG_WARNING, "No mouse driver detected, mouse support disabled");
     return;
   }
   g_mouse_present = true;
+
+  // CuteMouse and the drivers that copied its API answer 'WM' here. Reading the wheel from
+  // the driver leaves the arrow scancodes to the arrow keys, so nothing has to be traded.
+  mouse_call(&regs, 0x11);
+  g_mouse_wheel_present = (regs.x.ax == 0x574d) && ((regs.x.cx & 1) != 0);
+  if (!g_mouse_wheel_present)
+    MFB_LOG(MFB_LOG_DEBUG, "Mouse driver has no wheel API, scroll events disabled");
 
   // Use the actual VESA resolution for the mouse range, not the user-requested
   // window size, so the cursor covers the full screen area.
@@ -224,18 +271,19 @@ init_mouse(SWindowData *window_data) {
   uint32_t width  = window_data_specific ? window_data_specific->actual_width  : window_data->window_width;
   uint32_t height = window_data_specific ? window_data_specific->actual_height : window_data->window_height;
 
+  memset(&regs, 0, sizeof(regs));
   regs.x.ax = 7;
   regs.x.cx = 0;
   regs.x.dx = width - 1;
   __dpmi_int(0x33, &regs);
 
+  memset(&regs, 0, sizeof(regs));
   regs.x.ax = 8;
   regs.x.cx = 0;
   regs.x.dx = height - 1;
   __dpmi_int(0x33, &regs);
 
-  regs.x.ax = 2;
-  __dpmi_int(0x33, &regs);
+  mouse_call(&regs, 0x02);
 
   // There is no window here and the driver range covers the whole screen, so the
   // pointer can never be outside it. The event is never emitted, only the state.
@@ -285,6 +333,8 @@ destroy_window_data(SWindowData *window_data) {
 
   SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
   if (window_data_specific != NULL) {
+    mfb_timer_destroy(window_data_specific->timer);
+    window_data_specific->timer = NULL;
     free(window_data_specific->scale_buffer);
     free(window_data_specific->scanline_buffer);
     memset(window_data_specific, 0, sizeof(SWindowData_DOS));
@@ -349,6 +399,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     vesa_dispose();
     return NULL;
   }
+  window_data_specific->timer = mfb_timer_create();
   window_data_specific->actual_width = actual_width;
   window_data_specific->actual_height = actual_height;
   window_data_specific->actual_bpp = actual_bpp;
@@ -438,8 +489,34 @@ update_mouse(SWindowData *window_data) {
     return;
 
   __dpmi_regs regs;
-  regs.x.ax = 0x3;
-  __dpmi_int(0x33, &regs);
+
+  mouse_call(&regs, 0x03);
+
+  // Drivers disagree on where the wheel counter lives. CuteMouse documents BX of function
+  // 0x0b, DOSBox-X fills only BH of this call, so both are read. Function 0x0b is asked for
+  // even when BH already answered, because on the drivers that keep a counter it is that
+  // read which clears it, and without it one notch would repeat on every frame.
+  if (g_mouse_wheel_present) {
+    __dpmi_regs motion;
+    int         wheel = (int) (signed char) regs.h.bh;
+
+    mouse_call(&motion, 0x0b);
+    if (wheel == 0) {
+      wheel = (int) (int16_t) motion.x.bx;
+    }
+
+    if (wheel != 0) {
+      // Positive is up, as on every other backend. The driver counts down as positive.
+      float delta_y = (float) -wheel;
+      window_data->mouse_wheel_x = 0.0f;
+      window_data->mouse_wheel_y = delta_y;
+      if (window_data->mouse_wheel_func)
+        window_data->mouse_wheel_func((struct mfb_window *) window_data,
+                                      (mfb_key_mod) window_data->mod_keys,
+                                      0.0f,
+                                      delta_y);
+    }
+  }
   int32_t old_x = window_data->mouse_pos_x;
   int32_t old_y = window_data->mouse_pos_y;
   uint8_t old_left_pressed   = window_data->mouse_button_status[MFB_MOUSE_LEFT];
@@ -482,6 +559,27 @@ update_mouse(SWindowData *window_data) {
 }
 
 //-------------------------------------
+// Without Num Lock the keypad has moved the cursor since the 83 key keyboard, and a program
+// written for DOS expects that. MINIFB_DOS_KEYPAD_POSITIONAL reports the physical keypad key
+// instead, which is what every other backend does.
+static uint32_t
+keypad_without_num_lock(uint32_t key_code) {
+  switch (key_code) {
+    case MFB_KB_KEY_KP_7:       return MFB_KB_KEY_HOME;
+    case MFB_KB_KEY_KP_8:       return MFB_KB_KEY_UP;
+    case MFB_KB_KEY_KP_9:       return MFB_KB_KEY_PAGE_UP;
+    case MFB_KB_KEY_KP_4:       return MFB_KB_KEY_LEFT;
+    case MFB_KB_KEY_KP_6:       return MFB_KB_KEY_RIGHT;
+    case MFB_KB_KEY_KP_1:       return MFB_KB_KEY_END;
+    case MFB_KB_KEY_KP_2:       return MFB_KB_KEY_DOWN;
+    case MFB_KB_KEY_KP_3:       return MFB_KB_KEY_PAGE_DOWN;
+    case MFB_KB_KEY_KP_0:       return MFB_KB_KEY_INSERT;
+    case MFB_KB_KEY_KP_DECIMAL: return MFB_KB_KEY_DELETE;
+    default:                    return key_code;
+  }
+}
+
+//-------------------------------------
 static void
 update_keyboard(SWindowData *window_data) {
   uint8_t raw_scancode;
@@ -489,21 +587,44 @@ update_keyboard(SWindowData *window_data) {
   while (ring_buffer_pop(&g_keyboard.buffer, &raw_scancode)) {
     if (raw_scancode == 0xe0 || raw_scancode == 0xe1 || raw_scancode == 0xe2) {
       g_keyboard.last_scancode_was_extended = raw_scancode + 1 - 0xe0;
+      // Pause is the only key that uses E1, and it spells itself out as E1 1D 45 followed by
+      // E1 9D C5. Its two payload bytes carry no key of their own.
+      if (raw_scancode == 0xe1)
+        g_keyboard.pause_bytes_left = 2;
       continue;
     }
 
-    uint8_t scancode = raw_scancode & 0x7f;
-    if (scancode >= sizeof(scancode_to_mfb_key) / sizeof(scancode_to_mfb_key[0]))
-      continue;
+    bool     pressed  = !(raw_scancode & 0x80);
+    uint8_t  scancode = raw_scancode & 0x7f;
+    uint32_t key_code;
 
-    bool pressed = !(raw_scancode & 0x80);
-    uint32_t key_code = scancode_to_mfb_key[scancode];
-    bool is_extended = g_keyboard.last_scancode_was_extended != 0;
-
+    if (g_keyboard.pause_bytes_left > 0) {
+      g_keyboard.last_scancode_was_extended = 0;
+      if (--g_keyboard.pause_bytes_left > 0)
+        continue;
+      key_code = MFB_KB_KEY_PAUSE;
+    }
+    else if (g_keyboard.last_scancode_was_extended != 0) {
+      if (scancode >= sizeof(extended_scancode_to_mfb_key) / sizeof(extended_scancode_to_mfb_key[0]))
+        continue;
+      key_code = extended_scancode_to_mfb_key[scancode];
+      if (key_code == 0)
+        key_code = MFB_KB_KEY_UNKNOWN;
+    }
+    else {
+      if (scancode >= sizeof(scancode_to_mfb_key) / sizeof(scancode_to_mfb_key[0]))
+        continue;
+      key_code = scancode_to_mfb_key[scancode];
+#if !defined(MINIFB_DOS_KEYPAD_POSITIONAL)
+      if (!g_keyboard.num_lock)
+        key_code = keypad_without_num_lock(key_code);
+#endif
+    }
     // Some DOS mouse drivers emulate a wheel by injecting extended Up/Down keys. Reading
     // those as scroll costs the dedicated arrow keys, which send the very same scancodes
     // and would never reach the keyboard callback, so it has to be asked for.
 #if defined(MINIFB_DOS_WHEEL_FROM_ARROW_KEYS)
+    bool is_extended = g_keyboard.last_scancode_was_extended != 0;
     if (is_extended && (key_code == MFB_KB_KEY_UP || key_code == MFB_KB_KEY_DOWN)) {
       if (pressed) {
         float delta_y = (key_code == MFB_KB_KEY_UP) ? 1.0f : -1.0f;
@@ -522,8 +643,13 @@ update_keyboard(SWindowData *window_data) {
     }
 #endif
 
+    // An extended key borrows the number of the key it replaced, so this table would give it
+    // that key's text: Home would type a 7. The keypad slash is the one that prints the same
+    // either way.
+    bool prints_text = g_keyboard.last_scancode_was_extended == 0 || scancode == 0x35;
+
     char ascii = 0;
-    if (scancode < sizeof(scancode_to_ascii)) {
+    if (prints_text && scancode < sizeof(scancode_to_ascii)) {
       char base_ascii = scancode_to_ascii[scancode];
       bool is_letter  = (base_ascii >= 'a' && base_ascii <= 'z');
       // Caps Lock toggles shift only for letter keys; Shift always applies to all keys
@@ -542,36 +668,23 @@ update_keyboard(SWindowData *window_data) {
     if (key_code < MFB_MAX_KEYS)
       window_data->key_status[key_code] = pressed;
 
-    if (key_code == MFB_KB_KEY_LEFT_SHIFT || key_code == MFB_KB_KEY_RIGHT_SHIFT) {
-      if (pressed)
-        window_data->mod_keys |= MFB_KB_MOD_SHIFT;
-      else
-        window_data->mod_keys &= ~MFB_KB_MOD_SHIFT;
+    // The locks answer to their own toggle, the held ones come from the key buffer, and
+    // dropping a bit because one side of a pair came up is what the shared helper avoids.
+    if (!pressed) {
+      if (key_code == MFB_KB_KEY_CAPS_LOCK)
+        g_keyboard.caps_lock = !g_keyboard.caps_lock;
+      else if (key_code == MFB_KB_KEY_NUM_LOCK)
+        g_keyboard.num_lock = !g_keyboard.num_lock;
     }
 
-    if (key_code == MFB_KB_KEY_LEFT_ALT || key_code == MFB_KB_KEY_RIGHT_ALT) {
-      if (pressed)
-        window_data->mod_keys |= MFB_KB_MOD_ALT;
-      else
-        window_data->mod_keys &= ~MFB_KB_MOD_ALT;
-    }
+    uint32_t lock_mods = 0;
+    if (g_keyboard.caps_lock)
+      lock_mods |= MFB_KB_MOD_CAPS_LOCK;
+    if (g_keyboard.num_lock)
+      lock_mods |= MFB_KB_MOD_NUM_LOCK;
+    mfb_recalc_mod_keys(window_data, lock_mods);
 
-    if (key_code == MFB_KB_KEY_LEFT_CONTROL || key_code == MFB_KB_KEY_RIGHT_CONTROL) {
-      if (pressed)
-        window_data->mod_keys |= MFB_KB_MOD_CONTROL;
-      else
-        window_data->mod_keys &= ~MFB_KB_MOD_CONTROL;
-    }
-
-    if (key_code == MFB_KB_KEY_CAPS_LOCK && !pressed) {
-      g_keyboard.caps_lock = !g_keyboard.caps_lock;
-      if (g_keyboard.caps_lock)
-        window_data->mod_keys |= MFB_KB_MOD_CAPS_LOCK;
-      else
-        window_data->mod_keys &= ~MFB_KB_MOD_CAPS_LOCK;
-    }
-
-    if (window_data->keyboard_func)
+    if (window_data->keyboard_func && key_code != (uint32_t) MFB_KB_KEY_UNKNOWN)
       window_data->keyboard_func((struct mfb_window *) window_data,
                                  key_code,
                                  window_data->mod_keys,
@@ -580,7 +693,7 @@ update_keyboard(SWindowData *window_data) {
     if (window_data->char_input_func && pressed && ascii != 0)
       window_data->char_input_func((struct mfb_window *) window_data, ascii);
 
-    // FIXME we currently ignore extended keys
+    // The prefix belongs to the scancode that followed it and to nothing else.
     g_keyboard.last_scancode_was_extended = 0;
   }
 }
@@ -776,6 +889,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 }
 
 //-------------------------------------
+extern double g_time_for_frame;
+
+//-------------------------------------
 bool
 mfb_wait_sync(struct mfb_window *window) {
   if (!window) {
@@ -783,8 +899,29 @@ mfb_wait_sync(struct mfb_window *window) {
     return false;
   }
 
+  SWindowData     *window_data          = (SWindowData *) window;
+  SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
+
   mfb_update_state state = mfb_update_events(window);
-  return (state == MFB_STATE_OK);
+  if (state != MFB_STATE_OK)
+    return false;
+
+  // A target of zero means the caller wants every cycle it can get, which is what this
+  // backend did before it paced at all. Yielding gives the timeslice back to whatever is
+  // hosting DOS instead of burning it in a spin.
+  if (g_time_for_frame <= 0.0 || window_data_specific == NULL || window_data_specific->timer == NULL)
+    return true;
+
+  while (mfb_timer_now(window_data_specific->timer) < g_time_for_frame) {
+    __dpmi_yield();
+
+    state = mfb_update_events(window);
+    if (state != MFB_STATE_OK)
+      return false;
+  }
+
+  mfb_timer_compensated_reset(window_data_specific->timer);
+  return true;
 }
 
 //-------------------------------------

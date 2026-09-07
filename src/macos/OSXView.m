@@ -151,7 +151,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 }
 
 //-------------------------------------
-- (void)mouseDown:(NSEvent*)event {
+- (void)mouseDown:(NSEvent *)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_1] = true;
@@ -160,7 +160,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 }
 
 //-------------------------------------
-- (void)mouseUp:(NSEvent*)event {
+- (void)mouseUp:(NSEvent *)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_1] = false;
@@ -170,7 +170,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 }
 
 //-------------------------------------
-- (void)rightMouseDown:(NSEvent*)event {
+- (void)rightMouseDown:(NSEvent *)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_2] = true;
@@ -179,7 +179,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 }
 
 //-------------------------------------
-- (void)rightMouseUp:(NSEvent*)event {
+- (void)rightMouseUp:(NSEvent *)event {
     if(window_data != 0x0) {
         window_data->mod_keys = translate_modifiers([event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_2] = false;
@@ -424,7 +424,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
         if ([string isKindOfClass:[NSAttributedString class]])
             characters = [string string];
         else
-            characters = (NSString*) string;
+            characters = (NSString *) string;
 
         NSRange range = NSMakeRange(0, [characters length]);
         while (range.length) {

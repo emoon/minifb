@@ -389,7 +389,7 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
     // Delay getting the currentRenderPassDescriptor until absolutely needed. This avoids
     // holding onto the drawable and blocking the display pipeline any longer than necessary
-    MTLRenderPassDescriptor* renderPassDescriptor = view.currentRenderPassDescriptor;
+    MTLRenderPassDescriptor *renderPassDescriptor = view.currentRenderPassDescriptor;
     if (renderPassDescriptor != nil) {
         //renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
 

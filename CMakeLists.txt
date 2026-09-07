@@ -73,6 +73,8 @@ set(SrcLib
     src/MiniFB_internal.c
     src/MiniFB_internal.h
     src/MiniFB_timer.c
+    src/MiniFB_utf8.c
+    src/MiniFB_utf8.h
     src/WindowData.h
 )
 
@@ -132,8 +134,10 @@ set(SrcWayland
     src/MiniFB_linux.c
     src/MiniFB_timespec.c
     src/MiniFB_timespec.h
-    src/MiniFB_utf8.c
-    src/MiniFB_utf8.h
+    src/MiniFB_evdev_keys.c
+    src/MiniFB_evdev_keys.h
+    src/MiniFB_xkb.c
+    src/MiniFB_xkb.h
 )
 
 #--
@@ -141,10 +145,12 @@ set(SrcX11
     src/x11/X11MiniFB.c
     src/x11/X11MiniFB_scale_funcs.c
     src/x11/X11MiniFB_scale_funcs.h
+    src/x11/X11MiniFB_text.c
+    src/x11/X11MiniFB_text.h
     src/x11/WindowData_X11.h
     src/MiniFB_linux.c
-    src/MiniFB_utf8.c
-    src/MiniFB_utf8.h
+    src/MiniFB_evdev_keys.c
+    src/MiniFB_evdev_keys.h
 )
 
 set(SrcGL
@@ -216,6 +222,9 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
     cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON
         "MINIFB_USE_X11_API OR WIN32" OFF)
 
+    cmake_dependent_option(MINIFB_X11_USE_IME "Use an X11 input method (XIM) for text input" OFF
+        "MINIFB_USE_X11_API" OFF)
+
 else()
 
     # even if an `option()` isn't reached, if it's been reached in previous configurations then the old value still exists as a cache variable
@@ -248,6 +257,12 @@ else()
         option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON)
     else()
         set(MINIFB_USE_OPENGL_API OFF)
+    endif()
+
+    if (MINIFB_USE_X11_API)
+        option(MINIFB_X11_USE_IME "Use an X11 input method (XIM) for text input" OFF)
+    else()
+        set(MINIFB_X11_USE_IME OFF)
     endif()
 
 endif()
@@ -460,6 +475,26 @@ elseif(MINIFB_USE_X11_API)
         target_compile_definitions(minifb PRIVATE MINIFB_HAS_XRANDR)
     endif()
 
+    # xkbcommon owns the text side: keysym to Unicode, dead keys and Compose, the same code
+    # the Wayland backend uses. Without it the backend falls back to the input method and to
+    # its own small tables, which cover much less.
+    find_package(PkgConfig)
+    pkg_check_modules(XKBCOMMON xkbcommon)
+    if (XKBCOMMON_FOUND)
+        target_sources(minifb PRIVATE src/MiniFB_xkb.c src/MiniFB_xkb.h src/x11/X11MiniFB_text_xkb.c)
+        target_compile_definitions(minifb PRIVATE MINIFB_HAS_XKBCOMMON)
+        target_include_directories(minifb PRIVATE ${XKBCOMMON_INCLUDE_DIRS})
+        target_link_directories(minifb PRIVATE ${XKBCOMMON_LIBRARY_DIRS})
+        target_link_libraries(minifb PRIVATE ${XKBCOMMON_LIBRARIES})
+    else()
+        message(STATUS "xkbcommon not found: X11 text input falls back to XIM and to the built-in keysym tables (install libxkbcommon-dev)")
+    endif()
+
+    if (MINIFB_X11_USE_IME OR NOT XKBCOMMON_FOUND)
+        target_sources(minifb PRIVATE src/x11/X11MiniFB_text_xim.c)
+        target_compile_definitions(minifb PRIVATE MINIFB_X11_USE_XIM)
+    endif()
+
 elseif (EMSCRIPTEN)
     # emscripten has no dedicated linking code
 
@@ -473,11 +508,15 @@ endif()
 
 # example use: minifb_add_example(NAME noise SOURCE examples/noise.c)
 function(minifb_add_example)
-    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD;IOS_NO_STORYBOARD" "NAME" "SOURCE")
+    cmake_parse_arguments(PARSE_ARGV 0 arg "IOS_STORYBOARD;IOS_NO_STORYBOARD" "NAME;DOS_NAME" "SOURCE")
 
     add_executable(${arg_NAME} ${arg_SOURCE})
     target_link_libraries(${arg_NAME} PRIVATE minifb)
     minifb_configure_target(${arg_NAME})
+
+    if (arg_DOS_NAME)
+        minifb_set_dos_name(${arg_NAME} ${arg_DOS_NAME})
+    endif()
 
     set_property(TARGET ${arg_NAME} PROPERTY FOLDER "Examples")
 
@@ -544,23 +583,23 @@ function(minifb_add_example)
 endfunction()
 
 if (MINIFB_BUILD_VERSION_INFO)
-    minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c)
+    minifb_add_example(NAME minifb_version_info SOURCE examples/version_info.c DOS_NAME verinfo)
 endif()
 
 if (MINIFB_BUILD_EXAMPLES)
     if (NOT IOS)
         minifb_add_example(NAME noise                SOURCE examples/noise.c)
-        minifb_add_example(NAME input_events         SOURCE examples/input_events.c)
+        minifb_add_example(NAME input_events         SOURCE examples/input_events.c         DOS_NAME inpevent)
         minifb_add_example(NAME hidpi                SOURCE examples/hidpi.c)
-        minifb_add_example(NAME multiple_windows     SOURCE examples/multiple_windows.c)
+        minifb_add_example(NAME multiple_windows     SOURCE examples/multiple_windows.c     DOS_NAME multiwin)
         minifb_add_example(NAME timer                SOURCE examples/timer.c)
         if (NOT EMSCRIPTEN)
-            minifb_add_example(NAME fullscreen       SOURCE examples/fullscreen.c)
-            minifb_add_example(NAME hide_cursor      SOURCE examples/hide_cursor.c)
-            minifb_add_example(NAME input_events_cpp SOURCE examples/input_events_cpp.cpp)
+            minifb_add_example(NAME fullscreen       SOURCE examples/fullscreen.c       DOS_NAME fullscrn)
+            minifb_add_example(NAME hide_cursor      SOURCE examples/hide_cursor.c      DOS_NAME hidecurs)
+            minifb_add_example(NAME input_events_cpp SOURCE examples/input_events_cpp.cpp DOS_NAME inpevcpp)
         endif()
         if (DJGPP)
-            minifb_add_example(NAME debug_dos        SOURCE examples/dos/debug_dos.c)
+            minifb_add_example(NAME debug_dos        SOURCE examples/dos/debug_dos.c        DOS_NAME debugdos)
         endif()
 
     else() # iOS

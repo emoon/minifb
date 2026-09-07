@@ -18,6 +18,7 @@
 #include "MiniFB_internal.h"
 #include "MiniFB_enums.h"
 #include "MiniFB_timespec.h"
+#include "MiniFB_evdev_keys.h"
 #include "WindowData.h"
 #include "WindowData_Way.h"
 #include "WaylandMiniFB.h"
@@ -125,7 +126,6 @@
 #endif
 
 //-------------------------------------
-void init_keycodes();
 
 // Forward declarations for functions used in destroy/configure
 // but defined later in the file.
@@ -137,7 +137,7 @@ static void clear_pointer_axis_frame(SWindowData_Way *window_data_specific);
 // Protocol negotiation overrides, read from the environment while globals are
 // bound. They exist so the version-dependent and missing-global fallback paths
 // can be exercised against a single compositor, which otherwise needs an older
-// compositor or a rebuild against older headers. See docs/wayland-testing.md.
+// compositor or a rebuild against older headers. See docs/testing-wayland.md.
 //-------------------------------------
 
 //-------------------------------------
@@ -1062,9 +1062,10 @@ destroy_window_data(SWindowData *window_data) {
             slot_destroy(&window_data_specific->slots[i]);
         }
 
+        // The compose state holds a reference to the context, so it goes first.
+        mfb_xkb_compose_destroy(&window_data_specific->compose);
+
         // xkbcommon objects are refcounted, so these unref instead of destroy.
-        kWaylandDestroy(window_data_specific->xkb_compose_state, xkb_compose_state_unref);
-        kWaylandDestroy(window_data_specific->xkb_compose_table, xkb_compose_table_unref);
         kWaylandDestroy(window_data_specific->xkb_state,         xkb_state_unref);
         kWaylandDestroy(window_data_specific->xkb_keymap,        xkb_keymap_unref);
         kWaylandDestroy(window_data_specific->xkb_context,       xkb_context_unref);
@@ -1889,14 +1890,8 @@ static void
 release_keyboard_input_state(SWindowData *window_data, SWindowData_Way *window_data_specific) {
     release_keyboard(&window_data_specific->keyboard);
 
-    // Emit releases for keys whose real release events can no longer arrive.
-    for (uint32_t key = 0; key < MFB_MAX_KEYS; ++key) {
-        if (window_data->key_status[key] != 0) {
-            window_data->key_status[key] = 0;
-            kCall(keyboard_func, (mfb_key) key, (mfb_key_mod) window_data->mod_keys, false);
-        }
-    }
-
+    // Losing the capability and losing the focus leave the same problem behind, so both take
+    // the same route out.
     wayland_clear_keyboard_focus_state(window_data, window_data_specific);
 }
 
@@ -3139,7 +3134,12 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
 
     xdg_toplevel_set_app_id(window_data_specific->toplevel, MFB_STR(MFB_APP_ID));
 
-    xdg_toplevel_set_title(window_data_specific->toplevel, window_title);
+    char *safe_title = mfb_safe_title_copy(window_title);
+
+    if (safe_title != NULL) {
+        xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
+        free(safe_title);
+    }
     xdg_toplevel_add_listener(window_data_specific->toplevel, &toplevel_listener, window_data);
 
     // Commit without a buffer to trigger initial configure event
@@ -3257,7 +3257,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     }
     wl_registry_add_listener(window_data_specific->registry, &registry_listener, window_data);
 
-    init_keycodes();
+    mfb_init_evdev_keycodes(0);
 
     // Two roundtrips on window_queue: first gets globals, second ensures
     // all format events (from wl_shm) have been received.
@@ -3943,145 +3943,6 @@ mfb_wait_sync(struct mfb_window *window) {
 extern short int g_keycodes[MFB_MAX_KEYS];
 
 //-------------------------------------
-void
-init_keycodes() {
-    static bool s_initialized = false;
-    if (s_initialized) {
-        return;
-    }
-    s_initialized = true;
-
-    for (size_t i = 0; i < MFB_MAX_KEYS; ++i) {
-        g_keycodes[i] = MFB_KB_KEY_UNKNOWN;
-    }
-
-    g_keycodes[KEY_GRAVE]      = MFB_KB_KEY_GRAVE_ACCENT;
-    g_keycodes[KEY_1]          = MFB_KB_KEY_1;
-    g_keycodes[KEY_2]          = MFB_KB_KEY_2;
-    g_keycodes[KEY_3]          = MFB_KB_KEY_3;
-    g_keycodes[KEY_4]          = MFB_KB_KEY_4;
-    g_keycodes[KEY_5]          = MFB_KB_KEY_5;
-    g_keycodes[KEY_6]          = MFB_KB_KEY_6;
-    g_keycodes[KEY_7]          = MFB_KB_KEY_7;
-    g_keycodes[KEY_8]          = MFB_KB_KEY_8;
-    g_keycodes[KEY_9]          = MFB_KB_KEY_9;
-    g_keycodes[KEY_0]          = MFB_KB_KEY_0;
-    g_keycodes[KEY_SPACE]      = MFB_KB_KEY_SPACE;
-    g_keycodes[KEY_MINUS]      = MFB_KB_KEY_MINUS;
-    g_keycodes[KEY_EQUAL]      = MFB_KB_KEY_EQUAL;
-    g_keycodes[KEY_Q]          = MFB_KB_KEY_Q;
-    g_keycodes[KEY_W]          = MFB_KB_KEY_W;
-    g_keycodes[KEY_E]          = MFB_KB_KEY_E;
-    g_keycodes[KEY_R]          = MFB_KB_KEY_R;
-    g_keycodes[KEY_T]          = MFB_KB_KEY_T;
-    g_keycodes[KEY_Y]          = MFB_KB_KEY_Y;
-    g_keycodes[KEY_U]          = MFB_KB_KEY_U;
-    g_keycodes[KEY_I]          = MFB_KB_KEY_I;
-    g_keycodes[KEY_O]          = MFB_KB_KEY_O;
-    g_keycodes[KEY_P]          = MFB_KB_KEY_P;
-    g_keycodes[KEY_LEFTBRACE]  = MFB_KB_KEY_LEFT_BRACKET;
-    g_keycodes[KEY_RIGHTBRACE] = MFB_KB_KEY_RIGHT_BRACKET;
-    g_keycodes[KEY_A]          = MFB_KB_KEY_A;
-    g_keycodes[KEY_S]          = MFB_KB_KEY_S;
-    g_keycodes[KEY_D]          = MFB_KB_KEY_D;
-    g_keycodes[KEY_F]          = MFB_KB_KEY_F;
-    g_keycodes[KEY_G]          = MFB_KB_KEY_G;
-    g_keycodes[KEY_H]          = MFB_KB_KEY_H;
-    g_keycodes[KEY_J]          = MFB_KB_KEY_J;
-    g_keycodes[KEY_K]          = MFB_KB_KEY_K;
-    g_keycodes[KEY_L]          = MFB_KB_KEY_L;
-    g_keycodes[KEY_SEMICOLON]  = MFB_KB_KEY_SEMICOLON;
-    g_keycodes[KEY_APOSTROPHE] = MFB_KB_KEY_APOSTROPHE;
-    g_keycodes[KEY_Z]          = MFB_KB_KEY_Z;
-    g_keycodes[KEY_X]          = MFB_KB_KEY_X;
-    g_keycodes[KEY_C]          = MFB_KB_KEY_C;
-    g_keycodes[KEY_V]          = MFB_KB_KEY_V;
-    g_keycodes[KEY_B]          = MFB_KB_KEY_B;
-    g_keycodes[KEY_N]          = MFB_KB_KEY_N;
-    g_keycodes[KEY_M]          = MFB_KB_KEY_M;
-    g_keycodes[KEY_COMMA]      = MFB_KB_KEY_COMMA;
-    g_keycodes[KEY_DOT]        = MFB_KB_KEY_PERIOD;
-    g_keycodes[KEY_SLASH]      = MFB_KB_KEY_SLASH;
-    g_keycodes[KEY_BACKSLASH]  = MFB_KB_KEY_BACKSLASH;
-    g_keycodes[KEY_ESC]        = MFB_KB_KEY_ESCAPE;
-    g_keycodes[KEY_TAB]        = MFB_KB_KEY_TAB;
-    g_keycodes[KEY_LEFTSHIFT]  = MFB_KB_KEY_LEFT_SHIFT;
-    g_keycodes[KEY_RIGHTSHIFT] = MFB_KB_KEY_RIGHT_SHIFT;
-    g_keycodes[KEY_LEFTCTRL]   = MFB_KB_KEY_LEFT_CONTROL;
-    g_keycodes[KEY_RIGHTCTRL]  = MFB_KB_KEY_RIGHT_CONTROL;
-    g_keycodes[KEY_LEFTALT]    = MFB_KB_KEY_LEFT_ALT;
-    g_keycodes[KEY_RIGHTALT]   = MFB_KB_KEY_RIGHT_ALT;
-    g_keycodes[KEY_LEFTMETA]   = MFB_KB_KEY_LEFT_SUPER;
-    g_keycodes[KEY_RIGHTMETA]  = MFB_KB_KEY_RIGHT_SUPER;
-    g_keycodes[KEY_MENU]       = MFB_KB_KEY_MENU;
-    g_keycodes[KEY_NUMLOCK]    = MFB_KB_KEY_NUM_LOCK;
-    g_keycodes[KEY_CAPSLOCK]   = MFB_KB_KEY_CAPS_LOCK;
-    g_keycodes[KEY_PRINT]      = MFB_KB_KEY_PRINT_SCREEN;
-    // The kernel's HID table maps the physical keys below to these codes,
-    // not to KEY_PRINT/KEY_MENU above; keep both so devices that do emit the
-    // legacy codes still work.
-    g_keycodes[KEY_SYSRQ]      = MFB_KB_KEY_PRINT_SCREEN;
-    g_keycodes[KEY_COMPOSE]    = MFB_KB_KEY_MENU;
-    g_keycodes[KEY_102ND]      = MFB_KB_KEY_WORLD_2;
-    g_keycodes[KEY_SCROLLLOCK] = MFB_KB_KEY_SCROLL_LOCK;
-    g_keycodes[KEY_PAUSE]      = MFB_KB_KEY_PAUSE;
-    g_keycodes[KEY_DELETE]     = MFB_KB_KEY_DELETE;
-    g_keycodes[KEY_BACKSPACE]  = MFB_KB_KEY_BACKSPACE;
-    g_keycodes[KEY_ENTER]      = MFB_KB_KEY_ENTER;
-    g_keycodes[KEY_HOME]       = MFB_KB_KEY_HOME;
-    g_keycodes[KEY_END]        = MFB_KB_KEY_END;
-    g_keycodes[KEY_PAGEUP]     = MFB_KB_KEY_PAGE_UP;
-    g_keycodes[KEY_PAGEDOWN]   = MFB_KB_KEY_PAGE_DOWN;
-    g_keycodes[KEY_INSERT]     = MFB_KB_KEY_INSERT;
-    g_keycodes[KEY_LEFT]       = MFB_KB_KEY_LEFT;
-    g_keycodes[KEY_RIGHT]      = MFB_KB_KEY_RIGHT;
-    g_keycodes[KEY_DOWN]       = MFB_KB_KEY_DOWN;
-    g_keycodes[KEY_UP]         = MFB_KB_KEY_UP;
-    g_keycodes[KEY_F1]         = MFB_KB_KEY_F1;
-    g_keycodes[KEY_F2]         = MFB_KB_KEY_F2;
-    g_keycodes[KEY_F3]         = MFB_KB_KEY_F3;
-    g_keycodes[KEY_F4]         = MFB_KB_KEY_F4;
-    g_keycodes[KEY_F5]         = MFB_KB_KEY_F5;
-    g_keycodes[KEY_F6]         = MFB_KB_KEY_F6;
-    g_keycodes[KEY_F7]         = MFB_KB_KEY_F7;
-    g_keycodes[KEY_F8]         = MFB_KB_KEY_F8;
-    g_keycodes[KEY_F9]         = MFB_KB_KEY_F9;
-    g_keycodes[KEY_F10]        = MFB_KB_KEY_F10;
-    g_keycodes[KEY_F11]        = MFB_KB_KEY_F11;
-    g_keycodes[KEY_F12]        = MFB_KB_KEY_F12;
-    g_keycodes[KEY_F13]        = MFB_KB_KEY_F13;
-    g_keycodes[KEY_F14]        = MFB_KB_KEY_F14;
-    g_keycodes[KEY_F15]        = MFB_KB_KEY_F15;
-    g_keycodes[KEY_F16]        = MFB_KB_KEY_F16;
-    g_keycodes[KEY_F17]        = MFB_KB_KEY_F17;
-    g_keycodes[KEY_F18]        = MFB_KB_KEY_F18;
-    g_keycodes[KEY_F19]        = MFB_KB_KEY_F19;
-    g_keycodes[KEY_F20]        = MFB_KB_KEY_F20;
-    g_keycodes[KEY_F21]        = MFB_KB_KEY_F21;
-    g_keycodes[KEY_F22]        = MFB_KB_KEY_F22;
-    g_keycodes[KEY_F23]        = MFB_KB_KEY_F23;
-    g_keycodes[KEY_F24]        = MFB_KB_KEY_F24;
-    g_keycodes[KEY_KPSLASH]    = MFB_KB_KEY_KP_DIVIDE;
-    g_keycodes[KEY_KPASTERISK] = MFB_KB_KEY_KP_MULTIPLY;
-    g_keycodes[KEY_KPDOT]      = MFB_KB_KEY_KP_DECIMAL;
-    g_keycodes[KEY_KPMINUS]    = MFB_KB_KEY_KP_SUBTRACT;
-    g_keycodes[KEY_KPPLUS]     = MFB_KB_KEY_KP_ADD;
-    g_keycodes[KEY_KP0]        = MFB_KB_KEY_KP_0;
-    g_keycodes[KEY_KP1]        = MFB_KB_KEY_KP_1;
-    g_keycodes[KEY_KP2]        = MFB_KB_KEY_KP_2;
-    g_keycodes[KEY_KP3]        = MFB_KB_KEY_KP_3;
-    g_keycodes[KEY_KP4]        = MFB_KB_KEY_KP_4;
-    g_keycodes[KEY_KP5]        = MFB_KB_KEY_KP_5;
-    g_keycodes[KEY_KP6]        = MFB_KB_KEY_KP_6;
-    g_keycodes[KEY_KP7]        = MFB_KB_KEY_KP_7;
-    g_keycodes[KEY_KP8]        = MFB_KB_KEY_KP_8;
-    g_keycodes[KEY_KP9]        = MFB_KB_KEY_KP_9;
-    g_keycodes[KEY_KPCOMMA]    = MFB_KB_KEY_KP_DECIMAL;
-    g_keycodes[KEY_KPEQUAL]    = MFB_KB_KEY_KP_EQUAL;
-    g_keycodes[KEY_KPENTER]    = MFB_KB_KEY_KP_ENTER;
-}
-
-//-------------------------------------
 bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
@@ -4126,7 +3987,12 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    xdg_toplevel_set_title(window_data_specific->toplevel, title);
+    char *safe_title = mfb_safe_title_copy(title);
+
+    if (safe_title != NULL) {
+        xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
+        free(safe_title);
+    }
     flush_request(window_data_specific->display, "title update");
 }
 
