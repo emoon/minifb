@@ -63,15 +63,11 @@
     #define MFB_FUNC_NAME __func__
 #endif
 
-#if defined(__cplusplus)
-    #define MFB_LOG(level, tag, ...)                                                \
-        do {                                                                        \
-            const mfb_log_info mfb_log_info_aux = { level, __FILE__, MFB_FUNC_NAME, __LINE__ }; \
-            mfb_log(&mfb_log_info_aux, tag, __VA_ARGS__);                          \
-        } while (0)
-#else
-    #define MFB_LOG(level, tag, ...) mfb_log(&(mfb_log_info){ level, __FILE__, MFB_FUNC_NAME, __LINE__ }, tag, __VA_ARGS__)
-#endif
+#define MFB_LOG(level, tag, ...)                                                            \
+	do {                                                                                    \
+		const mfb_log_info mfb_log_info_aux = { level, __FILE__, MFB_FUNC_NAME, __LINE__ }; \
+		mfb_log(&mfb_log_info_aux, tag, __VA_ARGS__);                                       \
+	} while (0)
 
 #define MFB_LOGT(tag, ...) MFB_LOG(MFB_LOG_TRACE,   tag, __VA_ARGS__)
 #define MFB_LOGD(tag, ...) MFB_LOG(MFB_LOG_DEBUG,   tag, __VA_ARGS__)
@@ -81,14 +77,32 @@
 
 //-------------------------------------
 #if !defined(__ANDROID__)
-    #define MFB_RGB(r, g, b)         ((((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))
-    #define MFB_ARGB(a, r, g, b)     ((((uint32_t) (a)) << 24) | (((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))
+    #define __MFB_A_SHIFT 24
+    #define __MFB_R_SHIFT 16
+    #define __MFB_G_SHIFT 8
+    #define __MFB_B_SHIFT 0
 #else
     #if defined(HOST_WORDS_BIGENDIAN)
-        #define MFB_RGB(r, g, b)     ((((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))
-        #define MFB_ARGB(a, r, g, b) ((((uint32_t) (a)) << 24) | (((uint32_t) (r)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (b)))
+        #define __MFB_A_SHIFT 0
+        #define __MFB_R_SHIFT 24
+        #define __MFB_G_SHIFT 16
+        #define __MFB_B_SHIFT 8
     #else
-        #define MFB_RGB(r, g, b)     ((((uint32_t) (b)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (r)))
-        #define MFB_ARGB(a, r, g, b) ((((uint32_t) (a)) << 24) | (((uint32_t) (b)) << 16) | (((uint32_t) (g)) << 8) | ((uint32_t) (r)))
+        #define __MFB_A_SHIFT 24
+        #define __MFB_R_SHIFT 0
+        #define __MFB_G_SHIFT 8
+        #define __MFB_B_SHIFT 16
     #endif
 #endif
+
+#define MFB_RGB(r, g, b) MFB_ARGB(0xFF, r, g, b)
+#define MFB_ARGB(a, r, g, b) ( \
+    (((uint32_t) (a)) << __MFB_A_SHIFT) | \
+    (((uint32_t) (r)) << __MFB_R_SHIFT) | \
+    (((uint32_t) (g)) << __MFB_G_SHIFT) | \
+    (((uint32_t) (b)) << __MFB_B_SHIFT) )
+
+#define MFB_GET_A(col) (((uint32_t) (col) >> __MFB_A_SHIFT) & 0x000000FF)
+#define MFB_GET_R(col) (((uint32_t) (col) >> __MFB_R_SHIFT) & 0x000000FF)
+#define MFB_GET_G(col) (((uint32_t) (col) >> __MFB_G_SHIFT) & 0x000000FF)
+#define MFB_GET_B(col) (((uint32_t) (col) >> __MFB_B_SHIFT) & 0x000000FF)

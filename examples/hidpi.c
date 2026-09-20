@@ -21,7 +21,7 @@ pretty_square(unsigned int *p, int dimen) {
 
     for (int x = one_quarter_dimen; x < three_quarter_dimen; x++) {
         for (int y = one_quarter_dimen; y < three_quarter_dimen; y++) {
-            p[y * dimen + x] = (x & 1) ? MFB_ARGB(0xff, 223, 0, (255 * (x - one_quarter_dimen)) / one_half_dimen) : MFB_ARGB(0xff, 0, 0, 0);
+            p[y * dimen + x] = (x & 1) ? MFB_RGB(223, 0, (255 * (x - one_quarter_dimen)) / one_half_dimen) : MFB_RGB(0, 0, 0);
         }
     }
 }
