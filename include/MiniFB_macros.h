@@ -63,15 +63,11 @@
     #define MFB_FUNC_NAME __func__
 #endif
 
-#if defined(__cplusplus)
-    #define MFB_LOG(level, tag, ...)                                                \
-        do {                                                                        \
-            const mfb_log_info mfb_log_info_aux = { level, __FILE__, MFB_FUNC_NAME, __LINE__ }; \
-            mfb_log(&mfb_log_info_aux, tag, __VA_ARGS__);                          \
-        } while (0)
-#else
-    #define MFB_LOG(level, tag, ...) mfb_log(&(mfb_log_info){ level, __FILE__, MFB_FUNC_NAME, __LINE__ }, tag, __VA_ARGS__)
-#endif
+#define MFB_LOG(level, tag, ...)                                                            \
+	do {                                                                                    \
+		const mfb_log_info mfb_log_info_aux = { level, __FILE__, MFB_FUNC_NAME, __LINE__ }; \
+		mfb_log(&mfb_log_info_aux, tag, __VA_ARGS__);                                       \
+	} while (0)
 
 #define MFB_LOGT(tag, ...) MFB_LOG(MFB_LOG_TRACE,   tag, __VA_ARGS__)
 #define MFB_LOGD(tag, ...) MFB_LOG(MFB_LOG_DEBUG,   tag, __VA_ARGS__)
