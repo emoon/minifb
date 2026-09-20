@@ -234,8 +234,8 @@ resize(struct mfb_window *window, int width, int height) {
                     (y >= (g_height - inset_bottom))
                 );
                 g_buffer[i++] = in_inset
-                    ? MFB_ARGB(0xFF, noise, 0, 0)
-                    : MFB_ARGB(0xFF, noise, noise, noise);
+                    ? MFB_RGB(noise, 0, 0)
+                    : MFB_RGB(noise, noise, noise);
             }
         }
     }
