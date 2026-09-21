@@ -88,31 +88,66 @@ set_window_title(SWindowData_X11 *window_data_specific, const char *title) {
 }
 
 //-------------------------------------
-// The state field of an event describes the keyboard before it, so for the lock keys
-// themselves it is a step behind, and by how much depends on the server: some update it on
-// the press and others not until the release. Only the server knows, so it is asked, which
-// is a round trip taken just for those two keys.
+static uint32_t
+own_mod_bit(mfb_key key_code) {
+    switch (key_code) {
+        case MFB_KB_KEY_LEFT_SHIFT:
+        case MFB_KB_KEY_RIGHT_SHIFT:
+            return MFB_KB_MOD_SHIFT;
+        case MFB_KB_KEY_LEFT_CONTROL:
+        case MFB_KB_KEY_RIGHT_CONTROL:
+            return MFB_KB_MOD_CONTROL;
+        case MFB_KB_KEY_LEFT_ALT:
+        case MFB_KB_KEY_RIGHT_ALT:
+            return MFB_KB_MOD_ALT;
+        case MFB_KB_KEY_LEFT_SUPER:
+        case MFB_KB_KEY_RIGHT_SUPER:
+            return MFB_KB_MOD_SUPER;
+        default:
+            return 0;
+    }
+}
+
+//-------------------------------------
+// The state field describes the keyboard before the event. How far behind the locks are
+// depends on the server, so those are asked for directly. A held modifier is only behind for
+// the key of the event itself, and key_status already holds its new value.
 //-------------------------------------
 static uint32_t
-lock_mods_from_state(Display *display, unsigned int state, mfb_key key_code) {
-    uint32_t mods = 0;
+mods_from_state(Display *display, unsigned int state, mfb_key key_code) {
+    unsigned int lock_state = state;
+    uint32_t     mods = 0;
 
     if (key_code == MFB_KB_KEY_CAPS_LOCK || key_code == MFB_KB_KEY_NUM_LOCK) {
         XkbStateRec xkb_state;
 
         if (XkbGetState(display, XkbUseCoreKbd, &xkb_state) == Success) {
-            state = (unsigned int) xkb_state.locked_mods;
+            lock_state = (unsigned int) xkb_state.locked_mods;
         }
     }
 
-    if ((state & LockMask) != 0) {
+    if ((lock_state & LockMask) != 0) {
         mods |= MFB_KB_MOD_CAPS_LOCK;
     }
-    if ((state & Mod2Mask) != 0) {
+    if ((lock_state & Mod2Mask) != 0) {
         mods |= MFB_KB_MOD_NUM_LOCK;
     }
 
-    return mods;
+    // Only the server can report a modifier activated with no key of its own.
+    if ((state & ShiftMask) != 0) {
+        mods |= MFB_KB_MOD_SHIFT;
+    }
+    if ((state & ControlMask) != 0) {
+        mods |= MFB_KB_MOD_CONTROL;
+    }
+    if ((state & Mod1Mask) != 0) {
+        mods |= MFB_KB_MOD_ALT;
+    }
+    if ((state & Mod4Mask) != 0) {
+        mods |= MFB_KB_MOD_SUPER;
+    }
+
+    return mods & ~own_mod_bit(key_code);
 }
 
 //-------------------------------------
@@ -167,9 +202,9 @@ process_event(SWindowData *window_data, XEvent *event, bool filtered) {
             if (key_code != MFB_KB_KEY_UNKNOWN) {
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
                 mfb_recalc_mod_keys(window_data,
-                                    lock_mods_from_state(window_data_specific->display,
-                                                         event->xkey.state,
-                                                         key_code));
+                                    mods_from_state(window_data_specific->display,
+                                                    event->xkey.state,
+                                                    key_code));
                 kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
             }
 
@@ -185,9 +220,9 @@ process_event(SWindowData *window_data, XEvent *event, bool filtered) {
             mfb_mouse_button button = (mfb_mouse_button) event->xbutton.button;
             int          is_pressed = (event->type == ButtonPress);
             mfb_recalc_mod_keys(window_data,
-                                lock_mods_from_state(((SWindowData_X11 *) window_data->specific)->display,
-                                                     event->xbutton.state,
-                                                     MFB_KB_KEY_UNKNOWN));
+                                mods_from_state(((SWindowData_X11 *) window_data->specific)->display,
+                                                event->xbutton.state,
+                                                MFB_KB_KEY_UNKNOWN));
 
             // Swap mouse right and middle for parity with other platforms:
             // https://github.com/emoon/minifb/issues/65

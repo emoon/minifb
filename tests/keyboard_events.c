@@ -30,6 +30,7 @@
 #define ERROR_UNKNOWN_KEY_REPORTED  (UINT64_C(1) << 12)
 #define ERROR_CALLBACK_ORDER        (UINT64_C(1) << 13)
 #define ERROR_COMPOSITION_AFTER_FOCUS (UINT64_C(1) << 14)
+#define ERROR_ALTGR_COMPANION       (UINT64_C(1) << 15)
 
 #if defined(__DJGPP__)
     #define TEST_DOS_PLATFORM 1
@@ -91,6 +92,9 @@ typedef enum {
     STEP_LEFT_MODIFIERS,
     STEP_LEFT_SUPER,
     STEP_RIGHT_MODIFIERS,
+#if !TEST_DOS_PLATFORM
+    STEP_ALTGR,
+#endif
     STEP_RIGHT_SUPER,
     STEP_MENU,
 
@@ -206,6 +210,11 @@ static const TestStep g_steps[STEP_COUNT] = {
     { false, "right modifiers",
              "Press and release Right Control and Right Alt.",
              "both exercised", TEST_STEP_LIST(g_keys_right_mods) },
+#if !TEST_DOS_PLATFORM
+    { false, "AltGr companion",
+             "Press and release AltGr, the right Alt, ten times. Speed does not matter.",
+             "ten presses exercised", TEST_STEP_NO_KEYS },
+#endif
     { false, "right Super",
              "Press the right Windows or Command key. Many keyboards do not have one.",
              "exercised", TEST_STEP_NO_KEYS },
@@ -258,6 +267,7 @@ static const TestStep g_steps[STEP_COUNT] = {
 };
 #define SKIP_KEY         MFB_KB_KEY_ESCAPE
 #define TEST_FPS         60u
+#define TEST_ALTGR_PRESSES 10u
 #define TEST_SLOW_FPS    5u
 
 // Enough to repeat every error at the end without a dynamic array. report_error collapses
@@ -299,6 +309,10 @@ typedef struct {
     bool               saw_extra_mods;
     bool               lock_mods_known;
     bool               lock_step_active;
+    bool               altgr_step_active;
+    bool               altgr_control_stuck;
+    unsigned           altgr_presses;
+    unsigned           altgr_companion_seen;
     bool               lock_step_baseline_known;
     bool               lock_change_unreported;
     bool               dead_focus_active;
@@ -759,6 +773,9 @@ evaluate_steps(const KeyboardTest *test, bool *done) {
                                 test->press_count[MFB_KB_KEY_LEFT_ALT] > 0;
     done[STEP_RIGHT_MODIFIERS] = test->press_count[MFB_KB_KEY_RIGHT_CONTROL] > 0 &&
                                  test->press_count[MFB_KB_KEY_RIGHT_ALT] > 0;
+#if !TEST_DOS_PLATFORM
+    done[STEP_ALTGR] = test->altgr_presses >= TEST_ALTGR_PRESSES;
+#endif
     done[STEP_LEFT_SUPER] = test->press_count[MFB_KB_KEY_LEFT_SUPER] > 0;
     done[STEP_RIGHT_SUPER] = test->press_count[MFB_KB_KEY_RIGHT_SUPER] > 0;
     done[STEP_MENU] = test->press_count[MFB_KB_KEY_MENU] > 0;
@@ -843,6 +860,12 @@ announce_next_step(KeyboardTest *test) {
 
 #if !TEST_DOS_PLATFORM
     test->dead_focus_active = (step == STEP_DEAD_FOCUS);
+
+    if (step == STEP_ALTGR && test->altgr_step_active == false) {
+        test->altgr_presses = 0;
+        test->altgr_companion_seen = 0;
+    }
+    test->altgr_step_active = (step == STEP_ALTGR);
 #endif
 
     if (step == STEP_LOCK_KEYS && test->lock_step_active == false) {
@@ -975,6 +998,30 @@ update_progress(KeyboardTest *test) {
     }
 }
 
+// Windows reports the Control that AltGr presses of its own; the other backends report only
+// the Alt. Counting from the Alt keeps a press that began before this step from counting half.
+static void
+check_altgr_companion(KeyboardTest *test, mfb_key key, bool is_pressed, bool is_repeat) {
+    if (test->altgr_step_active == false || key != MFB_KB_KEY_RIGHT_ALT || is_repeat == true) {
+        return;
+    }
+
+    if (is_pressed == true) {
+        test->altgr_presses++;
+        if (test->expected_keys[MFB_KB_KEY_LEFT_CONTROL] == true) {
+            test->altgr_companion_seen++;
+        }
+        return;
+    }
+
+    // The companion comes up before the Alt does, so it has had its chance by now.
+    if (test->expected_keys[MFB_KB_KEY_LEFT_CONTROL] == true) {
+        test->altgr_control_stuck = true;
+        report_error(test, ERROR_ALTGR_COMPANION,
+                     "AltGr came up with its companion Control still held");
+    }
+}
+
 static void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     KeyboardTest *test = get_test(window);
@@ -1061,6 +1108,8 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
             test->pending_key_valid = false;
         }
     }
+
+    check_altgr_companion(test, key, is_pressed, is_repeat);
 
     // A bit the callback history says should be there and is not is a defect. An extra bit
     // is the platform reporting a modifier it never delivered as a key, such as the Control
@@ -1369,12 +1418,13 @@ check_after_pump(KeyboardTest *test) {
 
 
 // A step reads the same way in the summary whether it was done, skipped or never reached.
+// It re-evaluates from the final state, so a step already reported as done has to stay done.
 static const char *
 step_result(const KeyboardTest *test, TestStepId step, const bool *done) {
     if (test->step_skipped[step] == true) {
         return "SKIPPED";
     }
-    if (done[step] == true) {
+    if (done[step] == true || test->step_done[step] == true) {
         return g_steps[step].done_text;
     }
 
@@ -1459,6 +1509,16 @@ print_summary(const KeyboardTest *test) {
                    step_result(test, (TestStepId) step, done));
         }
     }
+#if !TEST_DOS_PLATFORM
+    if (test->altgr_presses == 0) {
+        printf("  %-24s not exercised\n", "AltGr companion Control");
+    }
+    else {
+        printf("  %-24s %s, reported on %u of %u\n", "AltGr companion Control",
+               test->altgr_control_stuck == true ? "LEFT HELD" : "released with the Alt",
+               test->altgr_companion_seen, test->altgr_presses);
+    }
+#endif
     if (test->saw_non_ascii == true) {
         printf("  %-24s first U+%04X\n", "non-ASCII text", test->first_non_ascii);
     }
@@ -1501,7 +1561,7 @@ finish_test(KeyboardTest *test) {
         if (g_steps[step].required == false || test->step_skipped[step] == true) {
             continue;
         }
-        if (done[step] == false) {
+        if (done[step] == false && test->step_done[step] == false) {
             report_missing(test, g_steps[step].action);
         }
     }

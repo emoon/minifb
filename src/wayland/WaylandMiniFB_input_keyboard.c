@@ -390,9 +390,13 @@ keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t
 
         if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
             window_data->key_status[key_code] = is_pressed;
-            // xkb answers about the layout, not about the keys: on a Spanish layout AltGr is
-            // ISO_Level3_Shift and no Alt at all, so the held key has to be added on top.
-            mfb_recalc_mod_keys(window_data, window_data->mod_keys);
+        }
+
+        // xkb answers about the layout, not about the keys: on a Spanish layout AltGr is
+        // ISO_Level3_Shift and no Alt, so the held key has to be added on top, token or not.
+        mfb_recalc_mod_keys(window_data, window_data->mod_keys);
+
+        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < MFB_MAX_KEYS) {
             kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, is_pressed);
         }
 

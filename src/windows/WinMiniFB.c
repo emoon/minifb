@@ -488,6 +488,12 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     kCall(keyboard_func, key_code, window_data->mod_keys, true);
                 }
 
+                // The key up for the Windows key arrives after update_events released it
+                // by hand.
+                if (is_pressed == 0 && window_data->key_status[key_code] == 0) {
+                    break;
+                }
+
                 window_data->key_status[key_code] = (uint8_t) is_pressed;
                 mfb_recalc_mod_keys(window_data, translate_mod());
                 kCall(keyboard_func, key_code, window_data->mod_keys, is_pressed);
@@ -544,8 +550,9 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         //case WM_XBUTTONDBLCLK:
             if (window_data) {
                 mfb_mouse_button button = MFB_MOUSE_BTN_0;
-                window_data->mod_keys   = translate_mod();
                 int          is_pressed = 0;
+
+                mfb_recalc_mod_keys(window_data, translate_mod());
 
                 switch(message) {
                     //case WM_LBUTTONDBLCLK:
@@ -618,7 +625,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_MOUSEWHEEL:
             if (window_data) {
                 window_data->mouse_wheel_y = (SHORT) HIWORD(wParam) / (float) WHEEL_DELTA;
-                kCall(mouse_wheel_func, translate_mod(), 0.0f, window_data->mouse_wheel_y);
+                mfb_recalc_mod_keys(window_data, translate_mod());
+                kCall(mouse_wheel_func, window_data->mod_keys, 0.0f, window_data->mouse_wheel_y);
             }
             break;
 
@@ -627,7 +635,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             // NOTE: The X-axis is inverted for consistency with macOS and X11
             if (window_data) {
                 window_data->mouse_wheel_x = -((SHORT) HIWORD(wParam) / (float) WHEEL_DELTA);
-                kCall(mouse_wheel_func, translate_mod(), window_data->mouse_wheel_x, 0.0f);
+                mfb_recalc_mod_keys(window_data, translate_mod());
+                kCall(mouse_wheel_func, window_data->mod_keys, window_data->mouse_wheel_x, 0.0f);
             }
             break;
 
@@ -687,6 +696,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
             if (window_data) {
                 window_data->is_active = true;
                 sync_key_status(window_data);
+                // Nothing else reports a lock toggled while another window had the focus.
+                mfb_recalc_mod_keys(window_data, translate_mod());
                 kCall(active_func, true);
             }
             break;
@@ -720,8 +731,12 @@ release_key_lost_by_system(SWindowData *window_data, int virtual_key, mfb_key ke
         return;
     }
 
+    const uint32_t lock_bits = (uint32_t) (MFB_KB_MOD_CAPS_LOCK | MFB_KB_MOD_NUM_LOCK);
+
     window_data->key_status[key_code] = 0;
-    mfb_recalc_mod_keys(window_data, translate_mod());
+    // The locks have no second source, and GetKeyState here answers for the focused window.
+    mfb_recalc_mod_keys(window_data,
+                        (translate_mod() & ~lock_bits) | (window_data->mod_keys & lock_bits));
     kCall(keyboard_func, key_code, window_data->mod_keys, false);
 }
 
@@ -1329,38 +1344,8 @@ translate_key(unsigned int wParam, unsigned long lParam) {
         return MFB_KB_KEY_KP_EQUAL;
 
     if (wParam == VK_CONTROL) {
-        static bool alt_gr_control = false;
-        MSG         next;
-        DWORD       time;
-        bool        is_release = ((lParam >> 31) & 1) != 0;
-
         if (lParam & 0x01000000)
             return MFB_KB_KEY_RIGHT_CONTROL;
-
-        // With the right Alt already down, a left Control can only be the one AltGr brings.
-        if ((GetKeyState(VK_RMENU) & 0x8000) != 0) {
-            return MFB_KB_KEY_UNKNOWN;
-        }
-
-        // AltGr sends a left Control before the right Alt, and only one event is reported for
-        // it. Only the first press needs the peek, since the Alt is not down yet to be seen.
-        time = GetMessageTime();
-        if (PeekMessageW(&next, NULL, 0, 0, PM_NOREMOVE))
-            if (next.message == WM_KEYDOWN || next.message == WM_SYSKEYDOWN || next.message == WM_KEYUP || next.message == WM_SYSKEYUP)
-                if (next.wParam == VK_MENU && (next.lParam & 0x01000000) && next.time == time) {
-                    alt_gr_control = is_release == false;
-                    return MFB_KB_KEY_UNKNOWN;
-                }
-
-        if (alt_gr_control == true && is_release == true) {
-            alt_gr_control = false;
-            return MFB_KB_KEY_UNKNOWN;
-        }
-
-        // A real left Control press means the one AltGr suppressed is no longer pending.
-        if (is_release == false) {
-            alt_gr_control = false;
-        }
 
         return MFB_KB_KEY_LEFT_CONTROL;
     }
