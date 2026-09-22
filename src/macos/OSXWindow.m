@@ -3,6 +3,8 @@
 #include "WindowData_OSX.h"
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
+#include <Carbon/Carbon.h>
+#include <IOKit/hidsystem/IOLLEvent.h>
 
 #if defined(USE_METAL_API)
 //-------------------------------------
@@ -39,6 +41,133 @@ update_metal_viewport_vertices(SWindowData *window_data) {
     window_data_specific->metal.vertices[3].y = y2;
 }
 #endif
+
+//-------------------------------------
+static inline bool
+key_is_valid(mfb_key key_code) {
+    return key_code != MFB_KB_KEY_UNKNOWN &&
+           (int) key_code >= 0 && (int) key_code < MFB_MAX_KEYS;
+}
+
+//-------------------------------------
+// Apple named these keycodes after ANSI hardware, but the driver assigns them by the keyboard
+// type it believes it has: on an ISO keyboard 0x0A is the key below Escape and 0x32 the one
+// next to left Shift, the opposite of what the names say. The type cannot be cached. It is
+// unknown until the first key event reaches the process, and another keyboard can be plugged
+// in while the window is open.
+//-------------------------------------
+static mfb_key
+translate_keycode(unsigned short keycode) {
+    if ((keycode == 0x0A || keycode == 0x32) &&
+        KBGetLayoutType(LMGetKbdType()) == kKeyboardISO) {
+        keycode = (keycode == 0x0A) ? 0x32 : 0x0A;
+    }
+
+    return (mfb_key) g_keycodes[keycode & 0x1ff];
+}
+
+//-------------------------------------
+// A keyboard that does not report sides sets only the generic bit, and then it is the one
+// answer available. It gives itself away when the generic bit disagrees with the OR of the
+// two device bits.
+//-------------------------------------
+static bool
+is_modifier_pressed(NSEventModifierFlags flags, NSEventModifierFlags target_mask,
+                    NSEventModifierFlags other_mask, NSEventModifierFlags either_mask) {
+    bool target_pressed = (flags & target_mask) != 0;
+    bool other_pressed  = (flags & other_mask) != 0;
+    bool either_pressed = (flags & either_mask) != 0;
+
+    if (either_pressed != (target_pressed || other_pressed)) {
+        return either_pressed;
+    }
+
+    return target_pressed;
+}
+
+//-------------------------------------
+static const struct {
+    mfb_key              key_code;
+    NSEventModifierFlags target_mask;
+    NSEventModifierFlags other_mask;
+    NSEventModifierFlags either_mask;
+} g_modifier_keys[] = {
+    { MFB_KB_KEY_LEFT_SHIFT,    NX_DEVICELSHIFTKEYMASK, NX_DEVICERSHIFTKEYMASK, NX_SHIFTMASK     },
+    { MFB_KB_KEY_RIGHT_SHIFT,   NX_DEVICERSHIFTKEYMASK, NX_DEVICELSHIFTKEYMASK, NX_SHIFTMASK     },
+    { MFB_KB_KEY_LEFT_CONTROL,  NX_DEVICELCTLKEYMASK,   NX_DEVICERCTLKEYMASK,   NX_CONTROLMASK   },
+    { MFB_KB_KEY_RIGHT_CONTROL, NX_DEVICERCTLKEYMASK,   NX_DEVICELCTLKEYMASK,   NX_CONTROLMASK   },
+    { MFB_KB_KEY_LEFT_ALT,      NX_DEVICELALTKEYMASK,   NX_DEVICERALTKEYMASK,   NX_ALTERNATEMASK },
+    { MFB_KB_KEY_RIGHT_ALT,     NX_DEVICERALTKEYMASK,   NX_DEVICELALTKEYMASK,   NX_ALTERNATEMASK },
+    { MFB_KB_KEY_LEFT_SUPER,    NX_DEVICELCMDKEYMASK,   NX_DEVICERCMDKEYMASK,   NX_COMMANDMASK   },
+    { MFB_KB_KEY_RIGHT_SUPER,   NX_DEVICERCMDKEYMASK,   NX_DEVICELCMDKEYMASK,   NX_COMMANDMASK   },
+};
+
+//-------------------------------------
+// The platform reports the lock and never the key, and nothing says the key came back up, so
+// the release is synthesized after the press to match what every other backend reports.
+//-------------------------------------
+static void
+update_caps_lock(SWindowData *window_data, NSEventModifierFlags flags) {
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (window_data_specific == NULL) {
+        return;
+    }
+
+    bool caps_lock_on = (flags & NSEventModifierFlagCapsLock) != 0;
+    if (caps_lock_on == window_data_specific->caps_lock_on) {
+        return;
+    }
+    window_data_specific->caps_lock_on = caps_lock_on;
+
+    window_data->key_status[MFB_KB_KEY_CAPS_LOCK] = 1;
+    uint32_t mod_keys = update_mod_keys(window_data, flags);
+    kCall(keyboard_func, MFB_KB_KEY_CAPS_LOCK, (mfb_key_mod) mod_keys, true);
+
+    window_data->key_status[MFB_KB_KEY_CAPS_LOCK] = 0;
+    mod_keys = update_mod_keys(window_data, flags);
+    kCall(keyboard_func, MFB_KB_KEY_CAPS_LOCK, (mfb_key_mod) mod_keys, false);
+}
+
+//-------------------------------------
+// Keys pressed while another window had the focus produce no event here, so the state is read
+// from the device instead of from what this window happened to see. Caps Lock is left out:
+// the device reports it down for as long as the lock is on, which is not a key being held.
+//-------------------------------------
+void
+sync_key_status(SWindowData *window_data) {
+    if (window_data == NULL) {
+        return;
+    }
+
+    memset(window_data->key_status, 0, sizeof(window_data->key_status));
+
+    for (unsigned keycode = 0; keycode < 0x80; ++keycode) {
+        if (keycode == kVK_CapsLock) {
+            continue;
+        }
+
+        if (CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState,
+                                  (CGKeyCode) keycode) == false) {
+            continue;
+        }
+
+        mfb_key key_code = translate_keycode((unsigned short) keycode);
+        if (key_is_valid(key_code) == true) {
+            window_data->key_status[key_code] = 1;
+        }
+    }
+
+    NSEventModifierFlags flags = [NSEvent modifierFlags];
+
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (window_data_specific != NULL) {
+        // Without this, a lock toggled while another window had the focus would look like a
+        // keystroke on the next flagsChanged and report a press nobody made.
+        window_data_specific->caps_lock_on = (flags & NSEventModifierFlagCapsLock) != 0;
+    }
+
+    update_mod_keys(window_data, flags);
+}
 
 //-------------------------------------
 static void
@@ -121,50 +250,34 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
 
 - (void)flagsChanged:(NSEvent *)event
 {
-    if(window_data == 0x0)
+    if(window_data == 0x0) {
+        [super flagsChanged:event];
         return;
-
-    uint32_t mod_keys = translate_modifiers([event modifierFlags]);
-    short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-
-    window_data->mod_keys = mod_keys;
-
-    if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
-        bool is_pressed = false;
-
-        switch (key_code) {
-            case MFB_KB_KEY_CAPS_LOCK:
-                is_pressed = (mod_keys & MFB_KB_MOD_CAPS_LOCK) != 0;
-                break;
-            case MFB_KB_KEY_NUM_LOCK:
-                is_pressed = (mod_keys & MFB_KB_MOD_NUM_LOCK) != 0;
-                break;
-            case MFB_KB_KEY_LEFT_SHIFT:
-            case MFB_KB_KEY_RIGHT_SHIFT:
-                is_pressed = (mod_keys & MFB_KB_MOD_SHIFT) != 0;
-                break;
-            case MFB_KB_KEY_LEFT_CONTROL:
-            case MFB_KB_KEY_RIGHT_CONTROL:
-                is_pressed = (mod_keys & MFB_KB_MOD_CONTROL) != 0;
-                break;
-            case MFB_KB_KEY_LEFT_ALT:
-            case MFB_KB_KEY_RIGHT_ALT:
-                is_pressed = (mod_keys & MFB_KB_MOD_ALT) != 0;
-                break;
-            case MFB_KB_KEY_LEFT_SUPER:
-            case MFB_KB_KEY_RIGHT_SUPER:
-                is_pressed = (mod_keys & MFB_KB_MOD_SUPER) != 0;
-                break;
-            default:
-                [super flagsChanged:event];
-                return;
-        }
-
-        if (window_data->key_status[key_code] != is_pressed) {
-            window_data->key_status[key_code] = is_pressed;
-            kCall(keyboard_func, key_code, mod_keys, is_pressed);
-        }
     }
+
+    NSEventModifierFlags flags = [event modifierFlags];
+
+    update_caps_lock(window_data, flags);
+
+    // All eight are reevaluated, and not only the one the keyCode names, because the event
+    // that releases one side while the other is held carries the keyCode of neither.
+    for (unsigned i = 0; i < sizeof(g_modifier_keys) / sizeof(g_modifier_keys[0]); ++i) {
+        mfb_key key_code = g_modifier_keys[i].key_code;
+        bool    is_pressed = is_modifier_pressed(flags,
+                                                 g_modifier_keys[i].target_mask,
+                                                 g_modifier_keys[i].other_mask,
+                                                 g_modifier_keys[i].either_mask);
+
+        if ((window_data->key_status[key_code] != 0) == is_pressed) {
+            continue;
+        }
+
+        window_data->key_status[key_code] = is_pressed;
+        uint32_t mod_keys = update_mod_keys(window_data, flags);
+        kCall(keyboard_func, key_code, (mfb_key_mod) mod_keys, is_pressed);
+    }
+
+    update_mod_keys(window_data, flags);
 
     [super flagsChanged:event];
 }
@@ -174,11 +287,17 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
 - (void)keyDown:(NSEvent *)event
 {
     if(window_data != 0x0) {
-        short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
+        mfb_key key_code = translate_keycode([event keyCode]);
+        bool    report = key_is_valid(key_code);
+
+        if (report == true) {
             window_data->key_status[key_code] = true;
-            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, true);
+        }
+
+        uint32_t mod_keys = update_mod_keys(window_data, [event modifierFlags]);
+
+        if (report == true) {
+            kCall(keyboard_func, key_code, (mfb_key_mod) mod_keys, true);
         }
     }
     [childContentView.superview interpretKeyEvents:@[event]];
@@ -189,11 +308,20 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
 - (void)keyUp:(NSEvent *)event
 {
     if(window_data != 0x0) {
-        short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
-        if (key_code != MFB_KB_KEY_UNKNOWN && key_code >= 0 && key_code < (int) (sizeof(window_data->key_status) / sizeof(window_data->key_status[0]))) {
+        mfb_key key_code = translate_keycode([event keyCode]);
+        // macOS delivers the key up of a key that losing the focus already released, and
+        // reporting it again would be a second release for a single press.
+        bool    report = key_is_valid(key_code) &&
+                         window_data->key_status[key_code] != 0;
+
+        if (report == true) {
             window_data->key_status[key_code] = false;
-            kCall(keyboard_func, key_code, (mfb_key_mod) window_data->mod_keys, false);
+        }
+
+        uint32_t mod_keys = update_mod_keys(window_data, [event modifierFlags]);
+
+        if (report == true) {
+            kCall(keyboard_func, key_code, (mfb_key_mod) mod_keys, false);
         }
     }
 }
@@ -273,6 +401,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     kUnused(notification);
     if(window_data != 0x0) {
         window_data->is_active = true;
+        sync_key_status(window_data);
         kCall(active_func, true);
     }
 }
@@ -283,6 +412,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     if(window_data) {
         window_data->is_active = false;
         kCall(active_func, false);
+        mfb_release_held_keys(window_data, translate_modifiers([NSEvent modifierFlags]));
     }
 }
 

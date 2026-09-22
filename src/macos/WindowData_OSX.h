@@ -19,6 +19,10 @@ typedef struct {
     OSXViewDelegate     *viewController;
     struct mfb_timer    *timer;
 
+    // Detecting a Caps Lock keystroke needs the previous state, and window_data->mod_keys
+    // cannot hold it: every event path rewrites that one.
+    bool                caps_lock_on;
+
 #if defined(USE_METAL_API)
     struct {
         Vertex          vertices[4];

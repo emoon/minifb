@@ -31,6 +31,7 @@
 #define ERROR_CALLBACK_ORDER        (UINT64_C(1) << 13)
 #define ERROR_COMPOSITION_AFTER_FOCUS (UINT64_C(1) << 14)
 #define ERROR_ALTGR_COMPANION       (UINT64_C(1) << 15)
+#define ERROR_GRAVE_KEY_TOKEN       (UINT64_C(1) << 16)
 
 #if defined(__DJGPP__)
     #define TEST_DOS_PLATFORM 1
@@ -58,6 +59,21 @@
     #define TEST_LOCK_MODS_VERIFIABLE false
 #else
     #define TEST_LOCK_MODS_VERIFIABLE true
+#endif
+
+// macOS has no Num Lock. The keypad Clear key keeps the MFB_KB_KEY_NUM_LOCK token, as it does
+// in GLFW and SDL, but no lock bit ever follows it, so the half of the lock step that asks for
+// one cannot be performed and its absence is not a fault to report.
+#if defined(__APPLE__)
+    #define TEST_NUM_LOCK_EXISTS  false
+    #define TEST_LOCK_KEYS_ACTION \
+        "Toggle Caps Lock twice, restoring it to its starting state. This system has no Num Lock."
+    #define TEST_LOCK_KEYS_DONE   "Caps Lock toggled and restored"
+#else
+    #define TEST_NUM_LOCK_EXISTS  true
+    #define TEST_LOCK_KEYS_ACTION \
+        "Toggle Caps Lock twice, then Num Lock twice, restoring both to their starting state."
+    #define TEST_LOCK_KEYS_DONE   "Caps Lock and Num Lock toggled and restored"
 #endif
 
 // Windows composes dead keys in the layout, and that state is the thread's rather than the
@@ -89,6 +105,7 @@ typedef enum {
 
     STEP_NO_TEXT,
     STEP_POSITIONAL,
+    STEP_GRAVE_ACCENT,
     STEP_LEFT_MODIFIERS,
     STEP_LEFT_SUPER,
     STEP_RIGHT_MODIFIERS,
@@ -201,6 +218,9 @@ static const TestStep g_steps[STEP_COUNT] = {
              "Press the key between Left Shift and Z. Then, with a tall Enter, the last key of the "
              "Caps Lock row; with a wide Enter, the key just above Enter.",
              "both named by position", TEST_STEP_LIST(g_keys_positional) },
+    { false, "top left key",
+             "Press the key below Escape, at the top left.",
+             "named by position", TEST_STEP_NO_KEYS },
     { false, "left modifiers",
              "Press and release Left Control and Left Alt.",
              "both exercised", TEST_STEP_LIST(g_keys_left_mods) },
@@ -238,8 +258,8 @@ static const TestStep g_steps[STEP_COUNT] = {
              "With Num Lock on, press every key of the keypad.",
              "the whole block exercised", TEST_STEP_LIST(g_keys_keypad_all) },
     { false, "lock keys",
-             "Toggle Caps Lock twice, then Num Lock twice, restoring both to their starting state.",
-             "Caps Lock and Num Lock toggled and restored", TEST_STEP_NO_KEYS },
+             TEST_LOCK_KEYS_ACTION,
+             TEST_LOCK_KEYS_DONE, TEST_STEP_NO_KEYS },
 
     { false, "modifiers on mouse",
              "Hold Right Alt, click inside the window, then release it.",
@@ -258,7 +278,8 @@ static const TestStep g_steps[STEP_COUNT] = {
              "Press the dead acute, switch to another application, come back, then press E.",
              "exercised", TEST_STEP_NO_KEYS },
     { false, "emoji",
-             "Insert an emoji with the system character picker.",
+             "Insert an emoji with the system character picker, including a coloured circle "
+             "or square if the picker offers one.",
              "supplementary Unicode scalar observed", TEST_STEP_NO_KEYS },
     { false, "CJK text",
              "Commit a short CJK string with an input method.",
@@ -321,6 +342,9 @@ typedef struct {
     bool               saw_dead_focus_clear;
     bool               composition_kept;
     bool               saw_mouse_mods;
+    bool               grave_step_active;
+    bool               grave_seen_in_step;
+    bool               saw_geometric_shape;
     bool               caps_lock_changed_while_pressed;
     bool               num_lock_changed_while_pressed;
     bool               non_text_key_valid;
@@ -331,7 +355,6 @@ typedef struct {
     bool               focus_loss_seen;
     bool               focus_release_callback;
     bool               focus_reset_pending;
-    bool               focus_sync_pending;
     bool               skipped_required;
     bool               focus_state_cleared;
     bool               focus_returned;
@@ -354,6 +377,7 @@ typedef struct {
     unsigned           error_count;
     unsigned           first_non_ascii;
     unsigned           first_supplementary;
+    unsigned           first_geometric_shape;
     unsigned           first_control;
     uint32_t           first_extra_mods;
     uint32_t           observed_lock_mods;
@@ -540,6 +564,12 @@ lock_state_text(const KeyboardTest *test, uint32_t bit) {
 // keyboard, so a step that says nothing until it is satisfied is a step pressed blindly.
 static void
 report_lock_progress(KeyboardTest *test) {
+    if (TEST_NUM_LOCK_EXISTS == false) {
+        guide("   lock keys: Caps Lock %u toggles, %s",
+              test->caps_lock_transitions, lock_state_text(test, MFB_KB_MOD_CAPS_LOCK));
+        return;
+    }
+
     guide("   lock keys: Caps Lock %u toggles, %s; Num Lock %u toggles, %s",
           test->caps_lock_transitions, lock_state_text(test, MFB_KB_MOD_CAPS_LOCK),
           test->num_lock_transitions, lock_state_text(test, MFB_KB_MOD_NUM_LOCK));
@@ -623,6 +653,7 @@ check_lock_modifiers(KeyboardTest *test, mfb_key key, mfb_key_mod mod,
             }
         }
         else if (key_lock_mod == MFB_KB_MOD_NUM_LOCK &&
+                 TEST_NUM_LOCK_EXISTS == true &&
                  test->num_lock_changed_while_pressed == false) {
             if (TEST_LOCK_MODS_VERIFIABLE == true) {
                 report_error(test, ERROR_LOCK_MODIFIER_STATE,
@@ -784,6 +815,7 @@ evaluate_steps(const KeyboardTest *test, bool *done) {
     done[STEP_POSITIONAL] = (test->press_count[MFB_KB_KEY_WORLD_1] > 0 ||
                              test->press_count[MFB_KB_KEY_WORLD_2] > 0) &&
                             test->press_count[MFB_KB_KEY_BACKSLASH] > 0;
+    done[STEP_GRAVE_ACCENT] = test->grave_seen_in_step;
     done[STEP_DUPLICATED_DIGIT] = test->press_count[MFB_KB_KEY_1] > 0 &&
                                   test->press_count[MFB_KB_KEY_KP_1] > 0;
     done[STEP_DUPLICATED_SLASH] = test->press_count[MFB_KB_KEY_SLASH] > 0 &&
@@ -798,7 +830,8 @@ evaluate_steps(const KeyboardTest *test, bool *done) {
     done[STEP_PAUSE] = test->press_count[MFB_KB_KEY_PAUSE] > 0;
     done[STEP_LOCK_KEYS] = test->lock_step_baseline_known == true &&
                            test->caps_lock_transitions >= 2 &&
-                           test->num_lock_transitions >= 2 &&
+                           (TEST_NUM_LOCK_EXISTS == false ||
+                            test->num_lock_transitions >= 2) &&
                            test->observed_lock_mods == test->lock_step_baseline &&
                            test->expected_keys[MFB_KB_KEY_CAPS_LOCK] == false &&
                            test->expected_keys[MFB_KB_KEY_NUM_LOCK] == false;
@@ -834,7 +867,8 @@ evaluate_steps(const KeyboardTest *test, bool *done) {
     done[STEP_CANCELLED_ACUTE] = test->saw_cancelled_acute_x;
     done[STEP_DEAD_FOCUS] = test->saw_dead_focus_clear || test->composition_kept;
     done[STEP_EMOJI] = test->saw_supplementary;
-    done[STEP_CJK] = test->saw_cjk;
+    // One scalar would pass even on a backend that delivers only the first of a commit.
+    done[STEP_CJK] = test->cjk_count >= 2;
 #endif
 }
 
@@ -857,6 +891,8 @@ pending_step(const KeyboardTest *test) {
 static void
 announce_next_step(KeyboardTest *test) {
     int step = pending_step(test);
+
+    test->grave_step_active = (step == STEP_GRAVE_ACCENT);
 
 #if !TEST_DOS_PLATFORM
     test->dead_focus_active = (step == STEP_DEAD_FOCUS);
@@ -1022,6 +1058,25 @@ check_altgr_companion(KeyboardTest *test, mfb_key key, bool is_pressed, bool is_
     }
 }
 
+// The step needs state of its own. The counters are global and update_progress completes any
+// step it finds satisfied, even one not announced yet, so a key pressed during an earlier step
+// would answer this one too.
+static void
+check_grave_step(KeyboardTest *test, mfb_key key, bool is_pressed, bool is_repeat) {
+    if (test->grave_step_active == false || is_pressed == false || is_repeat == true) {
+        return;
+    }
+
+    if (key == MFB_KB_KEY_GRAVE_ACCENT) {
+        test->grave_seen_in_step = true;
+    }
+    else if (key == MFB_KB_KEY_WORLD_1 || key == MFB_KB_KEY_WORLD_2) {
+        report_error(test, ERROR_GRAVE_KEY_TOKEN,
+                     "the key below Escape reported %s, the token of the key next to left Shift",
+                     key_name_or_unknown(key));
+    }
+}
+
 static void
 keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     KeyboardTest *test = get_test(window);
@@ -1110,6 +1165,7 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
     }
 
     check_altgr_companion(test, key, is_pressed, is_repeat);
+    check_grave_step(test, key, is_pressed, is_repeat);
 
     // A bit the callback history says should be there and is not is a defect. An extra bit
     // is the platform reporting a modifier it never delivered as a key, such as the Control
@@ -1226,6 +1282,15 @@ char_input(struct mfb_window *window, unsigned int codepoint) {
         }
         test->saw_supplementary = true;
     }
+    // The record above accepts any scalar over U+FFFF. This block is narrower on purpose: it
+    // is the one that a backend filtering the function key range with a sixteen bit mask
+    // drops, and no wider record would show that.
+    if (codepoint >= UINT32_C(0x1f700) && codepoint <= UINT32_C(0x1f7ff)) {
+        if (test->saw_geometric_shape == false) {
+            test->first_geometric_shape = codepoint;
+        }
+        test->saw_geometric_shape = true;
+    }
     if (codepoint == UINT32_C(0x00e9) || codepoint == UINT32_C(0x00c9)) {
         test->saw_composed_e_acute = true;
     }
@@ -1301,8 +1366,15 @@ active(struct mfb_window *window, bool is_active) {
     }
     else {
         // The state is taken from the platform when focus returns, with no callbacks, so a
-        // key held across the transition appears in the buffer without any history for it.
-        test->focus_sync_pending = true;
+        // key that moved while the window was away has no history here. It has to be read now
+        // and not at the end of the pump: a key callback later in this same pump compares the
+        // buffer against this expectation.
+        const uint8_t *focus_keys = mfb_get_key_buffer(window);
+        if (focus_keys != NULL) {
+            for (unsigned key = 0; key < TEST_KEY_COUNT; ++key) {
+                test->expected_keys[key] = focus_keys[key] != 0;
+            }
+        }
         test->lock_mods_known = false;
         if (test->focus_loss_seen == true) {
             test->focus_returned = true;
@@ -1370,13 +1442,6 @@ check_after_pump(KeyboardTest *test) {
         report_error(test, ERROR_KEY_BUFFER_NULL,
                      "mfb_get_key_buffer returned NULL after an event pump");
         return;
-    }
-
-    if (test->focus_sync_pending == true) {
-        for (unsigned key = 0; key < TEST_KEY_COUNT; ++key) {
-            test->expected_keys[key] = keys[key] != 0;
-        }
-        test->focus_sync_pending = false;
     }
 
     if (test->focus_reset_pending == true) {
@@ -1527,6 +1592,9 @@ print_summary(const KeyboardTest *test) {
     }
     if (test->saw_supplementary == true) {
         printf("  %-24s first U+%04X\n", "supplementary scalar", test->first_supplementary);
+    }
+    if (test->saw_geometric_shape == true) {
+        printf("  %-24s first U+%04X\n", "U+1F7xx scalar", test->first_geometric_shape);
     }
     if (test->cjk_count > 0) {
         printf("  %-24s %u scalar callback%s\n", "CJK scalars",

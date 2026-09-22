@@ -322,6 +322,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         [NSApp activateIgnoringOtherApps:YES];
         [NSApp finishLaunching];
 
+        // A window can open with a key already held, and no event would ever report it.
+        sync_key_status(window_data);
+
         mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
 #if defined(USE_METAL_API)
@@ -646,7 +649,8 @@ init_keycodes() {
     g_keycodes[0x1E] = MFB_KB_KEY_RIGHT_BRACKET;
     g_keycodes[0x29] = MFB_KB_KEY_SEMICOLON;
     g_keycodes[0x2C] = MFB_KB_KEY_SLASH;
-    g_keycodes[0x0A] = MFB_KB_KEY_WORLD_1;
+    // The key next to left Shift, which every other backend also names WORLD_2.
+    g_keycodes[0x0A] = MFB_KB_KEY_WORLD_2;
 
     g_keycodes[0x33] = MFB_KB_KEY_BACKSPACE;
     g_keycodes[0x39] = MFB_KB_KEY_CAPS_LOCK;

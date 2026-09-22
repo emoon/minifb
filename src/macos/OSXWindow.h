@@ -1,7 +1,11 @@
 #import <Cocoa/Cocoa.h>
 #include <WindowData.h>
 #include <MiniFB_enums.h>
+#include <MiniFB_internal.h>
 
+//-------------------------------------
+// There is no Num Lock on macOS. NSEventModifierFlagNumericPad only says the key belongs to
+// the keypad or is an arrow, which is not a lock and does not belong in the modifier state.
 //-------------------------------------
 static inline uint32_t
 translate_modifiers(NSEventModifierFlags flags) {
@@ -22,12 +26,18 @@ translate_modifiers(NSEventModifierFlags flags) {
     if (flags & NSEventModifierFlagCommand) {
         mod_keys |= MFB_KB_MOD_SUPER;
     }
-    if (flags & NSEventModifierFlagNumericPad) {
-        mod_keys |= MFB_KB_MOD_NUM_LOCK;
-    }
 
     return mod_keys;
 }
+
+//-------------------------------------
+static inline uint32_t
+update_mod_keys(SWindowData *window_data, NSEventModifierFlags flags) {
+    return mfb_recalc_mod_keys(window_data, translate_modifiers(flags));
+}
+
+//-------------------------------------
+void sync_key_status(SWindowData *window_data);
 
 //-------------------------------------
 @interface OSXWindow : NSWindow<NSWindowDelegate>

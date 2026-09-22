@@ -422,7 +422,8 @@ if (IOS)
     )
 
 elseif (MACOS)
-    target_link_libraries(minifb PRIVATE "-framework Cocoa")
+    # Carbon is only here for KBGetLayoutType, which says whether the keyboard is ISO.
+    target_link_libraries(minifb PRIVATE "-framework Cocoa" "-framework Carbon")
 
     if (MINIFB_USE_METAL_API)
         target_link_libraries(minifb PRIVATE

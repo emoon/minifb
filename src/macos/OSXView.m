@@ -153,7 +153,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)mouseDown:(NSEvent *)event {
     if(window_data != 0x0) {
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_1] = true;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_1, window_data->mod_keys, true);
     }
@@ -162,7 +162,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)mouseUp:(NSEvent *)event {
     if(window_data != 0x0) {
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_1] = false;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_1, window_data->mod_keys, false);
         settle_mouse_inside(window_data, self, event);
@@ -172,7 +172,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)rightMouseDown:(NSEvent *)event {
     if(window_data != 0x0) {
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_2] = true;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_2, window_data->mod_keys, true);
     }
@@ -181,7 +181,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 //-------------------------------------
 - (void)rightMouseUp:(NSEvent *)event {
     if(window_data != 0x0) {
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[MFB_MOUSE_BTN_2] = false;
         kCall(mouse_btn_func, MFB_MOUSE_BTN_2, window_data->mod_keys, false);
         settle_mouse_inside(window_data, self, event);
@@ -198,7 +198,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
             return;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[mapped_button] = true;
         kCall(mouse_btn_func, button, window_data->mod_keys, true);
     }
@@ -214,7 +214,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
             return;
         }
         mfb_mouse_button button = (mfb_mouse_button) mapped_button;
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_button_status[mapped_button] = false;
         kCall(mouse_btn_func, button, window_data->mod_keys, false);
         settle_mouse_inside(window_data, self, event);
@@ -242,7 +242,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
             delta_y = delta_y > 0.0 ? ceil(delta_y) : floor(delta_y);
         }
 
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         window_data->mouse_wheel_x = delta_x;
         window_data->mouse_wheel_y = delta_y;
         kCall(mouse_wheel_func, window_data->mod_keys, window_data->mouse_wheel_x, window_data->mouse_wheel_y);
@@ -268,7 +268,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 - (void)mouseMoved:(NSEvent *)event {
     if(window_data != 0x0) {
         NSPoint point = [event locationInWindow];
-        window_data->mod_keys = translate_modifiers([event modifierFlags]);
+        update_mod_keys(window_data, [event modifierFlags]);
         //NSPoint localPoint = [self convertPoint:point fromView:nil];
         window_data->mouse_pos_x = point.x;
 #if defined(USE_INVERTED_Y_ON_MACOS)
@@ -418,30 +418,32 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
     kUnused(replacementRange);
 
     if(window_data != 0x0) {
-        NSString    *characters;
-        NSUInteger  codepoint;
+        NSString *characters;
 
         if ([string isKindOfClass:[NSAttributedString class]])
             characters = [string string];
         else
             characters = (NSString *) string;
 
-        NSRange range = NSMakeRange(0, [characters length]);
-        while (range.length) {
-            codepoint = 0;
-            if ([characters getBytes:&codepoint
-                       maxLength:sizeof(codepoint)
-                      usedLength:NULL
-                        encoding:NSUTF32StringEncoding // NSUTF8StringEncoding
-                         options:0
-                           range:range
-                  remainingRange:&range]) {
+        NSUInteger length = [characters length];
+        for (NSUInteger i = 0; i < length; ++i) {
+            uint32_t codepoint = [characters characterAtIndex:i];
 
-                if ((codepoint & 0xff00) == 0xf700)
-                    continue;
-
-                kCall(char_input_func, codepoint);
+            if (codepoint >= 0xd800 && codepoint <= 0xdbff && i + 1 < length) {
+                uint32_t low_surrogate = [characters characterAtIndex:i + 1];
+                if (low_surrogate >= 0xdc00 && low_surrogate <= 0xdfff) {
+                    codepoint = 0x10000 + ((codepoint - 0xd800) << 10) + (low_surrogate - 0xdc00);
+                    ++i;
+                }
             }
+
+            // AppKit gives a function key a code point of its own private use area instead
+            // of text.
+            if (codepoint >= 0xf700 && codepoint <= 0xf7ff) {
+                continue;
+            }
+
+            mfb_dispatch_char_input(window_data, codepoint);
         }
     }
 }
