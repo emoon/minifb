@@ -4,18 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-Mouse and keyboard input now follow one contract on every backend. The same action produces the same callbacks, in the same order, with the same arguments and modifiers, so code tested on one platform behaves the same on the others. The few differences that remain come from the platform, such as AltGr on native Windows. Two interactive tests, `tests/mouse_events.c` and `tests/keyboard_events.c`, check the contract on any backend. A third one, `tests/window_events.c`, does the same for the active, resize and close callbacks.
+## [0.14.0]
+
+This release adds a callback for the cursor entering and leaving the window. Adding it to every backend showed that the backends did not report mouse and keyboard input in the same way, so this release also fixes that. Mouse and keyboard input now follow one contract on every backend. The same action produces the same callbacks, in the same order, with the same arguments and modifiers, so code tested on one platform behaves the same on the others. The few differences that remain come from the platform, such as AltGr on native Windows. Two interactive tests, `tests/mouse_events.c` and `tests/keyboard_events.c`, check the contract on any backend. A third one, `tests/window_events.c`, does the same for the active, resize and close callbacks.
 
 ### Added
 
 - **Color channel macros**: `MFB_GET_A`, `MFB_GET_R`, `MFB_GET_G` and `MFB_GET_B` read one channel from a pixel. They follow the same platform layout as `MFB_ARGB`, so they also work on Android ([#142](https://github.com/emoon/minifb/pull/142), by @cannedbeef).
-- **Cursor enter and leave**: `mfb_set_mouse_enter_callback` reports the cursor entering or leaving the window content area, and `mfb_is_mouse_inside` returns the same state. It fires only on a real crossing, and while a button is held the window keeps the pointer, so dragging out reports no leave until the button is released. Android needs a mouse, trackpad or hover capable stylus. iOS and DOS never fire it, but on DOS `mfb_is_mouse_inside` is true when a mouse driver is present.
+- **Cursor enter and leave**: `mfb_set_mouse_enter_callback` reports the cursor entering or leaving the window content area, and `mfb_is_mouse_inside` returns the same state. It fires only on a real crossing, and while a button is held the window keeps the pointer, so dragging out reports no leave until the button is released. Android needs a mouse, trackpad or hover capable stylus. iOS and DOS never fire it, but on DOS `mfb_is_mouse_inside` is true when a mouse driver is present. The C++ wrapper has the same callback, for a `std::function` and for a member function.
 - **Web `MFB_WF_RESIZABLE`**: the canvas follows its CSS layout box scaled by `devicePixelRatio`, so the page must give it a relative size. Without the flag the drawing buffer stays pinned to the framebuffer size, as before.
 - **DOS mouse wheel**: the wheel is read from the mouse driver through the CuteMouse API, so `mfb_set_mouse_scroll_callback` works there without giving up the arrow keys.
 - **X11 text input through xkbcommon**: dead keys and Compose sequences now come from the system Compose file, the same source the Wayland backend uses, instead of a built-in table that only knew five accents over Latin-1 vowels. The library is optional and found with `pkg-config`. `-DMINIFB_X11_USE_IME=ON` puts an X11 input method (XIM) in front of it, and without xkbcommon that input method is used on its own, as before.
 - **Web text input through a hidden text field**: dead keys, input method composition and characters outside the Basic Multilingual Plane now reach `mfb_set_char_input_callback`.
 - Three interactive tests, `tests/mouse_events.c`, `tests/keyboard_events.c` and `tests/window_events.c`, that walk a person through the mouse, keyboard and window event contracts and end with a summary meant to be compared between backends with `diff`.
-- Two testing documents: `docs/testing-x11.md`, on testing how X11 names keys on a server that does not number them the evdev way, without needing such a server, and `docs/testing-dos.md`, on running the interactive tests under DOSBox-x.
+- Two testing documents: `docs/testing-x11.md`, on testing how X11 names keys on a server that does not number them the evdev way, without needing such a server, and `docs/testing-dos.md`, on running the interactive tests under DOSBox-x. The Wayland testing document is now `docs/testing-wayland.md`, next to them.
 
 ### Changed
 
@@ -101,6 +103,8 @@ Macros:
 
 Build:
 
+- The Web examples build again when the build directory is outside the source tree. Each example's HTML page is also copied again whenever it changes, not only when the example is rebuilt.
+- The new `MINIFB_BUILD_TESTS` option builds the interactive tests. It is on by default, so a project that adds MiniFB with `add_subdirectory` builds them too unless it sets the option to `OFF`.
 - GCC builds are warning free again. Casting the result of `GetProcAddress` and `wglGetProcAddress` to a concrete signature trips `-Wcast-function-type`. The casts now go through `void (*)(void)`, as GLFW and SDL do.
 - macOS links the Carbon framework as well as Cocoa, only to ask whether the keyboard is ISO. A build that does not use the CMake project has to add `-framework Carbon`.
 - The DJGPP build names its executables so they fit the DOS 8.3 limit: `keyevent.exe`, `mouseevt.exe`, `inpevent.exe` and so on. The CMake target names do not change, and `docs/testing-dos.md` lists them all.
@@ -295,7 +299,8 @@ git fetch origin --tags --force
 - The project has been available on GitHub since 2014.
 - Changes before version 0.9.0 were not tracked with formal release versions.
 
-[Unreleased]: https://github.com/emoon/minifb/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/emoon/minifb/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/emoon/minifb/releases/tag/v0.14.0
 [0.13.0]: https://github.com/emoon/minifb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/emoon/minifb/releases/tag/v0.12.0
 [0.11.0]: https://github.com/emoon/minifb/releases/tag/v0.11.0
