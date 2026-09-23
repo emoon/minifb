@@ -166,7 +166,7 @@ void active(struct mfb_window *window, bool is_active) {
 }
 
 void resize(struct mfb_window *window, int width, int height) {
-    // Called when window is resized (width/height use the same drawable units as mfb_set_viewport)
+    // Called when the window size changes (width/height use the same drawable units as mfb_set_viewport)
     // Optionally adjust viewport:
     // mfb_set_viewport(window, x, y, width, height);
 }
@@ -177,7 +177,7 @@ bool close(struct mfb_window *window) {
 }
 
 void keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
-    if (key == KB_KEY_ESCAPE) {
+    if (key == MFB_KB_KEY_ESCAPE) {
         mfb_close(window);
     }
 }
@@ -205,7 +205,13 @@ void mouse_enter(struct mfb_window *window, bool is_inside) {
 
 The keyboard callback and the text callback report different things. `keyboard` reports a physical key going down or up, and `char_input` reports the text that key produced. Control characters, DEL and lone surrogates are never text, so Enter, Tab and Backspace reach `keyboard` only. When a key does produce text, the key is reported first and the text right after.
 
-When a window loses the focus, MiniFB releases every key still held, one `keyboard` callback each, and those callbacks carry only the lock keys in `mod`. The real release goes to whatever window took the focus, so without this an application that tracks state from callbacks would keep the key held for ever.
+When a window loses the focus, MiniFB releases every key still held, one `keyboard` callback each, and those callbacks carry only the lock keys in `mod`. The real release goes to whatever window took the focus, so without this an application that tracks state from callbacks would keep the key held forever.
+
+AltGr is one key on every backend except native Windows. Windows presses a left Control of its own for it, and MiniFB reports that Control too, so AltGr arrives as `MFB_KB_KEY_LEFT_CONTROL` followed by `MFB_KB_KEY_RIGHT_ALT`, and `mod` has both `MFB_KB_MOD_CONTROL` and `MFB_KB_MOD_ALT`. The Web backend reports one key under every host system.
+
+The `resize` callback reports a new size only. Moving the window does not call it, and neither does restoring a minimized window at the size it already had.
+
+The `close` callback answers a close request from the user: the window close button, or Escape when the default keyboard callback is in use. Return `false` to keep the window open. `mfb_close` closes the window without calling it. Web has no close request, so there the callback is never called.
 
 #### C++ Callback Interface
 

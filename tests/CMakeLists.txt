@@ -32,8 +32,26 @@ minifb_set_dos_name(keyboard_events_test keyevent)
 
 set_property(TARGET keyboard_events_test PROPERTY FOLDER "Tests")
 
+set(minifb_interactive_tests mouse_events_test keyboard_events_test)
+
+# DOS has no window to focus, resize or close.
+if (NOT DJGPP)
+    add_executable(window_events_test
+        window_events.c
+    )
+    target_link_libraries(window_events_test
+    PRIVATE
+        minifb
+    )
+    minifb_configure_target(window_events_test)
+
+    set_property(TARGET window_events_test PROPERTY FOLDER "Tests")
+
+    list(APPEND minifb_interactive_tests window_events_test)
+endif()
+
 if (EMSCRIPTEN)
-    foreach(test_target IN ITEMS mouse_events_test keyboard_events_test)
+    foreach(test_target IN LISTS minifb_interactive_tests)
         target_link_options(${test_target} PRIVATE
             "-sEXPORT_NAME=${test_target}"
             "-sSTRICT=1"

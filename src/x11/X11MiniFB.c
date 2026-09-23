@@ -302,6 +302,11 @@ process_event(SWindowData *window_data, XEvent *event, bool filtered) {
 
         case ConfigureNotify:
         {
+            // X11 also sends this event when the window only moves, and a window manager sends
+            // its own copy of every real resize.
+            bool size_changed = window_data->window_width  != (uint32_t) event->xconfigure.width ||
+                                window_data->window_height != (uint32_t) event->xconfigure.height;
+
             window_data->window_width  = event->xconfigure.width;
             window_data->window_height = event->xconfigure.height;
             resize_dst(window_data, event->xconfigure.width, event->xconfigure.height);
@@ -319,7 +324,9 @@ process_event(SWindowData *window_data, XEvent *event, bool filtered) {
             }
             XClearWindow(window_data_specific->display, window_data_specific->window);
 #endif
-            kCall(resize_func, window_data->window_width, window_data->window_height);
+            if (size_changed == true) {
+                kCall(resize_func, window_data->window_width, window_data->window_height);
+            }
         }
         break;
 

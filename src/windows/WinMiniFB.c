@@ -154,8 +154,18 @@ get_error_message() {
 }
 
 //-------------------------------------
+// Windows lets a process set its DPI awareness only once, by the first call or by the
+// executable manifest, and refuses every later attempt with an access denied error.
+//-------------------------------------
 void
 dpi_aware() {
+    static bool dpi_awareness_requested = false;
+
+    if (dpi_awareness_requested == true) {
+        return;
+    }
+    dpi_awareness_requested = true;
+
     if (mfb_SetProcessDpiAwarenessContext != NULL) {
         if (mfb_SetProcessDpiAwarenessContext(MFB_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == false) {
             uint32_t error = GetLastError();
@@ -165,13 +175,20 @@ dpi_aware() {
                     error = GetLastError();
                 }
             }
-            if (error != NO_ERROR) {
+            if (error == ERROR_ACCESS_DENIED) {
+                MFB_LOG(MFB_LOG_INFO, "DPI awareness was not changed; it is probably already set by the application manifest or by an earlier call.");
+            }
+            else if (error != NO_ERROR) {
                 MFB_LOG(MFB_LOG_WARNING, "SetProcessDpiAwarenessContext failed: %s", get_error_message());
             }
         }
     }
     else if (mfb_SetProcessDpiAwareness != NULL) {
-        if (mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE) != S_OK) {
+        HRESULT result = mfb_SetProcessDpiAwareness(mfb_PROCESS_PER_MONITOR_DPI_AWARE);
+        if (result == E_ACCESSDENIED) {
+            MFB_LOG(MFB_LOG_INFO, "DPI awareness was not changed; it is probably already set by the application manifest or by an earlier call.");
+        }
+        else if (result != S_OK) {
             MFB_LOG(MFB_LOG_WARNING, "SetProcessDpiAwareness failed: %s", get_error_message());
         }
     }
@@ -672,6 +689,10 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     return res;
                 }
 
+                // Restoring a minimized window sends WM_SIZE with the size it already had.
+                bool size_changed = window_data->window_width  != LOWORD(lParam) ||
+                                    window_data->window_height != HIWORD(lParam);
+
                 window_data->window_width  = LOWORD(lParam);
                 window_data->window_height = HIWORD(lParam);
                 resize_dst(window_data, window_data->window_width, window_data->window_height);
@@ -683,7 +704,8 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #else
                 resize_GL(window_data);
 #endif
-                if (window_data->window_width != 0 && window_data->window_height != 0) {
+                if (size_changed == true &&
+                    window_data->window_width != 0 && window_data->window_height != 0) {
                     MFB_LOG(MFB_LOG_DEBUG, "WM_SIZE: window=%ux%u framebuffer=%ux%u",
                             window_data->window_width, window_data->window_height,
                             window_data->buffer_width, window_data->buffer_height);

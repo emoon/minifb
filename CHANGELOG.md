@@ -4,25 +4,33 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+Mouse and keyboard input now follow one contract on every backend. The same action produces the same callbacks, in the same order, with the same arguments and modifiers, so code tested on one platform behaves the same on the others. The few differences that remain come from the platform, such as AltGr on native Windows. Two interactive tests, `tests/mouse_events.c` and `tests/keyboard_events.c`, check the contract on any backend. A third one, `tests/window_events.c`, does the same for the active, resize and close callbacks.
+
 ### Added
 
+- **Color channel macros**: `MFB_GET_A`, `MFB_GET_R`, `MFB_GET_G` and `MFB_GET_B` read one channel from a pixel. They follow the same platform layout as `MFB_ARGB`, so they also work on Android ([#142](https://github.com/emoon/minifb/pull/142), by @cannedbeef).
 - **Cursor enter and leave**: `mfb_set_mouse_enter_callback` reports the cursor entering or leaving the window content area, and `mfb_is_mouse_inside` returns the same state. It fires only on a real crossing, and while a button is held the window keeps the pointer, so dragging out reports no leave until the button is released. Android needs a mouse, trackpad or hover capable stylus. iOS and DOS never fire it, but on DOS `mfb_is_mouse_inside` is true when a mouse driver is present.
 - **Web `MFB_WF_RESIZABLE`**: the canvas follows its CSS layout box scaled by `devicePixelRatio`, so the page must give it a relative size. Without the flag the drawing buffer stays pinned to the framebuffer size, as before.
 - **DOS mouse wheel**: the wheel is read from the mouse driver through the CuteMouse API, so `mfb_set_mouse_scroll_callback` works there without giving up the arrow keys.
 - **X11 text input through xkbcommon**: dead keys and Compose sequences now come from the system Compose file, the same source the Wayland backend uses, instead of a built-in table that only knew five accents over Latin-1 vowels. The library is optional and found with `pkg-config`. `-DMINIFB_X11_USE_IME=ON` puts an X11 input method (XIM) in front of it, and without xkbcommon that input method is used on its own, as before.
 - **Web text input through a hidden text field**: dead keys, input method composition and characters outside the Basic Multilingual Plane now reach `mfb_set_char_input_callback`.
-- Two interactive tests, `tests/mouse_events.c` and `tests/keyboard_events.c`, that walk a person through the mouse and keyboard contracts and end with a summary meant to be compared between backends with `diff`.
-- Two testing documents: `docs/testing-x11.md`, on exercising the X11 key naming fallback without hunting for an unusual server, and `docs/testing-dos.md`, on running the interactive tests under DOSBox-x.
+- Three interactive tests, `tests/mouse_events.c`, `tests/keyboard_events.c` and `tests/window_events.c`, that walk a person through the mouse, keyboard and window event contracts and end with a summary meant to be compared between backends with `diff`.
+- Two testing documents: `docs/testing-x11.md`, on testing how X11 names keys on a server that does not number them the evdev way, without needing such a server, and `docs/testing-dos.md`, on running the interactive tests under DOSBox-x.
 
 ### Changed
 
-- **Frame pacing on Web and DOS**: `mfb_wait_sync` honours the target frame rate on both, as every other backend does. DOS returned as soon as it had pumped events and Web yielded to the browser once, so `mfb_set_target_fps` did nothing on either. Call `mfb_set_target_fps(0)` to get the old free running behaviour back.
-- **Android external mouse buttons**: a mouse click reported the touch pointer id, always `0`, in the `button` argument. It now reports the real button, like the desktop backends. The device moves to the packed pointer id: a mouse or hovering stylus reports the new `MFB_POINTER_ID_MOUSE`, a finger a lower id. Touch is unchanged.
+- **`MFB_RGB` sets the alpha channel to `0xFF`**: it is now `MFB_ARGB(0xFF, r, g, b)`, and it left alpha at `0` before. Code that compares pixels with a raw value such as `0x00FF0000` has to include the alpha byte ([#142](https://github.com/emoon/minifb/pull/142), by @cannedbeef).
+- **Frame pacing on Web and DOS**: `mfb_wait_sync` honours the target frame rate on both, as every other backend does. DOS returned as soon as it had pumped events and Web yielded to the browser once, so `mfb_set_target_fps` did nothing on either. Call `mfb_set_target_fps(0)` to go back to the old behaviour, with no frame limit.
+- **Android external mouse buttons**: a mouse click reported the touch pointer id, always `0`, in the `button` argument. It now reports the real button, like the desktop backends. The packed pointer id now says which device it was: a mouse or a hovering stylus reports the new `MFB_POINTER_ID_MOUSE`, and a finger reports a lower id. Touch is unchanged.
 - **DOS keypad keys**: with Num Lock off the keypad reports Home, the arrows, Page Up and the rest, which is what a program written for DOS expects; with Num Lock on it reports the keypad keys. Define `MINIFB_DOS_KEYPAD_POSITIONAL` to always report the physical keypad key, as the other backends do.
+- **Windows AltGr**: Windows presses a left Control of its own for AltGr, and MiniFB now always reports it. AltGr arrives as `MFB_KB_KEY_LEFT_CONTROL` followed by `MFB_KB_KEY_RIGHT_ALT`. MiniFB used to hide that Control by checking whether the Alt message was already in the queue, but the answer depended on timing: the same keystroke reported one key on some runs and two on others, and a Control release could arrive with no press. Every other backend, Web included, reports AltGr as one key.
+- **macOS key next to left Shift**: it reports `MFB_KB_KEY_WORLD_2` instead of `MFB_KB_KEY_WORLD_1`, like every other backend.
+- **macOS Num Lock bit**: `MFB_KB_MOD_NUM_LOCK` is never set. macOS has no Num Lock, and the flag MiniFB read only says that a key is on the keypad or is an arrow. The keypad Clear key still reports `MFB_KB_KEY_NUM_LOCK`.
+- **macOS Caps Lock**: each toggle reports a press followed by a release, as on the other backends. Before, turning the lock on reported a press and turning it off reported a release.
 
 ### Fixed
 
-The mouse contract is the same on every backend now. Each row is what an application used to receive:
+Mouse, where each row is what an application used to receive:
 
 | Backend | Divergence |
 | --- | --- |
@@ -32,17 +40,17 @@ The mouse contract is the same on every backend now. Each row is what an applica
 | Android | The horizontal wheel axis with the opposite sign, for the same reason |
 | Web, Wayland, Android, macOS | A scroll callback with both axes at zero, from a kinetic scroll ending or a trackpad gesture only changing phase |
 
-The keyboard contract is the same everywhere too:
+Keyboard:
 
 | Area | What changed |
 | --- | --- |
-| Modifiers | They are built from both sources, the keys held and what the platform reports. Releasing one Shift while the other was held reported no Shift, and AltGr reported no Alt on the layouts where the system does not count it as one |
-| Losing the focus | Every key still held is released, one callback each, leaving only the locks in the modifiers. The real release goes to whatever window took the focus and never arrives, so an application that tracked state from callbacks kept the key held for ever. Only Wayland did this before |
-| Gaining the focus | Windows and X11 rebuild the key buffer from the keyboard itself, so a key pressed while another window had the focus is in it. X11 also does this when the window opens |
+| Modifiers | They are built from both sources, the keys held and what the platform reports. Releasing one Shift while the other was held reported no Shift, and AltGr reported no Alt on the layouts where the system does not count it as one. Mouse button and wheel callbacks carry the same modifiers as the keyboard callback |
+| Losing the focus | Every key still held is released, one callback each, leaving only the locks in the modifiers. The real release goes to whatever window took the focus and never arrives, so an application that tracked state from callbacks kept the key held forever. Only Wayland did this before |
+| Gaining the focus | Windows, X11 and macOS rebuild the key buffer from the keyboard itself, so a key pressed while another window had the focus is in it. X11 and macOS also do this when the window opens. Windows also reads the locks again, so a lock toggled in another window shows in the modifiers |
 | Callback order | The physical key is reported before the character it produces. Wayland had the two the other way round |
 | Text callback | Control characters, DEL, the C1 range and lone surrogates no longer reach `mfb_set_char_input_callback`. On Windows, Enter, Tab and Backspace arrived there as `\r`, `\t` and `\b`. Those keys are still reported by the keyboard callback |
 
-Two more that affect every backend:
+Every backend:
 
 - **The window title is UTF-8.** A title that is not valid UTF-8 is now reported once in the log and its non-ASCII bytes dropped, instead of mojibake on Windows, no title at all on macOS, and a protocol error that closes the connection on Wayland. Windows creates a Unicode window now, so a valid non-ASCII title shows correctly, and X11 also sets `_NET_WM_NAME` for current window managers.
 - **Frame pacing could stop for good.** Elapsed time was measured with an unsigned subtraction, and the compensated reset at the end of a frame can leave the start of the next one in the future. One frame that ran long then measured as almost 2^64 ticks, and every frame after it skipped its wait.
@@ -51,25 +59,32 @@ Per backend:
 
 | Backend | Fix |
 | --- | --- |
-| Windows | A mouse button released outside the window is delivered; dragging out used to leave it marked as held for ever |
-| Windows | AltGr no longer leaks a left Control release that the application never saw pressed |
+| Windows | A mouse button released outside the window is delivered; dragging out used to leave it marked as held forever |
 | Windows | Shift and the Windows key no longer stay held when the system swallows their key up, as it does after Win+V |
 | Windows | Print Screen reports a press; Windows only sends the key up for it |
 | Windows | Text outside ASCII arrives whole, because the window and its message loop are Unicode now |
 | Windows | Closing a window with the cursor hidden no longer leaves the cursor hidden |
 | Windows | A null backend window state could be dereferenced in `WM_MOUSEMOVE` and `WM_SIZE` |
+| Windows | Restoring a minimized window no longer calls the resize callback with the size it already had |
+| Windows | Opening a window after closing all the others no longer logs a DPI awareness warning. If the DPI awareness was already set, for example in the application manifest, MiniFB now says so at INFO level instead of warning |
 | macOS | One wheel notch reports the same amount as elsewhere; `NSEvent` gives a fraction of a line per notch, a tenth of one on some devices. Trackpad deltas are unchanged |
+| macOS | Left and right modifiers are tracked separately. Releasing one Shift, Control, Option or Command while the other side was held reported nothing, and that key stayed held |
+| macOS | On an ISO keyboard, the key below Escape and the key next to left Shift are no longer swapped |
+| macOS | Text outside the Basic Multilingual Plane arrives as one code point. Code points such as `U+1F7E0` were dropped, because their low 16 bits looked like a function key |
+| macOS | Text committed several characters at a time, as an input method does, arrives one callback per character; they were read two at a time into a single value |
+| macOS | A key up for a key that losing the focus already released is no longer delivered a second time |
 | X11 | A key is named by where it is on the servers that number keys the evdev way, every current Xorg and Xwayland, so a Dvorak or AZERTY layout no longer moves the letters. Other servers keep naming a key after the keysym it produces, and `MINIFB_X11_DISABLE_EVDEV_KEYCODES` forces that fallback |
 | X11 | Auto-repeat no longer arrives as a release followed by a press |
 | X11 | Caps Lock and Num Lock report the state they leave behind, not the previous one |
 | X11 | A grab, from the window menu, alt-tab or dragging the window, is no longer reported as a focus change |
 | X11 | Entering the window at the end of another application's drag is reported; `mfb_is_mouse_inside` stayed false until the pointer left and came back |
+| X11 | Moving the window no longer calls the resize callback, and a real resize calls it once instead of twice |
 | Wayland | Losing the pointer releases the held buttons before reporting the leave, not after |
 | Web | The getters match the callback being delivered, because the state travels with each queued event |
 | Web | The active callback follows the real keyboard focus, which is also what decides whether keys reach the window |
 | Web | A key or mouse release with no press behind it is no longer delivered |
 | Web | A modifier release the browser reports without a key code is recovered; on Windows it reports no code at all once both Shift keys are down |
-| Web | AltGr arrives as one key, as on the Windows backend |
+| Web | AltGr arrives as one key on every host system. A browser under Windows also sends the Control that Windows presses for AltGr, and Web drops it |
 | Web | `IntlBackslash`, the key between the left Shift and Z, was missing from the key map |
 | iOS | Multi-touch works; `UIView` defaults `multipleTouchEnabled` to `NO`, so UIKit delivered one contact at a time |
 | DOS | The arrow keys work; extended Up and Down were always turned into wheel scroll, which now needs `MINIFB_DOS_WHEEL_FROM_ARROW_KEYS` |
@@ -79,9 +94,15 @@ Per backend:
 | DOS | A scancode with no token produces no keyboard callback; its text, when it has any, is still delivered |
 | DOS | The mouse position is reported in window units; VESA can pick a mode twice the size the application asked for |
 
+Macros:
+
+- **Android big-endian color layout**: `MFB_RGB` and `MFB_ARGB` put the channels in the order the Android documentation gives. Before, big-endian builds used the desktop layout ([#142](https://github.com/emoon/minifb/pull/142), by @cannedbeef).
+- `MiniFB_macros.h` defines each color macro once, from one set of channel shifts, instead of one copy per platform ([#143](https://github.com/emoon/minifb/pull/143), by @cannedbeef).
+
 Build:
 
 - GCC builds are warning free again. Casting the result of `GetProcAddress` and `wglGetProcAddress` to a concrete signature trips `-Wcast-function-type`. The casts now go through `void (*)(void)`, as GLFW and SDL do.
+- macOS links the Carbon framework as well as Cocoa, only to ask whether the keyboard is ISO. A build that does not use the CMake project has to add `-framework Carbon`.
 - The DJGPP build names its executables so they fit the DOS 8.3 limit: `keyevent.exe`, `mouseevt.exe`, `inpevent.exe` and so on. The CMake target names do not change, and `docs/testing-dos.md` lists them all.
 
 ## [0.13.0]
