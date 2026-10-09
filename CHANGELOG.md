@@ -12,6 +12,7 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - Every backend now releases a window through the same shared code, also when `mfb_open_ex` fails halfway, so a resource added to the shared window data is released everywhere.
+- macOS: the backend also builds with ARC (`-fobjc-arc`). It still uses manual reference counting by default.
 
 ### Fixed
 
@@ -19,6 +20,7 @@ All notable changes to this project are documented in this file.
 - GCC older than 9 failed to compile MiniFB as C. Those versions also define `__has_cpp_attribute` in C, so `MFB_DEPRECATED` and `MFB_ENUM_DEPRECATED` expanded to the C++ `[[deprecated]]` attribute. They now check `__cplusplus` first.
 - DOS: when `mfb_open_ex` could not allocate the scale buffer or the scanline buffer, it leaked the frame timer, and in the first case the scanline buffer too.
 - Android: the CMake files of the example and test projects did not list `src/MiniFB_utf8.c`, so they failed to link.
+- macOS and iOS with Metal: every window leaked its frame semaphore when it closed. The semaphore can only be released once the GPU has finished the frames still in flight, or libdispatch aborts, so closing a window now waits for them, at most one second per frame.
 
 ## [0.14.0]
 

@@ -61,6 +61,27 @@ NSString *g_shader_src = kShader(
 );
 
 //-------------------------------------
+// A frame still on the GPU signals the semaphore when it completes. Freeing the semaphore before
+// that makes libdispatch abort, and the late signal would write to freed memory, so wait for
+// those frames. Returns false if the GPU does not finish them in time.
+//-------------------------------------
+static bool
+wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
+    long acquired = 0;
+    while (acquired < MaxBuffersInFlight &&
+           dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC)) == 0) {
+        ++acquired;
+    }
+
+    // libdispatch also aborts when the value ends below the one the semaphore was created with.
+    for (long i = 0; i < acquired; ++i) {
+        dispatch_semaphore_signal(semaphore);
+    }
+
+    return acquired == MaxBuffersInFlight;
+}
+
+//-------------------------------------
 @implementation OSXViewDelegate
 
 //-------------------------------------
@@ -348,6 +369,11 @@ NSString *g_shader_src = kShader(
 
 //-------------------------------------
 - (void)dealloc {
+    bool frames_done = (semaphore == nil || wait_for_frames_in_flight(semaphore) == true);
+    if (frames_done == false) {
+        MFB_LOG(MFB_LOG_WARNING, "OSXViewDelegate: the GPU did not finish its frames in time, so the frame semaphore is kept.");
+    }
+
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
         MFB_OBJC_RELEASE(texture_buffers[i]);
         texture_buffers[i] = nil;
@@ -367,7 +393,7 @@ NSString *g_shader_src = kShader(
 
     // Under ARC, dispatch objects are Objective-C objects and ARC releases them.
 #if !(__has_feature(objc_arc) && OS_OBJECT_USE_OBJC)
-    if (semaphore) {
+    if (semaphore != nil && frames_done == true) {
         dispatch_release(semaphore);
     }
 #endif
