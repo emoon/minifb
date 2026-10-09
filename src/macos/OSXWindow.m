@@ -226,7 +226,9 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
 {
     [[NSNotificationCenter defaultCenter]
         removeObserver:self];
+#if !__has_feature(objc_arc)
     [super dealloc];
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -357,7 +359,7 @@ set_frame_view_window_data(NSView *frame_view, SWindowData *window_data) {
     OSXView *frameView = [super contentView];
     if (!frameView)
     {
-        frameView = [[[OSXView alloc] initWithFrame:bounds] autorelease];
+        frameView = MFB_OBJC_AUTORELEASE([[OSXView alloc] initWithFrame:bounds]);
         frameView->window_data = self->window_data;
 
         [super setContentView:frameView];

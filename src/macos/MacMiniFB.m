@@ -51,13 +51,13 @@ destroy_window_data(SWindowData *window_data) {
                 [window removeWindowData];
                 [window setDelegate:nil];
                 [window close];
-                [window release];
+                MFB_OBJC_RELEASE(window);
                 window_data_specific->window = nil;
             }
 
 #if defined(USE_METAL_API)
             if (window_data_specific->viewController != nil) {
-                [window_data_specific->viewController release];
+                MFB_OBJC_RELEASE(window_data_specific->viewController);
                 window_data_specific->viewController = nil;
             }
 #endif
@@ -87,13 +87,14 @@ create_window_data(unsigned width, unsigned height) {
     }
     memset(window_data, 0, sizeof(SWindowData));
 
-    SWindowData_OSX *window_data_specific = malloc(sizeof(SWindowData_OSX));
+    // calloc rather than malloc and memset: under ARC the struct holds object pointers, and
+    // clang warns about memset on such a struct.
+    SWindowData_OSX *window_data_specific = calloc(1, sizeof(SWindowData_OSX));
     if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData_OSX.");
         destroy_window_data(window_data);
         return NULL;
     }
-    memset(window_data_specific, 0, sizeof(SWindowData_OSX));
 
     window_data->specific = window_data_specific;
 
@@ -269,14 +270,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         view.device   = window_data_specific->viewController->metal_device;
         if (view.device == nil) {
             MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: MTKView has no Metal device.");
-            [view release];
+            MFB_OBJC_RELEASE(view);
             destroy_window_data(window_data);
             return NULL;
         }
         view.delegate = window_data_specific->viewController;
         view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         [window_data_specific->window.contentView addSubview:view];
-        [view release];
+        MFB_OBJC_RELEASE(view);
 
         //[window_data->window updateSize];
     #endif

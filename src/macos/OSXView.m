@@ -33,7 +33,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 - (void)updateTrackingAreas {
     if(tracking_area != nil) {
         [self removeTrackingArea:tracking_area];
-        [tracking_area release];
+        MFB_OBJC_RELEASE(tracking_area);
         tracking_area = nil;
     }
 
@@ -342,7 +342,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
         [img unlockFocus];
 
         invisible_cursor = [[NSCursor alloc] initWithImage:img hotSpot:NSMakePoint(0,0)];
-        [img release];
+        MFB_OBJC_RELEASE(img);
     }
 
     if (window_data != 0x0 && window_data->is_cursor_visible == false) {
@@ -381,11 +381,13 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
 - (void)dealloc {
     if (tracking_area != nil) {
         [self removeTrackingArea:tracking_area];
-        [tracking_area release];
+        MFB_OBJC_RELEASE(tracking_area);
         tracking_area = nil;
     }
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+#if !__has_feature(objc_arc)
     [super dealloc];
+#endif
 }
 
 #pragma mark NSTextInputClient

@@ -443,14 +443,17 @@ build_viewport_vertices(const SWindowData *window_data, Vertex out_vertices[4]) 
 
     [metal_library release];
     metal_library = nil;
+#endif
 
-  #if !OS_OBJECT_USE_OBJC
+    // Under ARC, dispatch objects are Objective-C objects and ARC releases them.
+#if !(__has_feature(objc_arc) && OS_OBJECT_USE_OBJC)
     if (semaphore) {
         dispatch_release(semaphore);
     }
-  #endif
+#endif
     semaphore = nil;
 
+#if !__has_feature(objc_arc)
     [super dealloc];
 #endif
 }

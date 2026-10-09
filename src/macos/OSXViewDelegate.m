@@ -79,7 +79,7 @@ NSString *g_shader_src = kShader(
         metal_device = MTLCreateSystemDefaultDevice();
         if (!metal_device) {
             MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: Metal is not supported on this device.");
-            [self release];
+            MFB_OBJC_RELEASE(self);
             return nil;
         }
 
@@ -87,7 +87,7 @@ NSString *g_shader_src = kShader(
         semaphore = dispatch_semaphore_create(MaxBuffersInFlight);
         if (!semaphore) {
             MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal frame semaphore.");
-            [self release];
+            MFB_OBJC_RELEASE(self);
             return nil;
         }
 
@@ -95,7 +95,7 @@ NSString *g_shader_src = kShader(
         command_queue = [metal_device newCommandQueue];
         if (!command_queue) {
             MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal command queue.");
-            [self release];
+            MFB_OBJC_RELEASE(self);
             return nil;
         }
 
@@ -107,11 +107,11 @@ NSString *g_shader_src = kShader(
         //}
 
         if (![self _createShaders]) {
-            [self release];
+            MFB_OBJC_RELEASE(self);
             return nil;
         }
         if (![self _createAssets]) {
-            [self release];
+            MFB_OBJC_RELEASE(self);
             return nil;
         }
     }
@@ -127,7 +127,7 @@ NSString *g_shader_src = kShader(
                                                options:options
                                                  error:&error
     ];
-    [options release];
+    MFB_OBJC_RELEASE(options);
     if (error || !metal_library) {
         MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create shaders (%s).",
                 (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
@@ -143,7 +143,7 @@ NSString *g_shader_src = kShader(
     id<MTLFunction> fragment_shader_func = [metal_library newFunctionWithName:@"fragFunc"];
     if (!fragment_shader_func) {
         MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to get fragment shader function 'fragFunc'.");
-        [vertex_shader_func release];
+        MFB_OBJC_RELEASE(vertex_shader_func);
         return false;
     }
 
@@ -155,9 +155,9 @@ NSString *g_shader_src = kShader(
     pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
 
     pipeline_state = [metal_device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
-    [pipelineStateDescriptor release];
-    [vertex_shader_func release];
-    [fragment_shader_func release];
+    MFB_OBJC_RELEASE(pipelineStateDescriptor);
+    MFB_OBJC_RELEASE(vertex_shader_func);
+    MFB_OBJC_RELEASE(fragment_shader_func);
     if (!pipeline_state) {
         MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: failed to create pipeline state (%s).",
                 (error && [error localizedDescription] != nil) ? [[error localizedDescription] UTF8String] : "unknown error");
@@ -194,7 +194,7 @@ NSString *g_shader_src = kShader(
         if (texture_buffers[i] == nil) {
             MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to create Metal texture buffer %zu.", i);
             for (size_t j = 0; j < i; ++j) {
-                [texture_buffers[j] release];
+                MFB_OBJC_RELEASE(texture_buffers[j]);
                 texture_buffers[j] = nil;
             }
             return false;
@@ -225,7 +225,7 @@ NSString *g_shader_src = kShader(
         if (new_textures[i] == nil) {
             MFB_LOG(MFB_LOG_ERROR, "OSXViewDelegate: unable to resize Metal texture buffer %zu.", i);
             for (size_t j = 0; j < i; ++j) {
-                [new_textures[j] release];
+                MFB_OBJC_RELEASE(new_textures[j]);
                 new_textures[j] = nil;
             }
             return false;
@@ -233,7 +233,7 @@ NSString *g_shader_src = kShader(
     }
 
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
-        [texture_buffers[i] release];
+        MFB_OBJC_RELEASE(texture_buffers[i]);
         texture_buffers[i] = new_textures[i];
     }
 
@@ -349,30 +349,33 @@ NSString *g_shader_src = kShader(
 //-------------------------------------
 - (void)dealloc {
     for (size_t i = 0; i < MaxBuffersInFlight; ++i) {
-        [texture_buffers[i] release];
+        MFB_OBJC_RELEASE(texture_buffers[i]);
         texture_buffers[i] = nil;
     }
 
-    [pipeline_state release];
+    MFB_OBJC_RELEASE(pipeline_state);
     pipeline_state = nil;
 
-    [command_queue release];
+    MFB_OBJC_RELEASE(command_queue);
     command_queue = nil;
 
-    [metal_library release];
+    MFB_OBJC_RELEASE(metal_library);
     metal_library = nil;
 
-    [metal_device release];
+    MFB_OBJC_RELEASE(metal_device);
     metal_device = nil;
 
-#if !OS_OBJECT_USE_OBJC
+    // Under ARC, dispatch objects are Objective-C objects and ARC releases them.
+#if !(__has_feature(objc_arc) && OS_OBJECT_USE_OBJC)
     if (semaphore) {
         dispatch_release(semaphore);
     }
 #endif
     semaphore = nil;
 
+#if !__has_feature(objc_arc)
     [super dealloc];
+#endif
 }
 
 @end
