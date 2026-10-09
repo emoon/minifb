@@ -154,7 +154,6 @@ typedef struct {
     SWaylandBufferSlot      slots[WAYLAND_BUFFER_SLOTS];
     int                     front_slot;
 
-    struct mfb_timer        *timer;
     struct xkb_context      *xkb_context;
     struct xkb_keymap       *xkb_keymap;
     struct xkb_state        *xkb_state;

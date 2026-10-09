@@ -15,6 +15,5 @@ typedef struct Vertex {
 typedef struct {
     iOSViewDelegate     *view_delegate;
     Vertex              vertices[4];
-    struct mfb_timer    *timer;
     os_unfair_lock      buffer_lock;
 } SWindowData_IOS;

@@ -93,26 +93,11 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
-
-    SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
-    if (window_data_specific != NULL) {
-        if (window_data_specific->timer != NULL) {
-            mfb_timer_destroy(window_data_specific->timer);
-            window_data_specific->timer = NULL;
-        }
-        memset(window_data_specific, 0, sizeof(SWindowData_Android));
-        free(window_data_specific);
-        window_data->specific = NULL;
-    }
-
     if (gApplication != NULL && gApplication->userData == window_data) {
         gApplication->userData = NULL;
     }
 
-    memset(window_data, 0, sizeof(SWindowData));
-    free(window_data);
+    mfb_free_window_data(window_data, sizeof(SWindowData_Android));
 }
 
 //-------------------------------------
@@ -878,11 +863,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
+    mfb_store_title(window_data, window_title);
 
     SWindowData_Android *window_data_specific = malloc(sizeof(SWindowData_Android));
     if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: failed to allocate SWindowData_Android.");
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Android));
@@ -892,11 +878,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->is_cursor_visible = false;
 
     window_data_specific->app       = gApplication;
-    window_data_specific->timer     = mfb_timer_create();
-    if (window_data_specific->timer == NULL) {
+    window_data->timer     = mfb_timer_create();
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: mfb_timer_create failed.");
-        free(window_data_specific);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -926,8 +911,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 #if defined(_DEBUG)
     MFB_LOG(MFB_LOG_DEBUG, "Window created using Android API");
 #endif
-
-    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1070,7 +1053,7 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    if (window_data_specific->timer == NULL) {
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -1080,7 +1063,7 @@ mfb_wait_sync(struct mfb_window *window) {
     while (1) {
         int timeout_ms;
         if (window_data->is_active && window_data_specific->app->window != NULL) {
-            current = mfb_timer_now(window_data_specific->timer);
+            current = mfb_timer_now(window_data->timer);
             timeout_ms = timeout_ms_from_remaining_seconds(g_time_for_frame - current);
         }
         else {
@@ -1109,12 +1092,12 @@ mfb_wait_sync(struct mfb_window *window) {
             continue;
         }
 
-        current = mfb_timer_now(window_data_specific->timer);
+        current = mfb_timer_now(window_data->timer);
         if (current >= g_time_for_frame) {
             break;
         }
     }
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
 
     return true;
 }

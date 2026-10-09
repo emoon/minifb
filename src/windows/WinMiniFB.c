@@ -260,9 +260,6 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
-
     // ShowCursor keeps a per-thread counter, so a window that hid the cursor has to undo it
     // before going away or the cursor stays hidden for the rest of the process.
     if (window_data->is_cursor_visible == false && window_data->is_mouse_inside == true) {
@@ -271,47 +268,27 @@ destroy_window_data(SWindowData *window_data) {
     }
 
     SWindowData_Win *window_data_specific = (SWindowData_Win *) window_data->specific;
-    if (window_data_specific == NULL) {
-        release_window_counter();
-        free(window_data);
-        return;
-    }
-
+    if (window_data_specific != NULL) {
 #if !defined(USE_OPENGL_API)
-    if (window_data_specific->bitmap_info != NULL) {
         free(window_data_specific->bitmap_info);
         window_data_specific->bitmap_info = NULL;
-    }
 #else
-    destroy_GL_context(window_data);
+        destroy_GL_context(window_data);
 #endif
 
-    if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
-        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        if (window_data_specific->window != 0 && window_data_specific->hdc != 0) {
+            ReleaseDC(window_data_specific->window, window_data_specific->hdc);
+        }
+        if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
+            SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, 0);
+            DestroyWindow(window_data_specific->window);
+        }
     }
-    if (window_data_specific->window != 0 && IsWindow(window_data_specific->window)) {
-        SetWindowLongPtr(window_data_specific->window, GWLP_USERDATA, 0);
-        DestroyWindow(window_data_specific->window);
-    }
-
-    window_data_specific->window = 0;
-    window_data_specific->hdc    = 0;
-
-    mfb_timer_destroy(window_data_specific->timer);
-    window_data_specific->timer = NULL;
-
-    window_data->draw_buffer = NULL;
-    window_data->close       = true;
 
     // To be able to sleep 1 ms on Windows (not thread safe)
     release_window_counter();
 
-    memset(window_data_specific, 0, sizeof(SWindowData_Win));
-    free(window_data_specific);
-    window_data->specific = NULL;
-
-    memset(window_data, 0, sizeof(SWindowData));
-    free(window_data);
+    mfb_free_window_data(window_data, sizeof(SWindowData_Win));
 }
 
 //-------------------------------------
@@ -826,12 +803,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
+    mfb_store_title(window_data, window_title);
 
     window_data_specific = malloc(sizeof(SWindowData_Win));
     if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "Cannot allocate SWindowData_Win");
-        free(window_data);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Win));
@@ -936,18 +913,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         uint32_t error = GetLastError();
         if (error != ERROR_CLASS_ALREADY_EXISTS) {
             MFB_LOG(MFB_LOG_ERROR, "RegisterClass failed: %s", get_error_message());
-            free(window_data);
-            free(window_data_specific);
-            release_window_counter();
+            destroy_window_data(window_data);
             return NULL;
         }
     }
 
     calc_dst_factor(window_data, width, height);
 
-    char  *safe_title = mfb_safe_title_copy(window_title);
-    WCHAR *wide_title = wide_from_utf8(safe_title);
-    free(safe_title);
+    WCHAR *wide_title = wide_from_utf8(window_data->safe_title);
 
     window_data_specific->window = CreateWindowExW(
         0,
@@ -960,9 +933,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     if (!window_data_specific->window) {
         MFB_LOG(MFB_LOG_ERROR, "CreateWindowExW failed: %s", get_error_message());
-        free(window_data);
-        free(window_data_specific);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -979,10 +950,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->hdc = GetDC(window_data_specific->window);
     if (window_data_specific->hdc == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "GetDC failed: %s", get_error_message());
-        DestroyWindow(window_data_specific->window);
-        free(window_data);
-        free(window_data_specific);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -991,11 +959,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->bitmap_info = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
     if (window_data_specific->bitmap_info == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "Cannot allocate BITMAPINFO");
-        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
-        DestroyWindow(window_data_specific->window);
-        free(window_data);
-        free(window_data_specific);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -1013,30 +977,16 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     if (!create_GL_context(window_data)) {
         MFB_LOG(MFB_LOG_ERROR, "create_GL_context failed");
-        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
-        DestroyWindow(window_data_specific->window);
-        free(window_data);
-        free(window_data_specific);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
 
 #endif
 
-    window_data_specific->timer = mfb_timer_create();
-    if (window_data_specific->timer == NULL) {
+    window_data->timer = mfb_timer_create();
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "mfb_timer_create failed");
-#if !defined(USE_OPENGL_API)
-        free(window_data_specific->bitmap_info);
-        window_data_specific->bitmap_info = NULL;
-#else
-        destroy_GL_context(window_data);
-#endif
-        ReleaseDC(window_data_specific->window, window_data_specific->hdc);
-        DestroyWindow(window_data_specific->window);
-        free(window_data);
-        free(window_data_specific);
-        release_window_counter();
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -1049,8 +999,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #endif
 
     ShowWindow(window_data_specific->window, show_window_cmd);
-
-    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1187,7 +1135,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     // Software pacing: Wait only the remaining time; wake on input
     for (;;) {
-        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        double elapsed_time = mfb_timer_now(window_data->timer);
         if (elapsed_time >= g_time_for_frame)
             break;
 
@@ -1219,7 +1167,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
     }
 
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
     return true;
 }
 

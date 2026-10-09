@@ -1055,9 +1055,6 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
-
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (window_data_specific != NULL) {
         // Destroy the wl_buffer objects and mapped memory owned by the slots.
@@ -1072,13 +1069,9 @@ destroy_window_data(SWindowData *window_data) {
         kWaylandDestroy(window_data_specific->xkb_state,         xkb_state_unref);
         kWaylandDestroy(window_data_specific->xkb_keymap,        xkb_keymap_unref);
         kWaylandDestroy(window_data_specific->xkb_context,       xkb_context_unref);
-
-        mfb_timer_destroy(window_data_specific->timer);
-        memset(window_data_specific, 0, sizeof(SWindowData_Way));
-        free(window_data_specific);
     }
-    memset(window_data, 0, sizeof(SWindowData));
-    free(window_data);
+
+    mfb_free_window_data(window_data, sizeof(SWindowData_Way));
 }
 
 //-------------------------------------
@@ -3062,14 +3055,14 @@ create_shm_buffer(SWindowData *window_data, SWindowData_Way *window_data_specifi
 //-------------------------------------
 static bool
 create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_specific,
-                    unsigned effective_flags, const char *window_title, unsigned width, unsigned height) {
+                    unsigned effective_flags, unsigned width, unsigned height) {
 #ifdef MINIFB_HAS_LIBDECOR
     // Without xdg-decoration the compositor draws no frame, so try to draw it
     // here. A borderless window does not need one.
     if (window_data_specific->decoration_manager == NULL &&
         (effective_flags & MFB_WF_BORDERLESS) == 0) {
         if (wayland_libdecor_create_toplevel(window_data, window_data_specific, effective_flags,
-                                             window_title, MFB_STR(MFB_APP_ID), width, height) == true) {
+                                             MFB_STR(MFB_APP_ID), width, height) == true) {
             MFB_LOG(MFB_LOG_INFO, "WaylandMiniFB: libdecor draws this window's frame.");
             return true;
         }
@@ -3137,10 +3130,8 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
 
     xdg_toplevel_set_app_id(window_data_specific->toplevel, MFB_STR(MFB_APP_ID));
 
-    char *safe_title = mfb_safe_title_copy(window_title);
-    if (safe_title != NULL) {
-        xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
-        free(safe_title);
+    if (window_data->safe_title != NULL) {
+        xdg_toplevel_set_title(window_data_specific->toplevel, window_data->safe_title);
     }
 
     xdg_toplevel_add_listener(window_data_specific->toplevel, &toplevel_listener, window_data);
@@ -3211,11 +3202,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
+    mfb_store_title(window_data, window_title);
 
     SWindowData_Way *window_data_specific = (SWindowData_Way *) malloc(sizeof(SWindowData_Way));
     if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to allocate SWindowData_Way.");
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Way));
@@ -3227,8 +3219,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->display = wl_display_connect(NULL);
     if (!window_data_specific->display) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to connect to Wayland display.");
-        free(window_data);
-        free(window_data_specific);
+        destroy(window_data);
         return NULL;
     }
 
@@ -3355,11 +3346,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         goto out;
     }
 
-    if (!create_xdg_toplevel(window_data, window_data_specific, effective_flags, window_title, width, height))
+    if (!create_xdg_toplevel(window_data, window_data_specific, effective_flags, width, height))
         goto out;
 
-    window_data_specific->timer = mfb_timer_create();
-    if (window_data_specific->timer == NULL) {
+    window_data->timer = mfb_timer_create();
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: failed to create frame timer.");
         goto out;
     }
@@ -3370,8 +3361,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->must_resize_context = false;
 
     MFB_LOG(MFB_LOG_DEBUG, "Window created using Wayland API");
-
-    mfb_store_title(window_data, window_title);
 
     return (struct mfb_window *) window_data;
 
@@ -3883,7 +3872,7 @@ mfb_wait_sync(struct mfb_window *window) {
         return false;
     }
 
-    if (window_data_specific->timer == NULL) {
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -3898,13 +3887,13 @@ mfb_wait_sync(struct mfb_window *window) {
     // When hardware sync is active (frame callback provides timing) or
     // no target FPS is set, skip software pacing entirely.
     if (g_use_hardware_sync == true || g_time_for_frame == 0.0) {
-        mfb_timer_compensated_reset(window_data_specific->timer);
+        mfb_timer_compensated_reset(window_data->timer);
         return true;
     }
 
     // Software pacing: sleep for the remaining time, dispatching events meanwhile.
     while (true) {
-        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        double elapsed_time = mfb_timer_now(window_data->timer);
         if (elapsed_time >= g_time_for_frame) {
             break;
         }
@@ -3940,7 +3929,7 @@ mfb_wait_sync(struct mfb_window *window) {
         emit_pending_resize(window_data);
     }
 
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
     return true;
 }
 

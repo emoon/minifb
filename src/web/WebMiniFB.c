@@ -1083,29 +1083,16 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
-
     SWindowData_Web *window_data_specific = (SWindowData_Web *) window_data->specific;
     if (window_data_specific != NULL) {
         if (window_data_specific->window_id != 0) {
             mfb_close_js(window_data_specific->window_id);
         }
 
-        mfb_timer_destroy(window_data_specific->timer);
-        window_data_specific->timer = NULL;
-
         free(window_data_specific->swizzle_buffer);
-        window_data_specific->swizzle_buffer = NULL;
-        window_data_specific->swizzle_buffer_size = 0;
-
-        memset(window_data_specific, 0, sizeof(SWindowData_Web));
-        free(window_data_specific);
-        window_data->specific = NULL;
     }
 
-    memset(window_data, 0, sizeof(SWindowData));
-    free(window_data);
+    mfb_free_window_data(window_data, sizeof(SWindowData_Web));
 }
 
 //-------------------------------------
@@ -1137,6 +1124,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
+    mfb_store_title(window_data, window_title);
 
     int wants_fullscreen = ((effective_flags & MFB_WF_FULLSCREEN) || (effective_flags & MFB_WF_FULLSCREEN_DESKTOP)) ? 1 : 0;
     int wants_resizable = ((effective_flags & MFB_WF_RESIZABLE) != 0u) ? 1 : 0;
@@ -1144,7 +1132,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     void *specific = mfb_open_ex_js(window_data, window_title, width, height, wants_fullscreen, wants_resizable);
     if (!specific) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to initialize JavaScript window data for title '%s'.", window_title);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
     if (!canvas_existed) {
@@ -1155,15 +1143,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     if (window_data_specific == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to allocate SWindowData_Web.");
         mfb_close_js((uintptr_t) specific);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_Web));
     window_data_specific->window_id = (uintptr_t) specific;
     window_data->specific = window_data_specific;
 
-    window_data_specific->timer = mfb_timer_create();
-    if (window_data_specific->timer == NULL) {
+    window_data->timer = mfb_timer_create();
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: failed to create frame timer.");
         destroy_window_data(window_data);
         return NULL;
@@ -1187,8 +1175,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->dst_width = width;
     window_data->dst_height = height;
     calc_dst_factor(window_data, width, height);
-
-    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     window_data->is_cursor_visible = true;
@@ -1501,7 +1487,7 @@ mfb_wait_sync(struct mfb_window *window) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync missing Web-specific window data.");
         return false;
     }
-    if (window_data_specific->timer == NULL) {
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "WebMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -1527,7 +1513,7 @@ mfb_wait_sync(struct mfb_window *window) {
             return false;
         }
 
-        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        double elapsed_time = mfb_timer_now(window_data->timer);
         if (elapsed_time >= g_time_for_frame) {
             if (yielded_to_browser) {
                 break;
@@ -1555,7 +1541,7 @@ mfb_wait_sync(struct mfb_window *window) {
         yielded_to_browser = true;
     }
 
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
     return true;
 }
 

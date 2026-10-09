@@ -174,7 +174,7 @@ keyboard_default(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool i
 // mojibake on Windows, a Latin-1 title with no window title at all on macOS, and a protocol
 // violation on Wayland, all without a word. Say it once, here.
 //-------------------------------------
-char *
+static char *
 mfb_safe_title_copy(const char *title) {
     if (title == NULL) {
         return NULL;
@@ -211,6 +211,28 @@ mfb_store_title(SWindowData *window_data, const char *title) {
     window_data->safe_title = safe_title;
 
     return safe_title;
+}
+
+//-------------------------------------
+// The backend struct is freed as a plain block, so the backend must first release everything
+// it points to.
+//-------------------------------------
+void
+mfb_free_window_data(SWindowData *window_data, size_t specific_size) {
+    if (window_data == NULL) {
+        return;
+    }
+
+    mfb_timer_destroy(window_data->timer);
+    free(window_data->safe_title);
+
+    if (window_data->specific != NULL) {
+        memset(window_data->specific, 0, specific_size);
+        free(window_data->specific);
+    }
+
+    memset(window_data, 0, sizeof(SWindowData));
+    free(window_data);
 }
 
 //-------------------------------------

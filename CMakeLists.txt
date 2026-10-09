@@ -175,6 +175,13 @@ set(SrcDOS
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" ON)
 option(MINIFB_BUILD_TESTS "Build interactive minifb test programs" ON)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
+option(MINIFB_SANITIZE "Build with AddressSanitizer, plus UndefinedBehaviorSanitizer where the compiler has it" OFF)
+
+if (MINIFB_SANITIZE AND DJGPP)
+    message(FATAL_ERROR "MINIFB_SANITIZE: DJGPP has no sanitizer runtime.")
+elseif (MINIFB_SANITIZE AND MINGW AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR "MINIFB_SANITIZE: MinGW GCC has no sanitizer runtime. Use Clang (llvm-mingw) instead.")
+endif()
 
 # purely for internal use, never exposed to the user
 set(MINIFB_USE_X11_API OFF)
@@ -285,6 +292,12 @@ function(minifb_configure_target target)
             "$<$<CONFIG:Debug>:-g>"
         )
 
+        if (MINIFB_SANITIZE)
+            target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+            # PUBLIC so that a program linking the static library also links the runtime.
+            target_link_options(${target} PUBLIC -fsanitize=address,undefined)
+        endif()
+
     else()
         # MSVC
         target_compile_options(${target} PRIVATE
@@ -301,8 +314,6 @@ function(minifb_configure_target target)
             # Additional security checks
             /sdl
 
-            # Program database (edit and continue in debug mode)
-            "$<IF:$<CONFIG:Debug>,/ZI,/Zi>"
             # Optimizations
             "$<IF:$<CONFIG:Debug>,/Od,/O2>"
             # Inline function expansion
@@ -310,6 +321,15 @@ function(minifb_configure_target target)
             # Basic runtime checks
             "$<$<CONFIG:Debug>:/RTC1>"
         )
+
+        if (MINIFB_SANITIZE)
+            # AddressSanitizer rejects edit and continue (/ZI), and ignores incremental linking with a warning.
+            target_compile_options(${target} PRIVATE /fsanitize=address /Zi)
+            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
+        else()
+            # Program database (edit and continue in debug mode)
+            target_compile_options(${target} PRIVATE "$<IF:$<CONFIG:Debug>,/ZI,/Zi>")
+        endif()
 
         # prevent annoying c standard lib unsafety msvc warnings
         target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)

@@ -19,6 +19,8 @@ add_library(minifb STATIC
     ${MINIFB_ROOT}/src/MiniFB_internal.c
     ${MINIFB_ROOT}/src/MiniFB_internal.h
     ${MINIFB_ROOT}/src/MiniFB_timer.c
+    ${MINIFB_ROOT}/src/MiniFB_utf8.c
+    ${MINIFB_ROOT}/src/MiniFB_utf8.h
     ${MINIFB_ROOT}/src/MiniFB_linux.c
     ${MINIFB_ROOT}/src/WindowData.h
 

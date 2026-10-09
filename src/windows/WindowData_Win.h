@@ -14,6 +14,5 @@ typedef struct {
 #else
     BITMAPINFO          *bitmap_info;
 #endif
-    struct mfb_timer    *timer;
     WCHAR               high_surrogate;
 } SWindowData_Win;

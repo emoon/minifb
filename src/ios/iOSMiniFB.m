@@ -92,8 +92,8 @@ create_window_data(unsigned width, unsigned height) {
 
     SWindowData_IOS *window_data_specific = malloc(sizeof(SWindowData_IOS));
     if(window_data_specific == NULL) {
-        free(window_data);
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate SWindowData_IOS.");
+        mfb_free_window_data(window_data, sizeof(SWindowData_IOS));
         return NULL;
     }
     memset((void *) window_data_specific, 0, sizeof(SWindowData_IOS));
@@ -116,9 +116,8 @@ create_window_data(unsigned width, unsigned height) {
 
     window_data->draw_buffer = malloc(total_bytes);
     if (!window_data->draw_buffer) {
-        free(window_data_specific);
-        free(window_data);
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to allocate draw buffer (%zu bytes).", total_bytes);
+        mfb_free_window_data(window_data, sizeof(SWindowData_IOS));
         return NULL;
     }
     memset(window_data->draw_buffer, 0, total_bytes);
@@ -146,15 +145,15 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         if (window_data == NULL) {
             return NULL;
         }
+        mfb_store_title(window_data, window_title);
 
         SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
 
-        window_data_specific->timer = mfb_timer_create();
-        if (window_data_specific->timer == NULL) {
+        window_data->timer = mfb_timer_create();
+        if (window_data->timer == NULL) {
             MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: failed to create frame timer.");
             free(window_data->draw_buffer);
-            free(window_data_specific);
-            free(window_data);
+            mfb_free_window_data(window_data, sizeof(SWindowData_IOS));
             return NULL;
         }
 
@@ -187,8 +186,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         [controller attachWindowData:window_data];
         [window makeKeyAndVisible];
 
-        mfb_store_title(window_data, window_title);
-
         window_data->is_initialized = true;
 
         MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: window created (size=%ux%u, screen=%.0fx%.0f, scale=%.1f).",
@@ -208,9 +205,6 @@ destroy_window_data(SWindowData *window_data) {
         return;
 
     release_cpp_stub((struct mfb_window *) window_data);
-
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
 
     @autoreleasepool {
         // Invalidate window_data pointers in UIKit objects before freeing
@@ -243,21 +237,10 @@ destroy_window_data(SWindowData *window_data) {
                 window_data_specific->view_delegate = nil;
             }
 #endif
-
-            mfb_timer_destroy(window_data_specific->timer);
-            window_data_specific->timer = NULL;
-
-            memset((void *) window_data_specific, 0, sizeof(SWindowData_IOS));
-            free(window_data_specific);
         }
 
-        if (window_data->draw_buffer != NULL) {
-            free(window_data->draw_buffer);
-            window_data->draw_buffer = NULL;
-        }
-
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
+        free(window_data->draw_buffer);
+        mfb_free_window_data(window_data, sizeof(SWindowData_IOS));
     }
 }
 
@@ -407,7 +390,7 @@ mfb_wait_sync(struct mfb_window *window) {
     }
 
     SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
-    if (window_data_specific == NULL || window_data_specific->timer == NULL) {
+    if (window_data_specific == NULL || window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_wait_sync missing iOS timer state.");
         return false;
     }
@@ -425,7 +408,7 @@ mfb_wait_sync(struct mfb_window *window) {
     // Software pacing: sleep for the remaining frame time to avoid busy-waiting,
     // which would drain the battery on a mobile device.
     for (;;) {
-        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        double elapsed_time = mfb_timer_now(window_data->timer);
         if (elapsed_time >= g_time_for_frame) {
             break;
         }
@@ -440,7 +423,7 @@ mfb_wait_sync(struct mfb_window *window) {
         usleep((useconds_t)(remaining * 0.5 * 1e6));
     }
 
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
     return true;
 }
 

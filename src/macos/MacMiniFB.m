@@ -27,9 +27,6 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
-    free(window_data->safe_title);
-    window_data->safe_title = NULL;
-
     @autoreleasepool {
         SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
         if (window_data_specific != NULL) {
@@ -64,21 +61,10 @@ destroy_window_data(SWindowData *window_data) {
                 window_data_specific->viewController = nil;
             }
 #endif
-
-            mfb_timer_destroy(window_data_specific->timer);
-            window_data_specific->timer = NULL;
-
-            memset(window_data_specific, 0, sizeof(SWindowData_OSX));
-            free(window_data_specific);
         }
 
-        if (window_data->draw_buffer != NULL) {
-            free(window_data->draw_buffer);
-            window_data->draw_buffer = NULL;
-        }
-
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
+        free(window_data->draw_buffer);
+        mfb_free_window_data(window_data, sizeof(SWindowData_OSX));
     }
 }
 
@@ -103,8 +89,8 @@ create_window_data(unsigned width, unsigned height) {
 
     SWindowData_OSX *window_data_specific = malloc(sizeof(SWindowData_OSX));
     if (window_data_specific == NULL) {
-        free(window_data);
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate SWindowData_OSX.");
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_OSX));
@@ -118,9 +104,8 @@ create_window_data(unsigned width, unsigned height) {
     window_data->buffer_stride = buffer_stride;
     window_data->draw_buffer   = malloc(buffer_total_bytes);
     if (!window_data->draw_buffer) {
-        free(window_data_specific);
-        free(window_data);
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to allocate draw buffer (%zu bytes).", buffer_total_bytes);
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data->draw_buffer, 0, buffer_total_bytes);
@@ -203,6 +188,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         if (window_data == NULL) {
             return NULL;
         }
+        mfb_store_title(window_data, window_title_c);
         SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
 
         init_keycodes();
@@ -296,15 +282,14 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #endif
 
         NSString *window_title = nil;
-        char     *safe_title   = mfb_safe_title_copy(window_title_c);
-        if (safe_title != NULL) {
-            window_title = [NSString stringWithUTF8String:safe_title];
-            free(safe_title);
+        if (window_data->safe_title != NULL) {
+            window_title = [NSString stringWithUTF8String:window_data->safe_title];
         }
 
         if (window_title == nil) {
             MFB_LOG(MFB_LOG_WARNING, "MacMiniFB: the window title could not be used; falling back to the default title.");
             window_title = @"minifb";
+            mfb_store_title(window_data, "minifb");
         }
         [window_data_specific->window setTitle:window_title];
         [window_data_specific->window performSelectorOnMainThread:@selector(makeKeyAndOrderFront:) withObject:nil waitUntilDone:YES];
@@ -314,8 +299,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         if (request_maximized_desktop) {
             [window_data_specific->window performSelectorOnMainThread:@selector(performZoom:) withObject:nil waitUntilDone:YES];
         }
-        window_data_specific->timer = mfb_timer_create();
-        if (window_data_specific->timer == NULL) {
+        window_data->timer = mfb_timer_create();
+        if (window_data->timer == NULL) {
             MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: failed to create frame timer.");
             destroy_window_data(window_data);
             return NULL;
@@ -336,9 +321,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: window created using Cocoa API (title='%s', size=%ux%u, flags=0x%x).",
                 window_title_c, width, height, flags);
 #endif
-
-        // Taken from the NSString so it also covers the fallback title.
-        mfb_store_title(window_data, [window_title UTF8String]);
 
         window_data->is_initialized = true;
         return (struct mfb_window *) window_data;
@@ -539,7 +521,7 @@ mfb_wait_sync(struct mfb_window *window) {
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing macOS-specific window data.");
         return false;
     }
-    if (window_data_specific->timer == NULL) {
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -559,7 +541,7 @@ mfb_wait_sync(struct mfb_window *window) {
     @autoreleasepool {
         // Software pacing: wait only the remaining time; wake on input
         for (;;) {
-            double elapsed_time = mfb_timer_now(window_data_specific->timer);
+            double elapsed_time = mfb_timer_now(window_data->timer);
             if (elapsed_time >= g_time_for_frame)
                 break;
 
@@ -585,7 +567,7 @@ mfb_wait_sync(struct mfb_window *window) {
             }
         }
 
-        mfb_timer_compensated_reset(window_data_specific->timer);
+        mfb_timer_compensated_reset(window_data->timer);
         return true;
     }
 }

@@ -118,8 +118,8 @@ extern "C" {
     void mfb_dispatch_char_input(SWindowData *window_data, uint32_t codepoint);
     uint32_t mfb_recalc_mod_keys(SWindowData *window_data, uint32_t platform_mods);
     void mfb_release_held_keys(SWindowData *window_data, uint32_t lock_keys);
-    char *mfb_safe_title_copy(const char *title);
     const char *mfb_store_title(SWindowData *window_data, const char *title);
+    void mfb_free_window_data(SWindowData *window_data, size_t specific_size);
     void release_cpp_stub(struct mfb_window *window);
 
     bool calculate_buffer_layout(uint32_t width, uint32_t height, uint32_t *stride_out, size_t *total_bytes_out);

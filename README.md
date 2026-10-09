@@ -480,6 +480,7 @@ The sections below describe what each platform needs and which backend it uses b
 | `MINIFB_BUILD_EXAMPLES` | `ON` | all | Build the example programs |
 | `MINIFB_BUILD_TESTS` | `ON` | all | Build the interactive tests in `tests/` |
 | `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
+| `MINIFB_SANITIZE` | `OFF` | GCC, Clang, MSVC | Build the library, examples and tests with AddressSanitizer, plus UndefinedBehaviorSanitizer on GCC and Clang. Not available on DJGPP or MinGW GCC |
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
 

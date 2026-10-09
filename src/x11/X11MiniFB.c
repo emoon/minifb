@@ -549,11 +549,12 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         return NULL;
     }
     memset(window_data, 0, sizeof(SWindowData));
+    mfb_store_title(window_data, window_title);
 
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) malloc(sizeof(SWindowData_X11));
     if (!window_data_specific) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: failed to allocate SWindowData_X11.");
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
     memset(window_data_specific, 0, sizeof(SWindowData_X11));
@@ -562,8 +563,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data_specific->display = XOpenDisplay(0);
     if (!window_data_specific->display) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XOpenDisplay failed.");
-        free(window_data);
-        free(window_data_specific);
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -618,9 +618,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     depth    = DefaultDepth(window_data_specific->display, window_data_specific->screen);
     if (formats == NULL || format_count <= 0) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XListPixmapFormats returned no formats.");
-        XCloseDisplay(window_data_specific->display);
-        free(window_data_specific);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -638,9 +636,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     // We only support 32-bit right now
     if (conv_depth != 32) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: unsupported visual depth conversion (%d bpp), expected 32 bpp.", conv_depth);
-        XCloseDisplay(window_data_specific->display);
-        free(window_data_specific);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -693,9 +689,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
                     &window_attributes);
     if (!window_data_specific->window) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: XCreateWindow failed.");
-        XCloseDisplay(window_data_specific->display);
-        free(window_data_specific);
-        free(window_data);
+        destroy_window_data(window_data);
         return NULL;
     }
 
@@ -721,9 +715,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: no text input pipeline is available; keys will still be reported.");
     }
 
-    char *safe_title = mfb_safe_title_copy(window_title);
-    set_window_title(window_data_specific, safe_title);
-    free(safe_title);
+    set_window_title(window_data_specific, window_data->safe_title);
 
     if (effective_flags & MFB_WF_BORDERLESS) {
         struct StyleHints {
@@ -835,8 +827,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     window_data_specific->gc = DefaultGC(window_data_specific->display, window_data_specific->screen);
 
-    window_data_specific->timer = mfb_timer_create();
-    if (window_data_specific->timer == NULL) {
+    window_data->timer = mfb_timer_create();
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_timer_create failed.");
         destroy_window_data(window_data);
         return NULL;
@@ -860,8 +852,6 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #else
         MFB_LOG(MFB_LOG_DEBUG, "Window created using X11 API");
     #endif
-
-    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1068,7 +1058,7 @@ mfb_wait_sync(struct mfb_window *window) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync has a null X11 display handle.");
         return false;
     }
-    if (window_data_specific->timer == NULL) {
+    if (window_data->timer == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: mfb_wait_sync missing frame timer state.");
         return false;
     }
@@ -1092,7 +1082,7 @@ mfb_wait_sync(struct mfb_window *window) {
 
     // Software pacing: Wait only the remaining time; wake on input
     for (;;) {
-        double elapsed_time = mfb_timer_now(window_data_specific->timer);
+        double elapsed_time = mfb_timer_now(window_data->timer);
         if (elapsed_time >= g_time_for_frame)
             break;
 
@@ -1127,7 +1117,7 @@ mfb_wait_sync(struct mfb_window *window) {
         }
     }
 
-    mfb_timer_compensated_reset(window_data_specific->timer);
+    mfb_timer_compensated_reset(window_data->timer);
     return true;
 }
 
@@ -1136,9 +1126,6 @@ void
 destroy_window_data(SWindowData *window_data)  {
     if (window_data != NULL) {
         release_cpp_stub((struct mfb_window *) window_data);
-
-        free(window_data->safe_title);
-        window_data->safe_title = NULL;
 
         if (window_data->specific != NULL) {
             SWindowData_X11   *window_data_specific = (SWindowData_X11 *) window_data->specific;
@@ -1169,19 +1156,15 @@ destroy_window_data(SWindowData *window_data)  {
                 XDestroyWindow(display, window_data_specific->window);
             }
 
-            mfb_timer_destroy(window_data_specific->timer);
             if (display != NULL && window_data_specific->invis_cursor != 0) {
                 XFreeCursor(display, window_data_specific->invis_cursor);
             }
             if (display != NULL) {
                 XCloseDisplay(display);
             }
-
-            memset(window_data_specific, 0, sizeof(SWindowData_X11));
-            free(window_data_specific);
         }
-        memset(window_data, 0, sizeof(SWindowData));
-        free(window_data);
+
+        mfb_free_window_data(window_data, sizeof(SWindowData_X11));
    }
 }
 

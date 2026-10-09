@@ -338,8 +338,8 @@ wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *sa
 //-------------------------------------
 bool
 wayland_libdecor_create_toplevel(SWindowData *window_data, SWindowData_Way *window_data_specific,
-                                 unsigned effective_flags, const char *window_title,
-                                 const char *app_id, unsigned width, unsigned height) {
+                                 unsigned effective_flags, const char *app_id,
+                                 unsigned width, unsigned height) {
     g_libdecor = libdecor_load();
     if (g_libdecor == NULL) {
         return false;
@@ -383,10 +383,8 @@ wayland_libdecor_create_toplevel(SWindowData *window_data, SWindowData_Way *wind
     window_data_specific->startup_state_applied = 0;
 
     g_libdecor->libdecor_frame_set_app_id(window_data_specific->libdecor_frame, app_id);
-    char *safe_title = mfb_safe_title_copy(window_title);
-    if (safe_title != NULL) {
-        g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
-        free(safe_title);
+    if (window_data->safe_title != NULL) {
+        g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, window_data->safe_title);
     }
 
     // A libdecor frame is unconstrained and fully capable by default, so only

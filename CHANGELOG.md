@@ -7,11 +7,18 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - **`mfb_get_title`**: returns the window title as MiniFB uses it, in UTF-8 (based on [#145](https://github.com/emoon/minifb/pull/145), by @fruediger). A title that is not valid UTF-8 keeps only its printable ASCII characters, as `mfb_set_title` already did. The pointer stays valid until the next `mfb_set_title` or `mfb_close`, and the function returns `""`, never `NULL`. It works on every backend, including Android, iOS, Web and DOS, where the title is not shown. The test `tests/window_title.c` checks it.
+- **`MINIFB_SANITIZE`**: a CMake option, off by default, that builds the library, the examples and the tests with AddressSanitizer, and also with UndefinedBehaviorSanitizer on GCC and Clang. With MSVC it replaces `/ZI` with `/Zi`, because AddressSanitizer does not accept edit and continue.
+
+### Changed
+
+- Every backend now releases a window through the same shared code, also when `mfb_open_ex` fails halfway, so a resource added to the shared window data is released everywhere.
 
 ### Fixed
 
 - X11: `mfb_update_ex` drew a buffer of a new size through the image created for the size given to `mfb_open_ex` when the new size matched the area it is drawn to. The picture came out wrong. It now uses the scaled image whenever the buffer size differs from either of them.
 - GCC older than 9 failed to compile MiniFB as C. Those versions also define `__has_cpp_attribute` in C, so `MFB_DEPRECATED` and `MFB_ENUM_DEPRECATED` expanded to the C++ `[[deprecated]]` attribute. They now check `__cplusplus` first.
+- DOS: when `mfb_open_ex` could not allocate the scale buffer or the scanline buffer, it leaked the frame timer, and in the first case the scanline buffer too.
+- Android: the CMake files of the example and test projects did not list `src/MiniFB_utf8.c`, so they failed to link.
 
 ## [0.14.0]
 

@@ -14,6 +14,7 @@ typedef struct {
     void                    *specific;
     void                    *user_data;
     char                    *safe_title;
+    struct mfb_timer        *timer;
 
     mfb_active_func         active_func;
     mfb_resize_func         resize_func;

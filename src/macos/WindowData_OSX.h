@@ -17,7 +17,6 @@ typedef struct Vertex {
 typedef struct {
     OSXWindow           *window;
     OSXViewDelegate     *viewController;
-    struct mfb_timer    *timer;
 
     // Detecting a Caps Lock keystroke needs the previous state, and window_data->mod_keys
     // cannot hold it: every event path rewrites that one.

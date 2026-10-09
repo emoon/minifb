@@ -211,7 +211,6 @@ typedef struct SWindowData_DOS {
   uint32_t actual_width, actual_height, actual_bpp, bytes_per_scanline;
   uint32_t *scale_buffer;
   uint8_t *scanline_buffer;
-  struct mfb_timer *timer;
 } SWindowData_DOS;
 
 //-------------------------------------
@@ -328,25 +327,16 @@ destroy_window_data(SWindowData *window_data) {
 
   release_cpp_stub((struct mfb_window *) window_data);
 
-  free(window_data->safe_title);
-  window_data->safe_title = NULL;
-
   g_window = NULL;
   vesa_dispose();
 
   SWindowData_DOS *window_data_specific = (SWindowData_DOS *) window_data->specific;
   if (window_data_specific != NULL) {
-    mfb_timer_destroy(window_data_specific->timer);
-    window_data_specific->timer = NULL;
     free(window_data_specific->scale_buffer);
     free(window_data_specific->scanline_buffer);
-    memset(window_data_specific, 0, sizeof(SWindowData_DOS));
-    free(window_data_specific);
   }
 
-  window_data->specific = NULL;
-  memset(window_data, 0, sizeof(SWindowData));
-  free(window_data);
+  mfb_free_window_data(window_data, sizeof(SWindowData_DOS));
 }
 
 //-------------------------------------
@@ -384,6 +374,7 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     return NULL;
   }
   memset(window_data, 0, sizeof(SWindowData));
+  mfb_store_title(window_data, window_title);
   window_data->window_width = width;
   window_data->window_height = height;
   window_data->buffer_width = width;
@@ -398,11 +389,13 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
   SWindowData_DOS *window_data_specific = malloc(sizeof(SWindowData_DOS));
   if (!window_data_specific) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS window data");
-    free(window_data);
-    vesa_dispose();
+    destroy_window_data(window_data);
     return NULL;
   }
-  window_data_specific->timer = mfb_timer_create();
+  memset(window_data_specific, 0, sizeof(SWindowData_DOS));
+  window_data->specific = window_data_specific;
+
+  window_data->timer = mfb_timer_create();
   window_data_specific->actual_width = actual_width;
   window_data_specific->actual_height = actual_height;
   window_data_specific->actual_bpp = actual_bpp;
@@ -415,26 +408,17 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   if (!window_data_specific->scale_buffer) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scale buffer");
-    free(window_data_specific);
-    free(window_data);
-    vesa_dispose();
+    destroy_window_data(window_data);
     return NULL;
   }
 
   if ((actual_bpp != 32 || bytes_per_scanline != width << 2) && !window_data_specific->scanline_buffer) {
     MFB_LOG(MFB_LOG_ERROR, "Cannot allocate DOS scanline buffer");
-    free(window_data_specific->scale_buffer);
-    free(window_data_specific);
-    free(window_data);
-    vesa_dispose();
+    destroy_window_data(window_data);
     return NULL;
   }
 
-  window_data->specific = window_data_specific;
-
   mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
-
-  mfb_store_title(window_data, window_title);
 
   window_data->is_active = true;
   window_data->is_initialized = true;
@@ -917,10 +901,10 @@ mfb_wait_sync(struct mfb_window *window) {
   // A target of zero means the caller wants every cycle it can get, which is what this
   // backend did before it paced at all. Yielding gives the timeslice back to whatever is
   // hosting DOS instead of burning it in a spin.
-  if (g_time_for_frame <= 0.0 || window_data_specific == NULL || window_data_specific->timer == NULL)
+  if (g_time_for_frame <= 0.0 || window_data_specific == NULL || window_data->timer == NULL)
     return true;
 
-  while (mfb_timer_now(window_data_specific->timer) < g_time_for_frame) {
+  while (mfb_timer_now(window_data->timer) < g_time_for_frame) {
     __dpmi_yield();
 
     state = mfb_update_events(window);
@@ -928,7 +912,7 @@ mfb_wait_sync(struct mfb_window *window) {
       return false;
   }
 
-  mfb_timer_compensated_reset(window_data_specific->timer);
+  mfb_timer_compensated_reset(window_data->timer);
   return true;
 }
 

@@ -18,8 +18,8 @@
 //-------------------------------------
 bool
 wayland_libdecor_create_toplevel(SWindowData *window_data, SWindowData_Way *window_data_specific,
-                                 unsigned effective_flags, const char *window_title,
-                                 const char *app_id, unsigned width, unsigned height);
+                                 unsigned effective_flags, const char *app_id,
+                                 unsigned width, unsigned height);
 
 //-------------------------------------
 // Drops the frame and the context, in that order. The frame owns an xdg_surface
