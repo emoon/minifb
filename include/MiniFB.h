@@ -46,8 +46,10 @@ mfb_update_state    mfb_update_events(struct mfb_window *window);
 // Close the window
 void                mfb_close(struct mfb_window *window);
 
-// Set title
+// Set title. It must be UTF-8; an invalid title keeps only its printable ASCII characters.
 void                mfb_set_title(struct mfb_window *window, const char *title);
+// Get title. Valid until the next mfb_set_title or mfb_close. Never NULL.
+const char *        mfb_get_title(struct mfb_window *window);
 
 // Set user data
 void                mfb_set_user_data(struct mfb_window *window, void *user_data);

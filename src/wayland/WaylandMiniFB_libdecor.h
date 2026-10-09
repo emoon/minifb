@@ -40,10 +40,11 @@ int
 wayland_libdecor_dispatch_pending(SWindowData_Way *window_data_specific);
 
 //-------------------------------------
-// Sets the frame title. Returns false when libdecor does not own this window,
-// so the caller goes through xdg_toplevel instead.
+// Sets the frame title, which must already come from the shared UTF-8 helper.
+// Returns false when libdecor does not own this window, so the caller goes
+// through xdg_toplevel instead.
 //-------------------------------------
 bool
-wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *title);
+wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *safe_title);
 
 #endif

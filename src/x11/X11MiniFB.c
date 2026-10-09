@@ -51,20 +51,18 @@ void destroy_window_data(SWindowData *window_data);
 //-------------------------------------
 // Old window managers read WM_NAME, which is Latin-1, and current ones read _NET_WM_NAME as
 // UTF8_STRING. Xutf8SetWMProperties encodes the legacy property from the same UTF-8 input,
-// so both stay in step.
+// so both stay in step. The title must already come from the shared UTF-8 helper.
 //-------------------------------------
 static void
-set_window_title(SWindowData_X11 *window_data_specific, const char *title) {
-    char *safe = mfb_safe_title_copy(title);
-
-    if (safe == NULL) {
+set_window_title(SWindowData_X11 *window_data_specific, const char *safe_title) {
+    if (safe_title == NULL) {
         return;
     }
 
     Xutf8SetWMProperties(window_data_specific->display,
                          window_data_specific->window,
-                         safe,
-                         safe,
+                         safe_title,
+                         safe_title,
                          NULL,
                          0,
                          NULL,
@@ -80,11 +78,9 @@ set_window_title(SWindowData_X11 *window_data_specific, const char *title) {
                         utf8_string,
                         8,
                         PropModeReplace,
-                        (const unsigned char *) safe,
-                        (int) strlen(safe));
+                        (const unsigned char *) safe_title,
+                        (int) strlen(safe_title));
     }
-
-    free(safe);
 }
 
 //-------------------------------------
@@ -725,7 +721,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_WARNING, "X11MiniFB: no text input pipeline is available; keys will still be reported.");
     }
 
-    set_window_title(window_data_specific, window_title);
+    char *safe_title = mfb_safe_title_copy(window_title);
+    set_window_title(window_data_specific, safe_title);
+    free(safe_title);
 
     if (effective_flags & MFB_WF_BORDERLESS) {
         struct StyleHints {
@@ -862,6 +860,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #else
         MFB_LOG(MFB_LOG_DEBUG, "Window created using X11 API");
     #endif
+
+    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1136,6 +1136,10 @@ void
 destroy_window_data(SWindowData *window_data)  {
     if (window_data != NULL) {
         release_cpp_stub((struct mfb_window *) window_data);
+
+        free(window_data->safe_title);
+        window_data->safe_title = NULL;
+
         if (window_data->specific != NULL) {
             SWindowData_X11   *window_data_specific = (SWindowData_X11 *) window_data->specific;
             Display *display = window_data_specific->display;
@@ -1490,7 +1494,7 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    set_window_title(window_data_specific, title);
+    set_window_title(window_data_specific, mfb_store_title(window_data, title));
     XFlush(window_data_specific->display);
 }
 

@@ -82,6 +82,7 @@ struct mfb_window * mfb_open(const char *title, unsigned width, unsigned height)
 struct mfb_window * mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags);
 void                mfb_close(struct mfb_window *window);
 void                mfb_set_title(struct mfb_window *window, const char *title);
+const char *        mfb_get_title(struct mfb_window *window);
 
 // Update and synchronization
 mfb_update_state    mfb_update(struct mfb_window *window, void *buffer);

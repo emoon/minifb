@@ -93,6 +93,9 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
+
     SWindowData_Android *window_data_specific = (SWindowData_Android *) window_data->specific;
     if (window_data_specific != NULL) {
         if (window_data_specific->timer != NULL) {
@@ -852,7 +855,7 @@ android_main(struct android_app *app) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-    kUnused(title);
+    const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     uint32_t buffer_stride = 0;
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
@@ -923,6 +926,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 #if defined(_DEBUG)
     MFB_LOG(MFB_LOG_DEBUG, "Window created using Android API");
 #endif
+
+    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1184,8 +1189,11 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
-    (void) window;
-    (void) title;
+    if (window == NULL || title == NULL) {
+        return;
+    }
+
+    mfb_store_title((SWindowData *) window, title);
 }
 
 //-------------------------------------

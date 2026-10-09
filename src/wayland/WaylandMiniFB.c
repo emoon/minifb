@@ -1055,6 +1055,9 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
+
     SWindowData_Way   *window_data_specific = (SWindowData_Way *) window_data->specific;
     if (window_data_specific != NULL) {
         // Destroy the wl_buffer objects and mapped memory owned by the slots.
@@ -3135,11 +3138,11 @@ create_xdg_toplevel(SWindowData *window_data, SWindowData_Way *window_data_speci
     xdg_toplevel_set_app_id(window_data_specific->toplevel, MFB_STR(MFB_APP_ID));
 
     char *safe_title = mfb_safe_title_copy(window_title);
-
     if (safe_title != NULL) {
         xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
         free(safe_title);
     }
+
     xdg_toplevel_add_listener(window_data_specific->toplevel, &toplevel_listener, window_data);
 
     // Commit without a buffer to trigger initial configure event
@@ -3367,6 +3370,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->must_resize_context = false;
 
     MFB_LOG(MFB_LOG_DEBUG, "Window created using Wayland API");
+
+    mfb_store_title(window_data, window_title);
 
     return (struct mfb_window *) window_data;
 
@@ -3973,10 +3978,14 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    kUnused(window_data);
+    const char *safe_title = mfb_store_title(window_data, title);
+    if (safe_title == NULL) {
+        return;
+    }
+
 #ifdef MINIFB_HAS_LIBDECOR
     if (window_data_specific->display != NULL &&
-        wayland_libdecor_set_title(window_data_specific, title) == true) {
+        wayland_libdecor_set_title(window_data_specific, safe_title) == true) {
         flush_request(window_data_specific->display, "title update");
         return;
     }
@@ -3987,12 +3996,7 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    char *safe_title = mfb_safe_title_copy(title);
-
-    if (safe_title != NULL) {
-        xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
-        free(safe_title);
-    }
+    xdg_toplevel_set_title(window_data_specific->toplevel, safe_title);
     flush_request(window_data_specific->display, "title update");
 }
 

@@ -27,6 +27,9 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
+
     @autoreleasepool {
         SWindowData_OSX   *window_data_specific = (SWindowData_OSX *) window_data->specific;
         if (window_data_specific != NULL) {
@@ -292,12 +295,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         //[window_data->window updateSize];
     #endif
 
-        char     *safe_title_c = mfb_safe_title_copy(window_title_c);
-        NSString *window_title  = nil;
-
-        if (safe_title_c != NULL) {
-            window_title = [NSString stringWithUTF8String:safe_title_c];
-            free(safe_title_c);
+        NSString *window_title = nil;
+        char     *safe_title   = mfb_safe_title_copy(window_title_c);
+        if (safe_title != NULL) {
+            window_title = [NSString stringWithUTF8String:safe_title];
+            free(safe_title);
         }
 
         if (window_title == nil) {
@@ -334,6 +336,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         MFB_LOG(MFB_LOG_DEBUG, "MacMiniFB: window created using Cocoa API (title='%s', size=%ux%u, flags=0x%x).",
                 window_title_c, width, height, flags);
 #endif
+
+        // Taken from the NSString so it also covers the fallback title.
+        mfb_store_title(window_data, [window_title UTF8String]);
 
         window_data->is_initialized = true;
         return (struct mfb_window *) window_data;
@@ -774,13 +779,11 @@ mfb_set_title(struct mfb_window *window, const char *title) {
     }
 
     @autoreleasepool {
-        char *safe_title = mfb_safe_title_copy(title);
-
+        const char *safe_title = mfb_store_title(window_data, title);
         if (safe_title != NULL) {
             // setTitle: with nil is not valid, and stringWithUTF8String: answers nil for
             // anything it cannot decode.
             NSString *new_title = [NSString stringWithUTF8String:safe_title];
-            free(safe_title);
             if (new_title != nil) {
                 [window_data_specific->window setTitle:new_title];
             }

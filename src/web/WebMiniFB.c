@@ -1083,6 +1083,9 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
+
     SWindowData_Web *window_data_specific = (SWindowData_Web *) window_data->specific;
     if (window_data_specific != NULL) {
         if (window_data_specific->window_id != 0) {
@@ -1185,6 +1188,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     window_data->dst_height = height;
     calc_dst_factor(window_data, width, height);
 
+    mfb_store_title(window_data, window_title);
+
     window_data->is_initialized = true;
     window_data->is_cursor_visible = true;
 
@@ -1213,8 +1218,11 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
-    (void) window;
-    (void) title;
+    if (window == NULL || title == NULL) {
+        return;
+    }
+
+    mfb_store_title((SWindowData *) window, title);
 }
 
 //-------------------------------------

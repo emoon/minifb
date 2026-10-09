@@ -50,6 +50,21 @@ if (NOT DJGPP)
     list(APPEND minifb_interactive_tests window_events_test)
 endif()
 
+# Runs on its own and needs no page to host it, so it stays out of the web list below.
+if (NOT EMSCRIPTEN)
+    add_executable(window_title_test
+        window_title.c
+    )
+    target_link_libraries(window_title_test
+    PRIVATE
+        minifb
+    )
+    minifb_configure_target(window_title_test)
+    minifb_set_dos_name(window_title_test wintitle)
+
+    set_property(TARGET window_title_test PROPERTY FOLDER "Tests")
+endif()
+
 if (EMSCRIPTEN)
     foreach(test_target IN LISTS minifb_interactive_tests)
         target_link_options(${test_target} PRIVATE

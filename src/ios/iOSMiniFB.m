@@ -130,8 +130,7 @@ create_window_data(unsigned width, unsigned height) {
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     UIWindow    *window;
-
-    kUnused(title);
+    const char  *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
 
     if (width == 0 || height == 0) {
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: invalid window size %ux%u.", width, height);
@@ -188,6 +187,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         [controller attachWindowData:window_data];
         [window makeKeyAndVisible];
 
+        mfb_store_title(window_data, window_title);
+
         window_data->is_initialized = true;
 
         MFB_LOG(MFB_LOG_DEBUG, "iOSMiniFB: window created (size=%ux%u, screen=%.0fx%.0f, scale=%.1f).",
@@ -207,6 +208,9 @@ destroy_window_data(SWindowData *window_data) {
         return;
 
     release_cpp_stub((struct mfb_window *) window_data);
+
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
 
     @autoreleasepool {
         // Invalidate window_data pointers in UIKit objects before freeing
@@ -461,8 +465,11 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
-    (void) window;
-    (void) title;
+    if (window == NULL || title == NULL) {
+        return;
+    }
+
+    mfb_store_title((SWindowData *) window, title);
 }
 
 //-------------------------------------

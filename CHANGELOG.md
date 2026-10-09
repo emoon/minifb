@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`mfb_get_title`**: returns the window title as MiniFB uses it, in UTF-8 (based on [#145](https://github.com/emoon/minifb/pull/145), by @fruediger). A title that is not valid UTF-8 keeps only its printable ASCII characters, as `mfb_set_title` already did. The pointer stays valid until the next `mfb_set_title` or `mfb_close`, and the function returns `""`, never `NULL`. It works on every backend, including Android, iOS, Web and DOS, where the title is not shown. The test `tests/window_title.c` checks it.
+
+### Fixed
+
+- X11: `mfb_update_ex` drew a buffer of a new size through the image created for the size given to `mfb_open_ex` when the new size matched the area it is drawn to. The picture came out wrong. It now uses the scaled image whenever the buffer size differs from either of them.
+- GCC older than 9 failed to compile MiniFB as C. Those versions also define `__has_cpp_attribute` in C, so `MFB_DEPRECATED` and `MFB_ENUM_DEPRECATED` expanded to the C++ `[[deprecated]]` attribute. They now check `__cplusplus` first.
+
 ## [0.14.0]
 
 This release adds a callback for the cursor entering and leaving the window. Adding it to every backend showed that the backends did not report mouse and keyboard input in the same way, so this release also fixes that. Mouse and keyboard input now follow one contract on every backend. The same action produces the same callbacks, in the same order, with the same arguments and modifiers, so code tested on one platform behaves the same on the others. The few differences that remain come from the platform, such as AltGr on native Windows. Two interactive tests, `tests/mouse_events.c` and `tests/keyboard_events.c`, check the contract on any backend. A third one, `tests/window_events.c`, does the same for the active, resize and close callbacks.

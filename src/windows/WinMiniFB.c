@@ -260,6 +260,9 @@ destroy_window_data(SWindowData *window_data) {
 
     release_cpp_stub((struct mfb_window *) window_data);
 
+    free(window_data->safe_title);
+    window_data->safe_title = NULL;
+
     // ShowCursor keeps a per-thread counter, so a window that hid the cursor has to undo it
     // before going away or the cursor stays hidden for the rest of the process.
     if (window_data->is_cursor_visible == false && window_data->is_mouse_inside == true) {
@@ -312,29 +315,26 @@ destroy_window_data(SWindowData *window_data) {
 }
 
 //-------------------------------------
-// Windows wants UTF-16. The shared helper has already validated the UTF-8 and warned if it
-// was not, so this only has to convert.
+// Windows wants UTF-16. The caller passes a title already validated by the shared helper,
+// so this only has to convert.
 //-------------------------------------
 static WCHAR *
-wide_from_utf8(const char *text) {
-    char  *safe  = mfb_safe_title_copy(text);
-    WCHAR *wide  = NULL;
+wide_from_utf8(const char *safe_title) {
+    WCHAR *wide = NULL;
     int    count;
 
-    if (safe == NULL) {
+    if (safe_title == NULL) {
         return NULL;
     }
 
-    count = MultiByteToWideChar(CP_UTF8, 0, safe, -1, NULL, 0);
+    count = MultiByteToWideChar(CP_UTF8, 0, safe_title, -1, NULL, 0);
     if (count > 0) {
         wide = (WCHAR *) malloc((size_t) count * sizeof(WCHAR));
-        if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, safe, -1, wide, count) == 0) {
+        if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, safe_title, -1, wide, count) == 0) {
             free(wide);
             wide = NULL;
         }
     }
-
-    free(safe);
 
     return wide;
 }
@@ -945,7 +945,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
     calc_dst_factor(window_data, width, height);
 
-    WCHAR *wide_title = wide_from_utf8(window_title);
+    char  *safe_title = mfb_safe_title_copy(window_title);
+    WCHAR *wide_title = wide_from_utf8(safe_title);
+    free(safe_title);
 
     window_data_specific->window = CreateWindowExW(
         0,
@@ -1047,6 +1049,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     #endif
 
     ShowWindow(window_data_specific->window, show_window_cmd);
+
+    mfb_store_title(window_data, window_title);
 
     window_data->is_initialized = true;
     return (struct mfb_window *) window_data;
@@ -1443,8 +1447,7 @@ mfb_set_title(struct mfb_window *window, const char *title) {
         return;
     }
 
-    WCHAR *wide_title = wide_from_utf8(title);
-
+    WCHAR *wide_title = wide_from_utf8(mfb_store_title(window_data, title));
     if (wide_title != NULL) {
         SetWindowTextW(window_data_specific->window, wide_title);
         free(wide_title);

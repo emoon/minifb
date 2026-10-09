@@ -328,6 +328,9 @@ destroy_window_data(SWindowData *window_data) {
 
   release_cpp_stub((struct mfb_window *) window_data);
 
+  free(window_data->safe_title);
+  window_data->safe_title = NULL;
+
   g_window = NULL;
   vesa_dispose();
 
@@ -349,7 +352,7 @@ destroy_window_data(SWindowData *window_data) {
 //-------------------------------------
 struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
-  (void) title;
+  const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
   uint32_t buffer_stride = 0;
 
   if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
@@ -431,6 +434,8 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
   mfb_set_keyboard_callback((struct mfb_window *) window_data, keyboard_default);
 
+  mfb_store_title(window_data, window_title);
+
   window_data->is_active = true;
   window_data->is_initialized = true;
   window_data->is_cursor_visible = false;
@@ -478,8 +483,11 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 //-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
-  (void) window;
-  (void) title;
+  if (window == NULL || title == NULL) {
+    return;
+  }
+
+  mfb_store_title((SWindowData *) window, title);
 }
 
 //-------------------------------------

@@ -325,17 +325,12 @@ wayland_libdecor_dispatch_pending(SWindowData_Way *window_data_specific) {
 
 //-------------------------------------
 bool
-wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *title) {
+wayland_libdecor_set_title(SWindowData_Way *window_data_specific, const char *safe_title) {
     if (g_libdecor == NULL || window_data_specific->libdecor_frame == NULL) {
         return false;
     }
 
-    char *safe_title = mfb_safe_title_copy(title);
-
-    if (safe_title != NULL) {
-        g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
-        free(safe_title);
-    }
+    g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
 
     return true;
 }
@@ -389,7 +384,6 @@ wayland_libdecor_create_toplevel(SWindowData *window_data, SWindowData_Way *wind
 
     g_libdecor->libdecor_frame_set_app_id(window_data_specific->libdecor_frame, app_id);
     char *safe_title = mfb_safe_title_copy(window_title);
-
     if (safe_title != NULL) {
         g_libdecor->libdecor_frame_set_title(window_data_specific->libdecor_frame, safe_title);
         free(safe_title);

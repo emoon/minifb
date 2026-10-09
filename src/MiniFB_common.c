@@ -128,6 +128,19 @@ mfb_get_user_data(struct mfb_window *window) {
     return NULL;
 }
 
+//-------------------------------------
+const char *
+mfb_get_title(struct mfb_window *window) {
+    if (window != NULL) {
+        SWindowData *window_data = (SWindowData *) window;
+        if (window_data->safe_title != NULL) {
+            return window_data->safe_title;
+        }
+    }
+
+    return "";
+}
+
 // [Deprecated]
 //-------------------------------------
 void
@@ -180,6 +193,24 @@ mfb_safe_title_copy(const char *title) {
     }
 
     return copy;
+}
+
+//-------------------------------------
+// Keeps the title for mfb_get_title. The caller may pass the stored title back in, as in
+// mfb_set_title(window, mfb_get_title(window)), so the old copy is freed only after the
+// new one exists. On failure the old title stays, as the window keeps showing it.
+//-------------------------------------
+const char *
+mfb_store_title(SWindowData *window_data, const char *title) {
+    char *safe_title = mfb_safe_title_copy(title);
+    if (safe_title == NULL) {
+        return NULL;
+    }
+
+    free(window_data->safe_title);
+    window_data->safe_title = safe_title;
+
+    return safe_title;
 }
 
 //-------------------------------------
