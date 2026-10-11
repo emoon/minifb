@@ -5,6 +5,10 @@
 #import <MetalKit/MetalKit.h>
 #include <MiniFB_internal.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 extern double   g_time_for_frame;
 extern bool     g_use_hardware_sync;
 //--

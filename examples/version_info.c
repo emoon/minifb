@@ -1,12 +1,20 @@
 #include <MiniFB.h>
 #include "minifb_version.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define TEST_TAG        "version_info"
 
 //-------------------------------------
 int
 main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     MFB_LOGI(TEST_TAG, "MINIFB_VERSION_STRING    = %s", MINIFB_VERSION_STRING);
     MFB_LOGI(TEST_TAG, "MINIFB_VERSION_NUMERIC   = 0x%012llX", (unsigned long long) MINIFB_VERSION_NUMERIC);
     MFB_LOGI(TEST_TAG, "MINIFB_VERSION_GET_MAJOR = %u", (unsigned int) MINIFB_VERSION_GET_MAJOR(MINIFB_VERSION_NUMERIC));

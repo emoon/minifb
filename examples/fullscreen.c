@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kUnused(var)    (void) var
 #define TEST_TAG        "fullscreen"
@@ -34,6 +38,10 @@ draw_noise(struct mfb_window *window) {
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     mfb_update_state state;
 
     MFB_LOGI(TEST_TAG, "Full Screen Window");

@@ -8,6 +8,13 @@ android {
         applicationId 'com.example.noise'
         minSdkVersion 14
         targetSdkVersion 31
+
+        externalNativeBuild {
+            cmake {
+                // ./gradlew assembleDebug -PminifbUseMmgr=ON
+                arguments "-DMINIFB_USE_MMGR=${project.findProperty('minifbUseMmgr') ?: 'OFF'}"
+            }
+        }
     }
 
     buildTypes {

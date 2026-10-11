@@ -32,6 +32,10 @@
     #include <X11/extensions/Xrandr.h>
 #endif
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 // The X protocol reserves the keycodes below eight, so a server that uses the kernel numbers
 // shifts them all up by that much.
 #define X11_EVDEV_KEYCODE_OFFSET 8
@@ -965,8 +969,10 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if (use_scaler == true) {
-        stretch_image((uint32_t *) buffer, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
-                      (uint32_t *) window_data_specific->image_buffer, 0, 0, window_data->dst_width, window_data->dst_height, window_data->dst_width);
+        stretch_image(
+            (uint32_t *) buffer,                             0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
+            (uint32_t *) window_data_specific->image_buffer, 0, 0, window_data->dst_width,    window_data->dst_height,    window_data->dst_width
+        );
         window_data_specific->image_scaler->data = (char *) window_data_specific->image_buffer;
         XPutImage(display, window_data_specific->window, window_data_specific->gc, window_data_specific->image_scaler, 0, 0, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height);
     }

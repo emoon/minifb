@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define EM_EXPORT __attribute__((used))
 

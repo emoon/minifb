@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define TEST_TAG        "timer"
 
 //-------------------------------------
@@ -23,6 +27,10 @@ resize(struct mfb_window *window, int width, int height) {
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     uint32_t    i, noise, carry, seed = 0xbeef;
     char        title[64];
 
@@ -73,6 +81,10 @@ main() {
 
         }
     } while (mfb_wait_sync(window));
+
+    mfb_timer_destroy(timer);
+    free(g_buffer);
+    g_buffer = NULL;
 
     return 0;
 }

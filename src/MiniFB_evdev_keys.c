@@ -8,6 +8,10 @@
 
 #include <stddef.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // The table is built apart from g_keycodes because each backend reaches the same physical
 // key at a different number, and the offset between them is all that changes.

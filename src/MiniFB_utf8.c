@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 bool
 utf8_decode_next(const unsigned char *bytes, size_t length, size_t *index, uint32_t *codepoint) {

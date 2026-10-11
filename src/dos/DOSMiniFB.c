@@ -17,6 +17,10 @@
 
 #include "vesa.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // The 101 key keyboard gave its new keys the scancode of the key they replaced, prefixed
 // with E0, so the prefix is the only thing telling a dedicated arrow from a keypad one.
@@ -809,16 +813,20 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
       if (vp_y + vp_h > a_height)
         vp_h = a_height - vp_y;
 
-      stretch_image(buffer, 0, 0, width, height, width, scale_buffer, vp_x,
-                    vp_y, vp_w, vp_h, a_width);
+      stretch_image(
+        buffer,       0,    0,     width, height, width,
+        scale_buffer, vp_x, vp_y,  vp_w,  vp_h,   a_width
+      );
     }
 
     frame = (uint8_t *) scale_buffer;
   }
 
   else if (a_width != width || a_height != height) {
-    stretch_image(buffer,       0, 0, width,   height,   width,
-                  scale_buffer, 0, 0, a_width, a_height, a_width);
+    stretch_image(
+      buffer,       0, 0, width,   height,   width,
+      scale_buffer, 0, 0, a_width, a_height, a_width
+    );
     frame = (uint8_t *) scale_buffer;
   }
 

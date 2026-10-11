@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
 static uint32_t *g_buffer = NULL;
@@ -38,6 +42,10 @@ keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_
 
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("H to hide, S to show", g_width, g_height, MFB_WF_RESIZABLE);
@@ -72,6 +80,9 @@ main() {
             break;
         }
     } while (mfb_wait_sync(window));
+
+    free(g_buffer);
+    g_buffer = NULL;
 
     return 0;
 }

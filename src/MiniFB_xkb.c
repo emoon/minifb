@@ -5,6 +5,10 @@
 
 #include <stdlib.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // The Compose table belongs to the locale, and a program that never calls setlocale still
 // has the environment saying which one the user picked.

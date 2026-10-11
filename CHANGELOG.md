@@ -4,10 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0]
+
+This release adds `mfb_get_title`, and two CMake options to find memory bugs: `MINIFB_SANITIZE` and `MINIFB_USE_MMGR`. Every backend now releases a window through the same shared code, and the macOS backend also builds with ARC. It also fixes a leak of the Metal frame semaphore on macOS and iOS, a leak on DOS, a drawing bug on X11, and the build with GCC older than 9 and on Android.
+
 ### Added
 
 - **`mfb_get_title`**: returns the window title as MiniFB uses it, in UTF-8 (based on [#145](https://github.com/emoon/minifb/pull/145), by @fruediger). A title that is not valid UTF-8 keeps only its printable ASCII characters, as `mfb_set_title` already did. The pointer stays valid until the next `mfb_set_title` or `mfb_close`, and the function returns `""`, never `NULL`. It works on every backend, including Android, iOS, Web and DOS, where the title is not shown. The test `tests/window_title.c` checks it.
 - **`MINIFB_SANITIZE`**: a CMake option, off by default, that builds the library, the examples and the tests with AddressSanitizer, and also with UndefinedBehaviorSanitizer on GCC and Clang. With MSVC it replaces `/ZI` with `/Zi`, because AddressSanitizer does not accept edit and continue.
+- **`MINIFB_USE_MMGR`**: a CMake option, off by default, that tracks the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr). mmgr reports leaks, overruns and blocks released with the wrong function, on every backend, DOS included. CMake downloads it with `FetchContent`; `-DFETCHCONTENT_SOURCE_DIR_MMGR=<path>` uses a local copy instead. The examples and tests are tracked too, and each one names its logs after itself, so that they do not overwrite each other. The Android projects turn it on with `./gradlew assembleDebug -PminifbUseMmgr=ON`. On Linux with OpenGL, the leak report also lists blocks with no source file (`??(0)::??`). They come from Mesa, the OpenGL library, not from MiniFB: mmgr replaces the global `operator new`, so it also sees the allocations of system libraries written in C++.
 
 ### Changed
 
@@ -21,6 +26,7 @@ All notable changes to this project are documented in this file.
 - DOS: when `mfb_open_ex` could not allocate the scale buffer or the scanline buffer, it leaked the frame timer, and in the first case the scanline buffer too.
 - Android: the CMake files of the example and test projects did not list `src/MiniFB_utf8.c`, so they failed to link.
 - macOS and iOS with Metal: every window leaked its frame semaphore when it closed. The semaphore can only be released once the GPU has finished the frames still in flight, or libdispatch aborts, so closing a window now waits for them, at most one second per frame.
+- Examples: `hidpi` kept using a window after `mfb_wait_sync` had released it, so closing both windows at once could crash it. `noise`, `input_events`, `hide_cursor` and `timer` did not free their buffers, and `timer` did not destroy its timer.
 
 ## [0.14.0]
 
@@ -317,7 +323,8 @@ git fetch origin --tags --force
 - The project has been available on GitHub since 2014.
 - Changes before version 0.9.0 were not tracked with formal release versions.
 
-[Unreleased]: https://github.com/emoon/minifb/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/emoon/minifb/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/emoon/minifb/releases/tag/v0.15.0
 [0.14.0]: https://github.com/emoon/minifb/releases/tag/v0.14.0
 [0.13.0]: https://github.com/emoon/minifb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/emoon/minifb/releases/tag/v0.12.0

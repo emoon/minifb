@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define TEST_WIDTH              320u
 #define TEST_HEIGHT             240u
 #define TEST_OPEN_TITLE         "MiniFB title test"
@@ -37,6 +41,10 @@ set_and_check(struct mfb_window *window, const char *label, const char *title, c
 //-------------------------------------
 int
 main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     struct mfb_window *window = mfb_open(TEST_OPEN_TITLE, TEST_WIDTH, TEST_HEIGHT);
     if (window == NULL) {
         fprintf(stderr, "Cannot open the test window.\n");

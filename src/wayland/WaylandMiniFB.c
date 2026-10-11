@@ -51,6 +51,10 @@
 
 #include <sys/mman.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #ifndef MFB_APP_ID
     #define MFB_APP_ID minifb
@@ -3554,6 +3558,9 @@ compose_presentation_buffer(const SWindowData *window_data,
                             const SWaylandPresentationMetrics *metrics,
                             const void *buffer,
                             uint32_t *shm_ptr) {
+
+    size_t size = (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t);
+
     if (metrics->use_buffer_scale == false
         && metrics->use_fractional == false
         && window_data->buffer_width == metrics->logical_dst_width
@@ -3563,19 +3570,26 @@ compose_presentation_buffer(const SWindowData *window_data,
         && metrics->logical_surface_width == metrics->logical_dst_width
         && metrics->logical_surface_height == metrics->logical_dst_height) {
         // Fast path: no scaling and source fills the entire surface exactly.
-        memcpy(shm_ptr, buffer,
-               (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t));
+        memcpy(shm_ptr, buffer, size);
     }
     else {
         // Clear the physical buffer, then stretch the source into the viewport.
         // When use_buffer_scale is true, physical_* coords are in physical pixels.
-        memset(shm_ptr, 0,
-               (size_t) metrics->physical_surface_width * metrics->physical_surface_height * sizeof(uint32_t));
+        uint32_t src_width  = window_data->buffer_width;
+        uint32_t src_height = window_data->buffer_height;
+        uint32_t src_pitch  = window_data->buffer_width;
+
+        uint32_t dst_x      = metrics->physical_dst_offset_x;
+        uint32_t dst_y      = metrics->physical_dst_offset_y;
+        uint32_t dst_width  = metrics->physical_dst_width;
+        uint32_t dst_height = metrics->physical_dst_height;
+        uint32_t dst_pitch  = metrics->physical_surface_width;
+
+        memset(shm_ptr, 0, size);
         stretch_image(
-            (uint32_t *) buffer, 0, 0,
-            window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
-            shm_ptr, metrics->physical_dst_offset_x, metrics->physical_dst_offset_y,
-            metrics->physical_dst_width, metrics->physical_dst_height, metrics->physical_surface_width);
+            (uint32_t *) buffer, 0,     0,     src_width, src_height, src_pitch,
+            shm_ptr,             dst_x, dst_y, dst_width, dst_height, dst_pitch
+        );
     }
 }
 

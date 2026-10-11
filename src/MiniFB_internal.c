@@ -2,6 +2,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //#define kUseBilinearInterpolation
 
 //-------------------------------------
@@ -74,7 +78,7 @@ mfb_validate_viewport(const SWindowData *window_data,
 //-------------------------------------
 static uint32_t
 interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, uint32_t src_offset_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch) {
-    uint32_t inc_x = x + 1 < src_width ? 1 : 0;
+    uint32_t inc_x = x + 1 < src_width  ? 1         : 0;
     uint32_t inc_y = y + 1 < src_height ? src_pitch : 0;
     uint8_t *p00 = (uint8_t *) &src_image[(src_offset_x >> 16)];
     uint8_t *p01 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_x];
@@ -86,16 +90,11 @@ interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, 
     uint32_t wx1 = 0x10000 - wx2;
     uint32_t wy1 = 0x10000 - wy2;
 
-    uint32_t w1 = (uint32_t)(((uint64_t) wx1 * wy1) >> 16);
-    uint32_t w2 = (uint32_t)(((uint64_t) wx2 * wy1) >> 16);
-    uint32_t w3 = (uint32_t)(((uint64_t) wx1 * wy2) >> 16);
-    uint32_t w4 = (uint32_t)(((uint64_t) wx2 * wy2) >> 16);
-
-    // If you don't have uint64_t
-    //uint32_t b = (((p00[0] * wx1 + p01[0] * wx2) >> 16) * wy1 + ((p10[0] * wx1 + p11[0] * wx2) >> 16) * wy2) >> 16;
-    //uint32_t g = (((p00[1] * wx1 + p01[1] * wx2) >> 16) * wy1 + ((p10[1] * wx1 + p11[1] * wx2) >> 16) * wy2) >> 16;
-    //uint32_t r = (((p00[2] * wx1 + p01[2] * wx2) >> 16) * wy1 + ((p10[2] * wx1 + p11[2] * wx2) >> 16) * wy2) >> 16;
-    //uint32_t a = (((p00[3] * wx1 + p01[3] * wx2) >> 16) * wy1 + ((p10[3] * wx1 + p11[3] * wx2) >> 16) * wy2) >> 16;
+    // wx1 * wy1 is 2^32 when wx2 == wy2 == 0, so w1 is computed from wx2 * wy1 to stay within 32 bits
+    uint32_t w1 = wy1 - ((wx2 * wy1 + 0xffff) >> 16);
+    uint32_t w2 = (wx2 * wy1) >> 16;
+    uint32_t w3 = (wx1 * wy2) >> 16;
+    uint32_t w4 = (wx2 * wy2) >> 16;
 
     uint32_t b = ((p00[0] * w1 + p01[0] * w2) + (p10[0] * w3 + p11[0] * w4)) >> 16;
     uint32_t g = ((p00[1] * w1 + p01[1] * w2) + (p10[1] * w3 + p11[1] * w4)) >> 16;

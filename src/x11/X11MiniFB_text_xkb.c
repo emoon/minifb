@@ -5,6 +5,10 @@
 
 #include <X11/XKBlib.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 bool
 x11_text_xkb_init(SWindowData_X11 *window_data_specific) {

@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kUnused(var)    (void) var
 #define TEST_TAG        "input_events"
@@ -240,6 +244,10 @@ mouse_enter(struct mfb_window *window, bool is_inside) {
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     int32_t noise, carry, seed = 0xbeef;
 
     g_buffer = (uint32_t *) malloc(g_width * g_height * sizeof(uint32_t));
@@ -311,6 +319,9 @@ main() {
 
         g_frame_count++;
     } while (mfb_wait_sync(window));
+
+    free(g_buffer);
+    g_buffer = NULL;
 
     return 0;
 }

@@ -2,6 +2,10 @@
 
 #include "MiniFB_internal.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 bool
 x11_text_init(SWindowData_X11 *window_data_specific) {

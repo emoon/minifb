@@ -6,7 +6,7 @@ if (IOS AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum iOS deployment target")
 endif()
 
-project(MiniFB VERSION 0.14.0 LANGUAGES C CXX)
+project(MiniFB VERSION 0.15.0 LANGUAGES C CXX)
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
@@ -176,6 +176,7 @@ option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" ON)
 option(MINIFB_BUILD_TESTS "Build interactive minifb test programs" ON)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
 option(MINIFB_SANITIZE "Build with AddressSanitizer, plus UndefinedBehaviorSanitizer where the compiler has it" OFF)
+option(MINIFB_USE_MMGR "Track the allocations of the library with mmgr, to find leaks and overruns" OFF)
 
 if (MINIFB_SANITIZE AND DJGPP)
     message(FATAL_ERROR "MINIFB_SANITIZE: DJGPP has no sanitizer runtime.")
@@ -340,6 +341,32 @@ function(minifb_configure_target target)
         "$<$<CONFIG:Debug>:DEBUG>"
     )
 
+    # Each program names its mmgr logs after itself, so that running several in one folder
+    # does not overwrite them. DOS needs 8.3 names, and "_leak" leaves room for three letters,
+    # so there the name is the initials of the words of the target: input_events_cpp gives iec.
+    get_target_property(target_type ${target} TYPE)
+    if (MINIFB_USE_MMGR AND target_type STREQUAL "EXECUTABLE")
+        if (DJGPP)
+            string(REPLACE "_" ";" words "${target}")
+            set(initials "")
+            foreach (word IN LISTS words)
+                string(SUBSTRING "${word}" 0 1 letter)
+                string(APPEND initials "${letter}")
+            endforeach()
+            string(SUBSTRING "${initials}" 0 3 initials)
+            set(memory_log "${initials}_mem.txt")
+            set(leaks_log  "${initials}_leak.txt")
+        else()
+            set(memory_log "$<TARGET_FILE_BASE_NAME:${target}>_memory.log")
+            set(leaks_log  "$<TARGET_FILE_BASE_NAME:${target}>_memleaks.log")
+        endif()
+        target_compile_definitions(${target} PRIVATE
+            MINIFB_USE_MMGR
+            "MINIFB_MMGR_MEMORY_LOG=\"${memory_log}\""
+            "MINIFB_MMGR_LEAKS_LOG=\"${leaks_log}\""
+        )
+    endif()
+
     if (WIN32)
         target_compile_definitions(${target} PRIVATE _WIN32_WINNT=0x0601)  # minimum supported version (and header version) = windows 7 (we are in 2026)
     endif()
@@ -371,6 +398,19 @@ add_library(minifb::minifb ALIAS minifb) # cmake installing will install the "mi
 
 set_property(TARGET minifb PROPERTY FOLDER "Libs")
 minifb_configure_target(minifb)
+
+if (MINIFB_USE_MMGR)
+    include(FetchContent)
+    FetchContent_Declare(mmgr
+        GIT_REPOSITORY https://github.com/Darky-Lucera/mmgr.git
+        GIT_TAG        v1.0.0
+    )
+    FetchContent_MakeAvailable(mmgr)
+
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_MMGR)
+    # Only while building: an installed MiniFB cannot carry mmgr along with it.
+    target_link_libraries(minifb PUBLIC $<BUILD_INTERFACE:mmgr::mmgr>)
+endif()
 
 # headers required for users (differs depending on if it's been built or installed)
 target_include_directories(minifb PUBLIC

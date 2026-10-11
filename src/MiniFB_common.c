@@ -14,6 +14,10 @@
     #include <TargetConditionals.h>
 #endif
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 short int g_keycodes[MFB_MAX_KEYS] = { 0 };
 //-------------------------------------

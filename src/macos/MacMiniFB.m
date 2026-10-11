@@ -16,6 +16,10 @@
 #include <MiniFB_internal.h>
 #include <MiniFB_enums.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 void     init_keycodes();
 

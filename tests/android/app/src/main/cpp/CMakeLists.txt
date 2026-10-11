@@ -63,3 +63,23 @@ target_link_libraries(mouse_events_test
     log
     m
 )
+
+# mmgr tracks the allocations of MiniFB and of the app. An app can only write inside its own
+# data folder, so the logs go there. Read them with: adb shell run-as com.example.mouse_events_test cat mouse_events_test_memleaks.log
+option(MINIFB_USE_MMGR "Track the allocations with mmgr, to find leaks and overruns" OFF)
+if (MINIFB_USE_MMGR)
+    include(FetchContent)
+    FetchContent_Declare(mmgr
+        GIT_REPOSITORY https://github.com/Darky-Lucera/mmgr.git
+        GIT_TAG        v1.0.0
+    )
+    FetchContent_MakeAvailable(mmgr)
+
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_MMGR)
+    target_link_libraries(minifb PUBLIC mmgr::mmgr)
+    target_compile_definitions(mouse_events_test PRIVATE
+        MINIFB_USE_MMGR
+        "MINIFB_MMGR_MEMORY_LOG=\"/data/data/com.example.mouse_events_test/mouse_events_test_memory.log\""
+        "MINIFB_MMGR_LEAKS_LOG=\"/data/data/com.example.mouse_events_test/mouse_events_test_memleaks.log\""
+    )
+endif()

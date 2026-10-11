@@ -4,6 +4,10 @@
 #include <MiniFB_internal.h>
 #include <math.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // The exit is held back while a button is down, and AppKit gives no second chance once the
 // drag ends, so whatever releases the last button settles the state from the position it

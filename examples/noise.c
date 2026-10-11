@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <MiniFB.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define TEST_TAG        "noise"
 
 //-------------------------------------
@@ -62,6 +66,10 @@ resize(struct mfb_window *window, int width, int height) {
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     uint32_t    i, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, MFB_WF_RESIZABLE);
@@ -92,6 +100,9 @@ main() {
             break;
         }
     } while (mfb_wait_sync(window));
+
+    free(g_buffer);
+    g_buffer = NULL;
 
     return 0;
 }

@@ -16,6 +16,10 @@
 #include <MiniFB_ios.h>
 #include <MiniFB_internal.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kShader(inc, src)    @inc#src
 

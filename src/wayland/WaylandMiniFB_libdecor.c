@@ -13,6 +13,10 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // The versioned soname is deliberate: plain libdecor-0.so is a symlink that
 // only the development package installs.

@@ -7,6 +7,10 @@
 #include <time.h>
 #include <MiniFB.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 extern double   g_timer_frequency;
 extern double   g_timer_resolution;
 

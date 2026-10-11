@@ -5,7 +5,15 @@
 #define GDB_IMPLEMENTATION
 #include "gdbstub.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 int main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
   int res_x = 640;
   int res_y = 480;
   int buf_x = 320;

@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define DIMEN_LOW       512
 static unsigned int g_buffer_low[DIMEN_LOW * DIMEN_LOW];
@@ -29,6 +33,10 @@ pretty_square(unsigned int *p, int dimen) {
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     pretty_square(g_buffer_low, DIMEN_LOW);
     pretty_square(g_buffer_high, DIMEN_HIGH);
 
@@ -44,8 +52,15 @@ main() {
             if (mfb_update_ex(window_high, g_buffer_high, DIMEN_HIGH, DIMEN_HIGH) != MFB_STATE_OK)
                 window_high = NULL;
 
-        if (window_high) mfb_wait_sync(window_high);
-        else if (window_low) mfb_wait_sync(window_low);
+        // mfb_wait_sync releases a window that was closed, so its pointer must not be used again.
+        if (window_high) {
+            if (mfb_wait_sync(window_high) == false)
+                window_high = NULL;
+        }
+        else if (window_low) {
+            if (mfb_wait_sync(window_low) == false)
+                window_low = NULL;
+        }
     }
 
     return 0;

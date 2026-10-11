@@ -14,6 +14,10 @@
 #include "WindowData_IOS.h"
 #include <MiniFB_internal.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 @interface iOSViewController ()
 - (void) setupRendererIfPossible;

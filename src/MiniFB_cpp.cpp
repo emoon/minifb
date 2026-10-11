@@ -2,6 +2,10 @@
 #include <MiniFB_enums.h>
 #include <vector>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 struct mfb_stub_vector {
     std::vector<mfb_stub *> instances;
 

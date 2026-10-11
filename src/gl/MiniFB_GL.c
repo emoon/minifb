@@ -13,6 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //#define kUse_Clean_UP
 #if defined(kUse_Clean_UP)
     #define UseCleanUp(x) x

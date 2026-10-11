@@ -7,6 +7,10 @@
 #include <sys/movedata.h>
 #include <sys/nearptr.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define MAX_NUM_VESA_MODES 256
 

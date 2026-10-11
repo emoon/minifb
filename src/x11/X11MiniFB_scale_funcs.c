@@ -16,6 +16,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 static uint16_t
 read_u16_xsettings(const unsigned char *ptr, bool little_endian) {

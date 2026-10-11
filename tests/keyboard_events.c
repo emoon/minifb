@@ -11,6 +11,10 @@
     #include <TargetConditionals.h>
 #endif
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define TEST_WIDTH       640u
 #define TEST_HEIGHT      480u
 #define TEST_KEY_COUNT   ((unsigned) MFB_KB_KEY_LAST + 1u)
@@ -1710,6 +1714,10 @@ fill_buffer(uint32_t *buffer) {
 
 int
 main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
 #if TEST_EXCLUDED_MOBILE_PLATFORM
     fputs("keyboard_events_test excludes Android and iOS by design\n", stderr);
     return EXIT_SUCCESS;

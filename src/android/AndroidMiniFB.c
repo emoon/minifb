@@ -13,6 +13,10 @@
 #include <WindowData.h>
 #include "WindowData_Android.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define  LOG_TAG    "MiniFB"
 
 #ifndef ACONFIGURATION_DENSITY_DEFAULT
@@ -141,7 +145,7 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
         uint32_t *dst = window_buffer->bits;
         stretch_image(
             src, 0,     0,     window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
-            dst, dst_x, dst_y, dst_w,                     dst_h,                     window_buffer->stride
+            dst, dst_x, dst_y, dst_w,                     dst_h,                      window_buffer->stride
         );
     }
 }

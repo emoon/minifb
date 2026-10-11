@@ -4,6 +4,10 @@
 
 #include "MiniFB_timespec.h"
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 struct timespec
 ts_add(const struct timespec a, const struct timespec b) {

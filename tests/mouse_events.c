@@ -11,6 +11,17 @@
     #include <TargetConditionals.h>
 #endif
 
+#if defined(__ANDROID__)
+    #include <android/log.h>
+    #include <pthread.h>
+    #include <string.h>
+    #include <unistd.h>
+#endif
+
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #define TEST_WIDTH              640u
 #define TEST_HEIGHT             480u
 #define TEST_MOUSE_BUTTON_COUNT 8u
@@ -192,11 +203,6 @@ guide(const char *format, ...) {
 }
 
 #if defined(__ANDROID__)
-#include <android/log.h>
-#include <pthread.h>
-#include <string.h>
-#include <unistd.h>
-
 // An Android app has no terminal, so stdout and stderr are discarded. The test prints with
 // the standard functions to keep one source for every platform, so both are piped into a
 // thread that forwards each line to logcat.
@@ -1188,6 +1194,10 @@ fill_buffer(uint32_t *buffer) {
 
 int
 main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
 #if defined(__ANDROID__)
     redirect_output_to_log();
 #endif

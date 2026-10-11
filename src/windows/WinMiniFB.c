@@ -7,6 +7,10 @@
 #endif
 #include <stdlib.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 // Copied (and modified) from Windows Kit 10 to avoid setting _WIN32_WINNT to a higher version
 //-------------------------------------
 typedef enum mfb_PROCESS_DPI_AWARENESS {

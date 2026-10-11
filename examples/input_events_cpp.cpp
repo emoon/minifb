@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kUnused(var)    (void) var;
 #define TEST_TAG        "input_events_cpp"
@@ -117,6 +121,10 @@ public:
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     int noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Input Events CPP Test", WIDTH, HEIGHT, MFB_WF_RESIZABLE);

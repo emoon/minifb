@@ -12,6 +12,10 @@
 #include <MiniFB_internal.h>
 #include <WindowData.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 static UIWindow *
 get_application_window(void) {
     UIApplication *application = [UIApplication sharedApplication];

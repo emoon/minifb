@@ -6,6 +6,10 @@
 #include <Carbon/Carbon.h>
 #include <IOKit/hidsystem/IOLLEvent.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 #if defined(USE_METAL_API)
 //-------------------------------------
 static void

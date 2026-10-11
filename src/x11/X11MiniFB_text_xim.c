@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 static uint32_t
 keysym_to_codepoint(KeySym keysym) {

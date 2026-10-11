@@ -14,6 +14,13 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        externalNativeBuild {
+            cmake {
+                // ./gradlew assembleDebug -PminifbUseMmgr=ON
+                arguments += "-DMINIFB_USE_MMGR=${project.findProperty("minifbUseMmgr") ?: "OFF"}"
+            }
+        }
     }
 
     externalNativeBuild {

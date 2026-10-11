@@ -4,6 +4,10 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kPI             3.14159265358979323846f
 #define kUnused(var)    (void) var;
@@ -98,6 +102,10 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
 //-------------------------------------
 int
 main() {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     int noise, carry, seed = 0xbeef;
 
     struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, MFB_WF_RESIZABLE);

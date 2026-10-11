@@ -19,6 +19,10 @@
 
 #include <sys/mman.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 // Synchronize MiniFB modifier flags from the current xkb state.
 //-------------------------------------

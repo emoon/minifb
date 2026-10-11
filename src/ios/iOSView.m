@@ -2,6 +2,10 @@
 #include <MiniFB_internal.h>
 #include <math.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 static inline CGFloat
 input_scale_for_view(iOSView *view) {

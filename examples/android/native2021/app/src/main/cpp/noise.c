@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <math.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define  LOG_TAG    "Noise"
 
@@ -102,6 +106,10 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
 //-------------------------------------
 int
 main(int argc, char *argv[]) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     kUnused(argc);
     kUnused(argv);
     uint32_t    i, x, y, noise, carry, seed = 0xbeef;
