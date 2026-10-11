@@ -9,6 +9,10 @@
 #import "AppDelegate.h"
 #include <MiniFB.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 //-------------------------------------
 #define kUnused(var)        (void) var;
 #define APP_TAG             "noise"
@@ -328,8 +332,18 @@ resize(struct mfb_window *window, int width, int height) {
 
     if (g_window != 0x0) {
         mfb_close(g_window);
+        // mfb_close only marks the window for closing; the next update releases it
+        mfb_update_events(g_window);
         g_window = 0x0;
     }
+
+    free(g_buffer);
+    g_buffer = 0x0;
+
+#if defined(MINIFB_USE_MMGR)
+    // iOS usually kills the app instead of calling exit(), so mmgr may never write its leak report at exit
+    m_dumpLeakReport();
+#endif
 }
 
 @end

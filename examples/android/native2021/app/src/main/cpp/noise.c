@@ -107,6 +107,8 @@ mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float de
 int
 main(int argc, char *argv[]) {
 #if defined(MINIFB_USE_MMGR)
+    // When Android recreates the activity, the new android_main thread can start before the old one ends
+    m_enableMultithread();
     m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
 #endif
 
@@ -140,7 +142,7 @@ main(int argc, char *argv[]) {
     mfb_update_state state;
     do {
         if (!g_is_active) {
-            mfb_wait_sync(window);
+            // continue runs mfb_wait_sync in the loop condition; calling it here too would use a released window
             continue;
         }
 
@@ -197,4 +199,12 @@ main(int argc, char *argv[]) {
 
         g_frame_count++;
     } while (mfb_wait_sync(window));
+
+    free(g_buffer);
+    g_buffer = NULL;
+
+#if defined(MINIFB_USE_MMGR)
+    // An Android app usually ends without calling exit(), so mmgr may never write its leak report at exit
+    m_dumpLeakReport();
+#endif
 }

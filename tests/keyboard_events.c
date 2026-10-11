@@ -1715,6 +1715,8 @@ fill_buffer(uint32_t *buffer) {
 int
 main(void) {
 #if defined(MINIFB_USE_MMGR)
+    // mmgr replaces the global operator new, so system libraries also allocate through it from their own threads
+    m_enableMultithread();
     m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
 #endif
 
