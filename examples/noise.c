@@ -17,50 +17,25 @@ static uint32_t *g_buffer = NULL;
 //-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    MFB_LOGI(TEST_TAG, "Resize:");
-    MFB_LOGI(TEST_TAG, "- Params: Width: %d, Height: %d",
-        width,
-        height
-    );
-
-    float scale_x = 0, scale_y = 0;
-    mfb_get_monitor_scale(window, &scale_x, &scale_y);
-
-    MFB_LOGI(TEST_TAG, "- Scale X: %.2f, Scale Y: %.2f",
-        scale_x,
-        scale_y
-    );
-    MFB_LOGI(TEST_TAG, "- Params Scaled: Width: %d, Height: %d",
-        (uint32_t) (width  * scale_x),
-        (uint32_t) (height * scale_y)
-    );
-
-    uint32_t window_width  = mfb_get_window_width(window);
-    uint32_t window_height = mfb_get_window_height(window);
-    MFB_LOGI(TEST_TAG, "- Window: Width: %d, Height: %d",
-        window_width,
-        window_height
-    );
-
-    uint32_t offset_x    = mfb_get_drawable_offset_x(window);
-    uint32_t offset_y    = mfb_get_drawable_offset_y(window);
-    uint32_t draw_width  = mfb_get_drawable_width(window);
-    uint32_t draw_height = mfb_get_drawable_height(window);
-    MFB_LOGI(TEST_TAG, "- Draw Area: x: %d, y: %d, Width: %d (%d), Height: %d (%d)",
-        offset_x,
-        offset_y,
-        draw_width,
-        window_width  - draw_width  - offset_x,
-        draw_height,
-        window_height - draw_height - offset_y
-    );
-
-    if ((g_width != draw_width) || (g_height != draw_height)) {
-        g_width  = draw_width;
-        g_height = draw_height;
-        g_buffer = realloc(g_buffer, g_width * g_height * 4);
+    if (width <= 0 || height <= 0) {
+        return;
     }
-    MFB_LOGI(TEST_TAG, "----");
+    if ((uint32_t) width > UINT32_MAX / sizeof(*g_buffer) ||
+        (size_t) height > SIZE_MAX / sizeof(*g_buffer) / (size_t) width) {
+        mfb_close(window);
+        return;
+    }
+
+    uint32_t *buffer = realloc(g_buffer, (size_t) width * height * sizeof(*g_buffer));
+    if (buffer == NULL) {
+        mfb_close(window);
+        return;
+    }
+
+    g_buffer = buffer;
+    g_width  = (uint32_t) width;
+    g_height = (uint32_t) height;
+    MFB_LOGI(TEST_TAG, "resize: %dx%d", width, height);
 }
 
 //-------------------------------------
@@ -72,19 +47,26 @@ main() {
     m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
 #endif
 
-    uint32_t    i, noise, carry, seed = 0xbeef;
+    size_t      i;
+    uint32_t    noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("Noise Test", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window) {
         return -1;
     }
 
-    g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
     mfb_set_resize_callback(window, resize);
+
+    g_buffer = (uint32_t *) malloc((size_t) g_width * g_height * sizeof(*g_buffer));
+    if (g_buffer == NULL) {
+        mfb_close(window);
+        mfb_update_events(window);
+        return -1;
+    }
 
     mfb_update_state state;
     do {
-        for (i = 0; i < g_width * g_height; ++i) {
+        for (i = 0; i < (size_t) g_width * g_height; ++i) {
             noise = seed;
             noise >>= 3;
             noise ^= seed;

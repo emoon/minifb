@@ -1,30 +1,46 @@
 // press 'H' to hide, press 'S' to show
 
-#include <MiniFB.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <MiniFB.h>
 
 #if defined(MINIFB_USE_MMGR)
     #include "mmgr.h"
 #endif
 
+#define TEST_TAG        "hide"
+
+//-------------------------------------
 static uint32_t  g_width  = 800;
 static uint32_t  g_height = 600;
 static uint32_t *g_buffer = NULL;
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 resize(struct mfb_window *window, int width, int height) {
-    (void) window;
-    g_width  = width;
-    g_height = height;
-    g_buffer = realloc(g_buffer, g_width * g_height * 4);
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    if ((uint32_t) width > UINT32_MAX / sizeof(*g_buffer) ||
+        (size_t) height > SIZE_MAX / sizeof(*g_buffer) / (size_t) width) {
+        mfb_close(window);
+        return;
+    }
+
+    uint32_t *buffer = realloc(g_buffer, (size_t) width * height * sizeof(*g_buffer));
+    if (buffer == NULL) {
+        mfb_close(window);
+        return;
+    }
+
+    g_buffer = buffer;
+    g_width  = (uint32_t) width;
+    g_height = (uint32_t) height;
+    MFB_LOGI(TEST_TAG, "resize: %dx%d", width, height);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 void
 keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_pressed) {
     if (key == MFB_KB_KEY_H) {
@@ -38,8 +54,7 @@ keyboard_event(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//-------------------------------------
 int
 main() {
 #if defined(MINIFB_USE_MMGR)
@@ -48,23 +63,28 @@ main() {
     m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
 #endif
 
-    uint32_t    i, noise, carry, seed = 0xbeef;
+    size_t      i;
+    uint32_t    noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open_ex("H to hide, S to show", g_width, g_height, MFB_WF_RESIZABLE);
-    if (!window)
-        return 0;
+    if (!window) {
+        return -1;
+    }
 
-    mfb_set_keyboard_callback(window, keyboard_event);
-
-    g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
     mfb_set_resize_callback(window, resize);
+    mfb_set_keyboard_callback(window, keyboard_event);
 
     mfb_set_viewport(window, 50, 50, g_width - 50 - 50, g_height - 50 - 50);
     resize(window, g_width - 100, g_height - 100);  // to resize buffer
+    if (g_buffer == NULL) {
+        mfb_close(window);
+        mfb_update_events(window);
+        return -1;
+    }
 
     mfb_update_state state;
     do {
-        for (i = 0; i < g_width * g_height; ++i) {
+        for (i = 0; i < (size_t) g_width * g_height; ++i) {
             noise = seed;
             noise >>= 3;
             noise ^= seed;
@@ -73,7 +93,7 @@ main() {
             seed >>= 1;
             seed |= (carry << 30);
             noise &= 0xFF;
-            g_buffer[i] = MFB_RGB(noise, noise, noise);
+            g_buffer[i] = MFB_RGB(0, noise, noise);
         }
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);

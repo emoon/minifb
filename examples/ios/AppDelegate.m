@@ -275,7 +275,16 @@ resize(struct mfb_window *window, int width, int height) {
             //g_height -= 100;
             //mfb_set_viewport(g_window, 50, 50, g_width, g_height);
 
-            g_buffer = malloc(g_width * g_height * 4);
+            g_buffer = malloc((size_t) g_width * g_height * sizeof(*g_buffer));
+            if (g_buffer == 0x0) {
+                MFB_LOGE(APP_TAG, "Failed to allocate the frame buffer");
+                mfb_close(g_window);
+                mfb_update_events(g_window);
+                g_window = 0x0;
+                g_width  = 0;
+                g_height = 0;
+                return YES;
+            }
             mfb_set_active_callback(g_window, active_changed);
             mfb_set_close_callback(g_window, window_closing);
             mfb_set_mouse_move_callback(g_window, mouse_move);

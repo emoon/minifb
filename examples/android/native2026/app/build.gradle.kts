@@ -9,7 +9,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.noise"
+        applicationId = "com.example.noise26"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

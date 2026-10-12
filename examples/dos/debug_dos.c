@@ -22,9 +22,16 @@ int main(void) {
   gdb_start();
 
   uint32_t *pixels = (uint32_t *)malloc(sizeof(uint32_t) * buf_x * buf_y);
+  if (pixels == NULL) {
+    return -1;
+  }
   memset(pixels, 0, buf_x * buf_y * 4);
 
   struct mfb_window *window = mfb_open_ex("Noise Test", res_x, res_y, MFB_WF_RESIZABLE);
+  if (window == NULL) {
+    free(pixels);
+    return -1;
+  }
 
   do {
     for (int i = 0; i < 2000; i++) {
@@ -57,5 +64,6 @@ int main(void) {
 
     gdb_checkpoint();
   } while (mfb_wait_sync(window));
+  free(pixels);
   return 0;
 }

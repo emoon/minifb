@@ -112,7 +112,7 @@ main() {
 
     struct mfb_window *window_a = mfb_open_ex("Multiple Windows Test", WIDTH_A, HEIGHT_A, MFB_WF_RESIZABLE);
     if (!window_a) {
-        return 0;
+        return -1;
     }
 
     mfb_set_active_callback(window_a, active);
@@ -129,7 +129,9 @@ main() {
     //--
     struct mfb_window *window_b = mfb_open_ex("Secondary Window", WIDTH_B, HEIGHT_B, MFB_WF_RESIZABLE);
     if (!window_b) {
-        return 0;
+        mfb_close(window_a);
+        mfb_update_events(window_a);
+        return -1;
     }
 
     mfb_set_active_callback(window_b, active);

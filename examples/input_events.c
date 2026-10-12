@@ -18,9 +18,6 @@ static uint32_t g_height      = 600;
 static uint32_t *g_buffer     = NULL;
 static bool     g_active      = true;
 static uint32_t g_frame_count = 0;
-// Convert phisical pixels to logical pixels
-static float    g_to_logic_width;
-static float    g_to_logic_height;
 
 //-------------------------------------
 static void
@@ -127,11 +124,21 @@ resize(struct mfb_window *window, int width, int height) {
 
     MFB_LOGI(TEST_TAG, "%s > resize: %d, %d", window_title, width, height);
 
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
     float scale = 1.0f;
     mfb_get_monitor_scale(window, &scale, NULL);
     int32_t viewport_x = (int32_t) (20 * scale);
     int32_t viewport_y = (int32_t) (20 * scale);
-    int32_t viewport_width  = width - 2 * viewport_x;
+    if (viewport_x > (width - 1) / 2) {
+        viewport_x = (width - 1) / 2;
+    }
+    if (viewport_y > (height - 1) / 2) {
+        viewport_y = (height - 1) / 2;
+    }
+    int32_t viewport_width  = width  - 2 * viewport_x;
     int32_t viewport_height = height - 2 * viewport_y;
 
     mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
@@ -194,16 +201,21 @@ char_input(struct mfb_window *window, unsigned int char_code) {
 static void
 mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, bool is_pressed) {
     const char *window_title = "";
-    int x, y, xl, yl;
+    int x, y;
+    double xl = 0.0, yl = 0.0;
     if (window) {
         window_title = (const char *) mfb_get_user_data(window);
     }
 
     x = mfb_get_mouse_x(window);
     y = mfb_get_mouse_y(window);
-    xl = x * (g_width  * g_to_logic_width);
-    yl = y * (g_height * g_to_logic_height);
-    MFB_LOGI(TEST_TAG, "%s > mouse_btn: button: %d (pressed: %d) (at: [phys: %d, %d] [log: %d, %d]) [key_mod: %x]",
+    unsigned offset_x, offset_y, draw_width, draw_height;
+    mfb_get_drawable_bounds(window, &offset_x, &offset_y, &draw_width, &draw_height);
+    if (draw_width != 0 && draw_height != 0) {
+        xl = ((double) x - offset_x) * g_width  / draw_width;
+        yl = ((double) y - offset_y) * g_height / draw_height;
+    }
+    MFB_LOGI(TEST_TAG, "%s > mouse_btn: button: %d (pressed: %d) (at: [window: %d, %d] [buffer: %.2f, %.2f]) [key_mod: %x]",
             window_title,
             button,
             is_pressed,
@@ -258,14 +270,11 @@ main() {
         return -1;
     }
 
-    // Convert phisical pixels to logical pixels
-    g_to_logic_width  = 1.0f / g_width;
-    g_to_logic_height = 1.0f / g_height;
-
     mfb_set_log_level(MFB_LOG_TRACE);
 
     struct mfb_window *window = mfb_open_ex("Input Events Test", g_width, g_height, MFB_WF_RESIZABLE);
     if (!window) {
+        free(g_buffer);
         return -1;
     }
 
@@ -281,15 +290,7 @@ main() {
 
     mfb_set_user_data(window, (void *) "Input Events Test");
 
-    float scale = 1.0f;
-    mfb_get_monitor_scale(window, &scale, NULL);
-    int32_t viewport_x = (int32_t) (20 * scale);
-    int32_t viewport_y = (int32_t) (20 * scale);
-    int32_t viewport_width  = g_width - 2 * viewport_x;
-    int32_t viewport_height = g_height - 2 * viewport_y;
-
-    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
-    print_getters(window);
+    resize(window, (int) mfb_get_window_width(window), (int) mfb_get_window_height(window));
 
     uint32_t         i;
     mfb_update_state state;

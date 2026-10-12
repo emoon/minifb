@@ -45,18 +45,18 @@ public class MiniFBActivity extends NativeActivity {
         // -----------------------------------------------------------------------
         // Step 1: Opt-in to draw in the display cutout (notch) area.
         //
-        // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS (API 31) is the strongest opt-in:
+        // LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS (API 30) is the strongest opt-in:
         //   the window is allowed to extend into the cutout in all orientations.
-        // For API 28-30 we use SHORT_EDGES (value 1), which covers portrait/landscape
+        // For API 28-29 we use SHORT_EDGES (value 1), which covers portrait/landscape
         //   short-edge cutouts.  No cutout API existed before API 28.
         // -----------------------------------------------------------------------
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {           // API 31+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {           // API 30+
             WindowManager.LayoutParams params = getWindow().getAttributes();
             params.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
             getWindow().setAttributes(params);
         }
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {   // API 28-30
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {   // API 28-29
             WindowManager.LayoutParams params = getWindow().getAttributes();
             params.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;

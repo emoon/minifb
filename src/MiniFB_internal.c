@@ -77,24 +77,26 @@ mfb_validate_viewport(const SWindowData *window_data,
 
 //-------------------------------------
 static uint32_t
-interpolate(uint32_t *src_image, uint32_t x, uint32_t y, uint32_t src_offset_x, uint32_t src_offset_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch) {
-    uint32_t inc_x = x + 1 < src_width  ? 1         : 0;
-    uint32_t inc_y = y + 1 < src_height ? src_pitch : 0;
-    uint8_t *p00 = (uint8_t *) &src_image[(src_offset_x >> 16)];
-    uint8_t *p01 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_x];
-    uint8_t *p10 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_y];
-    uint8_t *p11 = (uint8_t *) &src_image[(src_offset_x >> 16) + inc_y + inc_x];
+interpolate(uint32_t *src_image, uint32_t src_row, uint32_t src_offset_x, uint32_t src_offset_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch) {
+    uint32_t src_col = src_offset_x >> 16;
+    uint32_t inc_x = src_col + 1 < src_width  ? 1         : 0;
+    uint32_t inc_y = src_row + 1 < src_height ? src_pitch : 0;
+    uint8_t *p00 = (uint8_t *) &src_image[src_col];
+    uint8_t *p01 = (uint8_t *) &src_image[src_col + inc_x];
+    uint8_t *p10 = (uint8_t *) &src_image[src_col + inc_y];
+    uint8_t *p11 = (uint8_t *) &src_image[src_col + inc_y + inc_x];
 
     uint32_t wx2 = src_offset_x & 0xffff;
     uint32_t wy2 = src_offset_y & 0xffff;
     uint32_t wx1 = 0x10000 - wx2;
     uint32_t wy1 = 0x10000 - wy2;
 
-    // wx1 * wy1 is 2^32 when wx2 == wy2 == 0, so w1 is computed from wx2 * wy1 to stay within 32 bits
-    uint32_t w1 = wy1 - ((wx2 * wy1 + 0xffff) >> 16);
+    // w1 takes the rounding remainder so the four weights always add up to 0x10000, and a flat
+    // color keeps its exact value. It also avoids wx1 * wy1, which is 2^32 when both fractions are 0.
     uint32_t w2 = (wx2 * wy1) >> 16;
     uint32_t w3 = (wx1 * wy2) >> 16;
     uint32_t w4 = (wx2 * wy2) >> 16;
+    uint32_t w1 = 0x10000 - w2 - w3 - w4;
 
     uint32_t b = ((p00[0] * w1 + p01[0] * w2) + (p10[0] * w3 + p11[0] * w4)) >> 16;
     uint32_t g = ((p00[1] * w1 + p01[1] * w2) + (p10[1] * w3 + p11[1] * w4)) >> 16;
@@ -111,6 +113,9 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
               uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch) {
     uint32_t    x, y;
     uint32_t    src_offset_x, src_offset_y;
+#if defined(kUseBilinearInterpolation)
+    uint32_t    src_row = 0;
+#endif
 
     if (src_image == NULL || dst_image == NULL)
         return;
@@ -129,7 +134,7 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
         src_offset_x = 0;
         for (x=0; x<dst_width; ++x) {
 #if defined(kUseBilinearInterpolation)
-            dst_image[x] = interpolate(src_image, x+src_x, y+src_y, src_offset_x, src_offset_y, src_width, src_height, src_pitch);
+            dst_image[x] = interpolate(src_image, src_row, src_offset_x, src_offset_y, src_width, src_height, src_pitch);
 #else
             dst_image[x] = src_image[src_offset_x >> 16];
 #endif
@@ -139,6 +144,9 @@ stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_
         src_offset_y += delta_y;
         if (src_offset_y >= 0x10000) {
             src_image += (src_offset_y >> 16) * src_pitch;
+#if defined(kUseBilinearInterpolation)
+            src_row   += src_offset_y >> 16;
+#endif
             src_offset_y &= 0xffff;
         }
         dst_image += dst_pitch;

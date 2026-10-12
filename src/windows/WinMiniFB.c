@@ -960,6 +960,9 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
 
 #if !defined(USE_OPENGL_API)
 
+    // The default BLACKONWHITE mode combines colors with AND when shrinking.
+    SetStretchBltMode(window_data_specific->hdc, COLORONCOLOR);
+
     window_data_specific->bitmap_info = (BITMAPINFO *) calloc(1, sizeof(BITMAPINFOHEADER) + sizeof(RGBQUAD) * 3);
     if (window_data_specific->bitmap_info == NULL) {
         MFB_LOG(MFB_LOG_ERROR, "Cannot allocate BITMAPINFO");

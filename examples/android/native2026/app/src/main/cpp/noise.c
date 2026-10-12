@@ -132,14 +132,34 @@ active(struct mfb_window *window, bool is_active) {
 void
 resize(struct mfb_window *window, int width, int height) {
     MFB_LOGI(LOG_TAG, "resize: %d, %d", width, height);
-    g_width  = (width  >> 1);
-    g_height = (height >> 1);
-    g_buffer = realloc(g_buffer, g_width * g_height * 4);
+    if (width <= 1 || height <= 1) {
+        return;
+    }
+
+    uint32_t buffer_width  = (uint32_t) width  / 2;
+    uint32_t buffer_height = (uint32_t) height / 2;
+    if (buffer_width > UINT32_MAX / sizeof(*g_buffer) ||
+        (size_t) buffer_height > SIZE_MAX / sizeof(*g_buffer) / buffer_width) {
+        mfb_close(window);
+        return;
+    }
+
+    uint32_t *buffer = realloc(g_buffer, (size_t) buffer_width * buffer_height * sizeof(*g_buffer));
+    if (buffer == NULL) {
+        mfb_close(window);
+        return;
+    }
+
+    g_buffer = buffer;
+    g_width  = buffer_width;
+    g_height = buffer_height;
 
     float scale = 1.0f;
     mfb_get_monitor_scale(window, &scale, NULL);
     int32_t viewport_x = (int32_t) (20 * scale);
     int32_t viewport_y = (int32_t) (20 * scale);
+    viewport_x = MIN(viewport_x, (width  - 1) / 2);
+    viewport_y = MIN(viewport_y, (height - 1) / 2);
     int32_t viewport_width  = width - 2 * viewport_x;
     int32_t viewport_height = height - 2 * viewport_y;
 
@@ -164,11 +184,23 @@ mouse_btn(struct mfb_window *window, mfb_mouse_button button, mfb_key_mod mod, b
     int x, y, id;
     mfb_decode_touch(mfb_get_mouse_x(window), &x, &id);
     mfb_decode_touch(mfb_get_mouse_y(window), &y, NULL);
-    x >>= 1;
-    y >>= 1;
-    g_positions[button].enabled = is_pressed;
-    g_positions[button].x = x;
-    g_positions[button].y = y;
+    // A finger reports its pointer id in button, and a mouse its real button.
+    int pointer_id = (int) button;
+    if (id == MFB_POINTER_ID_MOUSE && pointer_id != MFB_POINTER_ID_MOUSE) {
+        if (button != MFB_MOUSE_LEFT) {
+            return;
+        }
+        pointer_id = MFB_POINTER_ID_MOUSE;
+    }
+    if (pointer_id < 0 || pointer_id >= 16) {
+        return;
+    }
+    g_positions[pointer_id].enabled = is_pressed;
+    // Cancellation reports each touch id in button without updating the saved coordinates.
+    if (is_pressed == true) {
+        g_positions[pointer_id].x = x;
+        g_positions[pointer_id].y = y;
+    }
     MFB_LOGI(LOG_TAG, "mouse_btn: button: id %d=%d, x=%d, y=%d (touch %d)", (int) button, (int) is_pressed, x, y, id);
 }
 
@@ -178,9 +210,9 @@ mouse_move(struct mfb_window *window, int x, int y) {
     int id;
     mfb_decode_touch(x, &x, &id);
     mfb_decode_touch(y, &y, NULL);
-    x >>= 1;
-    y >>= 1;
-    g_positions[id].enabled = true;
+    if (id < 0 || id >= 16) {
+        return;
+    }
     g_positions[id].x = x;
     g_positions[id].y = y;
     MFB_LOGI(LOG_TAG, "mouse_move: %d, %d [%d]", x, y, id);
@@ -190,6 +222,48 @@ mouse_move(struct mfb_window *window, int x, int y) {
 void
 mouse_scroll(struct mfb_window *window, mfb_key_mod mod, float delta_x, float delta_y) {
     MFB_LOGI(LOG_TAG, "mouse_scroll:");
+}
+
+//-------------------------------------
+static void
+draw_positions(struct mfb_window *window) {
+    unsigned offset_x, offset_y, draw_width, draw_height;
+    mfb_get_drawable_bounds(window, &offset_x, &offset_y, &draw_width, &draw_height);
+    if (draw_width == 0 || draw_height == 0) {
+        return;
+    }
+
+    for (int p = 0; p < 16; ++p) {
+        if (g_positions[p].enabled == true) {
+            int px = (int) floor(((double) g_positions[p].x - offset_x) * g_width  / draw_width);
+            int py = (int) floor(((double) g_positions[p].y - offset_y) * g_height / draw_height);
+            int min_x = MAX(px - 16, 0);
+            int max_x = MIN(px + 16, (int) g_width);
+            int min_y = MAX(py - 16, 0);
+            int max_y = MIN(py + 16, (int) g_height);
+            for (int y = min_y; y < max_y; ++y) {
+                for (int x = min_x; x < max_x; ++x) {
+                    g_buffer[(size_t) y * g_width + x] = MFB_RGB(0, 0, 0);
+                }
+            }
+        }
+    }
+}
+
+//-------------------------------------
+static uint32_t
+buffer_inset(int inset, int64_t viewport_margin, uint32_t buffer_size, uint32_t drawable_size) {
+    int64_t overlap = (int64_t) inset - viewport_margin;
+    if (overlap <= 0 || drawable_size == 0) {
+        return 0;
+    }
+    if ((uint64_t) overlap >= drawable_size) {
+        return buffer_size;
+    }
+
+    // Round up so a buffer pixel that only partly covers the unsafe area is marked too.
+    uint64_t pixels = (uint64_t) overlap * buffer_size + drawable_size - 1;
+    return (uint32_t) (pixels / drawable_size);
 }
 
 // I'm not sure that we can use this function name but it works
@@ -204,7 +278,8 @@ main(int argc, char *argv[]) {
 
     kUnused(argc);
     kUnused(argv);
-    uint32_t    i, x, y, noise, carry, seed = 0xbeef;
+    size_t      i;
+    uint32_t    x, y, noise, carry, seed = 0xbeef;
 
     struct mfb_window *window = mfb_open("Ignored", g_width, g_height);
     if (window == NULL)
@@ -218,18 +293,14 @@ main(int argc, char *argv[]) {
     mfb_set_mouse_move_callback(window, mouse_move);
     mfb_set_mouse_scroll_callback(window, mouse_scroll);    // not working
 
-    float scale = 1.0f;
-    mfb_get_monitor_scale(window, &scale, NULL);
-    int32_t viewport_x = (int32_t) (20 * scale);
-    int32_t viewport_y = (int32_t) (20 * scale);
-    int32_t viewport_width  = g_width  - 2 * viewport_x;
-    int32_t viewport_height = g_height - 2 * viewport_y;
-
-    mfb_set_viewport(window, viewport_x, viewport_y, viewport_width, viewport_height);
+    resize(window, (int) mfb_get_window_width(window), (int) mfb_get_window_height(window));
+    if (g_buffer == NULL) {
+        mfb_close(window);
+        mfb_update_events(window);
+        return -1;
+    }
 
     print_getters(window);
-
-    g_buffer = (uint32_t *) malloc(g_width * g_height * 4);
 
     mfb_update_state state;
     do {
@@ -241,15 +312,16 @@ main(int argc, char *argv[]) {
         int safe_left = 0, safe_top = 0, safe_right = 0, safe_bottom = 0;
         mfb_get_display_safe_insets(window, &safe_left, &safe_top, &safe_right, &safe_bottom);
 
-        uint32_t inset_left   = (uint32_t) MAX(0, safe_left);
-        uint32_t inset_top    = (uint32_t) MAX(0, safe_top);
-        uint32_t inset_right  = (uint32_t) MAX(0, safe_right);
-        uint32_t inset_bottom = (uint32_t) MAX(0, safe_bottom);
+        unsigned offset_x, offset_y, draw_width, draw_height;
+        mfb_get_drawable_bounds(window, &offset_x, &offset_y, &draw_width, &draw_height);
+        int64_t right_margin  = (int64_t) mfb_get_window_width(window)  - offset_x - draw_width;
+        int64_t bottom_margin = (int64_t) mfb_get_window_height(window) - offset_y - draw_height;
 
-        inset_left   = MIN(inset_left, g_width);
-        inset_right  = MIN(inset_right, g_width);
-        inset_top    = MIN(inset_top, g_height);
-        inset_bottom = MIN(inset_bottom, g_height);
+        // Only the overlap with the viewport reaches the reduced buffer.
+        uint32_t inset_left   = buffer_inset(safe_left,   offset_x,      g_width,  draw_width);
+        uint32_t inset_top    = buffer_inset(safe_top,    offset_y,      g_height, draw_height);
+        uint32_t inset_right  = buffer_inset(safe_right,  right_margin,  g_width,  draw_width);
+        uint32_t inset_bottom = buffer_inset(safe_bottom, bottom_margin, g_height, draw_height);
 
         bool has_insets = (inset_left > 0) || (inset_top > 0) || (inset_right > 0) || (inset_bottom > 0);
 
@@ -275,6 +347,8 @@ main(int argc, char *argv[]) {
                 g_buffer[i++] = in_inset ? MFB_RGB(noise, 0, 0) : MFB_RGB(noise, noise, noise);
             }
         }
+
+        draw_positions(window);
 
         state = mfb_update_ex(window, g_buffer, g_width, g_height);
         if (state != MFB_STATE_OK) {

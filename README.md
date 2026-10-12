@@ -868,12 +868,32 @@ The example (`examples/android/native2026`) shows two approaches; pick the one t
 
 ##### Option A - Manifest + theme (no Java code)
 
-Add a theme to `res/values/styles.xml`:
+Add the theme to three resource folders, so each API level only gets a cutout mode it knows. API 28-29 crash at startup with `Unknown windowLayoutInDisplayCutoutMode: 3` if the theme sets `always` (added in API 30).
+
+`res/values/styles.xml`:
 
 ```xml
 <resources>
     <style name="FullscreenNative" parent="@android:style/Theme.NoTitleBar.Fullscreen">
-        <!-- Allows the window to draw into the cutout area (API 31+). -->
+    </style>
+</resources>
+```
+
+`res/values-v28/styles.xml`:
+
+```xml
+<resources>
+    <style name="FullscreenNative" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>
+```
+
+`res/values-v30/styles.xml`:
+
+```xml
+<resources>
+    <style name="FullscreenNative" parent="@android:style/Theme.NoTitleBar.Fullscreen">
         <item name="android:windowLayoutInDisplayCutoutMode">always</item>
     </style>
 </resources>
@@ -895,7 +915,7 @@ Then reference it in `AndroidManifest.xml`:
 
 Subclass `NativeActivity` in `MiniFBActivity.java` and override `onCreate` / `onWindowFocusChanged` to call `setupFullscreen()`, which:
 
-- Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 31+) or `SHORT_EDGES` (API 28-30).
+- Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 30+) or `SHORT_EDGES` (API 28-29).
 - Hides system bars via `WindowInsetsController` (API 30+) or the legacy `setSystemUiVisibility` flags (API 24-29).
 - Re-applies on focus changes (bars can reappear after an edge-swipe gesture).
 
