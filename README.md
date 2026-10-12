@@ -481,7 +481,7 @@ The sections below describe what each platform needs and which backend it uses b
 | `MINIFB_BUILD_TESTS` | `ON` | all | Build the interactive tests in `tests/` |
 | `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
 | `MINIFB_SANITIZE` | `OFF` | GCC, Clang, MSVC | Build the library, examples and tests with AddressSanitizer, plus UndefinedBehaviorSanitizer on GCC and Clang. Not available on DJGPP or MinGW GCC |
-| `MINIFB_USE_MMGR` | `OFF` | all | Track the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr), which reports leaks and overruns in `<program>_memleaks.log` and `<program>_memory.log`. CMake downloads it the first time. On Linux with OpenGL, the leak report also lists a few thousand `new` blocks with no source file (`??(0)::??`): they belong to Mesa, which mmgr also sees because it replaces the global `operator new`, not to MiniFB. On macOS, with Cocoa and with Metal, about a thousand of these blocks come from AppKit, Metal and CoreAnalytics. These frameworks allocate from their own threads, so a program must call `m_enableMultithread()` before anything else. Otherwise mmgr corrupts its tables and the program crashes at random. On iOS, the working directory is read only, so the example writes its logs to the `tmp` folder of the app. iOS with Xcode needs a version of mmgr newer than 1.0.0. Xcode links with `-dead_strip`, and with mmgr 1.0.0 the linker removes its `operator new` but keeps its `operator delete`, so the app stops before `main` |
+| `MINIFB_USE_MMGR` | `OFF` | all | Track the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr), which reports leaks and overruns in `<program>_memleaks.log` and `<program>_memory.log`. CMake downloads it the first time. On Linux with OpenGL, the leak report also lists a few thousand `new` blocks with no source file (`??(0)::??`): they belong to Mesa, which mmgr also sees because it replaces the global `operator new`, not to MiniFB. On macOS, with Cocoa and with Metal, about a thousand of these blocks come from AppKit, Metal and CoreAnalytics. These frameworks allocate from their own threads, so a program must call `m_enableMultithread()` before anything else. Otherwise mmgr corrupts its tables and the program crashes at random. On iOS, the working directory is read only, so the example writes its logs to the `tmp` folder of the app. MiniFB needs mmgr 1.0.1 or newer. With 1.0.0, a program linked with `-dead_strip` stops at startup. Xcode always uses this option for iOS, and for macOS when `DEAD_CODE_STRIPPING` is on. On macOS, 1.0.0 can also write a leak report at exit that is mixed, cut or empty |
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
 
@@ -798,6 +798,8 @@ mkdir build-ios
 cd build-ios
 cmake -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
 ```
+
+For the Simulator, also pass `-DCMAKE_OSX_SYSROOT=iphonesimulator`. To build from the command line, use `cmake --build . --config Debug --target noise -- -sdk iphonesimulator`.
 
 Then choose the Xcode scheme you want to run:
 

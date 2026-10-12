@@ -71,7 +71,7 @@ if (MINIFB_USE_MMGR)
     include(FetchContent)
     FetchContent_Declare(mmgr
         GIT_REPOSITORY https://github.com/Darky-Lucera/mmgr.git
-        GIT_TAG        v1.0.0
+        GIT_TAG        v1.0.1
     )
     FetchContent_MakeAvailable(mmgr)
 
