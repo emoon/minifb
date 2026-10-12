@@ -91,3 +91,7 @@ Accepting a close request and calling `mfb_close` both end the run, so one windo
 The summary also records some things without checking them: the window size and monitor scale at open, whether the window starts active, which callbacks arrive in the first event pump, and what minimizing and maximizing produce. Not every platform reports a minimize, so compare those lines between backends.
 
 On Web there are two steps: click outside the canvas and back, and resize the browser window. A page has no close button and cannot be moved, minimized or maximized. Press Escape after the last step. The run then ends with `mfb_close`, which is how Web checks it.
+
+## Software scaling
+
+`scaling_test` runs without opening a window. It checks the shared scaler against a reference calculation, including enlargement, reduction, edge samples, flat colors, source and destination offsets, padded rows and dimensions of 65,536 pixels. It also checks reuse of the bilinear scaling buffer. Build and run it once with `MINIFB_USE_BILINEAR=OFF` and once with `MINIFB_USE_BILINEAR=ON`. It is available on desktop and DOS builds; its DOS executable is `scaling.exe`. On native builds, `ctest` runs it as the `scaling` test.

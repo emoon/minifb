@@ -85,7 +85,27 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
         return;
 
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
-    size_t image_size = (size_t) window_data->buffer_stride * (size_t) window_data->buffer_height;
+    uint32_t image_width = window_data->buffer_width;
+    uint32_t image_height = window_data->buffer_height;
+    uint32_t image_stride = window_data->buffer_stride;
+    void *image_buffer = window_data->draw_buffer;
+#if defined(MINIFB_USE_BILINEAR)
+    CGRect device_rect = CGContextConvertRectToDeviceSpace(context,
+        CGRectMake(window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height));
+    double device_width = ceil(fabs(device_rect.size.width));
+    double device_height = ceil(fabs(device_rect.size.height));
+    if (device_width < 1 || device_width > UINT32_MAX || device_height < 1 || device_height > UINT32_MAX) {
+        return;
+    }
+    image_width = (uint32_t) device_width;
+    image_height = (uint32_t) device_height;
+    image_buffer = mfb_get_scaled_buffer(window_data, image_width, image_height);
+    if (image_buffer == NULL || calculate_buffer_layout(image_width, image_height, &image_stride, NULL) == false) {
+        return;
+    }
+    CGContextSetInterpolationQuality(context, kCGInterpolationNone);
+#endif
+    size_t image_size = (size_t) image_stride * (size_t) image_height;
 
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
     if (space == NULL) {
@@ -93,7 +113,7 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
         return;
     }
     CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
-                                                              window_data->draw_buffer,
+                                                              image_buffer,
                                                               image_size,
                                                               0x0
     );
@@ -103,11 +123,11 @@ settle_mouse_inside(SWindowData *window_data, NSView *view, NSEvent *event) {
         return;
     }
 
-    CGImageRef img = CGImageCreate(window_data->buffer_width
-                                 , window_data->buffer_height
+    CGImageRef img = CGImageCreate(image_width
+                                 , image_height
                                  , 8
                                  , 32
-                                 , window_data->buffer_stride
+                                 , image_stride
                                  , space
                                  , kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
                                  , provider

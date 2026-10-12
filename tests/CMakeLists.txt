@@ -8,6 +8,21 @@ if (ANDROID)
     return()
 endif()
 
+if (NOT EMSCRIPTEN)
+    add_executable(scaling_test scaling.c)
+    target_link_libraries(scaling_test PRIVATE minifb)
+    target_include_directories(scaling_test PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    if (MINIFB_USE_BILINEAR)
+        target_compile_definitions(scaling_test PRIVATE MINIFB_USE_BILINEAR)
+    endif()
+    minifb_configure_target(scaling_test)
+    minifb_set_dos_name(scaling_test scaling)
+    set_property(TARGET scaling_test PROPERTY FOLDER "Tests")
+    if (NOT CMAKE_CROSSCOMPILING OR CMAKE_CROSSCOMPILING_EMULATOR)
+        add_test(NAME scaling COMMAND scaling_test)
+    endif()
+endif()
+
 add_executable(mouse_events_test
     mouse_events.c
 )

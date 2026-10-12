@@ -216,6 +216,29 @@ reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
 }
 
 //-------------------------------------
+EM_EXPORT bool
+window_data_uses_bilinear(void) {
+#if defined(MINIFB_USE_BILINEAR)
+    return true;
+#else
+    return false;
+#endif
+}
+
+//-------------------------------------
+EM_EXPORT void *
+window_data_get_frame_buffer(SWindowData *window_data) {
+    if (window_data == NULL) {
+        return NULL;
+    }
+#if defined(MINIFB_USE_BILINEAR)
+    return mfb_get_scaled_buffer(window_data, window_data->dst_width, window_data->dst_height);
+#else
+    return window_data->draw_buffer;
+#endif
+}
+
+//-------------------------------------
 EM_EXPORT void
 window_data_set_mouse_pos(SWindowData *window_data, int x, int y) {
     if (!window_data) return;
@@ -542,7 +565,9 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
          canvas.style.width = width + "px";
         canvas.style.height = height + "px";
     }
-    if (!canvas.style["image-rendering"]) canvas.style["image-rendering"] = "pixelated";
+    if (!canvas.style["image-rendering"]) {
+        canvas.style["image-rendering"] = Module._window_data_uses_bilinear() ? "auto" : "pixelated";
+    }
     if (!canvas.style["user-select"]) canvas.style["user-select"] = "none";
     if (!canvas.style["touch-action"]) canvas.style["touch-action"] = "none";
     if (!canvas.style["border"]) canvas.style["border"] = "none";
@@ -1365,16 +1390,24 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     Module._window_data_update_window_size(window_data, canvas.width, canvas.height);
     Module._window_data_set_buffer_size(window_data, width, height);
 
+    let dstOffsetX = Module._window_data_get_dst_offset_x(window_data);
+    let dstOffsetY = Module._window_data_get_dst_offset_y(window_data);
+    let dstWidth = Module._window_data_get_dst_width(window_data);
+    let dstHeight = Module._window_data_get_dst_height(window_data);
+    if (Module._window_data_uses_bilinear()) {
+        if (dstWidth === 0 || dstHeight === 0) return MFB_STATE_OK;
+        buffer = Module._window_data_get_frame_buffer(window_data);
+        if (buffer == 0) return MFB_STATE_INTERNAL_ERROR;
+        width = dstWidth;
+        height = dstHeight;
+    }
+
     let swizzleBuffer = Module._window_data_get_swizzle_buffer(window_data, width, height);
     if (swizzleBuffer == 0) return MFB_STATE_INTERNAL_ERROR;
 
     Module._reverse_color_channels(buffer, swizzleBuffer, width, height);
     let framePixels = new Uint8ClampedArray(HEAPU8.buffer, swizzleBuffer, width * height * 4);
     let imageData = new ImageData(framePixels, width, height);
-    let dstOffsetX = Module._window_data_get_dst_offset_x(window_data);
-    let dstOffsetY = Module._window_data_get_dst_offset_y(window_data);
-    let dstWidth = Module._window_data_get_dst_width(window_data);
-    let dstHeight = Module._window_data_get_dst_height(window_data);
     let ctx = w.ctx;
     if (!ctx) return MFB_STATE_INTERNAL_ERROR;
     ctx.imageSmoothingEnabled = false;

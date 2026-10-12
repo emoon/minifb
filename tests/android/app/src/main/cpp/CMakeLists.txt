@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18.1)
 project(mouse_events_test)
 
+option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
+
 # tests/android/app/src/main/cpp -> repository root
 set(MINIFB_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../../../../..)
 
@@ -33,6 +35,10 @@ target_include_directories(minifb PRIVATE
     ${MINIFB_ROOT}/include
     ${MINIFB_ROOT}/src
 )
+
+if (MINIFB_USE_BILINEAR)
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_BILINEAR)
+endif()
 
 # The test source is shared with the desktop builds; only the packaging differs.
 add_library(mouse_events_test SHARED

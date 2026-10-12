@@ -475,15 +475,20 @@ The sections below describe what each platform needs and which backend it uses b
 | `MINIFB_USE_OPENGL_API` | `ON` | Windows, X11 | Render through OpenGL 1.5 instead of GDI or XImage |
 | `MINIFB_USE_WAYLAND_API` | `OFF` | Linux | Use the Wayland backend instead of X11 |
 | `MINIFB_USE_METAL_API` | `ON` | macOS | Render through Metal instead of Cocoa |
+| `MINIFB_USE_BILINEAR` | `OFF` | all | Use bilinear filtering when MiniFB scales a pixel buffer |
 | `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
 | `MINIFB_X11_USE_IME` | `OFF` | X11 | Put an X11 input method (XIM) in front of xkbcommon for text input |
 | `MINIFB_BUILD_EXAMPLES` | `ON` | all | Build the example programs |
-| `MINIFB_BUILD_TESTS` | `ON` | all | Build the interactive tests in `tests/` |
+| `MINIFB_BUILD_TESTS` | `ON` | all | Build the tests in `tests/`; `ctest` runs the ones that need no window |
 | `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
 | `MINIFB_SANITIZE` | `OFF` | GCC, Clang, MSVC | Build the library, examples and tests with AddressSanitizer, plus UndefinedBehaviorSanitizer on GCC and Clang. Not available on DJGPP or MinGW GCC |
 | `MINIFB_USE_MMGR` | `OFF` | all | Track the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr), which reports leaks and overruns in `<program>_memleaks.log` and `<program>_memory.log`. CMake downloads it the first time. On Linux with OpenGL, the leak report also lists a few thousand `new` blocks with no source file (`??(0)::??`): they belong to Mesa, which mmgr also sees because it replaces the global `operator new`, not to MiniFB. On macOS, with Cocoa and with Metal, about a thousand of these blocks come from AppKit, Metal and CoreAnalytics. These frameworks allocate from their own threads, so a program must call `m_enableMultithread()` before anything else. Otherwise mmgr corrupts its tables and the program crashes at random. On iOS, the working directory is read only, so the example writes its logs to the `tmp` folder of the app. MiniFB needs mmgr 1.0.1 or newer. With 1.0.0, a program linked with `-dead_strip` stops at startup. Xcode always uses this option for iOS, and for macOS when `DEAD_CODE_STRIPPING` is on. On macOS, 1.0.0 can also write a leak report at exit that is mixed, cut or empty |
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
+
+Enable bilinear filtering with `-DMINIFB_USE_BILINEAR=ON`. OpenGL and Metal sample the texture with linear filtering. The other backends scale the buffer on the CPU with a bilinear version of the shared scaler. On GDI, Cocoa and Web, MiniFB scales the buffer to the final size before it hands it to the system, so the system does not scale it again. These three need an extra buffer, and they use more CPU time than with the option off, because MiniFB scales the whole frame on every update. The CPU cost is highest on DOS. With the option off, MiniFB scales with nearest-neighbor, as before.
+
+The option only controls the scaling that MiniFB does. A Wayland compositor, the CSS of the page or the operating system can still scale the image after that. The GPU and the CPU scaler can give slightly different results, because they round coordinates differently. The standalone Android CMake projects also accept this option.
 
 ### Windows
 

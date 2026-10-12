@@ -136,6 +136,10 @@ extern "C" {
                        uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y,
                        uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch);
 
+#if defined(MINIFB_USE_BILINEAR)
+    uint32_t *mfb_get_scaled_buffer(SWindowData *window_data, uint32_t width, uint32_t height);
+#endif
+
 #if defined(__cplusplus)
 }
 #endif

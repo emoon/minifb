@@ -177,6 +177,7 @@ option(MINIFB_BUILD_TESTS "Build interactive minifb test programs" ON)
 option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
 option(MINIFB_SANITIZE "Build with AddressSanitizer, plus UndefinedBehaviorSanitizer where the compiler has it" OFF)
 option(MINIFB_USE_MMGR "Track the allocations of the library with mmgr, to find leaks and overruns" OFF)
+option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
 
 if (MINIFB_SANITIZE AND DJGPP)
     message(FATAL_ERROR "MINIFB_SANITIZE: DJGPP has no sanitizer runtime.")
@@ -421,6 +422,10 @@ target_include_directories(minifb PUBLIC
 target_include_directories(minifb PRIVATE src)  # include internal headers
 
 # conditional main library target configuration
+
+if (MINIFB_USE_BILINEAR)
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_BILINEAR)
+endif()
 
 if (MINIFB_USE_INVERTED_Y_ON_MACOS)
     target_compile_definitions(minifb PRIVATE USE_INVERTED_Y_ON_MACOS)
@@ -680,6 +685,7 @@ if (MINIFB_BUILD_EXAMPLES)
 endif()
 
 if (MINIFB_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
 endif()
 

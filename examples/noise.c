@@ -59,10 +59,9 @@ main() {
 
     g_buffer = (uint32_t *) malloc((size_t) g_width * g_height * sizeof(*g_buffer));
     if (g_buffer == NULL) {
-        mfb_close(window);
-        mfb_update_events(window);
         return -1;
     }
+
 
     mfb_update_state state;
     do {

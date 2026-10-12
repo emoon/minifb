@@ -229,6 +229,9 @@ mfb_free_window_data(SWindowData *window_data, size_t specific_size) {
 
     mfb_timer_destroy(window_data->timer);
     free(window_data->safe_title);
+#if defined(MINIFB_USE_BILINEAR)
+    free(window_data->scaled_buffer);
+#endif
 
     if (window_data->specific != NULL) {
         memset(window_data->specific, 0, specific_size);

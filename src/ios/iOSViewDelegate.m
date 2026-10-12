@@ -21,7 +21,13 @@
 #endif
 
 //-------------------------------------
-#define kShader(inc, src)    @inc#src
+#define kShaderString(src)  #src
+#define kShader(inc, src)   @inc kShaderString(src)
+#if defined(MINIFB_USE_BILINEAR)
+    #define kTextureFilter linear
+#else
+    #define kTextureFilter nearest
+#endif
 
 //-------------------------------------
 enum { MaxBuffersInFlight = 3 };    // Number of textures in flight (tripple buffered)
@@ -58,7 +64,7 @@ NSString *g_shader_src = kShader(
     //-------------
     fragment float4
     fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
-        constexpr sampler textureSampler(mag_filter::nearest, min_filter::nearest);
+        constexpr sampler textureSampler(mag_filter::kTextureFilter, min_filter::kTextureFilter);
 
         // Sample the texture to obtain a color
         const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);

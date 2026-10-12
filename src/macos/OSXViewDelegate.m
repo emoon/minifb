@@ -21,7 +21,13 @@ set_target_fps_aux() {
 }
 
 //-------------------------------------
-#define kShader(inc, src)    @inc#src
+#define kShaderString(src)  #src
+#define kShader(inc, src)   @inc kShaderString(src)
+#if defined(MINIFB_USE_BILINEAR)
+    #define kTextureFilter linear
+#else
+    #define kTextureFilter nearest
+#endif
 
 NSString *g_shader_src = kShader(
     "#include <metal_stdlib>\n",
@@ -54,7 +60,7 @@ NSString *g_shader_src = kShader(
     //-------------
     fragment float4
     fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
-        constexpr sampler textureSampler(mag_filter::nearest, min_filter::nearest);
+        constexpr sampler textureSampler(mag_filter::kTextureFilter, min_filter::kTextureFilter);
 
         // Sample the texture to obtain a color
         const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);

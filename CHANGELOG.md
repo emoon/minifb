@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`MINIFB_USE_BILINEAR`**: a CMake option, off by default, that turns on bilinear filtering when MiniFB scales the buffer to the window. OpenGL and Metal sample the texture with linear filtering. X11 without OpenGL, Wayland, Android and DOS already scaled the buffer on the CPU, and now use a bilinear version of that scaler. GDI, Cocoa and Web scaled the buffer with the system, so with the option on, MiniFB first scales it on the CPU to the final size, which needs an extra buffer and more CPU time. Cocoa scales it to the size in device pixels, so a Retina screen gets a full resolution image. With the option off, scaling stays nearest-neighbor, as before. The standalone Android CMake projects accept the option too.
+- `tests/scaling.c`, a test that needs no window. It compares the shared scaler with a reference calculation, in nearest-neighbor and bilinear mode. On native builds, `ctest` runs it as the `scaling` test.
+
+### Changed
+
+- Android: the two example projects use different application ids, `com.example.noise21` and `com.example.noise26`, so both can be installed on the same device. The mmgr log paths of both changed with their ids. `native2021` now builds with Android Gradle Plugin 7.2.0 and Gradle 7.6.6.
+
+### Fixed
+
+- Windows with GDI: a window smaller than its buffer showed wrong colors, because the default stretch mode of GDI combines the pixels it drops with AND. MiniFB now sets `COLORONCOLOR`, which drops them.
+- The shared scaler produced a wrong image when the buffer was 65,536 pixels wide or high or larger, because its fixed point step overflowed 32 bits.
+- Android: the `native2026` example crashed at startup on API 28 and 29. Its theme set `windowLayoutInDisplayCutoutMode` to `always`, which only exists since API 30. The theme now sets `shortEdges` on API 28 and 29, and `always` from API 30. The Java code also uses `always` from API 30 instead of API 31.
+- Examples: they now check every allocation and the result of `mfb_open_ex`, and return an error when one fails. `multiple_windows` also closes the first window when the second one fails to open. `input_events` printed the mouse position in buffer pixels wrongly, and now converts it with the drawable bounds. In `native2026`, the touch markers and the safe area did not take the viewport into account, and a mouse click used the button number as a touch id.
+
 ## [0.15.0]
 
 This release adds `mfb_get_title`, and two CMake options to find memory bugs: `MINIFB_SANITIZE` and `MINIFB_USE_MMGR`. Every backend now releases a window through the same shared code, and the macOS backend also builds with ARC. It also fixes a leak of the Metal frame semaphore on macOS and iOS, a leak on DOS, a drawing bug on X11, and the build with GCC older than 9 and on Android.
