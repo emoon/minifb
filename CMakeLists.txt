@@ -301,7 +301,7 @@ function(minifb_configure_target target)
         endif()
 
     else()
-        # MSVC
+        # MSVC or Clang-CL
         target_compile_options(${target} PRIVATE
             # Security check
             /GS
@@ -315,6 +315,9 @@ function(minifb_configure_target target)
             /Zc:__cplusplus
             # Additional security checks
             /sdl
+
+            # Clang-CL-specific option: Suppress unused function warnings (just like the GCC/Clang path does)
+            "$<$<OR:$<COMPILE_LANG_AND_ID:C,Clang>,$<COMPILE_LANG_AND_ID:CXX,Clang>>:/clang:-Wno-unused-function>"
 
             # Optimizations
             "$<IF:$<CONFIG:Debug>,/Od,/O2>"
