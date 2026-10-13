@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined(MINIFB_USE_MMGR)
+    #include "mmgr.h"
+#endif
+
 static uint32_t
 expected_pixel(const uint32_t *src, unsigned width, unsigned height, unsigned pitch,
                unsigned x, unsigned y, unsigned dst_width, unsigned dst_height) {
@@ -83,6 +87,10 @@ check_scale(unsigned width, unsigned height, unsigned dst_width, unsigned dst_he
 
 int
 main(void) {
+#if defined(MINIFB_USE_MMGR)
+    m_setLogFiles(MINIFB_MMGR_MEMORY_LOG, MINIFB_MMGR_LEAKS_LOG);
+#endif
+
     int failures = 0;
     failures += check_scale(2, 2, 4, 4, false);
     failures += check_scale(3, 2, 5, 7, false);
