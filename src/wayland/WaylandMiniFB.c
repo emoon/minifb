@@ -3182,6 +3182,11 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     uint32_t buffer_stride = 0;
     size_t buffer_total_bytes = 0;
+
+    if (mfb_cpu_has_build_level() == false) {
+        return NULL;
+    }
+
     if (!calculate_buffer_layout(width, height, &buffer_stride, &buffer_total_bytes)) {
         MFB_LOG(MFB_LOG_ERROR, "WaylandMiniFB: invalid window size %ux%u.", width, height);
         return NULL;
@@ -3554,7 +3559,7 @@ acquire_presentation_slot(SWindowData *window_data,
 
 //-------------------------------------
 static void
-compose_presentation_buffer(const SWindowData *window_data,
+compose_presentation_buffer(SWindowData *window_data,
                             const SWaylandPresentationMetrics *metrics,
                             const void *buffer,
                             uint32_t *shm_ptr) {
@@ -3586,7 +3591,8 @@ compose_presentation_buffer(const SWindowData *window_data,
         uint32_t dst_pitch  = metrics->physical_surface_width;
 
         memset(shm_ptr, 0, size);
-        stretch_image(
+        stretch_image_cached(
+            &window_data->stretch_cache,
             (uint32_t *) buffer, 0,     0,     src_width, src_height, src_pitch,
             shm_ptr,             dst_x, dst_y, dst_width, dst_height, dst_pitch
         );

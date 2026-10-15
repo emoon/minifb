@@ -232,6 +232,7 @@ mfb_free_window_data(SWindowData *window_data, size_t specific_size) {
 #if defined(MINIFB_USE_BILINEAR)
     free(window_data->scaled_buffer);
 #endif
+    stretch_cache_free(&window_data->stretch_cache);
 
     if (window_data->specific != NULL) {
         memset(window_data->specific, 0, specific_size);

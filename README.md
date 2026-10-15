@@ -49,7 +49,7 @@ See `examples/noise.c` for a complete example.
 ## Supported Platforms
 
 | Platform | Backends | Status |
-|----------|----------|--------|
+| ---------- | ---------- | -------- |
 | **Windows** | GDI, OpenGL | Full API |
 | **macOS** | Cocoa, Metal | Full API |
 | **Linux/Unix** | X11, Wayland | Full API |
@@ -97,10 +97,12 @@ bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigne
 ```
 
 `mfb_set_viewport()` returns `false` if:
+
 - `width == 0` or `height == 0`
 - viewport bounds exceed the current window drawable size
 
 `mfb_open()` and `mfb_open_ex()` return `NULL` if:
+
 - `width == 0` or `height == 0`
 - `width * 4` would overflow the internal framebuffer stride
 
@@ -111,22 +113,25 @@ The title is UTF-8 on every backend. One that is not valid UTF-8 is reported onc
 If both `MFB_WF_FULLSCREEN` and `MFB_WF_FULLSCREEN_DESKTOP` are provided, `MFB_WF_FULLSCREEN` takes precedence.
 
 `mfb_update_ex()` returns `MFB_STATE_INVALID_BUFFER` if:
+
 - `buffer == NULL`
 - `width == 0` or `height == 0`
 - `width * 4` would overflow internal stride calculations
 
 `mfb_update_ex()` behaves differently on two backends:
+
 - Wayland waits for the compositor frame callback inside `mfb_update_ex()` (can block). A minimized or hidden window may stop receiving that callback. Each call then waits briefly and returns `MFB_STATE_OK` without presenting.
 - Android may return `MFB_STATE_OK` without presenting when `ANativeWindow` is temporarily unavailable during lifecycle transitions.
 
 What is ready when `mfb_open_ex()` returns also depends on the backend:
+
 - Wayland waits for the initial configure handshake before returning from `mfb_open_ex()`.
 - Android may return a window handle before `ANativeWindow` is ready (rendering starts once the native window becomes available).
 
 `mfb_open_ex()` flag support by backend:
 
 | Backend | RESIZABLE | BORDERLESS | ALWAYS_ON_TOP | FULLSCREEN | FULLSCREEN_DESKTOP |
-|---------|-----------|------------|---------------|------------|--------------------|
+| --------- | ----------- | ------------ | --------------- | ------------ | -------------------- |
 | Windows | Yes | Yes | Yes | Yes | Yes |
 | X11 | Yes | Yes* | Yes* | Yes* | Yes* |
 | Wayland | Yes | Yes | No (ignored, warning) | Yes | Yes (maximized) |
@@ -411,8 +416,8 @@ Return value contract (all backends):
 Behavior by backend:
 
 | Backend | `mfb_get_display_cutout_insets` | `mfb_get_display_safe_insets` |
-|---------|----------------------------------|--------------------------------|
-| Android | Physical cutout only (`DisplayCutout`, API 28+). Returns `true` with zeros when there is no cutout. Returns `false` if unavailable (e.g. API < 28 or query failure). | Full safe insets. API 30+: `WindowInsets.getInsets(systemBars|displayCutout)`. API 24-29: `getSystemWindowInset*()` fallback. |
+| ------- | ------------------------------- | ----------------------------- |
+| Android | Physical cutout only (`DisplayCutout`, API 28+). Returns `true` with zeros when there is no cutout. Returns `false` if unavailable (e.g. API < 28 or query failure). | Full safe insets. API 30+: `WindowInsets.getInsets(systemBars/displayCutout)`. API 24-29: `getSystemWindowInset*()` fallback. |
 | iOS | Approximated from `UIWindow.safeAreaInsets` for physical cutout intent. Bottom is kept `0` (home indicator is not a physical cutout). | Uses `UIWindow.safeAreaInsets` directly (includes notch/Dynamic Island + status bar + home indicator). |
 | Desktop/Web/DOS | Returns `true` with zeros for a valid window (no platform cutout/safe-inset data exposed). | Returns `true` with zeros for a valid window. |
 
@@ -470,23 +475,66 @@ The sections below describe what each platform needs and which backend it uses b
 
 ### CMake Options
 
+#### Build targets
+
 | Option | Default | Applies to | What it does |
-|--------|---------|------------|--------------|
-| `MINIFB_USE_OPENGL_API` | `ON` | Windows, X11 | Render through OpenGL 1.5 instead of GDI or XImage |
-| `MINIFB_USE_WAYLAND_API` | `OFF` | Linux | Use the Wayland backend instead of X11 |
-| `MINIFB_USE_METAL_API` | `ON` | macOS | Render through Metal instead of Cocoa |
-| `MINIFB_USE_BILINEAR` | `OFF` | all | Use bilinear filtering when MiniFB scales a pixel buffer |
-| `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
-| `MINIFB_X11_USE_IME` | `OFF` | X11 | Put an X11 input method (XIM) in front of xkbcommon for text input |
+| ------ | ------- | ---------- | ------------ |
 | `MINIFB_BUILD_EXAMPLES` | `ON` | all | Build the example programs |
 | `MINIFB_BUILD_TESTS` | `ON` | all | Build the tests in `tests/`; `ctest` runs the ones that need no window |
 | `MINIFB_BUILD_VERSION_INFO` | `ON` | desktop | Build the version info utility (always off on iOS, Android and Emscripten) |
+
+#### Backend selection and rendering
+
+| Option | Default | Applies to | What it does |
+| ------ | ------- | ---------- | ------------ |
+| `MINIFB_USE_OPENGL_API` | `ON` | Windows, X11 | Render through OpenGL 1.5 instead of GDI or XImage |
+| `MINIFB_USE_METAL_API` | `ON` | macOS | Render through Metal instead of Cocoa |
+| `MINIFB_USE_WAYLAND_API` | `OFF` | Linux | Use the Wayland backend instead of X11 |
+
+#### Image and input
+
+| Option | Default | Applies to | What it does |
+| ------ | ------- | ---------- | ------------ |
+| `MINIFB_USE_BILINEAR` | `OFF` | all | Use bilinear filtering when MiniFB scales a pixel buffer |
+| `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
+| `MINIFB_X11_USE_IME` | `OFF` | X11 | Put an X11 input method (XIM) in front of xkbcommon for text input |
+
+#### Optimization and requirements
+
+| Option | Default | Applies to | What it does |
+| ------ | ------- | ---------- | ------------ |
+| `MINIFB_USE_X86_64_V2` | `ON` | 64-bit x86 | Require x86-64-v2 for the whole library |
+| `MINIFB_USE_X86_64_V3` | `OFF` | 64-bit x86 | Require x86-64-v3 for the whole library; takes precedence over v2 |
+| `MINIFB_USE_WASM_SIMD` | `ON` | Emscripten | Enable WebAssembly SIMD with `-msimd128` for the library and targets that link it |
+
+`MINIFB_USE_X86_64_V2`: Build the library for x86-64-v2 (SSE3, SSSE3, SSE4.1, SSE4.2 and POPCNT), which Intel processors have since 2008 and AMD ones since 2011. The Steam Hardware Survey of September 2026 gives SSE4.2 on 98.2% of the computers, and Red Hat Enterprise Linux 9, SUSE Linux Enterprise 16 and Windows 11 24H2 require the level. On a processor without it, `mfb_open_ex` logs an error and returns `NULL`. `OFF` builds for the default x86-64 level.
+
+`MINIFB_USE_X86_64_V3`: Build the library for x86-64-v3 (AVX, AVX2, BMI1, BMI2, FMA, F16C, LZCNT and MOVBE), whatever `MINIFB_USE_X86_64_V2` says. The same survey gives AVX2 on 96% of the computers, and Red Hat Enterprise Linux 10 requires the level. On a processor without it, `mfb_open_ex` logs an error and returns `NULL`. When it is `OFF`, the bilinear scaling still uses AVX2 if the processor has it.
+
+#### Diagnostics
+
+| Option | Default | Applies to | What it does |
+| ------ | ------- | ---------- | ------------ |
 | `MINIFB_SANITIZE` | `OFF` | GCC, Clang, MSVC | Build the library, examples and tests with AddressSanitizer, plus UndefinedBehaviorSanitizer on GCC and Clang. Not available on DJGPP or MinGW GCC |
-| `MINIFB_USE_MMGR` | `OFF` | all | Track the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr), which reports leaks and overruns in `<program>_memleaks.log` and `<program>_memory.log`. CMake downloads it the first time. On Linux with OpenGL, the leak report also lists a few thousand `new` blocks with no source file (`??(0)::??`): they belong to Mesa, which mmgr also sees because it replaces the global `operator new`, not to MiniFB. On macOS, with Cocoa and with Metal, about a thousand of these blocks come from AppKit, Metal and CoreAnalytics. These frameworks allocate from their own threads, so a program must call `m_enableMultithread()` before anything else. Otherwise mmgr corrupts its tables and the program crashes at random. On iOS, the working directory is read only, so the example writes its logs to the `tmp` folder of the app. MiniFB needs mmgr 1.0.1 or newer. With 1.0.0, a program linked with `-dead_strip` stops at startup. Xcode always uses this option for iOS, and for macOS when `DEAD_CODE_STRIPPING` is on. On macOS, 1.0.0 can also write a leak report at exit that is mixed, cut or empty |
+| `MINIFB_USE_MMGR` | `OFF` | all | Track allocations with mmgr to find leaks and overruns |
+
+`MINIFB_USE_MMGR`: Track the allocations of the library with [mmgr](https://github.com/Darky-Lucera/mmgr), which reports leaks and overruns in `<program>_memleaks.log` and `<program>_memory.log`. CMake downloads it the first time. On Linux with OpenGL, the leak report also lists a few thousand `new` blocks with no source file (`??(0)::??`): they belong to Mesa, which mmgr also sees because it replaces the global `operator new`, not to MiniFB. On macOS, with Cocoa and with Metal, about a thousand of these blocks come from AppKit, Metal and CoreAnalytics. These frameworks allocate from their own threads, so a program must call `m_enableMultithread()` before anything else. Otherwise mmgr corrupts its tables and the program crashes at random. On iOS, the working directory is read only, so the example writes its logs to the `tmp` folder of the app. MiniFB needs mmgr 1.0.1 or newer. With 1.0.0, a program linked with `-dead_strip` stops at startup. Xcode always uses this option for iOS, and for macOS when `DEAD_CODE_STRIPPING` is on. On macOS, 1.0.0 can also write a leak report at exit that is mixed, cut or empty.
+
+#### Headers
+
+| Option | Default | Applies to | What it does |
+| ------ | ------- | ---------- | ------------ |
+| `MINIFB_AVOID_CPP_HEADERS` | `OFF` | C++ | Control automatic inclusion of the C++ wrappers; see the note below |
+
+The CMake option `MINIFB_AVOID_CPP_HEADERS` is currently declared but does not add a compiler definition. To prevent `MiniFB.h` from including `MiniFB_cpp.h` in C++, define the preprocessor macro for the consuming target, for example with `target_compile_definitions(my_app PRIVATE MINIFB_AVOID_CPP_HEADERS)`.
+
+#### Option notes
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
 
-Enable bilinear filtering with `-DMINIFB_USE_BILINEAR=ON`. OpenGL and Metal sample the texture with linear filtering. The other backends scale the buffer on the CPU with a bilinear version of the shared scaler. On GDI, Cocoa and Web, MiniFB scales the buffer to the final size before it hands it to the system, so the system does not scale it again. These three need an extra buffer, and they use more CPU time than with the option off, because MiniFB scales the whole frame on every update. The CPU cost is highest on DOS. With the option off, MiniFB scales with nearest-neighbor, as before.
+Enable bilinear filtering with `-DMINIFB_USE_BILINEAR=ON`. OpenGL and Metal sample the texture with linear filtering. Web delegates scaling to Canvas and sets `imageSmoothingEnabled` from this option; the browser chooses the smoothing algorithm and whether to use hardware acceleration. The other backends scale the buffer on the CPU with a bilinear version of the shared scaler. On GDI and Cocoa, MiniFB scales the buffer to the final size before it hands it to the system, so the system does not scale it again. These two need an extra buffer, and they use more CPU time than with the option off, because MiniFB scales the whole frame on every update. The CPU cost is highest on DOS. With the option off, scaling uses nearest-neighbor.
+
+The CPU scaler samples each window pixel at its center, as a GPU does, and keeps its tables in the window, so it only builds them again when a size changes. On 64-bit x86 it uses SSE2, and AVX2 for bilinear when the processor has it; on ARM it uses NEON for bilinear. [docs/scaling_algorithms.md](docs/scaling_algorithms.md) explains how it works and how much faster it is than before.
 
 The option only controls the scaling that MiniFB does. A Wayland compositor, the CSS of the page or the operating system can still scale the image after that. The GPU and the CPU scaler can give slightly different results, because they round coordinates differently. The standalone Android CMake projects also accept this option.
 
@@ -728,6 +776,7 @@ That is why there are two iOS example targets:
 - `noise_no_storyboard`: uses `examples/ios/Info.no_storyboard.plist` without launch storyboard (useful for legacy/manual setups and behavior comparison).
 
 Apple references:
+
 - https://developer.apple.com/news/?id=03042020b
 - https://developer.apple.com/documentation/xcode/specifying-your-apps-launch-screen
 - https://developer.apple.com/videos/play/wwdc2019/401/
@@ -836,7 +885,7 @@ All other MiniFB functions work normally, including timers, viewports, and user 
 MiniFB uses a **32-bit pixel buffer** on all platforms, but the byte order in memory differs between Android and desktop/iOS:
 
 | Platform | Byte order in memory | Equivalent uint32_t (LE) |
-|----------|----------------------|--------------------------|
+| ---------- | ---------------------- | -------------------------- |
 | Desktop (Windows, Linux, macOS) | B · G · R · X | `0x00RRGGBB` |
 | iOS | B · G · R · A | `0x00RRGGBB` |
 | **Android** | **R · G · B · X** | **`0x00BBGGRR`** |
@@ -864,7 +913,7 @@ buffer[i] = MFB_RGB(255, 0, 0);   // always displays red, on every platform
 Android's handling of the display cutout (notch, punch-hole camera) changed across API levels and can cause a framebuffer-size mismatch if not handled explicitly:
 
 | API level | Default behaviour                               | Result                        |
-|-----------|-------------------------------------------------|-------------------------------|
+| --------- | ----------------------------------------------- | ----------------------------- |
 | ≤ 31      | Legacy fullscreen flags handle everything       | Works out of the box          |
 | 32-34     | System reserves space for the cutout by default | **Content shifted / clipped** |
 | ≥ 35      | Edge-to-edge is forced by the OS                | Works out of the box          |
@@ -949,6 +998,18 @@ See [Display Insets](#display-insets) in the API reference for exact semantics, 
 ### Web (WASM)
 
 Download and install [Emscripten](https://emscripten.org/), then point CMake at the Emscripten toolchain file and build as usual.
+
+#### WebAssembly SIMD
+
+`MINIFB_USE_WASM_SIMD` is on by default. It adds `-msimd128` to the compile and link options of MiniFB and targets that link it. With optimizations enabled, the compiler can vectorize loops such as the BGRA to RGBA conversion without hand-written intrinsics. The option has no effect on other platforms.
+
+The default enables faster buffer operations on current browsers. Chrome 91 and Firefox 89 have supported WebAssembly SIMD since 2021, and Safari 16.4 since 2023. These are browser requirements, not x86 CPU levels: the same module can run on x86 and ARM. See [Emscripten's SIMD support notes](https://emscripten.org/docs/porting/simd.html).
+
+In a conversion-only benchmark on an Intel Core i7-10850H with Emscripten 6.0.12 and `-O2`, this flag made the existing conversion about 4 to 6 times faster at 1920x1080 and 3 to 4.5 times faster at 3840x2160 across Chrome, Edge, Opera GX, Firefox and DuckDuckGo on Windows. Explicit SIMD intrinsics gave similar times, with no consistent advantage. These measurements exclude Canvas upload and rendering.
+
+The generated module requires a browser with WebAssembly SIMD support. The browser maps these operations to the local CPU instructions on x86 or ARM. The application does not need to detect the CPU itself. A browser without WebAssembly SIMD support cannot load the module, even if it contains a scalar alternative.
+
+Use `-DMINIFB_USE_WASM_SIMD=OFF` to build without this requirement. To support both kinds of browser, build two versions and select one in JavaScript after checking for WebAssembly SIMD support. See [WebAssembly SIMD feature detection](https://v8.dev/features/simd#feature-detection).
 
 #### Building and running the examples (WASM)
 
@@ -1269,7 +1330,7 @@ You can use both the CLI and GUI method for debugging the MiniFB examples as wel
 Not every feature exists on every platform. This table summarizes what each backend does:
 
 | Feature | Windows | macOS | Linux X11 | Wayland | iOS | Android | Web | DOS |
-|---------|---------|-------|-----------|---------|-----|---------|-----|-----|
+| --------- | --------- | ------- | ----------- | --------- | ----- | --------- | ----- | ----- |
 | Window creation | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | mfb_update | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Keyboard input | Yes | Yes | Yes | Yes | No | Limited | Yes | Limited |

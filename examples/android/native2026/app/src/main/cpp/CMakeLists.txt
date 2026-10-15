@@ -32,8 +32,15 @@ add_library(minifb STATIC
 
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_common.c
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_cpp.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_cpu_x86.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_cpu_x86.h
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_internal.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_stretch.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_stretch.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_stretch_internal.h
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_stretch_neon.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_stretch_sse2.c
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_timer.c
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_utf8.c
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src/MiniFB_utf8.h

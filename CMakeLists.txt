@@ -6,7 +6,7 @@ if (IOS AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum iOS deployment target")
 endif()
 
-project(MiniFB VERSION 0.15.0 LANGUAGES C CXX)
+project(MiniFB VERSION 0.16.0 LANGUAGES C CXX)
 
 message(STATUS "Processing " ${PROJECT_NAME})
 
@@ -70,8 +70,16 @@ set(SrcLib
 
     src/MiniFB_common.c
     src/MiniFB_cpp.cpp
+    src/MiniFB_cpu_x86.c
+    src/MiniFB_cpu_x86.h
     src/MiniFB_internal.c
     src/MiniFB_internal.h
+    src/MiniFB_stretch.c
+    src/MiniFB_stretch.h
+    src/MiniFB_stretch_avx2.c
+    src/MiniFB_stretch_internal.h
+    src/MiniFB_stretch_neon.c
+    src/MiniFB_stretch_sse2.c
     src/MiniFB_timer.c
     src/MiniFB_utf8.c
     src/MiniFB_utf8.h
@@ -172,18 +180,9 @@ set(SrcDOS
 
 # Options
 #--------------------------------------
+# Build targets
 option(MINIFB_BUILD_EXAMPLES "Build minifb example programs" ON)
 option(MINIFB_BUILD_TESTS "Build interactive minifb test programs" ON)
-option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
-option(MINIFB_SANITIZE "Build with AddressSanitizer, plus UndefinedBehaviorSanitizer where the compiler has it" OFF)
-option(MINIFB_USE_MMGR "Track the allocations of the library with mmgr, to find leaks and overruns" OFF)
-option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
-
-if (MINIFB_SANITIZE AND DJGPP)
-    message(FATAL_ERROR "MINIFB_SANITIZE: DJGPP has no sanitizer runtime.")
-elseif (MINIFB_SANITIZE AND MINGW AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    message(FATAL_ERROR "MINIFB_SANITIZE: MinGW GCC has no sanitizer runtime. Use Clang (llvm-mingw) instead.")
-endif()
 
 # purely for internal use, never exposed to the user
 set(MINIFB_USE_X11_API OFF)
@@ -216,11 +215,7 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
     cmake_dependent_option(MINIFB_BUILD_VERSION_INFO "Build version info utility" ON
         "NOT IOS AND NOT ANDROID AND NOT EMSCRIPTEN" OFF)
 
-    cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
-        "MACOS" OFF)
-    cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
-        "MACOS" OFF)
-
+    # Backend selection and rendering
     cmake_dependent_option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF
         "LINUX" OFF)
 
@@ -230,6 +225,12 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.22)
 
     cmake_dependent_option(MINIFB_USE_OPENGL_API "Build the project using OpenGL API code" ON
         "MINIFB_USE_X11_API OR WIN32" OFF)
+    cmake_dependent_option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON
+        "MACOS" OFF)
+
+    # Image and input
+    cmake_dependent_option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF
+        "MACOS" OFF)
 
     cmake_dependent_option(MINIFB_X11_USE_IME "Use an X11 input method (XIM) for text input" OFF
         "MINIFB_USE_X11_API" OFF)
@@ -247,14 +248,7 @@ else()
         set(MINIFB_BUILD_VERSION_INFO OFF)
     endif()
 
-    if (MACOS)
-        option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON)
-        option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
-    else()
-        set(MINIFB_USE_METAL_API OFF)
-        set(MINIFB_USE_INVERTED_Y_ON_MACOS OFF)
-    endif()
-
+    # Backend selection and rendering
     if (LINUX)
         option(MINIFB_USE_WAYLAND_API "Build the project using Wayland API code" OFF)
     else()
@@ -268,6 +262,19 @@ else()
         set(MINIFB_USE_OPENGL_API OFF)
     endif()
 
+    if (MACOS)
+        option(MINIFB_USE_METAL_API "Build the project using Metal API code" ON)
+    else()
+        set(MINIFB_USE_METAL_API OFF)
+    endif()
+
+    # Image and input
+    if (MACOS)
+        option(MINIFB_USE_INVERTED_Y_ON_MACOS "Use default mouse position: (0, 0) at (left, down)" OFF)
+    else()
+        set(MINIFB_USE_INVERTED_Y_ON_MACOS OFF)
+    endif()
+
     if (MINIFB_USE_X11_API)
         option(MINIFB_X11_USE_IME "Use an X11 input method (XIM) for text input" OFF)
     else()
@@ -277,6 +284,51 @@ else()
 endif()
 
 endif()
+
+# Image scaling
+option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
+
+# Optimization and requirements
+# x86-64-v2 adds SSE3, SSSE3, SSE4.1, SSE4.2 and POPCNT to the default x86-64 level.
+# Intel processors have it since Nehalem (2008) and AMD ones since Bulldozer (2011).
+# The Steam Hardware Survey of September 2026 gives SSE4.2, the newest part of the level,
+# on 98.2% of the computers (99.6% on Linux).
+# Steam users have newer computers than most people, but Red Hat Enterprise Linux 9,
+# SUSE Linux Enterprise 16, Windows 11 24H2 and .NET 11 already require the level.
+#
+# The option is ON by default so that programs are built for the processors of today.
+option(MINIFB_USE_X86_64_V2 "Build the library for x86-64-v2" ON)
+
+# x86-64-v3 adds AVX, AVX2, BMI1, BMI2, FMA, F16C, LZCNT and MOVBE.
+# Intel processors have it since Haswell (2013), except some Pentium and Celeron, and AMD ones since Excavator (2015).
+# The same survey gives AVX2 on 96% of the computers, and Red Hat Enterprise Linux 10 requires the level.
+#
+# It is less common than x86-64-v2, so the option is OFF.
+# Without it, the bilinear scaling still uses AVX2 when the processor has it.
+option(MINIFB_USE_X86_64_V3 "Build the library for x86-64-v3, whatever MINIFB_USE_X86_64_V2 says" OFF)
+
+# If MINIFB_USE_X86_64_V2 and/or MINIFB_USE_X86_64_V3 are set to ON, the whole library is built for that level,
+# and mfb_open_ex fails, with an error, on a processor without it.
+# Only 64-bit x86 builds use these options
+
+# WebAssembly SIMD lets the compiler vectorize buffer loops, including BGRA to RGBA.
+# Conversion-only tests were about 4 to 6 times faster at 1920x1080 with -O2.
+# Chrome 91 and Firefox 89 support it since 2021, and Safari 16.4 since 2023.
+# The option is ON by default for current browsers. Turn it OFF for browsers without WebAssembly SIMD.
+option(MINIFB_USE_WASM_SIMD "Enable WebAssembly SIMD in Emscripten builds" ON)
+
+# Diagnostics
+option(MINIFB_SANITIZE "Build with AddressSanitizer, plus UndefinedBehaviorSanitizer where the compiler has it" OFF)
+option(MINIFB_USE_MMGR "Track the allocations of the library with mmgr, to find leaks and overruns" OFF)
+
+if (MINIFB_SANITIZE AND DJGPP)
+    message(FATAL_ERROR "MINIFB_SANITIZE: DJGPP has no sanitizer runtime.")
+elseif (MINIFB_SANITIZE AND MINGW AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR "MINIFB_SANITIZE: MinGW GCC has no sanitizer runtime. Use Clang (llvm-mingw) instead.")
+endif()
+
+# Headers
+option(MINIFB_AVOID_CPP_HEADERS "Avoid including C++ Headers" OFF)
 
 # Compilation configuration (will be ran on library and examples)
 #--------------------------------------
@@ -430,6 +482,83 @@ if (MINIFB_USE_BILINEAR)
     target_compile_definitions(minifb PRIVATE MINIFB_USE_BILINEAR)
 endif()
 
+# The options of the compiler for x86-64-v2 and x86-64-v3, or empty when the target has no 64-bit x86 or the compiler does not take them.
+# A universal build of macOS also builds for ARM, so the options only go to its x86_64 part
+include(CheckCCompilerFlag)
+include(CheckCSourceCompiles)
+
+check_c_source_compiles([=[
+    #if defined(_M_X64) || defined(__x86_64__) || defined(_M_IX86) || defined(__i386__)
+        #error The target is x86
+    #endif
+    int main(void) { return 0; }
+]=] MINIFB_TARGET_WITHOUT_X86)
+
+set(MINIFB_USE_X86_64_V2_FLAGS "")
+set(MINIFB_USE_X86_64_V3_FLAGS "")
+if (NOT MINIFB_TARGET_WITHOUT_X86 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+        # MSVC has no option for the whole of x86-64-v3: /arch:AVX2 also lets it use FMA and BMI
+        set(v2_candidate "/arch:SSE4.2")
+        set(v3_candidate "/arch:AVX2")
+    elseif (APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES ";")
+        set(v2_candidate "-Xarch_x86_64;-march=x86-64-v2")
+        set(v3_candidate "-Xarch_x86_64;-march=x86-64-v3")
+    else()
+        # clang-cl does not take /arch:SSE4.2, but it takes these
+        set(v2_candidate "-march=x86-64-v2")
+        set(v3_candidate "-march=x86-64-v3")
+    endif()
+
+    check_c_compiler_flag("${v2_candidate}" MINIFB_HAS_X86_64_V2_FLAGS)
+    check_c_compiler_flag("${v3_candidate}" MINIFB_HAS_X86_64_V3_FLAGS)
+    if (MINIFB_HAS_X86_64_V2_FLAGS)
+        set(MINIFB_USE_X86_64_V2_FLAGS "${v2_candidate}")
+    endif()
+
+    if (MINIFB_HAS_X86_64_V3_FLAGS)
+        set(MINIFB_USE_X86_64_V3_FLAGS "${v3_candidate}")
+    endif()
+
+    # GCC for Windows keeps the stack aligned to 16 bytes but saves AVX registers on it with aligned moves of 32 bytes,
+    # which crash (GCC bug 54412). The assembler can turn them into unaligned moves; without that option, those builds
+    # get no code for x86-64-v3
+    if (MINIFB_USE_X86_64_V3_FLAGS AND (WIN32 OR CYGWIN) AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        check_c_compiler_flag("-Wa,-muse-unaligned-vector-move" MINIFB_HAS_UNALIGNED_VECTOR_MOVE)
+        if (MINIFB_HAS_UNALIGNED_VECTOR_MOVE)
+            list(APPEND MINIFB_USE_X86_64_V3_FLAGS "-Wa,-muse-unaligned-vector-move")
+        else()
+            set(MINIFB_USE_X86_64_V3_FLAGS "")
+        endif()
+    endif()
+endif()
+
+set(MINIFB_LIBRARY_LEVEL "")
+set(MINIFB_LIBRARY_LEVEL_FLAGS "")
+if (MINIFB_USE_X86_64_V3 AND MINIFB_USE_X86_64_V3_FLAGS)
+    set(MINIFB_LIBRARY_LEVEL "v3")
+    set(MINIFB_LIBRARY_LEVEL_FLAGS "${MINIFB_USE_X86_64_V3_FLAGS}")
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_X86_64_V2 MINIFB_USE_X86_64_V3)
+elseif (MINIFB_USE_X86_64_V2 AND MINIFB_USE_X86_64_V2_FLAGS)
+    set(MINIFB_LIBRARY_LEVEL "v2")
+    set(MINIFB_LIBRARY_LEVEL_FLAGS "${MINIFB_USE_X86_64_V2_FLAGS}")
+    target_compile_definitions(minifb PRIVATE MINIFB_USE_X86_64_V2)
+endif()
+
+if (MINIFB_USE_X86_64_V3 AND NOT MINIFB_LIBRARY_LEVEL STREQUAL "v3" AND NOT MINIFB_TARGET_WITHOUT_X86 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(WARNING "MINIFB_USE_X86_64_V3: this compiler cannot build for x86-64-v3, so the option is ignored")
+endif()
+
+# The bilinear scaling has an AVX2 path. Without a library built for x86-64-v3, only its file is built for that
+# level, and it is only used when the processor has it
+if (MINIFB_USE_BILINEAR AND MINIFB_USE_X86_64_V3_FLAGS)
+    if (NOT MINIFB_LIBRARY_LEVEL STREQUAL "v3")
+        set_source_files_properties(src/MiniFB_stretch_avx2.c PROPERTIES COMPILE_OPTIONS "${MINIFB_USE_X86_64_V3_FLAGS}")
+    endif()
+
+    target_compile_definitions(minifb PRIVATE MINIFB_STRETCH_AVX2)
+endif()
+
 if (MINIFB_USE_INVERTED_Y_ON_MACOS)
     target_compile_definitions(minifb PRIVATE USE_INVERTED_Y_ON_MACOS)
 endif()
@@ -439,6 +568,7 @@ if (MINIFB_USE_OPENGL_API)
     target_sources(minifb PRIVATE ${SrcGL})
     target_compile_definitions(minifb PRIVATE USE_OPENGL_API)
 endif()
+
 if (MINIFB_USE_METAL_API)
     target_compile_definitions(minifb PRIVATE USE_METAL_API)
     target_sources(minifb PRIVATE ${SrcMacOSMetal})
@@ -464,6 +594,17 @@ elseif (EMSCRIPTEN)
 
 elseif (DJGPP)
     target_sources(minifb PRIVATE ${SrcDOS})
+endif()
+
+# The level of the library goes to each file, and not to the target, so that the options of the AVX2 file come last:
+# the Visual Studio generator puts the options of a file before those of the target, and MSVC keeps the last /arch
+if (MINIFB_LIBRARY_LEVEL)
+    get_target_property(minifb_sources minifb SOURCES)
+    foreach (source IN LISTS minifb_sources)
+        if (NOT source MATCHES "MiniFB_stretch_avx2\.c$" OR MINIFB_LIBRARY_LEVEL STREQUAL "v3")
+            set_property(SOURCE ${source} APPEND PROPERTY COMPILE_OPTIONS ${MINIFB_LIBRARY_LEVEL_FLAGS})
+        endif()
+    endforeach()
 endif()
 
 # Link main library
@@ -537,6 +678,7 @@ elseif(MINIFB_USE_X11_API)
     if (NOT X11_FOUND)
         message(FATAL_ERROR "X11 development files not found (install X11 headers/libs, e.g. libx11-dev)")
     endif()
+
     target_link_libraries(minifb PRIVATE X11::X11)
 
     if (X11_Xrandr_FOUND)
@@ -565,7 +707,10 @@ elseif(MINIFB_USE_X11_API)
     endif()
 
 elseif (EMSCRIPTEN)
-    # emscripten has no dedicated linking code
+    if (MINIFB_USE_WASM_SIMD)
+        target_compile_options(minifb PUBLIC -msimd128)
+        target_link_options(minifb PUBLIC -msimd128)
+    endif()
 
 elseif (WIN32)
     target_link_libraries(minifb PRIVATE "winmm.lib")  # windows multimedia library, used in our case for precise timing
@@ -599,7 +744,6 @@ function(minifb_add_example)
             "-sALLOW_MEMORY_GROWTH=1"
             "-sALLOW_TABLE_GROWTH"
             "-sMALLOC=emmalloc"
-            "-sEXPORT_ALL=1"
             "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
             "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
             "-sASYNCIFY"
@@ -667,6 +811,7 @@ if (MINIFB_BUILD_EXAMPLES)
             minifb_add_example(NAME hide_cursor      SOURCE examples/hide_cursor.c      DOS_NAME hidecurs)
             minifb_add_example(NAME input_events_cpp SOURCE examples/input_events_cpp.cpp DOS_NAME inpevcpp)
         endif()
+
         if (DJGPP)
             minifb_add_example(NAME debug_dos        SOURCE examples/dos/debug_dos.c        DOS_NAME debugdos)
         endif()

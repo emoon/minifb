@@ -528,6 +528,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     Visual *visual;
     uint32_t buffer_stride = 0;
 
+    if (mfb_cpu_has_build_level() == false) {
+        return NULL;
+    }
+
     if (width == 0 || height == 0) {
         MFB_LOG(MFB_LOG_ERROR, "X11MiniFB: invalid window size %ux%u.", width, height);
         return NULL;
@@ -969,7 +973,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     }
 
     if (use_scaler == true) {
-        stretch_image(
+        stretch_image_cached(
+            &window_data->stretch_cache,
             (uint32_t *) buffer,                             0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
             (uint32_t *) window_data_specific->image_buffer, 0, 0, window_data->dst_width,    window_data->dst_height,    window_data->dst_width
         );

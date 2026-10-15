@@ -135,6 +135,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     UIWindow    *window;
     const char  *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
 
+    if (mfb_cpu_has_build_level() == false) {
+        return NULL;
+    }
+
     if (width == 0 || height == 0) {
         MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: invalid window size %ux%u.", width, height);
         return NULL;

@@ -813,7 +813,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
       if (vp_y + vp_h > a_height)
         vp_h = a_height - vp_y;
 
-      stretch_image(
+      stretch_image_cached(
+        &window_data->stretch_cache,
         buffer,       0,    0,     width, height, width,
         scale_buffer, vp_x, vp_y,  vp_w,  vp_h,   a_width
       );
@@ -823,7 +824,8 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
   }
 
   else if (a_width != width || a_height != height) {
-    stretch_image(
+    stretch_image_cached(
+      &window_data->stretch_cache,
       buffer,       0, 0, width,   height,   width,
       scale_buffer, 0, 0, a_width, a_height, a_width
     );

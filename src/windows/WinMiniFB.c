@@ -801,6 +801,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
     SWindowData_Win *window_data_specific = NULL;
     long            window_style = WS_POPUP | WS_SYSMENU | WS_CAPTION;
 
+    if (mfb_cpu_has_build_level() == false) {
+        return NULL;
+    }
+
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         MFB_LOG(MFB_LOG_ERROR, "WinMiniFB: invalid window size %ux%u.", width, height);
         return NULL;

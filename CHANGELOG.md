@@ -4,17 +4,32 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0]
+
+This release adds bilinear filtering when MiniFB scales the buffer to the window, with the `MINIFB_USE_BILINEAR` option, and makes the shared scaler faster, with SSE2 and AVX2 on x86 and NEON on ARM. Nearest-neighbor now samples each window pixel at its center, so its image changes slightly.
+
+Two new options build the library for x86-64-v2, which is now the default, or x86-64-v3.
+
+Emscripten builds enable WebAssembly SIMD by default with `MINIFB_USE_WASM_SIMD`.
+
 ### Added
 
-- **`MINIFB_USE_BILINEAR`**: a CMake option, off by default, that turns on bilinear filtering when MiniFB scales the buffer to the window. OpenGL and Metal sample the texture with linear filtering. X11 without OpenGL, Wayland, Android and DOS already scaled the buffer on the CPU, and now use a bilinear version of that scaler. GDI, Cocoa and Web scaled the buffer with the system, so with the option on, MiniFB first scales it on the CPU to the final size, which needs an extra buffer and more CPU time. Cocoa scales it to the size in device pixels, so a Retina screen gets a full resolution image. With the option off, scaling stays nearest-neighbor, as before. The standalone Android CMake projects accept the option too.
-- `tests/scaling.c`, a test that needs no window. It compares the shared scaler with a reference calculation, in nearest-neighbor and bilinear mode. On native builds, `ctest` runs it as the `scaling` test.
+- **`MINIFB_USE_WASM_SIMD`**: a CMake option, on by default, that adds `-msimd128` to Emscripten compile and link options, including targets that link MiniFB. It lets the compiler vectorize the existing BGRA to RGBA conversion without hand-written intrinsics. The default speeds up buffer operations on current browsers: Chrome and Firefox have supported WebAssembly SIMD since 2021, and Safari since 2023. The generated module requires a browser with WebAssembly SIMD support. Set the option to `OFF` to build without that requirement. Applications that support both must build two versions and select one in JavaScript after checking for SIMD support. The option has no effect on other platforms.
+- **`MINIFB_USE_BILINEAR`**: a CMake option, off by default, that turns on bilinear filtering when MiniFB scales the buffer to the window. OpenGL and Metal sample the texture with linear filtering. Web delegates scaling to Canvas and sets `imageSmoothingEnabled` from this option; the browser chooses the smoothing algorithm and whether to use hardware acceleration. X11 without OpenGL, Wayland, Android and DOS already scaled the buffer on the CPU, and now use a bilinear version of that scaler. GDI and Cocoa scaled the buffer with the system, so with the option on, MiniFB first scales it on the CPU to the final size, which needs an extra buffer and more CPU time. Cocoa scales it to the size in device pixels, so a Retina screen gets a full resolution image. With the option off, scaling uses nearest-neighbor. The standalone Android CMake projects accept the option too.
+- **`MINIFB_USE_X86_64_V2`** and **`MINIFB_USE_X86_64_V3`**: CMake options for 64-bit x86 that build the whole library for x86-64-v2 or x86-64-v3. `MINIFB_USE_X86_64_V2` is on by default: x86-64-v2 is on Intel processors since 2008 and AMD ones since 2011, the Steam Hardware Survey of September 2026 gives SSE4.2 on 98.2% of the computers, and Red Hat Enterprise Linux 9, SUSE Linux Enterprise 16 and Windows 11 24H2 already require it. `MINIFB_USE_X86_64_V3` is off. On a processor without the level, `mfb_open_ex` logs an error and returns `NULL`. They do nothing on other processors.
+- `tests/scaling.c`, a test that needs no window. It compares the shared scaler with a reference calculation, in nearest-neighbor and bilinear mode, with fixed sizes, 300 random ones, and a window cache whose sizes change between calls. On native builds, `ctest` runs it as the `scaling` test.
+- [`docs/scaling_algorithms.md`](docs/scaling_algorithms.md), which explains how the shared scaler works, with figures, and how much faster it is.
 
 ### Changed
 
+- **The shared scaler is faster.** X11 without OpenGL, Wayland, Android and DOS use it for every frame, and with `MINIFB_USE_BILINEAR` also GDI and Cocoa. Compared with 0.15.0, nearest-neighbor is up to 7.7 times faster, depending on the processor and the sizes; `docs/scaling_algorithms.md` lists the gains. It computes the source columns once per size, keeps that table in the window, copies repeated rows, and splits bilinear into a horizontal and a vertical pass that reuse rows. On 64-bit x86 it uses SSE2, and AVX2 for bilinear when the processor has it; on ARM it uses NEON for bilinear. The level is chosen at run time.
+- **The nearest-neighbor image changes slightly.** It now takes the texel under the center of each window pixel, as the GPU does. Before, it took the texel under the left or top edge, and some integer factors, such as x3, repeated some texels more than others.
+- With the default `MINIFB_USE_X86_64_V2`, the library needs an x86-64-v2 processor; see Added.
 - Android: the two example projects use different application ids, `com.example.noise21` and `com.example.noise26`, so both can be installed on the same device. The mmgr log paths of both changed with their ids. `native2021` now builds with Android Gradle Plugin 7.2.0 and Gradle 7.6.6.
 
 ### Fixed
 
+- Web: Release builds of the examples and interactive tests could abort at startup with `_asyncify_start_unwind is not a function`. Their link options no longer use `EXPORT_ALL`, which causes an Asyncify export-name mismatch with optimization. The required function and runtime exports remain enabled.
 - Windows with GDI: a window smaller than its buffer showed wrong colors, because the default stretch mode of GDI combines the pixels it drops with AND. MiniFB now sets `COLORONCOLOR`, which drops them.
 - The shared scaler produced a wrong image when the buffer was 65,536 pixels wide or high or larger, because its fixed point step overflowed 32 bits.
 - Android: the `native2026` example crashed at startup on API 28 and 29. Its theme set `windowLayoutInDisplayCutoutMode` to `always`, which only exists since API 30. The theme now sets `shortEdges` on API 28 and 29, and `always` from API 30. The Java code also uses `always` from API 30 instead of API 31.
@@ -339,7 +354,8 @@ git fetch origin --tags --force
 - The project has been available on GitHub since 2014.
 - Changes before version 0.9.0 were not tracked with formal release versions.
 
-[Unreleased]: https://github.com/emoon/minifb/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/emoon/minifb/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/emoon/minifb/releases/tag/v0.16.0
 [0.15.0]: https://github.com/emoon/minifb/releases/tag/v0.15.0
 [0.14.0]: https://github.com/emoon/minifb/releases/tag/v0.14.0
 [0.13.0]: https://github.com/emoon/minifb/releases/tag/v0.13.0

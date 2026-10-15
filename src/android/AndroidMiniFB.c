@@ -143,7 +143,8 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
     else {
         uint32_t *src = window_data->draw_buffer;
         uint32_t *dst = window_buffer->bits;
-        stretch_image(
+        stretch_image_cached(
+            &window_data->stretch_cache,
             src, 0,     0,     window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
             dst, dst_x, dst_y, dst_w,                     dst_h,                      window_buffer->stride
         );
@@ -846,6 +847,10 @@ struct mfb_window *
 mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) {
     const char *window_title = (title != NULL && title[0] != '\0') ? title : "minifb";
     uint32_t buffer_stride = 0;
+
+    if (mfb_cpu_has_build_level() == false) {
+        return NULL;
+    }
 
     if (!calculate_buffer_layout(width, height, &buffer_stride, NULL)) {
         MFB_LOG(MFB_LOG_ERROR, "AndroidMiniFB: invalid window size %ux%u.", width, height);

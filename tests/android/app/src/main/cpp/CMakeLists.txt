@@ -18,8 +18,15 @@ add_library(minifb STATIC
 
     ${MINIFB_ROOT}/src/MiniFB_common.c
     ${MINIFB_ROOT}/src/MiniFB_cpp.cpp
+    ${MINIFB_ROOT}/src/MiniFB_cpu_x86.c
+    ${MINIFB_ROOT}/src/MiniFB_cpu_x86.h
     ${MINIFB_ROOT}/src/MiniFB_internal.c
     ${MINIFB_ROOT}/src/MiniFB_internal.h
+    ${MINIFB_ROOT}/src/MiniFB_stretch.c
+    ${MINIFB_ROOT}/src/MiniFB_stretch.h
+    ${MINIFB_ROOT}/src/MiniFB_stretch_internal.h
+    ${MINIFB_ROOT}/src/MiniFB_stretch_neon.c
+    ${MINIFB_ROOT}/src/MiniFB_stretch_sse2.c
     ${MINIFB_ROOT}/src/MiniFB_timer.c
     ${MINIFB_ROOT}/src/MiniFB_utf8.c
     ${MINIFB_ROOT}/src/MiniFB_utf8.h

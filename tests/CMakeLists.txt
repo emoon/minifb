@@ -90,7 +90,6 @@ if (EMSCRIPTEN)
             "-sALLOW_MEMORY_GROWTH=1"
             "-sALLOW_TABLE_GROWTH"
             "-sMALLOC=emmalloc"
-            "-sEXPORT_ALL=1"
             "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_main\"]"
             "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
             "-sASYNCIFY"

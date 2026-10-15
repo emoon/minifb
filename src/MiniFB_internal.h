@@ -2,6 +2,7 @@
 
 #include <MiniFB.h>
 #include "WindowData.h"
+#include "MiniFB_cpu_x86.h"
 #include <stddef.h>
 
 //-------------------------------------

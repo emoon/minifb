@@ -175,6 +175,10 @@ mfb_open_ex(const char *title, unsigned width, unsigned height, unsigned flags) 
         unsigned effective_flags = flags;
         const char *window_title_c = (title != NULL && title[0] != '\0') ? title : "minifb";
 
+        if (mfb_cpu_has_build_level() == false) {
+            return NULL;
+        }
+
         if (width == 0 || height == 0) {
             MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: invalid window size %ux%u.", width, height);
             return NULL;

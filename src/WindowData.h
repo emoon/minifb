@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <MiniFB_types.h>
+#include "MiniFB_stretch.h"
 
 //-------------------------------------
 #define MFB_MAX_KEYS                512
@@ -48,6 +49,7 @@ typedef struct {
     // the same layout in every translation unit, whether or not it defines MINIFB_USE_BILINEAR.
     uint32_t                *scaled_buffer;
     size_t                  scaled_buffer_size;
+    SStretchCache           stretch_cache;
 
     int32_t                 mouse_pos_x;
     int32_t                 mouse_pos_y;

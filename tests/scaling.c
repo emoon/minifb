@@ -1,39 +1,55 @@
 #include <MiniFB_internal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(MINIFB_USE_MMGR)
     #include "mmgr.h"
+#endif
+
+#if defined(MINIFB_USE_BILINEAR)
+// The center of destination pixel i in 1/256 of a source texel, rounded and clamped to the first and the last texel
+static uint32_t
+sample_position(unsigned i, unsigned size, unsigned dst_size) {
+    int64_t numerator = ((2 * (int64_t) i + 1) * size - dst_size) * 256 + dst_size;
+    int64_t divisor   = 2 * (int64_t) dst_size;
+    int64_t sample    = numerator >= 0 ? numerator / divisor : -((-numerator + divisor - 1) / divisor);
+    int64_t last      = ((int64_t) size - 1) * 256;
+    if (sample < 0) {
+        sample = 0;
+    }
+    if (sample > last) {
+        sample = last;
+    }
+    return (uint32_t) sample;
+}
 #endif
 
 static uint32_t
 expected_pixel(const uint32_t *src, unsigned width, unsigned height, unsigned pitch,
                unsigned x, unsigned y, unsigned dst_width, unsigned dst_height) {
 #if defined(MINIFB_USE_BILINEAR)
-    double sx = ((double) x + 0.5) * width / dst_width - 0.5;
-    double sy = ((double) y + 0.5) * height / dst_height - 0.5;
-    if (sx < 0) sx = 0;
-    if (sy < 0) sy = 0;
-    if (sx > width - 1) sx = width - 1;
-    if (sy > height - 1) sy = height - 1;
-    unsigned x0 = (unsigned) sx;
-    unsigned y0 = (unsigned) sy;
+    uint32_t sx = sample_position(x, width, dst_width);
+    uint32_t sy = sample_position(y, height, dst_height);
+    unsigned x0 = sx >> 8;
+    unsigned y0 = sy >> 8;
     unsigned x1 = x0 + 1 < width ? x0 + 1 : x0;
     unsigned y1 = y0 + 1 < height ? y0 + 1 : y0;
-    double fx = sx - x0;
-    double fy = sy - y0;
+    uint32_t fx = sx & 255;
+    uint32_t fy = sy & 255;
     uint32_t result = 0;
     for (unsigned shift = 0; shift < 32; shift += 8) {
-        double top = ((src[(size_t) y0 * pitch + x0] >> shift) & 255) * (1 - fx)
-                   + ((src[(size_t) y0 * pitch + x1] >> shift) & 255) * fx;
-        double bottom = ((src[(size_t) y1 * pitch + x0] >> shift) & 255) * (1 - fx)
-                      + ((src[(size_t) y1 * pitch + x1] >> shift) & 255) * fx;
-        result |= (uint32_t) (top * (1 - fy) + bottom * fy) << shift;
+        uint32_t top    = ((src[(size_t) y0 * pitch + x0] >> shift) & 255) * (256 - fx)
+                        + ((src[(size_t) y0 * pitch + x1] >> shift) & 255) * fx;
+        uint32_t bottom = ((src[(size_t) y1 * pitch + x0] >> shift) & 255) * (256 - fx)
+                        + ((src[(size_t) y1 * pitch + x1] >> shift) & 255) * fx;
+        result |= ((top * (256 - fy) + bottom * fy + 0x8000) >> 16) << shift;
     }
     return result;
 #else
-    return src[(size_t) ((uint64_t) y * height / dst_height) * pitch
-               + (uint64_t) x * width / dst_width];
+    // The texel under the center of the pixel
+    return src[(size_t) ((2 * (uint64_t) y + 1) * height / (2 * (uint64_t) dst_height)) * pitch
+               + (2 * (uint64_t) x + 1) * width / (2 * (uint64_t) dst_width)];
 #endif
 }
 
@@ -62,15 +78,7 @@ check_scale(unsigned width, unsigned height, unsigned dst_width, unsigned dst_he
                 uint32_t expected = flat == true ? 0xffffffff :
                     expected_pixel(src + src_pitch + 1, width, height, src_pitch,
                                    x - 2, y - 1, dst_width, dst_height);
-                for (unsigned shift = 0; shift < 32; shift += 8) {
-                    int difference = (int) ((actual >> shift) & 255) - (int) ((expected >> shift) & 255);
-#if defined(MINIFB_USE_BILINEAR)
-                    int tolerance = flat == true ? 0 : 2;
-#else
-                    int tolerance = 0;
-#endif
-                    if (difference < -tolerance || difference > tolerance) ++failures;
-                }
+                if (actual != expected) ++failures;
             }
             else if (actual != 0x12345678) {
                 ++failures;
@@ -82,6 +90,33 @@ check_scale(unsigned width, unsigned height, unsigned dst_width, unsigned dst_he
     }
     free(src);
     free(dst);
+    return failures;
+}
+
+// One cache through calls with different sizes must give what a call with no cache before it gives
+static int
+check_cache(void) {
+    static const unsigned sizes[][4] = {
+        { 10, 8, 30, 24 }, { 10, 8, 17, 13 }, { 7, 8, 17, 13 }, { 10, 8, 30, 24 }, { 40, 30, 9, 7 },
+    };
+    uint32_t src[40 * 30];
+    uint32_t cached[30 * 24];
+    uint32_t fresh[30 * 24];
+    for (unsigned i = 0; i < 40 * 30; ++i) src[i] = i * 0x5d3b1729u;
+
+    SStretchCache cache;
+    memset(&cache, 0, sizeof(cache));
+    int failures = 0;
+    for (unsigned i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
+        const unsigned *size = sizes[i];
+        stretch_image_cached(&cache, src, 0, 0, size[0], size[1], size[0], cached, 0, 0, size[2], size[3], size[2]);
+        stretch_image(src, 0, 0, size[0], size[1], size[0], fresh, 0, 0, size[2], size[3], size[2]);
+        if (memcmp(cached, fresh, (size_t) size[2] * size[3] * sizeof(uint32_t)) != 0) {
+            fprintf(stderr, "Cached scaling %ux%u to %ux%u differs\n", size[0], size[1], size[2], size[3]);
+            ++failures;
+        }
+    }
+    stretch_cache_free(&cache);
     return failures;
 }
 
@@ -100,6 +135,23 @@ main(void) {
     failures += check_scale(2, 2, 5, 5, true);
     failures += check_scale(65536, 1, 2, 1, false);
     failures += check_scale(1, 65536, 1, 2, false);
+    failures += check_scale(16, 9, 48, 27, false);
+    failures += check_scale(13, 7, 26, 14, false);
+    failures += check_scale(11, 5, 44, 20, false);
+    failures += check_scale(37, 23, 100, 61, false);
+    failures += check_scale(100, 61, 37, 23, false);
+
+    uint32_t seed = 12345;
+    for (unsigned i = 0; i < 300; ++i) {
+        unsigned size[4];
+        for (unsigned j = 0; j < 4; ++j) {
+            seed = seed * 1103515245u + 12345u;
+            size[j] = 1 + (seed >> 16) % 70;
+        }
+        failures += check_scale(size[0], size[1], size[2], size[3], false);
+    }
+
+    failures += check_cache();
 
     uint32_t pixel = 0x12345678;
     uint32_t result = 0xffffffff;
@@ -132,6 +184,7 @@ main(void) {
     }
     free(window_data.scaled_buffer);
     free(window_data.safe_title);
+    stretch_cache_free(&window_data.stretch_cache);
 #endif
 
     if (failures != 0) return EXIT_FAILURE;

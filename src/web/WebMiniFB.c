@@ -226,19 +226,6 @@ window_data_uses_bilinear(void) {
 }
 
 //-------------------------------------
-EM_EXPORT void *
-window_data_get_frame_buffer(SWindowData *window_data) {
-    if (window_data == NULL) {
-        return NULL;
-    }
-#if defined(MINIFB_USE_BILINEAR)
-    return mfb_get_scaled_buffer(window_data, window_data->dst_width, window_data->dst_height);
-#else
-    return window_data->draw_buffer;
-#endif
-}
-
-//-------------------------------------
 EM_EXPORT void
 window_data_set_mouse_pos(SWindowData *window_data, int x, int y) {
     if (!window_data) return;
@@ -1394,13 +1381,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     let dstOffsetY = Module._window_data_get_dst_offset_y(window_data);
     let dstWidth = Module._window_data_get_dst_width(window_data);
     let dstHeight = Module._window_data_get_dst_height(window_data);
-    if (Module._window_data_uses_bilinear()) {
-        if (dstWidth === 0 || dstHeight === 0) return MFB_STATE_OK;
-        buffer = Module._window_data_get_frame_buffer(window_data);
-        if (buffer == 0) return MFB_STATE_INTERNAL_ERROR;
-        width = dstWidth;
-        height = dstHeight;
-    }
+    if (dstWidth === 0 || dstHeight === 0) return MFB_STATE_OK;
 
     let swizzleBuffer = Module._window_data_get_swizzle_buffer(window_data, width, height);
     if (swizzleBuffer == 0) return MFB_STATE_INTERNAL_ERROR;
@@ -1410,7 +1391,7 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     let imageData = new ImageData(framePixels, width, height);
     let ctx = w.ctx;
     if (!ctx) return MFB_STATE_INTERNAL_ERROR;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = Module._window_data_uses_bilinear();
 
     // Clear when viewport does not cover the full canvas to avoid stale pixels.
     if (dstOffsetX !== 0 || dstOffsetY !== 0 || dstWidth !== canvas.width || dstHeight !== canvas.height) {
