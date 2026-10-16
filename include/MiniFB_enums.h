@@ -12,6 +12,12 @@
 
 //-------------------------------------
 typedef enum {
+    MFB_STRETCH_NEAREST = 0,
+    MFB_STRETCH_BILINEAR
+} mfb_stretch_mode;
+
+//-------------------------------------
+typedef enum {
     MFB_STATE_OK             =  0,
     MFB_STATE_EXIT           = -1,
     MFB_STATE_INVALID_WINDOW = -2,

@@ -29,6 +29,7 @@ typedef struct {
 #if defined(USE_OPENGL_API)
     GLXContext          context;
     uint32_t            text_id;
+    mfb_stretch_mode    texture_filter;
 #else
     XImage              *image;
     void                *image_buffer;

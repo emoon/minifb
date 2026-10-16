@@ -259,6 +259,7 @@ destroy_GL_context(SWindowData *window_data) {
     SWindowData_X11 *window_data_specific = (SWindowData_X11 *) window_data->specific;
     if (window_data_specific->context) {
         if (window_data_specific->display) {
+            glXMakeCurrent(window_data_specific->display, None, NULL);
             glXDestroyContext(window_data_specific->display, window_data_specific->context);
         }
         window_data_specific->context = 0;
@@ -310,17 +311,11 @@ init_GL(SWindowData *window_data) {
     glGenTextures(1, &window_data_specific->text_id);
     //glActiveTexture(TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, window_data_specific->text_id);
-#if defined(MINIFB_USE_BILINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-#else
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-#endif
+    window_data_specific->texture_filter = MFB_STRETCH_NEAREST;
 
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -436,6 +431,12 @@ redraw_GL(SWindowData *window_data, const void *pixels) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     UseCleanUp(glBindTexture(GL_TEXTURE_2D, window_data_specific->text_id));
+    if (window_data_specific->texture_filter != window_data->stretch_mode) {
+        GLint filter = window_data->stretch_mode == MFB_STRETCH_BILINEAR ? GL_LINEAR : GL_NEAREST;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+        window_data_specific->texture_filter = window_data->stretch_mode;
+    }
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, window_data->buffer_width, window_data->buffer_height, 0, format, GL_UNSIGNED_BYTE, pixels);
     //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window_data->buffer_width, window_data->buffer_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 

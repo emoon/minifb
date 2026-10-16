@@ -285,9 +285,6 @@ endif()
 
 endif()
 
-# Image scaling
-option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
-
 # Optimization and requirements
 # x86-64-v2 adds SSE3, SSSE3, SSE4.1, SSE4.2 and POPCNT to the default x86-64 level.
 # Intel processors have it since Nehalem (2008) and AMD ones since Bulldozer (2011).
@@ -478,10 +475,6 @@ target_include_directories(minifb PRIVATE src)  # include internal headers
 
 # conditional main library target configuration
 
-if (MINIFB_USE_BILINEAR)
-    target_compile_definitions(minifb PRIVATE MINIFB_USE_BILINEAR)
-endif()
-
 # The options of the compiler for x86-64-v2 and x86-64-v3, or empty when the target has no 64-bit x86 or the compiler does not take them.
 # A universal build of macOS also builds for ARM, so the options only go to its x86_64 part
 include(CheckCCompilerFlag)
@@ -551,7 +544,7 @@ endif()
 
 # The bilinear scaling has an AVX2 path. Without a library built for x86-64-v3, only its file is built for that
 # level, and it is only used when the processor has it
-if (MINIFB_USE_BILINEAR AND MINIFB_USE_X86_64_V3_FLAGS)
+if (MINIFB_USE_X86_64_V3_FLAGS)
     if (NOT MINIFB_LIBRARY_LEVEL STREQUAL "v3")
         set_source_files_properties(src/MiniFB_stretch_avx2.c PROPERTIES COMPILE_OPTIONS "${MINIFB_USE_X86_64_V3_FLAGS}")
     endif()

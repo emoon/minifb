@@ -3592,7 +3592,7 @@ compose_presentation_buffer(SWindowData *window_data,
 
         memset(shm_ptr, 0, size);
         stretch_image_cached(
-            &window_data->stretch_cache,
+            &window_data->stretch_cache, window_data->stretch_mode,
             (uint32_t *) buffer, 0,     0,     src_width, src_height, src_pitch,
             shm_ptr,             dst_x, dst_y, dst_width, dst_height, dst_pitch
         );

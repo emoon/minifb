@@ -437,6 +437,27 @@ mfb_wait_sync(struct mfb_window *window) {
 
 //-------------------------------------
 bool
+mfb_set_stretch_mode(struct mfb_window *window, mfb_stretch_mode mode) {
+    if (window == NULL || (mode != MFB_STRETCH_NEAREST && mode != MFB_STRETCH_BILINEAR)) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    SWindowData_IOS *window_data_specific = (SWindowData_IOS *) window_data->specific;
+    if (window_data_specific == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "iOSMiniFB: mfb_set_stretch_mode missing iOS-specific window data.");
+        return false;
+    }
+
+    os_unfair_lock_lock(&window_data_specific->buffer_lock);
+    window_data->stretch_mode = mode;
+    os_unfair_lock_unlock(&window_data_specific->buffer_lock);
+
+    return true;
+}
+
+//-------------------------------------
+bool
 mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y, unsigned width, unsigned height) {
     SWindowData *window_data = (SWindowData *) window;
 

@@ -144,7 +144,7 @@ draw(SWindowData *window_data, ANativeWindow_Buffer *window_buffer) {
         uint32_t *src = window_data->draw_buffer;
         uint32_t *dst = window_buffer->bits;
         stretch_image_cached(
-            &window_data->stretch_cache,
+            &window_data->stretch_cache, window_data->stretch_mode,
             src, 0,     0,     window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
             dst, dst_x, dst_y, dst_w,                     dst_h,                      window_buffer->stride
         );

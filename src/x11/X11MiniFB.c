@@ -974,7 +974,7 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
 
     if (use_scaler == true) {
         stretch_image_cached(
-            &window_data->stretch_cache,
+            &window_data->stretch_cache, window_data->stretch_mode,
             (uint32_t *) buffer,                             0, 0, window_data->buffer_width, window_data->buffer_height, window_data->buffer_width,
             (uint32_t *) window_data_specific->image_buffer, 0, 0, window_data->dst_width,    window_data->dst_height,    window_data->dst_width
         );

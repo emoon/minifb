@@ -60,6 +60,12 @@ bool                mfb_set_viewport(struct mfb_window *window, unsigned offset_
 // Let mfb calculate the best fit from your framebuffer original size (same drawable coordinate units)
 bool                mfb_set_viewport_best_fit(struct mfb_window *window, unsigned old_width, unsigned old_height);
 
+// Select the filter for future frames. New windows use nearest
+// Frames already being rendered or queued for presentation keep their filter
+// Returns false for NULL or an unknown mode, leaving the current mode unchanged
+// Call on the same thread as the other window functions
+bool                mfb_set_stretch_mode(struct mfb_window *window, mfb_stretch_mode mode);
+
 // DPI
 // [Deprecated]: Probably a better name will be mfb_get_monitor_scale
 MFB_DEPRECATED("mfb_get_moniter_dpi deprecated, use mfb_get_monitor_scale instead")

@@ -445,8 +445,11 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 #if !defined(USE_OPENGL_API)
         case WM_PAINT:
             if (window_data && window_data->draw_buffer && window_data_specific) {
-#if defined(MINIFB_USE_BILINEAR)
-                if (window_data->dst_width != 0 && window_data->dst_height != 0) {
+                if (window_data->stretch_mode == MFB_STRETCH_BILINEAR) {
+                    if (window_data->dst_width == 0 || window_data->dst_height == 0) {
+                        ValidateRect(hWnd, NULL);
+                        return 0;
+                    }
                     uint32_t *buffer = mfb_get_scaled_buffer(window_data, window_data->dst_width, window_data->dst_height);
                     if (buffer == NULL) {
                         ValidateRect(hWnd, NULL);
@@ -465,10 +468,10 @@ WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
                     StretchDIBits(window_data_specific->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->dst_width, window_data->dst_height, buffer,
                                   (BITMAPINFO *) &bitmap_info, DIB_RGB_COLORS, SRCCOPY);
                 }
-#else
-                StretchDIBits(window_data_specific->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
-                              window_data_specific->bitmap_info, DIB_RGB_COLORS, SRCCOPY);
-#endif
+                else {
+                    StretchDIBits(window_data_specific->hdc, window_data->dst_offset_x, window_data->dst_offset_y, window_data->dst_width, window_data->dst_height, 0, 0, window_data->buffer_width, window_data->buffer_height, window_data->draw_buffer,
+                                  window_data_specific->bitmap_info, DIB_RGB_COLORS, SRCCOPY);
+                }
             }
             ValidateRect(hWnd, NULL);
             break;
@@ -1081,13 +1084,9 @@ mfb_update_ex(struct mfb_window *window, void *buffer, unsigned width, unsigned 
     window_data_specific->bitmap_info->bmiHeader.biHeight = -(LONG) window_data->buffer_height;
     InvalidateRect(window_data_specific->window, NULL, TRUE);
     LRESULT paint_result = SendMessage(window_data_specific->window, WM_PAINT, 0, 0);
-#if defined(MINIFB_USE_BILINEAR)
     if (paint_result == -1) {
         return MFB_STATE_INTERNAL_ERROR;
     }
-#else
-    kUnused(paint_result);
-#endif
 
 #else
 

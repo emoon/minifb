@@ -1,12 +1,14 @@
 # How the scaling works
 
-`stretch_image` scales a 32-bit image to another size, once per frame, with one of two filters chosen when MiniFB is built: nearest (the default) or bilinear (`MINIFB_USE_BILINEAR`). This page explains how both work and the techniques that make them fast, so that the code can be read and changed without the history of how it was found.
+The shared CPU scaler resizes a 32-bit image with nearest-neighbor or bilinear filtering. Each window starts with nearest. Call `mfb_set_stretch_mode(window, MFB_STRETCH_BILINEAR)` to select bilinear at run time, or pass `MFB_STRETCH_NEAREST` to switch back. Both filters are always available.
+
+Backends use `stretch_image_cached` with a cache stored in the window. The `stretch_image` helper uses a temporary cache for one call. This page explains how both filters work and how the scaler keeps and reuses its tables.
 
 A pixel is 32 bits: blue in the low byte, then green, red and alpha (the byte order of Windows, macOS, Wayland and MiniFB). The code assumes a little-endian processor, which every MiniFB target is. Below, a **texel** is a pixel of the source image, and a **pixel** is one of the destination.
 
 ## What one call does
 
-1. Build the **column table**: for each destination column, which source column (or columns, and with which weight) it uses. It only depends on the widths, so it is kept between calls and built again only when a width changes.
+1. Reuse or build the **column table**, when the filter needs one: for each destination column, which source column (or columns, and with which weight) it uses. The table depends on the source and destination widths and the filter.
 2. Choose the **level** once for the whole call: scalar, SSE2, AVX2 or NEON, from the processor and the width of the row.
 3. Go through the destination rows from top to bottom. For each row, find which source row (or rows, and with which weight) it uses, and fill it in the cheapest way that gives the same pixels.
 
@@ -74,7 +76,9 @@ Every row uses the same source columns, so the column positions are computed onc
 - Nearest: one source index per destination column.
 - Bilinear: the two source columns and the horizontal weight of each destination column.
 
-Reading the table is cheaper than stepping an offset in every row, so being exact costs nothing per pixel. The table and the bilinear row buffers are kept in a cache that lasts between calls (in the window data). Its memory only grows, and the column table is built again only when a width changes.
+Reading the table is cheaper than stepping an offset in every row, so being exact costs nothing per pixel. The table and the memory for the bilinear row buffers are kept in the window's cache between calls. The allocation only grows when more space is needed.
+
+Changing either width or the filter invalidates the column table. Switching filters must rebuild it even at the same size: nearest stores one source index per column, while bilinear stores two indices and a weight. The allocation is kept when the filter changes, and the bilinear row buffers are filled again from the current source image on each call.
 
 If the memory cannot be allocated, `stretch_image` still draws: it computes the columns pixel by pixel instead of reading a table, which is slower but gives the same pixels, and it logs a warning once.
 
@@ -172,4 +176,4 @@ In AVX2, `pack` and `unpack` work inside each 128-bit half, so after them the pi
 
 - A fuzz test runs the code on thousands of random inputs and checks each result. Here it compares every level with the scalar code on sizes from 1 up, offsets, pitches longer than the row, integer factors, reductions and sizes of 0. The images are placed right before a protected page of memory, so that any read or write past the image stops the program. It also runs under AddressSanitizer.
 - The formulas (8-bit weights, the halves of the horizontal pass, the byte split of the vertical pass) were checked for every possible input.
-- `tests/scaling.c` compares the result with a reference in double.
+- `tests/scaling.c` checks both filters against an integer reference calculation. It also checks switching filters at the same size with one cache, source and destination offsets, padded rows and dimensions of 65,536 pixels.

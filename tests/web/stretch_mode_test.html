@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MiniFB stretch mode test</title>
+    <script src="./stretch_mode_test.js"></script>
+</head>
+<body>
+    <h1>MiniFB stretch mode test</h1>
+    <pre id="result">Running...</pre>
+    <canvas id="MiniFB stretch mode A" style="width:320px;height:240px"></canvas>
+    <canvas id="MiniFB stretch mode B" style="width:320px;height:240px;image-rendering:pixelated"></canvas>
+    <script>
+        async function run() {
+            const output = document.getElementById("result");
+            const lines = [];
+            function log(text) {
+                lines.push(text);
+                output.textContent = lines.join("\n");
+            }
+            try {
+                const module = await stretch_mode_test({print: log, printErr: log, noInitialRun: true});
+                const status = await module.ccall("main", "number", [], [], {async: true});
+                log(status === 0 ? "PASS" : "FAIL");
+            }
+            catch (error) {
+                log("FAIL: " + error);
+            }
+        }
+        run();
+    </script>
+</body>
+</html>

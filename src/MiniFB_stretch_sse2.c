@@ -7,7 +7,6 @@
 #if defined(MINIFB_STRETCH_SSE2)
 #include <emmintrin.h>
 
-#if !defined(MINIFB_USE_BILINEAR)
 //-------------------------------------
 // Nearest
 //-------------------------------------
@@ -74,7 +73,6 @@ stretch_nearest_take_sse2(uint32_t *dst_line, const uint32_t *src_line, const ui
     }
 }
 
-#else
 //-------------------------------------
 // Bilinear
 //-------------------------------------
@@ -156,6 +154,5 @@ stretch_bilinear_blend_sse2(uint32_t *dst_line, const uint16_t *top, const uint1
         blend_block(dst_line + x, top + x * 4, bottom + x * 4, fy1, fy2);
     }
 }
-#endif
 
 #endif

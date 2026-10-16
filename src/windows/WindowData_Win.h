@@ -11,6 +11,7 @@ typedef struct {
 #if defined(USE_OPENGL_API)
     HGLRC               hGLRC;
     uint32_t            text_id;
+    mfb_stretch_mode    texture_filter;
 #else
     BITMAPINFO          *bitmap_info;
 #endif

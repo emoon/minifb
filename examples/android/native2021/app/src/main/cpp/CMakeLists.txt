@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.18.1)
 project(noise)
 
-option(MINIFB_USE_BILINEAR "Use bilinear filtering when scaling pixel buffers" OFF)
-
 if (ANDROID)
     option(MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC "On Android, capture right-click/BACK and map it to ESC in MiniFB" OFF)
 endif()
@@ -56,10 +54,6 @@ target_include_directories(minifb PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../include
     ${CMAKE_CURRENT_LIST_DIR}/../../../../../../../src
 )
-
-if (MINIFB_USE_BILINEAR)
-    target_compile_definitions(minifb PRIVATE MINIFB_USE_BILINEAR)
-endif()
 
 if (ANDROID)
     if (MINIFB_ANDROID_CAPTURE_RIGHT_CLICK_AS_ESC)

@@ -24,7 +24,7 @@
 // Memory of the cache
 //-------------------------------------
 
-// The cache holds at least size bytes. Growing means the widths changed, so the column table is marked as stale
+// The cache holds at least size bytes. It grows when a width or the filter changes, so the column table is marked as stale
 //-------------------------------------
 static bool
 reserve_cache(SStretchCache *cache, size_t size) {
@@ -71,7 +71,6 @@ stretch_cache_free(SStretchCache *cache) {
     memset(cache, 0, sizeof(*cache));
 }
 
-#if !defined(MINIFB_USE_BILINEAR)
 //-------------------------------------
 // Nearest
 //-------------------------------------
@@ -263,7 +262,6 @@ stretch_nearest(SStretchCache *cache,
     }
 }
 
-#else
 //-------------------------------------
 // Bilinear
 //-------------------------------------
@@ -508,7 +506,6 @@ stretch_bilinear(SStretchCache *cache,
         dst_image += dst_pitch;
     }
 }
-#endif
 
 //-------------------------------------
 // Entry points
@@ -516,7 +513,7 @@ stretch_bilinear(SStretchCache *cache,
 
 //-------------------------------------
 void
-stretch_image_cached(SStretchCache *cache,
+stretch_image_cached(SStretchCache *cache, mfb_stretch_mode mode,
                      uint32_t *src_image, uint32_t src_x, uint32_t src_y,
                      uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
                      uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y,
@@ -532,21 +529,27 @@ stretch_image_cached(SStretchCache *cache,
     src_image += src_x + (size_t) src_y * src_pitch;
     dst_image += dst_x + (size_t) dst_y * dst_pitch;
 
-#if defined(MINIFB_USE_BILINEAR)
-    stretch_bilinear(cache, src_image, src_width, src_height, src_pitch, dst_image, dst_width, dst_height, dst_pitch);
-#else
-    stretch_nearest(cache, src_image, src_width, src_height, src_pitch, dst_image, dst_width, dst_height, dst_pitch);
-#endif
+    if (cache->mode != mode) {
+        cache->columns_valid = false;
+        cache->mode = mode;
+    }
+
+    if (mode == MFB_STRETCH_BILINEAR) {
+        stretch_bilinear(cache, src_image, src_width, src_height, src_pitch, dst_image, dst_width, dst_height, dst_pitch);
+    }
+    else {
+        stretch_nearest(cache, src_image, src_width, src_height, src_pitch, dst_image, dst_width, dst_height, dst_pitch);
+    }
 }
 
 // Without a window there is nowhere to keep the tables, so they last for one call
 //-------------------------------------
 void
-stretch_image(uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
+stretch_image(mfb_stretch_mode mode, uint32_t *src_image, uint32_t src_x, uint32_t src_y, uint32_t src_width, uint32_t src_height, uint32_t src_pitch,
               uint32_t *dst_image, uint32_t dst_x, uint32_t dst_y, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch) {
     SStretchCache cache;
     memset(&cache, 0, sizeof(cache));
-    stretch_image_cached(&cache,
+    stretch_image_cached(&cache, mode,
                          src_image, src_x, src_y, src_width, src_height, src_pitch,
                          dst_image, dst_x, dst_y, dst_width, dst_height, dst_pitch);
     stretch_cache_free(&cache);

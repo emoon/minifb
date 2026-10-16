@@ -74,7 +74,6 @@ mfb_validate_viewport(const SWindowData *window_data,
     return true;
 }
 
-#if defined(MINIFB_USE_BILINEAR)
 //-------------------------------------
 uint32_t *
 mfb_get_scaled_buffer(SWindowData *window_data, uint32_t width, uint32_t height) {
@@ -92,20 +91,19 @@ mfb_get_scaled_buffer(SWindowData *window_data, uint32_t width, uint32_t height)
     if (total_bytes > window_data->scaled_buffer_size) {
         uint32_t *buffer = (uint32_t *) realloc(window_data->scaled_buffer, total_bytes);
         if (buffer == NULL) {
-            MFB_LOG(MFB_LOG_ERROR, "Cannot allocate %zu bytes for bilinear scaling.", total_bytes);
+            MFB_LOG(MFB_LOG_ERROR, "Cannot allocate %zu bytes for scaling.", total_bytes);
             return NULL;
         }
         window_data->scaled_buffer = buffer;
         window_data->scaled_buffer_size = total_bytes;
     }
 
-    stretch_image_cached(&window_data->stretch_cache,
+    stretch_image_cached(&window_data->stretch_cache, window_data->stretch_mode,
                          window_data->draw_buffer, 0, 0,
                          window_data->buffer_width, window_data->buffer_height, window_data->buffer_stride / 4,
                          window_data->scaled_buffer, 0, 0, width, height, width);
     return window_data->scaled_buffer;
 }
-#endif
 
 //-------------------------------------
 void

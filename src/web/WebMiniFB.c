@@ -217,12 +217,8 @@ reverse_color_channels(uint8_t *src, uint8_t *dst, int width, int height) {
 
 //-------------------------------------
 EM_EXPORT bool
-window_data_uses_bilinear(void) {
-#if defined(MINIFB_USE_BILINEAR)
-    return true;
-#else
-    return false;
-#endif
+window_data_uses_bilinear(SWindowData *window_data) {
+    return window_data != NULL && window_data->stretch_mode == MFB_STRETCH_BILINEAR;
 }
 
 //-------------------------------------
@@ -552,8 +548,10 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
          canvas.style.width = width + "px";
         canvas.style.height = height + "px";
     }
-    if (!canvas.style["image-rendering"]) {
-        canvas.style["image-rendering"] = Module._window_data_uses_bilinear() ? "auto" : "pixelated";
+    let managedImageRendering = !canvas.style["image-rendering"];
+    let lastImageRendering = Module._window_data_uses_bilinear(window_data) ? "auto" : "pixelated";
+    if (managedImageRendering) {
+        canvas.style["image-rendering"] = lastImageRendering;
     }
     if (!canvas.style["user-select"]) canvas.style["user-select"] = "none";
     if (!canvas.style["touch-action"]) canvas.style["touch-action"] = "none";
@@ -589,6 +587,8 @@ EM_JS(void *, mfb_open_ex_js,(SWindowData *window_data, const char *title, unsig
         canvas: canvas,
         textInput: textInput,
         ctx: ctx,
+        managedImageRendering: managedImageRendering,
+        lastImageRendering: lastImageRendering,
         backCanvas: null,
         backCtx: null,
         window_data: window_data,
@@ -1087,6 +1087,12 @@ EM_JS(void, mfb_close_js, (uintptr_t window_id), {
     if (w.textInput && w.textInput.parentNode) {
         w.textInput.parentNode.removeChild(w.textInput);
     }
+    // A reopened window must not treat MiniFB's last filter as an application style
+    if (w.managedImageRendering &&
+        w.canvas.style["image-rendering"] === w.lastImageRendering &&
+        w.canvas.style.getPropertyPriority("image-rendering") === "") {
+        w.canvas.style.removeProperty("image-rendering");
+    }
     delete window._minifb.windows[window_id];
 });
 
@@ -1391,7 +1397,18 @@ EM_JS(mfb_update_state, mfb_update_js, (struct mfb_window * window_data, void *b
     let imageData = new ImageData(framePixels, width, height);
     let ctx = w.ctx;
     if (!ctx) return MFB_STATE_INTERNAL_ERROR;
-    ctx.imageSmoothingEnabled = Module._window_data_uses_bilinear();
+    const bilinear = Module._window_data_uses_bilinear(window_data);
+    ctx.imageSmoothingEnabled = bilinear;
+    if (w.managedImageRendering) {
+        if (canvas.style["image-rendering"] !== w.lastImageRendering ||
+            canvas.style.getPropertyPriority("image-rendering") !== "") {
+            w.managedImageRendering = false;
+        }
+        else {
+            w.lastImageRendering = bilinear ? "auto" : "pixelated";
+            canvas.style["image-rendering"] = w.lastImageRendering;
+        }
+    }
 
     // Clear when viewport does not cover the full canvas to avoid stale pixels.
     if (dstOffsetX !== 0 || dstOffsetY !== 0 || dstWidth !== canvas.width || dstHeight !== canvas.height) {

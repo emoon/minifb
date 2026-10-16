@@ -94,4 +94,6 @@ On Web there are two steps: click outside the canvas and back, and resize the br
 
 ## Software scaling
 
-`scaling_test` runs without opening a window. It checks the shared scaler against a reference calculation, including enlargement, reduction, edge samples, flat colors, source and destination offsets, padded rows and dimensions of 65,536 pixels. It also checks reuse of the bilinear scaling buffer. Build and run it once with `MINIFB_USE_BILINEAR=OFF` and once with `MINIFB_USE_BILINEAR=ON`. It is available on desktop and DOS builds; its DOS executable is `scaling.exe`. On native builds, `ctest` runs it as the `scaling` test.
+`scaling_test` runs without opening a window. It checks both filters against a reference calculation, including enlargement, reduction, edge samples, flat colors, source and destination offsets, padded rows and dimensions of 65,536 pixels. It also checks switching filters at the same size with one cache and reuse of the scaling buffer. Both filters are tested in one run. It is available on desktop and DOS builds; its DOS executable is `scaling.exe`. On native builds, `ctest` runs it as the `scaling` test.
+
+`stretch_mode_test` opens two real windows and checks the default filter, repeated settings, invalid modes and independent window settings. Run it explicitly in a graphical session; it is not registered with CTest. DOS does not support two windows, so this test is not built there. On Web, open `stretch_mode_test.html`; it also checks closing and reopening the same canvas and preserving application CSS, including `!important`.

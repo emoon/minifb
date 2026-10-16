@@ -4,7 +4,7 @@
 // when mfb_cpu_has_x64v3 says the processor and the operating system support it. Each function needs at least 8
 // pixels; the last block of a row ends where the row ends and may overlap the one before it
 
-#if defined(MINIFB_STRETCH_AVX2) && defined(MINIFB_USE_BILINEAR)
+#if defined(MINIFB_STRETCH_AVX2)
 #include <immintrin.h>
 
 // Interpolates 8 destination columns across one source row, into 32 channels of 16 bits in pixel byte order:

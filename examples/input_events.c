@@ -13,8 +13,8 @@
 #define TEST_TAG        "input_events"
 
 //-------------------------------------
-static uint32_t g_width       = 800;
-static uint32_t g_height      = 600;
+static uint32_t g_width       = 640;
+static uint32_t g_height      = 480;
 static uint32_t *g_buffer     = NULL;
 static bool     g_active      = true;
 static uint32_t g_frame_count = 0;
@@ -179,6 +179,16 @@ keyboard(struct mfb_window *window, mfb_key key, mfb_key_mod mod, bool is_presse
         if (key == MFB_KB_KEY_H) {
             MFB_LOGI(TEST_TAG, "Hide cursor");
             mfb_show_cursor(window, false);
+        }
+
+        if (key == MFB_KB_KEY_B) {
+            MFB_LOGI(TEST_TAG, "Use bilinear filtering");
+            mfb_set_stretch_mode(window, MFB_STRETCH_BILINEAR);
+        }
+
+        if (key == MFB_KB_KEY_N) {
+            MFB_LOGI(TEST_TAG, "Use nearest filtering");
+            mfb_set_stretch_mode(window, MFB_STRETCH_NEAREST);
         }
 
         if (key == MFB_KB_KEY_ESCAPE) {

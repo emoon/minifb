@@ -495,7 +495,6 @@ The sections below describe what each platform needs and which backend it uses b
 
 | Option | Default | Applies to | What it does |
 | ------ | ------- | ---------- | ------------ |
-| `MINIFB_USE_BILINEAR` | `OFF` | all | Use bilinear filtering when MiniFB scales a pixel buffer |
 | `MINIFB_USE_INVERTED_Y_ON_MACOS` | `OFF` | macOS | Keep the native macOS mouse origin at the bottom-left |
 | `MINIFB_X11_USE_IME` | `OFF` | X11 | Put an X11 input method (XIM) in front of xkbcommon for text input |
 
@@ -532,11 +531,19 @@ The CMake option `MINIFB_AVOID_CPP_HEADERS` is currently declared but does not a
 
 The old names without the `MINIFB_` prefix (`USE_OPENGL_API`, `USE_WAYLAND_API`, `USE_METAL_API`, `USE_INVERTED_Y_ON_MACOS`) still work, but they are deprecated and print a warning when CMake configures the project.
 
-Enable bilinear filtering with `-DMINIFB_USE_BILINEAR=ON`. OpenGL and Metal sample the texture with linear filtering. Web delegates scaling to Canvas and sets `imageSmoothingEnabled` from this option; the browser chooses the smoothing algorithm and whether to use hardware acceleration. The other backends scale the buffer on the CPU with a bilinear version of the shared scaler. On GDI and Cocoa, MiniFB scales the buffer to the final size before it hands it to the system, so the system does not scale it again. These two need an extra buffer, and they use more CPU time than with the option off, because MiniFB scales the whole frame on every update. The CPU cost is highest on DOS. With the option off, scaling uses nearest-neighbor.
+New windows use nearest-neighbor filtering. Select bilinear filtering for a window with:
 
-The CPU scaler samples each window pixel at its center, as a GPU does, and keeps its tables in the window, so it only builds them again when a size changes. On 64-bit x86 it uses SSE2, and AVX2 for bilinear when the processor has it; on ARM it uses NEON for bilinear. [docs/scaling_algorithms.md](docs/scaling_algorithms.md) explains how it works and how much faster it is than before.
+```c
+mfb_set_stretch_mode(window, MFB_STRETCH_BILINEAR);
+```
 
-The option only controls the scaling that MiniFB does. A Wayland compositor, the CSS of the page or the operating system can still scale the image after that. The GPU and the CPU scaler can give slightly different results, because they round coordinates differently. The standalone Android CMake projects also accept this option.
+Pass `MFB_STRETCH_NEAREST` to switch back. The change applies to future frames, without recreating the window or changing the source buffer. Frames already being rendered or queued for presentation keep their filter. Call this function on the same thread as the other window functions. It returns `false` for a null window or an unknown mode and leaves the current mode unchanged. Each window has its own mode. The former `MINIFB_USE_BILINEAR` build option has been removed; both filters are always available.
+
+OpenGL and Metal use texture filtering. Web delegates scaling to Canvas; the browser chooses the smoothing algorithm and whether to use hardware acceleration, so its smoothed pixels need not match the CPU bilinear scaler. MiniFB also updates the canvas `image-rendering` style when it manages that style. An inline style supplied or changed by the application takes precedence. Closing the window removes MiniFB's style if the application has left it unchanged, so reopening the canvas can manage it again. Other backends use the shared CPU bilinear scaler. GDI and Cocoa need an extra buffer for bilinear filtering and scale the whole frame before handing it to the system. Bilinear filtering costs more CPU time than nearest-neighbor, especially on DOS.
+
+The CPU scaler samples each window pixel at its center, as a GPU does, and keeps its tables in the window, so it only builds them again when a width or the filter changes. On 64-bit x86 it uses SSE2, and AVX2 for bilinear when the processor has it; on ARM it uses NEON for bilinear. [docs/scaling_algorithms.md](docs/scaling_algorithms.md) explains how it works and how much faster it is than before.
+
+The stretch mode controls the scaling that MiniFB does. A Wayland compositor, the CSS of the page or the operating system can still scale the image after that. The GPU and the CPU scaler can give slightly different results, because they round coordinates differently.
 
 ### Windows
 

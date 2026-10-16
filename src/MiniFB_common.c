@@ -22,6 +22,21 @@
 short int g_keycodes[MFB_MAX_KEYS] = { 0 };
 //-------------------------------------
 
+// iOS and macOS with Metal define it in their backend, to take the lock that their render loop uses
+//-------------------------------------
+#if !(defined(TARGET_OS_IOS) && TARGET_OS_IOS) && !(defined(__APPLE__) && defined(USE_METAL_API))
+bool
+mfb_set_stretch_mode(struct mfb_window *window, mfb_stretch_mode mode) {
+    if (window == NULL || (mode != MFB_STRETCH_NEAREST && mode != MFB_STRETCH_BILINEAR)) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    window_data->stretch_mode = mode;
+    return true;
+}
+#endif
+
 //-------------------------------------
 struct mfb_window *
 mfb_open(const char *title, unsigned width, unsigned height) {
@@ -229,9 +244,7 @@ mfb_free_window_data(SWindowData *window_data, size_t specific_size) {
 
     mfb_timer_destroy(window_data->timer);
     free(window_data->safe_title);
-#if defined(MINIFB_USE_BILINEAR)
     free(window_data->scaled_buffer);
-#endif
     stretch_cache_free(&window_data->stretch_cache);
 
     if (window_data->specific != NULL) {

@@ -21,6 +21,8 @@ enum { MaxBuffersInFlight = 3 };
     dispatch_semaphore_t        semaphore;    // Used for syncing with CPU/GPU
     id<MTLCommandQueue>         command_queue;
 
+    id<MTLSamplerState>         nearest_sampler;
+    id<MTLSamplerState>         bilinear_sampler;
     id<MTLRenderPipelineState>  pipeline_state;
     id<MTLTexture>              texture_buffers[MaxBuffersInFlight];
 

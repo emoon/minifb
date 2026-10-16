@@ -3,7 +3,7 @@
 // The bilinear passes on 4 pixels at a time, for ARM. Each function needs at least 4 pixels; the last block of a row
 // ends where the row ends and may overlap the one before it
 
-#if defined(MINIFB_STRETCH_NEON) && defined(MINIFB_USE_BILINEAR)
+#if defined(MINIFB_STRETCH_NEON)
 #include <arm_neon.h>
 
 // Interpolates 4 destination columns across one source row, into 16 channels of 16 bits in pixel byte order:

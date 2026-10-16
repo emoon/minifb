@@ -757,6 +757,29 @@ mfb_set_viewport(struct mfb_window *window, unsigned offset_x, unsigned offset_y
 }
 
 //-------------------------------------
+#if defined(USE_METAL_API)
+bool
+mfb_set_stretch_mode(struct mfb_window *window, mfb_stretch_mode mode) {
+    if (window == NULL || (mode != MFB_STRETCH_NEAREST && mode != MFB_STRETCH_BILINEAR)) {
+        return false;
+    }
+
+    SWindowData *window_data = (SWindowData *) window;
+    SWindowData_OSX *window_data_specific = (SWindowData_OSX *) window_data->specific;
+    if (window_data_specific == NULL) {
+        MFB_LOG(MFB_LOG_ERROR, "MacMiniFB: mfb_set_stretch_mode missing macOS-specific window data.");
+        return false;
+    }
+
+    @synchronized(window_data_specific->viewController) {
+        window_data->stretch_mode = mode;
+    }
+
+    return true;
+}
+#endif
+
+//-------------------------------------
 void
 mfb_set_title(struct mfb_window *window, const char *title) {
     if (window == 0x0 || title == 0x0) {

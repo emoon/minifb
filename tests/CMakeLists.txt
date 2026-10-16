@@ -12,15 +12,21 @@ if (NOT EMSCRIPTEN)
     add_executable(scaling_test scaling.c)
     target_link_libraries(scaling_test PRIVATE minifb)
     target_include_directories(scaling_test PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    if (MINIFB_USE_BILINEAR)
-        target_compile_definitions(scaling_test PRIVATE MINIFB_USE_BILINEAR)
-    endif()
     minifb_configure_target(scaling_test)
     minifb_set_dos_name(scaling_test scaling)
     set_property(TARGET scaling_test PROPERTY FOLDER "Tests")
     if (NOT CMAKE_CROSSCOMPILING OR CMAKE_CROSSCOMPILING_EMULATOR)
         add_test(NAME scaling COMMAND scaling_test)
     endif()
+endif()
+
+# This test needs two windows, which DOS does not support
+if (NOT DJGPP)
+    add_executable(stretch_mode_test stretch_mode.c)
+    target_link_libraries(stretch_mode_test PRIVATE minifb)
+    target_include_directories(stretch_mode_test PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    minifb_configure_target(stretch_mode_test)
+    set_property(TARGET stretch_mode_test PROPERTY FOLDER "Tests")
 endif()
 
 add_executable(mouse_events_test
@@ -81,7 +87,9 @@ if (NOT EMSCRIPTEN)
 endif()
 
 if (EMSCRIPTEN)
-    foreach(test_target IN LISTS minifb_interactive_tests)
+    target_link_options(stretch_mode_test PRIVATE "-sINCOMING_MODULE_JS_API=print,printErr,noInitialRun")
+    set(minifb_web_tests ${minifb_interactive_tests} stretch_mode_test)
+    foreach(test_target IN LISTS minifb_web_tests)
         target_link_options(${test_target} PRIVATE
             "-sEXPORT_NAME=${test_target}"
             "-sSTRICT=1"

@@ -19,7 +19,6 @@ android {
             cmake {
                 // ./gradlew assembleDebug -PminifbUseMmgr=ON
                 arguments += "-DMINIFB_USE_MMGR=${project.findProperty("minifbUseMmgr") ?: "OFF"}"
-                //arguments += "-DMINIFB_USE_BILINEAR=ON"
             }
         }
     }

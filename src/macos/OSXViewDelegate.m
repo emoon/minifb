@@ -23,11 +23,6 @@ set_target_fps_aux() {
 //-------------------------------------
 #define kShaderString(src)  #src
 #define kShader(inc, src)   @inc kShaderString(src)
-#if defined(MINIFB_USE_BILINEAR)
-    #define kTextureFilter linear
-#else
-    #define kTextureFilter nearest
-#endif
 
 NSString *g_shader_src = kShader(
     "#include <metal_stdlib>\n",
@@ -59,8 +54,8 @@ NSString *g_shader_src = kShader(
 
     //-------------
     fragment float4
-    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
-        constexpr sampler textureSampler(mag_filter::kTextureFilter, min_filter::kTextureFilter);
+    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]],
+             sampler textureSampler [[ sampler(0) ]]) {
 
         // Sample the texture to obtain a color
         const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);
@@ -213,6 +208,25 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
     };
     memcpy(window_data_specific->metal.vertices, s_vertices, sizeof(s_vertices));
 
+    MTLSamplerDescriptor *sampler_descriptor = [[MTLSamplerDescriptor alloc] init];
+    sampler_descriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+    sampler_descriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+    sampler_descriptor.minFilter = MTLSamplerMinMagFilterNearest;
+    sampler_descriptor.magFilter = MTLSamplerMinMagFilterNearest;
+    nearest_sampler = [metal_device newSamplerStateWithDescriptor:sampler_descriptor];
+    sampler_descriptor.minFilter = MTLSamplerMinMagFilterLinear;
+    sampler_descriptor.magFilter = MTLSamplerMinMagFilterLinear;
+    bilinear_sampler = [metal_device newSamplerStateWithDescriptor:sampler_descriptor];
+
+#if !__has_feature(objc_arc)
+    [sampler_descriptor release];
+#endif
+
+    if (nearest_sampler == nil || bilinear_sampler == nil) {
+        MFB_LOG(MFB_LOG_ERROR, "Cannot create Metal scaling samplers.");
+        return false;
+    }
+
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                             width:window_data->buffer_width
@@ -276,6 +290,11 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
     if (window_data == NULL || window_data_specific == NULL ||
         window_data->draw_buffer == NULL || window_data->buffer_width == 0 || window_data->buffer_height == 0) {
         return;
+    }
+
+    mfb_stretch_mode stretch_mode;
+    @synchronized(self) {
+        stretch_mode = window_data->stretch_mode;
     }
 
     if (g_target_fps_changed) {
@@ -343,6 +362,7 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
         [renderEncoder setVertexBytes:window_data_specific->metal.vertices length:sizeof(window_data_specific->metal.vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
+        [renderEncoder setFragmentSamplerState:(stretch_mode == MFB_STRETCH_BILINEAR ? bilinear_sampler : nearest_sampler) atIndex:0];
 
         // Draw the vertices of our quads
         [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -388,6 +408,11 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
         MFB_OBJC_RELEASE(texture_buffers[i]);
         texture_buffers[i] = nil;
     }
+
+    MFB_OBJC_RELEASE(nearest_sampler);
+    nearest_sampler = nil;
+    MFB_OBJC_RELEASE(bilinear_sampler);
+    bilinear_sampler = nil;
 
     MFB_OBJC_RELEASE(pipeline_state);
     pipeline_state = nil;

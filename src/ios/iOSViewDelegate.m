@@ -23,11 +23,6 @@
 //-------------------------------------
 #define kShaderString(src)  #src
 #define kShader(inc, src)   @inc kShaderString(src)
-#if defined(MINIFB_USE_BILINEAR)
-    #define kTextureFilter linear
-#else
-    #define kTextureFilter nearest
-#endif
 
 //-------------------------------------
 enum { MaxBuffersInFlight = 3 };    // Number of textures in flight (tripple buffered)
@@ -63,8 +58,8 @@ NSString *g_shader_src = kShader(
 
     //-------------
     fragment float4
-    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]]) {
-        constexpr sampler textureSampler(mag_filter::kTextureFilter, min_filter::kTextureFilter);
+    fragFunc(VertexOutput input [[stage_in]], texture2d<half> colorTexture [[ texture(0) ]],
+             sampler textureSampler [[ sampler(0) ]]) {
 
         // Sample the texture to obtain a color
         const half4 colorSample = colorTexture.sample(textureSampler, input.texcoord);
@@ -165,6 +160,8 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
     dispatch_semaphore_t        semaphore;
     id<MTLCommandQueue>         command_queue;
 
+    id<MTLSamplerState>         nearest_sampler;
+    id<MTLSamplerState>         bilinear_sampler;
     id<MTLRenderPipelineState>  pipeline_state;
     id<MTLTexture>              texture_buffers[MaxBuffersInFlight];
 
@@ -307,6 +304,25 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
 
     build_viewport_vertices(window_data, window_data_specific->vertices);
 
+    MTLSamplerDescriptor *sampler_descriptor = [[MTLSamplerDescriptor alloc] init];
+    sampler_descriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+    sampler_descriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+    sampler_descriptor.minFilter = MTLSamplerMinMagFilterNearest;
+    sampler_descriptor.magFilter = MTLSamplerMinMagFilterNearest;
+    nearest_sampler = [metal_device newSamplerStateWithDescriptor:sampler_descriptor];
+    sampler_descriptor.minFilter = MTLSamplerMinMagFilterLinear;
+    sampler_descriptor.magFilter = MTLSamplerMinMagFilterLinear;
+    bilinear_sampler = [metal_device newSamplerStateWithDescriptor:sampler_descriptor];
+
+#if !__has_feature(objc_arc)
+    [sampler_descriptor release];
+#endif
+
+    if (nearest_sampler == nil || bilinear_sampler == nil) {
+        MFB_LOG(MFB_LOG_ERROR, "Cannot create Metal scaling samplers.");
+        return false;
+    }
+
     MTLTextureDescriptor    *td;
     td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                                             width:window_data->buffer_width
@@ -412,6 +428,7 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
     // Copy the bytes from our data object into the current texture slot.
     // Lock to prevent mfb_update_ex from freeing/replacing draw_buffer mid-copy.
     os_unfair_lock_lock(&window_data_specific->buffer_lock);
+    mfb_stretch_mode stretch_mode = window_data->stretch_mode;
     if (window_data->draw_buffer != NULL) {
         MTLRegion region = { { 0, 0, 0 }, { window_data->buffer_width, window_data->buffer_height, 1 } };
         [texture_buffers[current_buffer] replaceRegion:region mipmapLevel:0 withBytes:window_data->draw_buffer bytesPerRow:window_data->buffer_stride];
@@ -440,6 +457,7 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
         [renderEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
 
         [renderEncoder setFragmentTexture:texture_buffers[current_buffer] atIndex:0];
+        [renderEncoder setFragmentSamplerState:(stretch_mode == MFB_STRETCH_BILINEAR ? bilinear_sampler : nearest_sampler) atIndex:0];
 
         // Draw the vertices of our quads
         [renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
@@ -470,6 +488,11 @@ wait_for_frames_in_flight(dispatch_semaphore_t semaphore) {
         [texture_buffers[i] release];
         texture_buffers[i] = nil;
     }
+
+    [nearest_sampler release];
+    nearest_sampler = nil;
+    [bilinear_sampler release];
+    bilinear_sampler = nil;
 
     [pipeline_state release];
     pipeline_state = nil;
